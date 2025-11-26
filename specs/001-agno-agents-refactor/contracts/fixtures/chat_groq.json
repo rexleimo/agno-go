@@ -1,0 +1,23 @@
+{
+  "fixtureId": "chat-groq-baseline",
+  "provider": "groq",
+  "type": "chat",
+  "input": {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Respond ONLY with: BASELINE-GROQ"
+      }
+    ],
+    "modelId": "llama-3.3-70b-versatile"
+  },
+  "expected": {
+    "contains": "BASELINE-GROQ"
+  },
+  "tolerance": {
+    "tokenTolerance": 2,
+    "embeddingCosine": 0.98
+  },
+  "sourceCommit": "go-generated",
+  "notes": "Generated 2025-11-26T09:52:19Z via live provider call"
+}

@@ -1,0 +1,5 @@
+{
+  "fixtureId": "basics/rag",
+  "provider": "stub",
+  "type": "chat"
+}

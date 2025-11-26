@@ -1,10 +1,14 @@
 server:
   host: 0.0.0.0
   port: 8080
-  # transport: http (SSE/chunked streaming per specs/001-go-agno-rewrite/contracts/openapi.yaml)
+  # transport: http (SSE/chunked streaming per specs/001-agno-agents-refactor/contracts/openapi.yaml)
 
 logging:
   level: info
+
+auth:
+  apiKey: ${AGNO_API_KEY}
+  header: X-API-Key
 
 providers:
   # Each provider is toggled based on env keys; missing keys should mark provider as not-configured.

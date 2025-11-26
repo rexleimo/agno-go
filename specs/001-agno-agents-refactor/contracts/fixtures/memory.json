@@ -1,0 +1,5 @@
+{
+  "fixtureId": "basics/memory",
+  "provider": "stub",
+  "type": "chat"
+}

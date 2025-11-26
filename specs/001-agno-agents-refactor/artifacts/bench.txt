@@ -1,0 +1,1 @@
+bench basics samples=31058 p95=93.5235ms peak_alloc=1601929016 bytes

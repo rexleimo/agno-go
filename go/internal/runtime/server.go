@@ -29,6 +29,10 @@ type serverOptions struct {
 	middlewares        []func(http.Handler) http.Handler
 	messageMiddlewares []func(http.Handler) http.Handler
 	logger             *log.Logger
+	timeout            time.Duration
+	apiKey             string
+	apiKeyHeader       string
+	enableRecovery     bool
 }
 
 // ServerOption configures runtime server behavior.
@@ -55,6 +59,25 @@ func WithLogger(l *log.Logger) ServerOption {
 	}
 }
 
+// WithTimeout configures a request-level timeout middleware.
+func WithTimeout(d time.Duration) ServerOption {
+	return func(o *serverOptions) {
+		if d > 0 {
+			o.timeout = d
+		}
+	}
+}
+
+// WithAPIKeyAuth enforces API Key header authentication when a non-empty key is provided.
+func WithAPIKeyAuth(key, header string) ServerOption {
+	return func(o *serverOptions) {
+		o.apiKey = key
+		if header != "" {
+			o.apiKeyHeader = header
+		}
+	}
+}
+
 // WithConcurrencyLimiter is a convenience option to attach a limiter to message routes.
 func WithConcurrencyLimiter(l *rtmiddleware.ConcurrencyLimiter) ServerOption {
 	if l == nil {
@@ -65,10 +88,11 @@ func WithConcurrencyLimiter(l *rtmiddleware.ConcurrencyLimiter) ServerOption {
 
 func defaultServerOptions() serverOptions {
 	return serverOptions{
-		middlewares: []func(http.Handler) http.Handler{
-			rtmiddleware.RequestID(),
-		},
-		logger: log.New(os.Stdout, "runtime: ", log.LstdFlags),
+		middlewares:    nil,
+		logger:         log.New(os.Stdout, "runtime: ", log.LstdFlags),
+		timeout:        60 * time.Second,
+		apiKeyHeader:   "X-API-Key",
+		enableRecovery: true,
 	}
 }
 
@@ -82,7 +106,20 @@ func NewServer(providerStatuses func() []model.ProviderStatus, version string, s
 	if providerStatuses == nil {
 		providerStatuses = func() []model.ProviderStatus { return nil }
 	}
+	if config.logger == nil {
+		config.logger = log.New(os.Stdout, "runtime: ", log.LstdFlags)
+	}
 	r := chi.NewRouter()
+	if config.enableRecovery {
+		r.Use(rtmiddleware.Recoverer(config.logger))
+	}
+	r.Use(rtmiddleware.RequestID())
+	if config.timeout > 0 {
+		r.Use(rtmiddleware.Timeout(config.timeout))
+	}
+	if config.apiKey != "" {
+		r.Use(rtmiddleware.APIKeyAuth(config.apiKey, config.apiKeyHeader, config.logger))
+	}
 	for _, mw := range config.middlewares {
 		if mw != nil {
 			r.Use(mw)
@@ -310,6 +347,9 @@ func statusForError(err error) int {
 	}
 	if errors.Is(err, context.Canceled) {
 		return http.StatusRequestTimeout
+	}
+	if errors.Is(err, model.ErrMissingCredentials) {
+		return http.StatusServiceUnavailable
 	}
 	if errors.Is(err, model.ErrProviderUnavailable) {
 		return http.StatusServiceUnavailable

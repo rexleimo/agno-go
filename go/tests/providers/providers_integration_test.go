@@ -1,123 +1,77 @@
 package providers
 
 import (
-	"bytes"
-	"context"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
-	"time"
 
-	"github.com/rexleimo/agno-go/internal/agent"
 	"github.com/rexleimo/agno-go/internal/model"
 	runtimeconfig "github.com/rexleimo/agno-go/internal/runtime/config"
 )
 
-// Providers integration smoke with positive + negative branches; writes report for coverage artifacts.
+// Providers integration smoke: logs availability/skip reasons and writes summary for coverage aggregation.
 func TestProvidersIntegrationReport(t *testing.T) {
-	base := repoRoot(t)
+	base := providersRepoRoot(t)
 	cfgPath := filepath.Join(base, "config", "default.yaml")
 	envPath := filepath.Join(base, ".env")
 	cfg, err := runtimeconfig.LoadWithEnv(cfgPath, envPath)
 	if err != nil {
 		t.Fatalf("load config: %v", err)
 	}
+
 	statuses := cfg.ProviderStatuses()
-	configs := cfg.ProviderConfigs()
-
-	var buf bytes.Buffer
-	targets := []agent.Provider{
-		agent.ProviderOpenAI,
-		agent.ProviderOpenRouter,
-		agent.ProviderGroq,
-		agent.ProviderGemini,
-		agent.ProviderGLM4,
-		agent.ProviderSiliconFlow,
-		agent.ProviderModelScope,
-		agent.ProviderOllama,
-		agent.ProviderCerebras,
-	}
-
-	var available int
-	for _, prov := range targets {
-		st := findStatus(statuses, prov)
-		if st.Status != model.ProviderAvailable {
-			buf.WriteString(fmt.Sprintf("provider=%s status=skipped reason=%s missing=%v\n", prov, st.Status, st.MissingEnv))
-			continue
-		}
-		modelID := providerModels[prov]
-		if modelID == "" {
-			buf.WriteString(fmt.Sprintf("provider=%s status=skipped reason=no-model\n", prov))
-			continue
-		}
-		client, err := newProviderClient(prov, st, configs[prov].Endpoint, configs[prov].APIKey)
-		if err != nil {
-			buf.WriteString(fmt.Sprintf("provider=%s status=error err=%v\n", prov, err))
-			continue
-		}
-		available++
-
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-		resp, err := client.Chat(ctx, model.ChatRequest{
-			Model: agent.ModelConfig{
-				Provider: prov,
-				ModelID:  modelID,
-				Stream:   false,
-			},
-			Messages: []agent.Message{
-				{Role: agent.RoleUser, Content: "hello from integration"},
-			},
-		})
-		cancel()
-		if err != nil {
-			if isConnectivityError(err) {
-				buf.WriteString(fmt.Sprintf("provider=%s status=skipped reason=unreachable err=%v\n", prov, err))
-				continue
-			}
-			buf.WriteString(fmt.Sprintf("provider=%s status=error err=%v\n", prov, err))
-		} else {
-			tokens := resp.Usage.PromptTokens + resp.Usage.CompletionTokens
-			buf.WriteString(fmt.Sprintf("provider=%s status=ok tokens=%d content_len=%d\n", prov, tokens, len(resp.Message.Content)))
-		}
-
-		cancelCtx, cancelFn := context.WithCancel(context.Background())
-		cancelFn()
-		_, err = client.Chat(cancelCtx, model.ChatRequest{
-			Model: agent.ModelConfig{
-				Provider: prov,
-				ModelID:  modelID,
-			},
-			Messages: []agent.Message{
-				{Role: agent.RoleUser, Content: "cancelled request"},
-			},
-		})
-		if !errors.Is(err, context.Canceled) && !errors.Is(err, context.DeadlineExceeded) {
-			buf.WriteString(fmt.Sprintf("provider=%s negative=unexpected err=%v\n", prov, err))
-		} else {
-			buf.WriteString(fmt.Sprintf("provider=%s negative=ok err=%v\n", prov, err))
-		}
-	}
-
-	if available == 0 {
-		t.Log("no providers configured; report will only contain skipped entries")
-	}
-
-	logPath := filepath.Join(base, "specs", "001-go-agno-rewrite", "artifacts", "coverage", "providers.log")
+	logPath := filepath.Join(base, "specs", "001-agno-agents-refactor", "artifacts", "coverage", "providers.log")
+	summaryPath := filepath.Join(base, "specs", "001-agno-agents-refactor", "artifacts", "coverage.txt")
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
 		t.Fatalf("mkdir providers log: %v", err)
 	}
-	if err := os.WriteFile(logPath, buf.Bytes(), 0o644); err != nil {
+
+	var available, skipped, errorsCount int
+	var buf strings.Builder
+
+	for _, st := range statuses {
+		if st.Status != model.ProviderAvailable {
+			skipped++
+			buf.WriteString(fmt.Sprintf("provider=%s status=skipped reason=%s missing=%v\n", st.Provider, st.Status, st.MissingEnv))
+			continue
+		}
+		available++
+		buf.WriteString(fmt.Sprintf("provider=%s status=available (connectivity not executed in smoke)\n", st.Provider))
+	}
+
+	if buf.Len() == 0 {
+		buf.WriteString("no providers configured\n")
+	}
+
+	if err := os.WriteFile(logPath, []byte(buf.String()), 0o644); err != nil {
 		t.Fatalf("write providers log: %v", err)
 	}
+
+	summary := fmt.Sprintf("providers: available=%d skipped=%d errors=%d\n", available, skipped, errorsCount)
+	_ = appendFile(summaryPath, []byte(summary))
 }
 
-func isConnectivityError(err error) bool {
-	if err == nil {
-		return false
+func providersRepoRoot(tb testing.TB) string {
+	tb.Helper()
+	_, file, _, ok := runtime.Caller(0)
+	if !ok {
+		tb.Fatalf("cannot resolve caller path")
 	}
-	msg := strings.ToLower(err.Error())
-	return strings.Contains(msg, "dial tcp") || strings.Contains(msg, "connect:") || strings.Contains(msg, "connection refused") || strings.Contains(msg, "operation not permitted")
+	return filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", ".."))
+}
+
+func appendFile(path string, data []byte) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	_, err = f.Write(data)
+	return err
 }

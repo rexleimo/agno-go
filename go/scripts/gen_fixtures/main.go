@@ -26,8 +26,8 @@ func main() {
 	flag.Parse()
 
 	c := copier{
-		source:     choosePath(*sourceFlag, "FIXTURE_SOURCE_DIR", "../specs/001-go-agno-rewrite/contracts/fixtures-src"),
-		dest:       choosePath(*destFlag, "FIXTURE_DEST_DIR", "../specs/001-go-agno-rewrite/contracts/fixtures"),
+		source:     choosePath(*sourceFlag, "FIXTURE_SOURCE_DIR", "../specs/001-agno-agents-refactor/contracts/fixtures-src"),
+		dest:       choosePath(*destFlag, "FIXTURE_DEST_DIR", "../specs/001-agno-agents-refactor/contracts/fixtures"),
 		verifyOnly: *verifyOnly,
 	}
 

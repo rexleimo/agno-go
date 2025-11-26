@@ -201,7 +201,7 @@ func assertEmbeddingFixture(t *testing.T, client model.EmbeddingProvider, provid
 
 func loadProviderFixtures(t *testing.T) []providerFixture {
 	t.Helper()
-	dir := filepath.Join("..", "..", "..", "specs", "001-go-agno-rewrite", "contracts", "fixtures")
+	dir := filepath.Join("..", "..", "..", "specs", "001-agno-agents-refactor", "contracts", "fixtures")
 	entries, err := os.ReadDir(dir)
 	if os.IsNotExist(err) {
 		return nil

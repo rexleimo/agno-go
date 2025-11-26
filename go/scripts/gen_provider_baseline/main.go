@@ -53,42 +53,43 @@ type providerFixture struct {
 
 var (
 	chatModels = map[agent.Provider]string{
-		agent.ProviderOpenAI:      "gpt-4.1-mini",
-		agent.ProviderGemini:      "gemini-2.5-flash",
-		agent.ProviderGLM4:        "GLM-4-Flash-250414",
-		agent.ProviderOpenRouter:  "tngtech/deepseek-r1t2-chimera:free",
+		agent.ProviderOpenAI:      "gpt-4o-mini",
+		agent.ProviderGemini:      "gemini-1.5-flash",
+		agent.ProviderGLM4:        "glm-4",
+		agent.ProviderOpenRouter:  "openrouter/auto",
 		agent.ProviderSiliconFlow: "Qwen/Qwen2.5-7B-Instruct",
 		agent.ProviderCerebras:    "llama3.1-8b",
 		agent.ProviderModelScope:  "qwen2-7b-instruct",
 		agent.ProviderGroq:        "llama-3.3-70b-versatile",
-		agent.ProviderOllama:      "qwen3:4b",
+		agent.ProviderOllama:      "llama3",
 	}
 	embedModels = map[agent.Provider]string{
 		agent.ProviderOpenAI:      "text-embedding-3-small",
-		agent.ProviderGemini:      "text-embedding-004",
-		agent.ProviderOpenRouter:  "text-embedding-3-small",
-		agent.ProviderGroq:        "",            // TODO: Groq 官方未提供 embedding 模型，保持占位并跳过
-		agent.ProviderGLM4:        "embedding-2", // TODO: 需付费/配额，当前账户 429，无免费额度
-		agent.ProviderSiliconFlow: "BAAI/bge-large-zh-v1.5",
-		agent.ProviderCerebras:    "llama3.1-8b",           // TODO: 401/404 鉴权失败，待有效 key 后生成
-		agent.ProviderModelScope:  "BAAI/bge-base-en-v1.5", // TODO: 远端 EOF，不确定免费额度
-		agent.ProviderOllama:      "nomic-embed-text",      // TODO: 本地 /api/embeddings 空返回，需适配或换 openai 兼容路径
+		agent.ProviderGemini:      "textembedding-gecko",
+		agent.ProviderOpenRouter:  "openai/text-embedding-3-small",
+		agent.ProviderGroq:        "", // groq embeddings not available
+		agent.ProviderGLM4:        "glm-4-embedding",
+		agent.ProviderSiliconFlow: "bge-large-en-v1.5",
+		agent.ProviderCerebras:    "mistral-embed",
+		agent.ProviderModelScope:  "bge-base-en-v1.5",
+		agent.ProviderOllama:      "all-minilm",
 	}
 )
 
 func main() {
 	cfgPath := flag.String("config", filepath.FromSlash("../config/default.yaml"), "path to config YAML")
 	envPath := flag.String("env", filepath.FromSlash("../.env"), "path to .env file")
-	destDir := flag.String("dest", filepath.FromSlash("../specs/001-go-agno-rewrite/contracts/fixtures"), "destination fixtures directory")
+	destDir := flag.String("dest", filepath.FromSlash("../specs/001-agno-agents-refactor/contracts/fixtures"), "destination fixtures directory")
+	deviations := flag.String("deviations", filepath.FromSlash("../specs/001-agno-agents-refactor/contracts/deviations.md"), "path to deviations log")
 	flag.Parse()
 
 	cfg, err := runtimeconfig.LoadWithEnv(*cfgPath, *envPath)
 	if err != nil {
-		log.Fatalf("load config: %v", err)
+		failWithDeviation(*deviations, "load config: %v", err)
 	}
 
 	if err := os.MkdirAll(*destDir, 0o755); err != nil {
-		log.Fatalf("mkdir dest: %v", err)
+		failWithDeviation(*deviations, "mkdir dest: %v", err)
 	}
 
 	statuses := cfg.ProviderStatuses()
@@ -96,6 +97,7 @@ func main() {
 
 	now := time.Now().UTC().Format(time.RFC3339)
 	var generated int
+	var hadErr bool
 
 	for _, st := range statuses {
 		if st.Status != model.ProviderAvailable {
@@ -107,14 +109,16 @@ func main() {
 		chatClient, embedClient := buildClients(prov, st, cfgEntry)
 		if chatClient != nil {
 			if err := writeChatFixture(*destDir, prov, chatClient, now); err != nil {
-				log.Printf("chat %s: %v", prov, err)
+				appendDeviation(*deviations, fmt.Sprintf("chat %s: %v", prov, err))
+				hadErr = true
 			} else {
 				generated++
 			}
 		}
 		if embedClient != nil {
 			if err := writeEmbedFixture(*destDir, prov, embedClient, now); err != nil {
-				log.Printf("embed %s: %v", prov, err)
+				appendDeviation(*deviations, fmt.Sprintf("embed %s: %v", prov, err))
+				hadErr = true
 			} else {
 				generated++
 			}
@@ -122,6 +126,32 @@ func main() {
 	}
 
 	log.Printf("fixtures generated/updated: %d -> %s", generated, *destDir)
+	if hadErr {
+		failWithDeviation(*deviations, "provider baseline generation completed with errors; see deviations at %s", time.Now().UTC().Format(time.RFC3339))
+	}
+}
+
+func appendDeviation(path, msg string) {
+	if path == "" {
+		return
+	}
+	_ = os.MkdirAll(filepath.Dir(path), 0o755)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		log.Printf("warn: unable to write deviation to %s: %v", path, err)
+		return
+	}
+	defer func() { _ = f.Close() }()
+	ts := time.Now().UTC().Format(time.RFC3339)
+	if _, err := fmt.Fprintf(f, "- [fixtures] %s: %s\n", ts, msg); err != nil {
+		log.Printf("warn: unable to append deviation: %v", err)
+	}
+}
+
+func failWithDeviation(path, format string, args ...interface{}) {
+	msg := fmt.Sprintf(format, args...)
+	appendDeviation(path, msg)
+	log.Fatalf("%s", msg)
 }
 
 func buildClients(p agent.Provider, st model.ProviderStatus, cfg runtimeconfig.ProviderConfig) (model.ChatProvider, model.EmbeddingProvider) {
@@ -146,9 +176,9 @@ func buildClients(p agent.Provider, st model.ProviderStatus, cfg runtimeconfig.P
 	case agent.ProviderModelScope:
 		return modelscope.New(st, cfg.Endpoint, cfg.APIKey), modelscope.NewEmbed(st, cfg.Endpoint, cfg.APIKey)
 	case agent.ProviderGroq:
-		return groq.New(st, cfg.Endpoint, cfg.APIKey), groq.NewEmbed(st, cfg.Endpoint, cfg.APIKey)
+		return groq.New(st, cfg.Endpoint, cfg.APIKey), nil
 	case agent.ProviderOllama:
-		return ollama.New(st, cfg.Endpoint, cfg.APIKey), ollama.NewEmbed(st, cfg.Endpoint, cfg.APIKey)
+		return ollama.New(st, cfg.Endpoint, cfg.APIKey), nil
 	default:
 		return nil, nil
 	}
@@ -235,12 +265,23 @@ func writeFixtureFile(path string, fx providerFixture) error {
 }
 
 func chosenModel(p agent.Provider, embedding bool) string {
-	envKey := fmt.Sprintf("%s_MODEL", strings.ToUpper(string(p)))
+	prefix := strings.ToUpper(string(p))
+	var candidates []string
 	if embedding {
-		envKey = fmt.Sprintf("%s_EMBED_MODEL", strings.ToUpper(string(p)))
+		candidates = []string{
+			fmt.Sprintf("%s_EMBED_MODEL", prefix),
+			fmt.Sprintf("%s_MODEL", prefix),
+		}
+	} else {
+		candidates = []string{
+			fmt.Sprintf("%s_CHAT_MODEL", prefix),
+			fmt.Sprintf("%s_MODEL", prefix),
+		}
 	}
-	if val := strings.TrimSpace(os.Getenv(envKey)); val != "" {
-		return val
+	for _, key := range candidates {
+		if val := strings.TrimSpace(os.Getenv(key)); val != "" {
+			return val
+		}
 	}
 	if embedding {
 		return embedModels[p]

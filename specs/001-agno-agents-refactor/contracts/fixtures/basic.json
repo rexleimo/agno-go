@@ -1,0 +1,5 @@
+{
+  "fixtureId": "basics/basic",
+  "provider": "stub",
+  "type": "chat"
+}

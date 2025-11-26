@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.1'
+
+      - name: Set up Node (for VitePress docs)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache Go build
+        uses: actions/cache@v4
+        with:
+          path: .cache/go-build
+          key: go-build-${{ runner.os }}-${{ hashFiles('go/go.sum') }}
+
+      - name: Install tooling (golangci-lint, benchstat)
+        run: |
+          go install github.com/golangci/golangci-lint/cmd/golangci-lint@v1.64.8
+          go install golang.org/x/perf/cmd/benchstat@latest
+
+      - name: Constitution check
+        env:
+          GOCACHE: ${{ github.workspace }}/.cache/go-build
+        run: make constitution-check
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: agno-go-artifacts
+          path: |
+            specs/001-agno-agents-refactor/artifacts/**
+            specs/001-agno-agents-refactor/contracts/fixtures/**
+            specs/001-agno-agents-refactor/contracts/deviations.md
+          if-no-files-found: warn

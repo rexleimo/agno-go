@@ -28,11 +28,14 @@ var (
 type Service struct {
 	store  agent.Store
 	router *model.Router
+	engine *Engine
 
 	mu         sync.RWMutex
 	agents     map[uuid.UUID]agent.Agent
 	agentNames map[string]uuid.UUID
 	sessions   map[uuid.UUID]map[uuid.UUID]*agent.Session
+
+	guardrails GuardrailConfig
 }
 
 // NewService constructs a Service with the provided store and router.
@@ -40,9 +43,11 @@ func NewService(store agent.Store, router *model.Router) *Service {
 	return &Service{
 		store:      store,
 		router:     router,
+		engine:     &Engine{Router: router, Store: store},
 		agents:     make(map[uuid.UUID]agent.Agent),
 		agentNames: make(map[string]uuid.UUID),
 		sessions:   make(map[uuid.UUID]map[uuid.UUID]*agent.Session),
+		guardrails: GuardrailConfig{EnablePII: true, EnableInjection: true},
 	}
 }
 
@@ -185,31 +190,19 @@ func (s *Service) PostMessage(ctx context.Context, agentID, sessionID uuid.UUID,
 	}
 
 	chatMessages := append(history, req.Messages...)
-	resp, err := s.router.Chat(ctx, model.ChatRequest{
-		Model:    s.agentModel(agentID),
-		Messages: chatMessages,
-		Tools:    req.Tools,
-		Metadata: req.Metadata,
-	})
+	respMsg, usage, err := s.engine.Execute(ctx, agentID, sessionID, s.agentModel(agentID), chatMessages)
 	if err != nil {
 		session.State = agent.SessionErrored
 		session.LastActivityAt = time.Now().UTC()
 		return nil, err
 	}
 
-	resp.Message.ID = uuid.New()
-	resp.Message.AgentID = agentID
-	resp.Message.SessionID = sessionID
-	resp.Message.CreatedAt = time.Now().UTC()
-	if err := s.store.AppendMessage(ctx, agentID, sessionID, resp.Message); err != nil {
-		return nil, err
-	}
 	session.State = agent.SessionCompleted
 	session.LastActivityAt = time.Now().UTC()
-	session.History = append(chatMessages, resp.Message)
+	session.History = append(chatMessages, *respMsg)
 	return &MessageResponse{
-		Message: resp.Message,
-		Usage:   resp.Usage,
+		Message: *respMsg,
+		Usage:   usage,
 	}, nil
 }
 
@@ -487,4 +480,10 @@ func setEnabled(list []string, v string, enabled bool) []string {
 		filtered = append(filtered, v)
 	}
 	return filtered
+}
+
+// GuardrailConfig toggles PII/Prompt injection checks at runtime.
+type GuardrailConfig struct {
+	EnablePII       bool
+	EnableInjection bool
 }

@@ -108,6 +108,7 @@ var (
 	ErrProviderNotRegistered = errors.New("provider not registered")
 	ErrCapabilityUnsupported = errors.New("capability unsupported")
 	ErrProviderUnavailable   = errors.New("provider not available")
+	ErrMissingCredentials    = errors.New("provider missing credentials")
 )
 
 // NewRouter constructs an empty provider router.
@@ -176,7 +177,7 @@ func (r *Router) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 	}
 	status := p.Status()
 	if status.Status != ProviderAvailable {
-		return nil, fmt.Errorf("%w: %s", ErrProviderUnavailable, status.Status)
+		return nil, providerError(status)
 	}
 	if req.Stream {
 		return nil, errors.New("stream requested without stream handler")
@@ -198,7 +199,7 @@ func (r *Router) Stream(ctx context.Context, req ChatRequest, fn StreamHandler) 
 	}
 	status := p.Status()
 	if status.Status != ProviderAvailable {
-		return fmt.Errorf("%w: %s", ErrProviderUnavailable, status.Status)
+		return providerError(status)
 	}
 	return r.execute(ctx, func(callCtx context.Context) error {
 		return p.Stream(callCtx, req, fn)
@@ -213,7 +214,7 @@ func (r *Router) Embed(ctx context.Context, req EmbeddingRequest) (*EmbeddingRes
 	}
 	status := p.Status()
 	if status.Status != ProviderAvailable {
-		return nil, fmt.Errorf("%w: %s", ErrProviderUnavailable, status.Status)
+		return nil, providerError(status)
 	}
 	var resp *EmbeddingResponse
 	err := r.execute(ctx, func(callCtx context.Context) error {
@@ -300,4 +301,15 @@ func (r *Router) acquire(ctx context.Context) (func(), error) {
 
 func (r *Router) retryable(err error) bool {
 	return errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled)
+}
+
+func providerError(status ProviderStatus) error {
+	if status.Status == ProviderNotConfigured {
+		return fmt.Errorf("%w: not-configured missing=%v", ErrMissingCredentials, status.MissingEnv)
+	}
+	reason := status.Reason
+	if reason == "" {
+		reason = string(status.Status)
+	}
+	return fmt.Errorf("%w: %s", ErrProviderUnavailable, reason)
 }

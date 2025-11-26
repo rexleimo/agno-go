@@ -1,0 +1,64 @@
+providers: available=1 skipped=8 errors=0
+providers: available=1 skipped=8 errors=0
+basics_scenario=rag_fallback status=ok
+basics_scenario=tool_hitl_guarded status=ok
+basics_scenario=agent_basic status=ok
+basics_scenario=memory_session status=ok
+basics_scenario=agent_basic status=ok
+basics_scenario=memory_session status=ok
+basics_scenario=rag_fallback status=ok
+basics_scenario=tool_hitl_guarded status=ok
+basics_scenario=agent_basic status=ok
+basics_scenario=memory_session status=ok
+basics_scenario=rag_fallback status=ok
+basics_scenario=tool_hitl_guarded status=ok
+basics_scenario=memory_session status=ok
+basics_scenario=rag_fallback status=ok
+basics_scenario=tool_hitl_guarded status=ok
+basics_scenario=agent_basic status=ok
+auth_scheme=missing status=blocked
+auth_scheme=basic status=blocked
+auth_scheme=bearer status=blocked
+auth_scheme=custom status=blocked
+auth_scheme=valid status=allowed
+providers: available=1 skipped=8 errors=0
+auth_scheme=missing status=blocked
+auth_scheme=basic status=blocked
+auth_scheme=bearer status=blocked
+auth_scheme=custom status=blocked
+auth_scheme=valid status=allowed
+contracts: total=5 ok=5 failed=0
+basics_scenario=memory_session status=ok
+basics_scenario=rag_fallback status=ok
+basics_scenario=tool_hitl_guarded status=ok
+basics_scenario=agent_basic status=ok
+auth_scheme=missing status=blocked
+auth_scheme=basic status=blocked
+auth_scheme=bearer status=blocked
+auth_scheme=custom status=blocked
+auth_scheme=valid status=allowed
+contracts: total=5 ok=5 failed=0
+basics_scenario=agent_basic status=ok
+basics_scenario=memory_session status=ok
+basics_scenario=rag_fallback status=ok
+basics_scenario=tool_hitl_guarded status=ok
+auth_scheme=missing status=blocked
+auth_scheme=basic status=blocked
+auth_scheme=bearer status=blocked
+auth_scheme=custom status=blocked
+auth_scheme=valid status=allowed
+contracts: total=5 ok=5 failed=0
+basics_scenario=agent_basic status=ok
+basics_scenario=memory_session status=ok
+basics_scenario=rag_fallback status=ok
+basics_scenario=tool_hitl_guarded status=ok
+auth_scheme=missing status=blocked
+auth_scheme=basic status=blocked
+auth_scheme=bearer status=blocked
+auth_scheme=custom status=blocked
+auth_scheme=valid status=allowed
+contracts: total=5 ok=5 failed=0
+basics_scenario=rag_fallback status=ok
+basics_scenario=tool_hitl_guarded status=ok
+basics_scenario=agent_basic status=ok
+basics_scenario=memory_session status=ok

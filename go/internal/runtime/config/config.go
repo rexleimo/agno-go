@@ -18,6 +18,7 @@ import (
 type Config struct {
 	Server    ServerConfig       `yaml:"server"`
 	Logging   LoggingConfig      `yaml:"logging"`
+	Auth      AuthConfig         `yaml:"auth"`
 	Providers ProvidersConfig    `yaml:"providers"`
 	Memory    agent.MemoryConfig `yaml:"memory"`
 	Bench     BenchConfig        `yaml:"bench"`
@@ -31,6 +32,11 @@ type ServerConfig struct {
 
 type LoggingConfig struct {
 	Level string `yaml:"level"`
+}
+
+type AuthConfig struct {
+	APIKey string `yaml:"apiKey"`
+	Header string `yaml:"header"`
 }
 
 type BenchConfig struct {
@@ -60,6 +66,7 @@ type ProviderConfig struct {
 	APIKey     string             `yaml:"-"`
 	Status     model.Availability `yaml:"-"`
 	MissingEnv []string           `yaml:"-"`
+	Reason     string             `yaml:"-"`
 }
 
 type ProvidersConfig struct {
@@ -96,6 +103,7 @@ func LoadWithEnv(configPath, envPath string) (*Config, error) {
 		return nil, fmt.Errorf("parse config: %w", err)
 	}
 
+	cfg.applyAuthDefaults()
 	cfg.applyProviderEnv()
 	cfg.applyRuntimeEnv()
 	return &cfg, nil
@@ -111,6 +119,7 @@ func (c *Config) ProviderStatuses() []model.ProviderStatus {
 			Status:       cfg.Status,
 			Capabilities: providerCapabilities(provider),
 			MissingEnv:   cfg.MissingEnv,
+			Reason:       cfg.Reason,
 		})
 	}
 	return statuses
@@ -141,8 +150,10 @@ func (c *Config) applyProviderEnv() {
 		cfg.MissingEnv = missing
 		if len(missing) > 0 {
 			cfg.Status = model.ProviderNotConfigured
+			cfg.Reason = fmt.Sprintf("missing env: %s", strings.Join(missing, ","))
 		} else {
 			cfg.Status = model.ProviderAvailable
+			cfg.Reason = ""
 		}
 	}
 }
@@ -177,6 +188,17 @@ func getEnv(keys []string) []string {
 		values = append(values, os.Getenv(k))
 	}
 	return values
+}
+
+func (c *Config) applyAuthDefaults() {
+	c.Auth.APIKey = strings.TrimSpace(firstNonEmpty([]string{c.Auth.APIKey, os.Getenv("AGNO_API_KEY")}))
+	c.Auth.Header = strings.TrimSpace(c.Auth.Header)
+	if c.Auth.Header == "" {
+		c.Auth.Header = "X-API-Key"
+	}
+	if c.Auth.APIKey == "" {
+		c.Auth.APIKey = "dev-local-key"
+	}
 }
 
 func firstNonEmpty(values []string) string {

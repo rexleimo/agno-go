@@ -13,17 +13,19 @@ import (
 )
 
 func TestBenchstatReport(t *testing.T) {
-	output := firstNonEmpty(os.Getenv("BENCH_OUTPUT"), filepath.Join("..", "..", "..", "specs", "001-go-agno-rewrite", "artifacts", "bench", "bench.txt"))
-	baselineDefault := filepath.Join("..", "..", "..", "specs", "001-go-agno-rewrite", "artifacts", "bench", "python_baseline.txt")
+	output := firstNonEmpty(os.Getenv("BENCH_OUTPUT"), filepath.Join("..", "..", "..", "specs", "001-agno-agents-refactor", "artifacts", "bench.txt"))
+	baselineDefault := filepath.Join("..", "..", "..", "specs", "001-agno-agents-refactor", "artifacts", "baseline", "python-bench.json")
 	if _, err := os.Stat(output); err != nil {
 		t.Skipf("bench output not found, run make bench to generate: %v", err)
 	}
 	baseline := firstNonEmpty(os.Getenv("BENCH_BASELINE"), baselineDefault)
 	paths := []string{output}
 	if baseline != "" {
-		if _, err := os.Stat(baseline); err == nil {
+		if filepath.Ext(baseline) == ".json" {
+			t.Logf("baseline is JSON; benchstat compare skipped: %s", baseline)
+		} else if info, err := os.Stat(baseline); err == nil && info.Size() > 0 {
 			paths = append([]string{baseline}, paths...)
-		} else if !errorsIsNotExist(err) {
+		} else if err != nil && !errorsIsNotExist(err) {
 			t.Fatalf("stat baseline: %v", err)
 		}
 	}
@@ -44,7 +46,7 @@ func TestBenchstatReport(t *testing.T) {
 	var buf bytes.Buffer
 	benchstat.FormatText(&buf, tables)
 
-	dest := filepath.Join("..", "..", "..", "specs", "001-go-agno-rewrite", "artifacts", "bench", "benchstat.txt")
+	dest := filepath.Join("..", "..", "..", "specs", "001-agno-agents-refactor", "artifacts", "benchstat.txt")
 	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
 		t.Fatalf("mkdir bench dir: %v", err)
 	}
@@ -53,7 +55,10 @@ func TestBenchstatReport(t *testing.T) {
 	}
 
 	report := buildReport(output, baseline, buf.String())
-	reportPath := filepath.Join("..", "..", "..", "specs", "001-go-agno-rewrite", "artifacts", "bench", "report.md")
+	reportPath := filepath.Join("..", "..", "..", "specs", "001-agno-agents-refactor", "artifacts", "bench", "report.md")
+	if err := os.MkdirAll(filepath.Dir(reportPath), 0o755); err != nil {
+		t.Fatalf("mkdir bench report dir: %v", err)
+	}
 	if err := os.WriteFile(reportPath, []byte(report), 0o644); err != nil {
 		t.Fatalf("write bench report: %v", err)
 	}

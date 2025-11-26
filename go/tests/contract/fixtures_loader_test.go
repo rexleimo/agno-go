@@ -61,7 +61,7 @@ func fixtureDir() string {
 	if env := os.Getenv("FIXTURE_DEST_DIR"); env != "" {
 		return env
 	}
-	return filepath.Join("..", "..", "..", "specs", "001-go-agno-rewrite", "contracts", "fixtures")
+	return filepath.Join("..", "..", "..", "specs", "001-agno-agents-refactor", "contracts", "fixtures")
 }
 
 func collectFixtureFiles(dir string) ([]string, error) {

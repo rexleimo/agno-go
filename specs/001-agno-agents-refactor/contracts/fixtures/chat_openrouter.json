@@ -1,0 +1,23 @@
+{
+  "fixtureId": "chat-openrouter-baseline",
+  "provider": "openrouter",
+  "type": "chat",
+  "input": {
+    "messages": [
+      {
+        "role": "user",
+        "content": "Respond ONLY with: BASELINE-OPENROUTER"
+      }
+    ],
+    "modelId": "openrouter/auto"
+  },
+  "expected": {
+    "contains": "BASELINE-OPENROUTER"
+  },
+  "tolerance": {
+    "tokenTolerance": 2,
+    "embeddingCosine": 0.98
+  },
+  "sourceCommit": "go-generated",
+  "notes": "Generated 2025-11-26T09:52:19Z via live provider call"
+}

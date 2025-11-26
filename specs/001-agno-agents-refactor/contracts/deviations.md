@@ -1,0 +1,47 @@
+# Deviations - 001-agno-agents-refactor
+
+- [placeholder] 2025-11-26: Initialized empty artifacts (coverage.txt, bench.txt, coverage/providers.log) and baseline placeholder at `artifacts/baseline/python-bench.json`; real benchmark data pending.
+- [placeholder] 2025-11-27: Added stub-only Basics fixtures (basic/memory/rag/tool/workflow) for CLI回放；内容为形状占位，未含真实模型响应/多模态/PII/Prompt 拦截/流式事件，待供应商接通后替换并记录差异。
+- [fixtures] 2025-11-26T09:37:14Z: chat glm4: glm4 error: 429 Too Many Requests (余额不足或无可用资源包,请充值。)
+- [fixtures] 2025-11-26T09:37:15Z: embed glm4: glm4 error: 400 Bad Request (模型不存在，请检查模型代码。)
+- [fixtures] 2025-11-26T09:37:18Z: embed openrouter: openrouter error: 400 Bad Request (Model openrouter/embedding does not exist)
+- [fixtures] 2025-11-26T09:37:18Z: chat groq: groq error: 400 Bad Request (The model `llama3-8b-8192` has been decommissioned and is no longer supported. Please refer to https://console.groq.com/docs/deprecations for a recommendation on which model to use instead.)
+- [fixtures] 2025-11-26T09:37:18Z: embed groq: groq error: 404 Not Found (The model `text-embedding-3-large` does not exist or you do not have access to it.)
+- [fixtures] 2025-11-26T09:37:18Z: chat ollama: Post "http://localhost:11434/v1/chat": dial tcp [::1]:11434: connect: connection refused
+- [fixtures] 2025-11-26T09:37:18Z: embed ollama: Post "http://localhost:11434/v1/embeddings": dial tcp [::1]:11434: connect: connection refused
+- [fixtures] 2025-11-26T09:37:18Z: chat gemini: gemini error: 404 Not Found (models/gemini-1.5-pro is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.)
+- [fixtures] 2025-11-26T09:37:19Z: embed gemini: gemini error: 404 Not Found (models/textembedding-gecko is not found for API version v1beta, or is not supported for embedContent. Call ListModels to see the list of available models and their supported methods.)
+- [fixtures] 2025-11-26T09:37:19Z: chat siliconflow: siliconflow error: 400 Bad Request ({"choices":null,"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}})
+- [fixtures] 2025-11-26T09:37:19Z: embed siliconflow: siliconflow error: 400 Bad Request ({"data":null,"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}})
+- [fixtures] 2025-11-26T09:37:19Z: chat cerebras: cerebras error: 401 Unauthorized ({"choices":null,"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}})
+- [fixtures] 2025-11-26T09:37:19Z: embed cerebras: cerebras error: 404 Not Found ({"data":null,"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}})
+- [fixtures] 2025-11-26T09:37:20Z: chat modelscope: Post "https://api.modelscope.cn/v1/chat/completions": EOF
+- [fixtures] 2025-11-26T09:37:20Z: embed modelscope: Post "https://api.modelscope.cn/v1/embeddings": EOF
+- [fixtures] 2025-11-26T09:37:20Z: provider baseline generation completed with errors; see deviations at 2025-11-26T09:37:20Z
+- [fixtures] 2025-11-26T09:40:28Z: chat modelscope: Post "https://api.modelscope.cn/v1/chat/completions": EOF
+- [fixtures] 2025-11-26T09:40:28Z: embed modelscope: Post "https://api.modelscope.cn/v1/embeddings": EOF
+- [fixtures] 2025-11-26T09:40:28Z: chat ollama: Post "http://localhost:11434/v1/chat": dial tcp [::1]:11434: connect: connection refused
+- [fixtures] 2025-11-26T09:40:28Z: embed ollama: Post "http://localhost:11434/v1/embeddings": dial tcp [::1]:11434: connect: connection refused
+- [fixtures] 2025-11-26T09:40:29Z: chat glm4: glm4 error: 429 Too Many Requests (余额不足或无可用资源包,请充值。)
+- [fixtures] 2025-11-26T09:40:29Z: embed glm4: glm4 error: 400 Bad Request (模型不存在，请检查模型代码。)
+- [fixtures] 2025-11-26T09:40:29Z: embed siliconflow: siliconflow error: 400 Bad Request ({"data":null,"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}})
+- [fixtures] 2025-11-26T09:40:30Z: chat cerebras: cerebras error: 401 Unauthorized ({"choices":null,"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}})
+- [fixtures] 2025-11-26T09:40:30Z: embed cerebras: cerebras error: 404 Not Found ({"data":null,"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}})
+- [fixtures] 2025-11-26T09:40:30Z: chat gemini: gemini error: 404 Not Found (models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.)
+- [fixtures] 2025-11-26T09:40:30Z: embed gemini: gemini error: 404 Not Found (models/textembedding-gecko is not found for API version v1beta, or is not supported for embedContent. Call ListModels to see the list of available models and their supported methods.)
+- [fixtures] 2025-11-26T09:40:34Z: provider baseline generation completed with errors; see deviations at 2025-11-26T09:40:34Z
+- [fixtures] 2025-11-26T09:47:46Z: chat ollama: ollama error: 404 Not Found ({"choices":null,"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}})
+- [fixtures] 2025-11-26T09:47:49Z: provider baseline generation completed with errors; see deviations at 2025-11-26T09:47:49Z
+- [fixtures] 2025-11-26T09:48:16Z: chat ollama: ollama empty response
+- [fixtures] 2025-11-26T09:48:20Z: provider baseline generation completed with errors; see deviations at 2025-11-26T09:48:20Z
+- [fixtures] 2025-11-26T09:52:19Z: chat gemini: gemini error: 404 Not Found (models/gemini-1.5-flash is not found for API version v1beta, or is not supported for generateContent. Call ListModels to see the list of available models and their supported methods.)
+- [fixtures] 2025-11-26T09:52:19Z: embed gemini: gemini error: 404 Not Found (models/textembedding-gecko is not found for API version v1beta, or is not supported for embedContent. Call ListModels to see the list of available models and their supported methods.)
+- [fixtures] 2025-11-26T09:52:20Z: chat glm4: glm4 error: 429 Too Many Requests (余额不足或无可用资源包,请充值。)
+- [fixtures] 2025-11-26T09:52:20Z: embed glm4: glm4 error: 400 Bad Request (模型不存在，请检查模型代码。)
+- [fixtures] 2025-11-26T09:52:25Z: embed siliconflow: siliconflow error: 400 Bad Request ({"data":null,"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}})
+- [fixtures] 2025-11-26T09:52:25Z: chat cerebras: cerebras error: 401 Unauthorized ({"choices":null,"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}})
+- [fixtures] 2025-11-26T09:52:25Z: embed cerebras: cerebras error: 404 Not Found ({"data":null,"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}})
+- [fixtures] 2025-11-26T09:52:25Z: chat modelscope: Post "https://api.modelscope.cn/v1/chat/completions": EOF
+- [fixtures] 2025-11-26T09:52:25Z: embed modelscope: Post "https://api.modelscope.cn/v1/embeddings": EOF
+- [fixtures] 2025-11-26T09:52:25Z: chat ollama: ollama error: 404 Not Found ({"choices":null,"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}})
+- [fixtures] 2025-11-26T09:52:25Z: provider baseline generation completed with errors; see deviations at 2025-11-26T09:52:25Z
