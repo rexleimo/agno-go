@@ -14,15 +14,7 @@ import (
 	"github.com/rexleimo/agno-go/internal/agent"
 	"github.com/rexleimo/agno-go/internal/model"
 	runtimeconfig "github.com/rexleimo/agno-go/internal/runtime/config"
-	"github.com/rexleimo/agno-go/pkg/providers/cerebras"
-	"github.com/rexleimo/agno-go/pkg/providers/gemini"
-	"github.com/rexleimo/agno-go/pkg/providers/glm4"
-	"github.com/rexleimo/agno-go/pkg/providers/groq"
-	"github.com/rexleimo/agno-go/pkg/providers/modelscope"
-	"github.com/rexleimo/agno-go/pkg/providers/ollama"
-	"github.com/rexleimo/agno-go/pkg/providers/openai"
-	"github.com/rexleimo/agno-go/pkg/providers/openrouter"
-	"github.com/rexleimo/agno-go/pkg/providers/siliconflow"
+	"github.com/rexleimo/agno-go/internal/runtime/providers"
 )
 
 // providerFixture mirrors the contract fixture shape we consume in tests.
@@ -155,33 +147,11 @@ func failWithDeviation(path, format string, args ...interface{}) {
 }
 
 func buildClients(p agent.Provider, st model.ProviderStatus, cfg runtimeconfig.ProviderConfig) (model.ChatProvider, model.EmbeddingProvider) {
-	switch p {
-	case agent.ProviderOpenAI:
-		return openai.New(cfg.Endpoint, cfg.APIKey, st.MissingEnv), openai.New(cfg.Endpoint, cfg.APIKey, st.MissingEnv)
-	case agent.ProviderGemini:
-		c := gemini.New(cfg.Endpoint, cfg.APIKey, st.MissingEnv)
-		return c, c
-	case agent.ProviderGLM4:
-		return glm4.New(st, cfg.Endpoint, cfg.APIKey), glm4.NewEmbed(st, cfg.Endpoint, cfg.APIKey)
-	case agent.ProviderOpenRouter:
-		headers := map[string]string{
-			"HTTP-Referer": "https://local.agno",
-			"X-Title":      "Go-Agno",
-		}
-		return openrouter.New(st, cfg.Endpoint, cfg.APIKey, headers), openrouter.NewEmbed(st, cfg.Endpoint, cfg.APIKey, headers)
-	case agent.ProviderSiliconFlow:
-		return siliconflow.New(st, cfg.Endpoint, cfg.APIKey), siliconflow.NewEmbed(st, cfg.Endpoint, cfg.APIKey)
-	case agent.ProviderCerebras:
-		return cerebras.New(st, cfg.Endpoint, cfg.APIKey), cerebras.NewEmbed(st, cfg.Endpoint, cfg.APIKey)
-	case agent.ProviderModelScope:
-		return modelscope.New(st, cfg.Endpoint, cfg.APIKey), modelscope.NewEmbed(st, cfg.Endpoint, cfg.APIKey)
-	case agent.ProviderGroq:
-		return groq.New(st, cfg.Endpoint, cfg.APIKey), nil
-	case agent.ProviderOllama:
-		return ollama.New(st, cfg.Endpoint, cfg.APIKey), nil
-	default:
+	clients, err := providers.Build(p, st, cfg)
+	if err != nil {
 		return nil, nil
 	}
+	return clients.Chat, clients.Embed
 }
 
 func writeChatFixture(dest string, p agent.Provider, client model.ChatProvider, now string) error {

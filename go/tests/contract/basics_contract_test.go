@@ -87,9 +87,20 @@ func TestBasicsScenariosWithStub(t *testing.T) {
 	}
 
 	for name, fn := range scenarios {
+		name := name
+		fn := fn
 		t.Run(name, func(t *testing.T) {
+			status := "ok"
+			t.Cleanup(func() {
+				switch {
+				case t.Skipped():
+					status = "skipped"
+				case t.Failed():
+					status = "failed"
+				}
+				_ = appendFile(coverageLog, []byte(fmt.Sprintf("basics_scenario=%s status=%s\n", name, status)))
+			})
 			fn(t)
-			_ = appendFile(coverageLog, []byte(fmt.Sprintf("basics_scenario=%s status=ok\n", name)))
 		})
 	}
 }

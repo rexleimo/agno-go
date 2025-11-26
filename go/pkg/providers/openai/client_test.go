@@ -16,7 +16,7 @@ type rtFunc func(*http.Request) (*http.Response, error)
 func (f rtFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func TestClientChatSuccess(t *testing.T) {
-	client := New("http://noop", "key", nil)
+	client := New(availableStatus(agent.ProviderOpenAI), "http://noop", "key")
 	client.http = &http.Client{
 		Transport: rtFunc(func(req *http.Request) (*http.Response, error) {
 			body := `{"choices":[{"message":{"content":"ok"}}],"usage":{"prompt_tokens":2,"completion_tokens":3}}`
@@ -43,7 +43,7 @@ func TestClientChatSuccess(t *testing.T) {
 }
 
 func TestClientStreamParsesTokens(t *testing.T) {
-	client := New("http://noop", "key", nil)
+	client := New(availableStatus(agent.ProviderOpenAI), "http://noop", "key")
 	client.http = &http.Client{
 		Transport: rtFunc(func(req *http.Request) (*http.Response, error) {
 			body := "" +
@@ -76,7 +76,7 @@ func TestClientStreamParsesTokens(t *testing.T) {
 }
 
 func TestClientEmbedSuccess(t *testing.T) {
-	client := New("http://noop", "key", nil)
+	client := New(availableStatus(agent.ProviderOpenAI), "http://noop", "key")
 	client.http = &http.Client{
 		Transport: rtFunc(func(req *http.Request) (*http.Response, error) {
 			body := `{"data":[{"embedding":[0.1,0.2]}]}`
@@ -100,7 +100,7 @@ func TestClientEmbedSuccess(t *testing.T) {
 }
 
 func TestClientErrorMappingUnauthorized(t *testing.T) {
-	client := New("http://noop", "key", nil)
+	client := New(availableStatus(agent.ProviderOpenAI), "http://noop", "key")
 	client.http = &http.Client{
 		Transport: rtFunc(func(req *http.Request) (*http.Response, error) {
 			return &http.Response{
@@ -117,4 +117,10 @@ func TestClientErrorMappingUnauthorized(t *testing.T) {
 	if err == nil || !strings.Contains(err.Error(), "unauthorized") {
 		t.Fatalf("expected unauthorized error, got %v", err)
 	}
+}
+
+func availableStatus(provider agent.Provider) model.ProviderStatus {
+	st := model.DefaultProviderStatus(provider)
+	st.Status = model.ProviderAvailable
+	return st
 }

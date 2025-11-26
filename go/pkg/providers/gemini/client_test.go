@@ -16,7 +16,7 @@ type rtFunc func(*http.Request) (*http.Response, error)
 func (f rtFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
 
 func TestChatSuccess(t *testing.T) {
-	client := New("", "key", nil)
+	client := New(availableStatus(agent.ProviderGemini), "", "key")
 	client.http = &http.Client{Transport: rtFunc(func(req *http.Request) (*http.Response, error) {
 		body := `{"candidates":[{"content":{"parts":[{"text":"ok"}]}}]}`
 		return &http.Response{
@@ -39,7 +39,7 @@ func TestChatSuccess(t *testing.T) {
 }
 
 func TestStreamParsesTokens(t *testing.T) {
-	client := New("", "key", nil)
+	client := New(availableStatus(agent.ProviderGemini), "", "key")
 	client.http = &http.Client{Transport: rtFunc(func(req *http.Request) (*http.Response, error) {
 		body := "" +
 			"data: {\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"hi\"}]}}]}\n\n" +
@@ -71,7 +71,7 @@ func TestStreamParsesTokens(t *testing.T) {
 }
 
 func TestEmbedSuccess(t *testing.T) {
-	client := New("", "key", nil)
+	client := New(availableStatus(agent.ProviderGemini), "", "key")
 	client.http = &http.Client{Transport: rtFunc(func(req *http.Request) (*http.Response, error) {
 		body := `{"embedding":{"values":[0.1,0.2]}}`
 		return &http.Response{
@@ -94,7 +94,7 @@ func TestEmbedSuccess(t *testing.T) {
 }
 
 func TestErrorMapping(t *testing.T) {
-	client := New("", "key", nil)
+	client := New(availableStatus(agent.ProviderGemini), "", "key")
 	client.http = &http.Client{Transport: rtFunc(func(req *http.Request) (*http.Response, error) {
 		return &http.Response{
 			StatusCode: http.StatusInternalServerError,
@@ -107,4 +107,10 @@ func TestErrorMapping(t *testing.T) {
 	}); err == nil {
 		t.Fatalf("expected error")
 	}
+}
+
+func availableStatus(provider agent.Provider) model.ProviderStatus {
+	st := model.DefaultProviderStatus(provider)
+	st.Status = model.ProviderAvailable
+	return st
 }

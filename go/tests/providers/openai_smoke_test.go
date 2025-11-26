@@ -21,6 +21,8 @@ func TestOpenAIStreamingAndErrorBranches(t *testing.T) {
 	if apiKey == "" {
 		t.Skip("OPENAI_API_KEY not set; skipping")
 	}
+	status := model.DefaultProviderStatus(agent.ProviderOpenAI)
+	status.Status = model.ProviderAvailable
 
 	streamSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -43,7 +45,7 @@ func TestOpenAIStreamingAndErrorBranches(t *testing.T) {
 	}))
 	defer streamSrv.Close()
 
-	client := openai.New(streamSrv.URL, apiKey, nil)
+	client := openai.New(status, streamSrv.URL, apiKey)
 	req := model.ChatRequest{
 		Model: agent.ModelConfig{
 			Provider: agent.ProviderOpenAI,
@@ -83,7 +85,7 @@ func TestOpenAIStreamingAndErrorBranches(t *testing.T) {
 	}))
 	defer errorSrv.Close()
 
-	errorClient := openai.New(errorSrv.URL, apiKey, nil)
+	errorClient := openai.New(status, errorSrv.URL, apiKey)
 	errorReq := req
 	errorReq.Stream = false
 	if _, err := errorClient.Chat(ctx, errorReq); err == nil {

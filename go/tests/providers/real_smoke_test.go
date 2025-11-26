@@ -3,7 +3,6 @@ package providers
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
@@ -12,15 +11,7 @@ import (
 	"github.com/rexleimo/agno-go/internal/agent"
 	"github.com/rexleimo/agno-go/internal/model"
 	runtimeconfig "github.com/rexleimo/agno-go/internal/runtime/config"
-	"github.com/rexleimo/agno-go/pkg/providers/cerebras"
-	"github.com/rexleimo/agno-go/pkg/providers/gemini"
-	"github.com/rexleimo/agno-go/pkg/providers/glm4"
-	"github.com/rexleimo/agno-go/pkg/providers/groq"
-	"github.com/rexleimo/agno-go/pkg/providers/modelscope"
-	"github.com/rexleimo/agno-go/pkg/providers/ollama"
-	"github.com/rexleimo/agno-go/pkg/providers/openai"
-	"github.com/rexleimo/agno-go/pkg/providers/openrouter"
-	"github.com/rexleimo/agno-go/pkg/providers/siliconflow"
+	runtimeproviders "github.com/rexleimo/agno-go/internal/runtime/providers"
 )
 
 // User-provided preferred model IDs.
@@ -107,46 +98,27 @@ func findStatus(all []model.ProviderStatus, p agent.Provider) model.ProviderStat
 			return st
 		}
 	}
-	return model.ProviderStatus{Provider: p, Status: model.ProviderNotConfigured}
+	st := model.DefaultProviderStatus(p)
+	st.Status = model.ProviderNotConfigured
+	return st
 }
 
 func newProviderClient(prov agent.Provider, st model.ProviderStatus, endpoint, apiKey string) (model.ChatProvider, error) {
-	switch prov {
-	case agent.ProviderOpenRouter:
-		return openrouter.New(st, endpoint, apiKey, openRouterHeaders()), nil
-	case agent.ProviderGroq:
-		return groq.New(st, endpoint, apiKey), nil
-	case agent.ProviderGemini:
-		return gemini.New(endpoint, apiKey, st.MissingEnv), nil
-	case agent.ProviderGLM4:
-		return glm4.New(st, endpoint, apiKey), nil
-	case agent.ProviderOpenAI:
-		return openai.New(endpoint, apiKey, st.MissingEnv), nil
-	case agent.ProviderSiliconFlow:
-		return siliconflow.New(st, endpoint, apiKey), nil
-	case agent.ProviderModelScope:
-		return modelscope.New(st, endpoint, apiKey), nil
-	case agent.ProviderOllama:
-		return ollama.New(st, endpoint, apiKey), nil
-	case agent.ProviderCerebras:
-		return cerebras.New(st, endpoint, apiKey), nil
-	default:
-		return nil, fmt.Errorf("unsupported provider: %s", prov)
+	cfg := runtimeconfig.ProviderConfig{
+		Endpoint:   endpoint,
+		APIKey:     apiKey,
+		Status:     st.Status,
+		MissingEnv: append([]string(nil), st.MissingEnv...),
+		Reason:     st.Reason,
 	}
-}
-
-func openRouterHeaders() map[string]string {
-	headers := map[string]string{
-		"HTTP-Referer": "https://local.agno",
-		"X-Title":      "Go-Agno",
+	clients, err := runtimeproviders.Build(prov, st, cfg)
+	if err != nil {
+		return nil, err
 	}
-	if ref := os.Getenv("OPENROUTER_HTTP_REFERER"); ref != "" {
-		headers["HTTP-Referer"] = ref
+	if clients.Chat == nil {
+		return nil, fmt.Errorf("provider %s does not expose chat client", prov)
 	}
-	if title := os.Getenv("OPENROUTER_TITLE"); title != "" {
-		headers["X-Title"] = title
-	}
-	return headers
+	return clients.Chat, nil
 }
 
 func repoRoot(t *testing.T) string {

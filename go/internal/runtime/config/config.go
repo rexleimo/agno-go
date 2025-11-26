@@ -114,10 +114,13 @@ func (c *Config) ProviderStatuses() []model.ProviderStatus {
 	all := c.Providers.asMap()
 	statuses := make([]model.ProviderStatus, 0, len(all))
 	for provider, cfg := range all {
+		meta := model.ProviderMetadata(provider)
 		statuses = append(statuses, model.ProviderStatus{
 			Provider:     provider,
 			Status:       cfg.Status,
-			Capabilities: providerCapabilities(provider),
+			Capabilities: append([]model.Capability(nil), meta.Capabilities...),
+			Priority:     meta.Priority,
+			Fallbacks:    append([]agent.Provider(nil), meta.Fallbacks...),
 			MissingEnv:   cfg.MissingEnv,
 			Reason:       cfg.Reason,
 		})
@@ -264,15 +267,5 @@ func (p *ProvidersConfig) asMap() map[agent.Provider]*ProviderConfig {
 		agent.ProviderModelScope:  &p.ModelScope,
 		agent.ProviderGroq:        &p.Groq,
 		agent.ProviderOllama:      &p.Ollama,
-	}
-}
-
-func providerCapabilities(p agent.Provider) []model.Capability {
-	// All providers expose chat + embedding + streaming surfaces; specific
-	// adapters will gate unavailable capabilities at call time.
-	return []model.Capability{
-		model.CapabilityChat,
-		model.CapabilityEmbedding,
-		model.CapabilityStreaming,
 	}
 }

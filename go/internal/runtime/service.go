@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rexleimo/agno-go/internal/agent"
 	"github.com/rexleimo/agno-go/internal/model"
+	"github.com/rexleimo/agno-go/internal/tool"
 )
 
 var (
@@ -22,6 +23,8 @@ var (
 	ErrInvalidSessionState = errors.New("invalid session state for operation")
 	// ErrSessionNotFound indicates a missing session.
 	ErrSessionNotFound = agent.ErrSessionNotFound
+	// ErrGuardrailViolation indicates guardrail checks blocked the request.
+	ErrGuardrailViolation = errors.New("guardrail violation")
 )
 
 // Service orchestrates agents, sessions, and message flows.
@@ -170,6 +173,9 @@ func (s *Service) PostMessage(ctx context.Context, agentID, sessionID uuid.UUID,
 	if err != nil {
 		return nil, err
 	}
+	if err := s.guardrailCheck(req.Messages); err != nil {
+		return nil, err
+	}
 	session.State = agent.SessionStreaming
 	session.LastActivityAt = time.Now().UTC()
 
@@ -246,6 +252,9 @@ func (s *Service) StreamMessage(ctx context.Context, agentID, sessionID uuid.UUI
 	}
 	history, err := s.store.LoadHistory(ctx, agentID, sessionID, agent.HistoryOptions{TokenWindow: s.tokenWindow(agentID)})
 	if err != nil {
+		return err
+	}
+	if err := s.guardrailCheck(req.Messages); err != nil {
 		return err
 	}
 	session.State = agent.SessionStreaming
@@ -483,7 +492,19 @@ func setEnabled(list []string, v string, enabled bool) []string {
 }
 
 // GuardrailConfig toggles PII/Prompt injection checks at runtime.
-type GuardrailConfig struct {
-	EnablePII       bool
-	EnableInjection bool
+type GuardrailConfig = tool.GuardrailConfig
+
+func (s *Service) guardrailCheck(messages []agent.Message) error {
+	if s == nil {
+		return nil
+	}
+	for _, msg := range messages {
+		if msg.Role != agent.RoleUser {
+			continue
+		}
+		if tool.ShouldBlock(s.guardrails, msg.Content) {
+			return fmt.Errorf("%w: content rejected", ErrGuardrailViolation)
+		}
+	}
+	return nil
 }

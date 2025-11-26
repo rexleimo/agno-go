@@ -9,6 +9,7 @@ type Recorder interface {
 	ObserveToolLatency(tool string, duration time.Duration)
 	ObserveTokens(provider string, prompt int, completion int)
 	ObserveMemory(bytes uint64)
+	ObserveProviderError(provider string, model string, reason string)
 }
 
 // NoopRecorder is the default when no metrics backend is wired.
@@ -18,3 +19,4 @@ func (NoopRecorder) ObserveModelLatency(string, string, time.Duration) {}
 func (NoopRecorder) ObserveToolLatency(string, time.Duration)          {}
 func (NoopRecorder) ObserveTokens(string, int, int)                    {}
 func (NoopRecorder) ObserveMemory(uint64)                              {}
+func (NoopRecorder) ObserveProviderError(string, string, string)       {}

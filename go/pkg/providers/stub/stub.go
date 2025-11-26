@@ -29,11 +29,14 @@ func New(name agent.Provider, status model.Availability, missing []string) *Prov
 func (p *Provider) Name() agent.Provider { return p.name }
 
 func (p *Provider) Status() model.ProviderStatus {
+	meta := model.ProviderMetadata(p.name)
 	return model.ProviderStatus{
 		Provider:     p.name,
 		Status:       p.status,
 		Capabilities: p.capabilities,
 		MissingEnv:   p.missingEnv,
+		Priority:     meta.Priority,
+		Fallbacks:    append([]agent.Provider(nil), meta.Fallbacks...),
 	}
 }
 

@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"time"
 
 	"github.com/rexleimo/agno-go/internal/agent"
+	"github.com/rexleimo/agno-go/internal/runtime/metrics"
 )
 
 // Capability captures provider abilities.
@@ -29,11 +31,13 @@ const (
 
 // ProviderStatus reports configuration and capability state for a provider.
 type ProviderStatus struct {
-	Provider     agent.Provider `json:"provider"`
-	Status       Availability   `json:"status"`
-	Capabilities []Capability   `json:"capabilities,omitempty"`
-	MissingEnv   []string       `json:"missingEnv,omitempty"`
-	Reason       string         `json:"reason,omitempty"`
+	Provider     agent.Provider   `json:"provider"`
+	Status       Availability     `json:"status"`
+	Capabilities []Capability     `json:"capabilities,omitempty"`
+	MissingEnv   []string         `json:"missingEnv,omitempty"`
+	Priority     int              `json:"priority,omitempty"`
+	Fallbacks    []agent.Provider `json:"fallbacks,omitempty"`
+	Reason       string           `json:"reason,omitempty"`
 }
 
 // ChatRequest models a provider-agnostic chat request.
@@ -97,6 +101,9 @@ type Router struct {
 	chatProviders      map[agent.Provider]ChatProvider
 	embeddingProviders map[agent.Provider]EmbeddingProvider
 
+	metrics metrics.Recorder
+	plan    map[Capability][]ProviderInfo
+
 	limiter chan struct{}
 	timeout time.Duration
 	retries int
@@ -116,9 +123,22 @@ func NewRouter(opts ...RouterOption) *Router {
 	router := &Router{
 		chatProviders:      make(map[agent.Provider]ChatProvider),
 		embeddingProviders: make(map[agent.Provider]EmbeddingProvider),
+		metrics:            metrics.NoopRecorder{},
+		plan:               make(map[Capability][]ProviderInfo),
 		timeout:            60 * time.Second,
 		retries:            1,
 		backoff:            50 * time.Millisecond,
+	}
+	for _, info := range providerCatalog {
+		for _, cap := range info.Capabilities {
+			router.plan[cap] = append(router.plan[cap], info)
+		}
+	}
+	for cap, entries := range router.plan {
+		sort.SliceStable(entries, func(i, j int) bool {
+			return entries[i].Priority > entries[j].Priority
+		})
+		router.plan[cap] = entries
 	}
 	for _, opt := range opts {
 		opt(router)
@@ -159,6 +179,15 @@ func WithRetries(count int, backoff time.Duration) RouterOption {
 	}
 }
 
+// WithMetricsRecorder wires a metrics recorder into the router.
+func WithMetricsRecorder(rec metrics.Recorder) RouterOption {
+	return func(r *Router) {
+		if rec != nil {
+			r.metrics = rec
+		}
+	}
+}
+
 // RegisterChatProvider adds or replaces a chat provider.
 func (r *Router) RegisterChatProvider(p ChatProvider) {
 	r.chatProviders[p.Name()] = p
@@ -183,12 +212,21 @@ func (r *Router) Chat(ctx context.Context, req ChatRequest) (*ChatResponse, erro
 		return nil, errors.New("stream requested without stream handler")
 	}
 	var resp *ChatResponse
+	start := time.Now()
 	err := r.execute(ctx, func(callCtx context.Context) error {
 		var err error
 		resp, err = p.Chat(callCtx, req)
 		return err
 	})
-	return resp, err
+	if err != nil {
+		r.metrics.ObserveProviderError(string(req.Model.Provider), req.Model.ModelID, err.Error())
+		return nil, err
+	}
+	r.metrics.ObserveModelLatency(string(req.Model.Provider), req.Model.ModelID, time.Since(start))
+	if resp != nil {
+		r.metrics.ObserveTokens(string(req.Model.Provider), resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
+	}
+	return resp, nil
 }
 
 // Stream routes a streaming completion request.
@@ -201,9 +239,16 @@ func (r *Router) Stream(ctx context.Context, req ChatRequest, fn StreamHandler) 
 	if status.Status != ProviderAvailable {
 		return providerError(status)
 	}
-	return r.execute(ctx, func(callCtx context.Context) error {
+	start := time.Now()
+	err := r.execute(ctx, func(callCtx context.Context) error {
 		return p.Stream(callCtx, req, fn)
 	})
+	if err != nil {
+		r.metrics.ObserveProviderError(string(req.Model.Provider), req.Model.ModelID, err.Error())
+		return err
+	}
+	r.metrics.ObserveModelLatency(string(req.Model.Provider), req.Model.ModelID, time.Since(start))
+	return nil
 }
 
 // Embed routes an embedding request.
@@ -217,12 +262,21 @@ func (r *Router) Embed(ctx context.Context, req EmbeddingRequest) (*EmbeddingRes
 		return nil, providerError(status)
 	}
 	var resp *EmbeddingResponse
+	start := time.Now()
 	err := r.execute(ctx, func(callCtx context.Context) error {
 		var err error
 		resp, err = p.Embed(callCtx, req)
 		return err
 	})
-	return resp, err
+	if err != nil {
+		r.metrics.ObserveProviderError(string(req.Model.Provider), req.Model.ModelID, err.Error())
+		return nil, err
+	}
+	r.metrics.ObserveModelLatency(string(req.Model.Provider), req.Model.ModelID, time.Since(start))
+	if resp != nil {
+		r.metrics.ObserveTokens(string(req.Model.Provider), resp.Usage.PromptTokens, resp.Usage.CompletionTokens)
+	}
+	return resp, nil
 }
 
 // Statuses returns provider statuses for health checks.
@@ -242,6 +296,17 @@ func (r *Router) Statuses() []ProviderStatus {
 		result = append(result, p.Status())
 	}
 	return result
+}
+
+// ProviderPlan returns the configured provider order for the given capability.
+func (r *Router) ProviderPlan(cap Capability) []ProviderInfo {
+	list := r.plan[cap]
+	if len(list) == 0 {
+		return nil
+	}
+	out := make([]ProviderInfo, len(list))
+	copy(out, list)
+	return out
 }
 
 func (r *Router) execute(ctx context.Context, fn func(context.Context) error) error {

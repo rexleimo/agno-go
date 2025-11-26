@@ -13,15 +13,7 @@ import (
 	"github.com/rexleimo/agno-go/internal/agent"
 	"github.com/rexleimo/agno-go/internal/model"
 	runtimeconfig "github.com/rexleimo/agno-go/internal/runtime/config"
-	"github.com/rexleimo/agno-go/pkg/providers/cerebras"
-	"github.com/rexleimo/agno-go/pkg/providers/gemini"
-	"github.com/rexleimo/agno-go/pkg/providers/glm4"
-	"github.com/rexleimo/agno-go/pkg/providers/groq"
-	"github.com/rexleimo/agno-go/pkg/providers/modelscope"
-	"github.com/rexleimo/agno-go/pkg/providers/ollama"
-	"github.com/rexleimo/agno-go/pkg/providers/openai"
-	"github.com/rexleimo/agno-go/pkg/providers/openrouter"
-	"github.com/rexleimo/agno-go/pkg/providers/siliconflow"
+	runtimeproviders "github.com/rexleimo/agno-go/internal/runtime/providers"
 	"gopkg.in/yaml.v3"
 )
 
@@ -243,26 +235,11 @@ func buildChatClients(statuses map[agent.Provider]model.ProviderStatus, cfg map[
 			continue
 		}
 		c := cfg[prov]
-		switch prov {
-		case agent.ProviderOpenAI:
-			out[prov] = openai.New(c.Endpoint, c.APIKey, st.MissingEnv)
-		case agent.ProviderGemini:
-			out[prov] = gemini.New(c.Endpoint, c.APIKey, st.MissingEnv)
-		case agent.ProviderGLM4:
-			out[prov] = glm4.New(st, c.Endpoint, c.APIKey)
-		case agent.ProviderOpenRouter:
-			out[prov] = openrouter.New(st, c.Endpoint, c.APIKey, openRouterHeaders())
-		case agent.ProviderSiliconFlow:
-			out[prov] = siliconflow.New(st, c.Endpoint, c.APIKey)
-		case agent.ProviderCerebras:
-			out[prov] = cerebras.New(st, c.Endpoint, c.APIKey)
-		case agent.ProviderModelScope:
-			out[prov] = modelscope.New(st, c.Endpoint, c.APIKey)
-		case agent.ProviderGroq:
-			out[prov] = groq.New(st, c.Endpoint, c.APIKey)
-		case agent.ProviderOllama:
-			out[prov] = ollama.New(st, c.Endpoint, c.APIKey)
+		clients, err := runtimeproviders.Build(prov, st, c)
+		if err != nil || clients.Chat == nil {
+			continue
 		}
+		out[prov] = clients.Chat
 	}
 	return out
 }
@@ -274,26 +251,11 @@ func buildEmbedClients(statuses map[agent.Provider]model.ProviderStatus, cfg map
 			continue
 		}
 		c := cfg[prov]
-		switch prov {
-		case agent.ProviderOpenAI:
-			out[prov] = openai.New(c.Endpoint, c.APIKey, st.MissingEnv)
-		case agent.ProviderGemini:
-			out[prov] = gemini.New(c.Endpoint, c.APIKey, st.MissingEnv)
-		case agent.ProviderGLM4:
-			out[prov] = glm4.NewEmbed(st, c.Endpoint, c.APIKey)
-		case agent.ProviderOpenRouter:
-			out[prov] = openrouter.NewEmbed(st, c.Endpoint, c.APIKey, openRouterHeaders())
-		case agent.ProviderSiliconFlow:
-			out[prov] = siliconflow.NewEmbed(st, c.Endpoint, c.APIKey)
-		case agent.ProviderCerebras:
-			out[prov] = cerebras.NewEmbed(st, c.Endpoint, c.APIKey)
-		case agent.ProviderModelScope:
-			out[prov] = modelscope.NewEmbed(st, c.Endpoint, c.APIKey)
-		case agent.ProviderGroq:
-			out[prov] = groq.NewEmbed(st, c.Endpoint, c.APIKey)
-		case agent.ProviderOllama:
-			out[prov] = ollama.NewEmbed(st, c.Endpoint, c.APIKey)
+		clients, err := runtimeproviders.Build(prov, st, c)
+		if err != nil || clients.Embed == nil {
+			continue
 		}
+		out[prov] = clients.Embed
 	}
 	return out
 }
@@ -329,18 +291,4 @@ func cosine(a, b []float64) float64 {
 		return -1
 	}
 	return dot / (math.Sqrt(na) * math.Sqrt(nb))
-}
-
-func openRouterHeaders() map[string]string {
-	headers := map[string]string{
-		"HTTP-Referer": "https://local.agno",
-		"X-Title":      "Go-Agno",
-	}
-	if ref := os.Getenv("OPENROUTER_HTTP_REFERER"); strings.TrimSpace(ref) != "" {
-		headers["HTTP-Referer"] = ref
-	}
-	if title := os.Getenv("OPENROUTER_TITLE"); strings.TrimSpace(title) != "" {
-		headers["X-Title"] = title
-	}
-	return headers
 }

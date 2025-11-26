@@ -58,16 +58,10 @@ type embedResponse struct {
 }
 
 // New constructs a Gemini client.
-func New(endpoint, apiKey string, missingEnv []string) *Client {
+func New(status model.ProviderStatus, endpoint, apiKey string) *Client {
 	ep := endpoint
 	if strings.TrimSpace(ep) == "" {
 		ep = defaultEndpoint
-	}
-	status := model.ProviderStatus{
-		Provider:     agent.ProviderGemini,
-		Status:       model.ProviderAvailable,
-		Capabilities: []model.Capability{model.CapabilityChat, model.CapabilityEmbedding, model.CapabilityStreaming},
-		MissingEnv:   missingEnv,
 	}
 	if apiKey == "" {
 		status.Status = model.ProviderNotConfigured

@@ -2,6 +2,7 @@ package bench
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -115,13 +116,23 @@ func TestBasicsBenchMetrics(t *testing.T) {
 	}
 
 	p95 := percentile(durations, 0.95)
-	report := fmt.Sprintf("bench basics samples=%d p95=%s peak_alloc=%d bytes\n", len(durations), p95, atomic.LoadUint64(&peakAlloc))
+	peakBytes := atomic.LoadUint64(&peakAlloc)
+	measured := benchMetrics{
+		Samples:   len(durations),
+		P95:       p95,
+		P95Ms:     float64(p95) / float64(time.Millisecond),
+		PeakAlloc: peakBytes,
+	}
+	report := fmt.Sprintf("bench basics samples=%d p95_ms=%.2f peak_alloc=%d bytes\n", measured.Samples, measured.P95Ms, measured.PeakAlloc)
 	outPath := filepath.Join(base, "specs", "001-agno-agents-refactor", "artifacts", "bench.txt")
 	if err := os.MkdirAll(filepath.Dir(outPath), 0o755); err != nil {
 		t.Fatalf("mkdir bench artifacts: %v", err)
 	}
 	if err := os.WriteFile(outPath, []byte(report), 0o644); err != nil {
 		t.Fatalf("write bench report: %v", err)
+	}
+	if err := evaluateBaseline(base, measured); err != nil {
+		t.Fatalf("baseline comparison failed: %v", err)
 	}
 }
 
@@ -145,4 +156,80 @@ func maxUint64(a, b uint64) uint64 {
 		return a
 	}
 	return b
+}
+
+type benchMetrics struct {
+	Samples   int
+	P95       time.Duration
+	P95Ms     float64
+	PeakAlloc uint64
+}
+
+type benchBaseline struct {
+	P95Ms          float64 `json:"p95_ms"`
+	PeakAllocBytes uint64  `json:"peak_alloc_bytes"`
+}
+
+func evaluateBaseline(base string, measured benchMetrics) error {
+	baselinePath := filepath.Join(base, "specs", "001-agno-agents-refactor", "artifacts", "baseline", "python-bench.json")
+	deviations := filepath.Join(base, "specs", "001-agno-agents-refactor", "contracts", "deviations.md")
+	baseline, err := loadBaseline(baselinePath)
+	if err != nil {
+		appendDeviation(deviations, fmt.Sprintf("bench baseline missing or unreadable: %v", err))
+		return nil
+	}
+	if baseline.P95Ms <= 0 || baseline.PeakAllocBytes == 0 {
+		appendDeviation(deviations, "bench baseline missing required metrics; capture python baseline and rerun (owner=tbd)")
+		return nil
+	}
+	p95Reduction := (baseline.P95Ms - measured.P95Ms) / baseline.P95Ms
+	if p95Reduction < 0 {
+		p95Reduction = 0
+	}
+	peakReduction := float64(baseline.PeakAllocBytes-measured.PeakAlloc) / float64(baseline.PeakAllocBytes)
+	if peakReduction < 0 {
+		peakReduction = 0
+	}
+
+	var regressions []string
+	if p95Reduction < 0.20 {
+		regressions = append(regressions, fmt.Sprintf("p95 improvement %.2f%% < target 20%%", p95Reduction*100))
+	}
+	if peakReduction < 0.25 {
+		regressions = append(regressions, fmt.Sprintf("peak alloc improvement %.2f%% < target 25%%", peakReduction*100))
+	}
+	if len(regressions) > 0 {
+		msg := fmt.Sprintf("bench regression: %s (owner=runtime, next=optimize router/memory)", strings.Join(regressions, "; "))
+		appendDeviation(deviations, msg)
+		return fmt.Errorf("%s", msg)
+	}
+	return nil
+}
+
+func loadBaseline(path string) (benchBaseline, error) {
+	var baseline benchBaseline
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return baseline, err
+	}
+	if len(strings.TrimSpace(string(data))) == 0 {
+		return baseline, fmt.Errorf("baseline file empty")
+	}
+	if err := json.Unmarshal(data, &baseline); err != nil {
+		return benchBaseline{}, err
+	}
+	return baseline, nil
+}
+
+func appendDeviation(path, msg string) {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return
+	}
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o644)
+	if err != nil {
+		return
+	}
+	defer func() { _ = f.Close() }()
+	ts := time.Now().UTC().Format(time.RFC3339)
+	_, _ = fmt.Fprintf(f, "- [bench] %s: %s\n", ts, msg)
 }

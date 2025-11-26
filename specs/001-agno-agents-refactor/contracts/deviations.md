@@ -45,3 +45,5 @@
 - [fixtures] 2025-11-26T09:52:25Z: embed modelscope: Post "https://api.modelscope.cn/v1/embeddings": EOF
 - [fixtures] 2025-11-26T09:52:25Z: chat ollama: ollama error: 404 Not Found ({"choices":null,"usage":{"prompt_tokens":0,"completion_tokens":0,"total_tokens":0}})
 - [fixtures] 2025-11-26T09:52:25Z: provider baseline generation completed with errors; see deviations at 2025-11-26T09:52:25Z
+- [demo] 2025-11-26: Added CLI/runtime provider demo (`go run ./go/cmd/agno --demo --providers ...`) and integration tests that log chat/stream/embed status to `specs/001-agno-agents-refactor/artifacts/coverage/providers.log`. Providers without keys will be logged as `skipped` with reasons; demos use `*_CHAT_MODEL`/`*_EMBED_MODEL` overrides when present.
+- [bench] 2025-11-26T13:40:00Z: bench baseline missing required metrics; capture python baseline and rerun (owner=tbd)

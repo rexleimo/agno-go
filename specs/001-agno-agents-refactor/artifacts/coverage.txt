@@ -62,3 +62,7 @@ basics_scenario=rag_fallback status=ok
 basics_scenario=tool_hitl_guarded status=ok
 basics_scenario=agent_basic status=ok
 basics_scenario=memory_session status=ok
+aggregate basics_pass=80.00% providers_pass=0.00% coverage=0.00% status=fail
+aggregate_issue: Basics pass rate 80.00% < 95%
+aggregate_issue: Provider success/skip rate 0.00% < 90%
+aggregate_issue: Code coverage 0.00% < 85%

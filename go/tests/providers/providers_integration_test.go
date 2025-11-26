@@ -1,18 +1,19 @@
 package providers
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
-	"strings"
 	"testing"
 
-	"github.com/rexleimo/agno-go/internal/model"
+	"github.com/rexleimo/agno-go/internal/agent"
 	runtimeconfig "github.com/rexleimo/agno-go/internal/runtime/config"
+	runtimeproviders "github.com/rexleimo/agno-go/internal/runtime/providers"
 )
 
-// Providers integration smoke: logs availability/skip reasons and writes summary for coverage aggregation.
+// Providers integration smoke: exercises chat/stream/embed for configured providers and writes coverage logs.
 func TestProvidersIntegrationReport(t *testing.T) {
 	base := providersRepoRoot(t)
 	cfgPath := filepath.Join(base, "config", "default.yaml")
@@ -23,35 +24,49 @@ func TestProvidersIntegrationReport(t *testing.T) {
 	}
 
 	statuses := cfg.ProviderStatuses()
+	configs := cfg.ProviderConfigs()
 	logPath := filepath.Join(base, "specs", "001-agno-agents-refactor", "artifacts", "coverage", "providers.log")
 	summaryPath := filepath.Join(base, "specs", "001-agno-agents-refactor", "artifacts", "coverage.txt")
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {
 		t.Fatalf("mkdir providers log: %v", err)
 	}
 
-	var available, skipped, errorsCount int
-	var buf strings.Builder
-
+	timeout := runtimeproviders.DemoTimeout(cfg)
+	results := make([]runtimeproviders.DemoResult, 0, len(statuses))
+	statusMap := make(map[agent.Provider]runtimeconfig.ProviderConfig, len(configs))
+	for provider, entry := range configs {
+		statusMap[provider] = entry
+	}
 	for _, st := range statuses {
-		if st.Status != model.ProviderAvailable {
-			skipped++
-			buf.WriteString(fmt.Sprintf("provider=%s status=skipped reason=%s missing=%v\n", st.Provider, st.Status, st.MissingEnv))
-			continue
-		}
-		available++
-		buf.WriteString(fmt.Sprintf("provider=%s status=available (connectivity not executed in smoke)\n", st.Provider))
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		result := runtimeproviders.Exercise(ctx, cfg, st.Provider, st, statusMap[st.Provider])
+		cancel()
+		results = append(results, result)
 	}
 
-	if buf.Len() == 0 {
-		buf.WriteString("no providers configured\n")
-	}
-
-	if err := os.WriteFile(logPath, []byte(buf.String()), 0o644); err != nil {
+	if err := runtimeproviders.WriteDemoLog(logPath, results); err != nil {
 		t.Fatalf("write providers log: %v", err)
 	}
 
-	summary := fmt.Sprintf("providers: available=%d skipped=%d errors=%d\n", available, skipped, errorsCount)
+	var success, skipped, failures int
+	for _, res := range results {
+		if res.Chat.Status == "success" || res.Stream.Status == "success" || res.Embed.Status == "success" {
+			success++
+		}
+		if res.Chat.Status == "skipped" && res.Stream.Status == "skipped" && res.Embed.Status == "skipped" {
+			skipped++
+		}
+		if hasError(res) {
+			failures++
+		}
+	}
+
+	summary := fmt.Sprintf("providers-demo: success=%d skipped=%d errors=%d\n", success, skipped, failures)
 	_ = appendFile(summaryPath, []byte(summary))
+}
+
+func hasError(res runtimeproviders.DemoResult) bool {
+	return res.Chat.Status == "error" || res.Stream.Status == "error" || res.Embed.Status == "error"
 }
 
 func providersRepoRoot(tb testing.TB) string {

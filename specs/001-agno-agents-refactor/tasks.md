@@ -45,14 +45,14 @@
 **独立测试**：`make providers-test`，输出与跳过原因存于 `artifacts/coverage/providers.log` 并汇总至 `artifacts/coverage.txt`。 
 
 ### 测试
-- [ ] T021 [P] [US2] 在 `go/tests/providers/` 为九家供应商补充 chat/stream/embedding 集成用例，包含跳过与错误路径校验，写入 `artifacts/coverage/providers.log`。 
+- [X] T021 [P] [US2] 在 `go/tests/providers/` 为九家供应商补充 chat/stream/embedding 集成用例，包含跳过与错误路径校验，写入 `artifacts/coverage/providers.log`。 
 
 ### 实现
-- [ ] T022 [P] [US2] 在 `go/internal/model/router.go` 配置供应商能力宣告与优先级/回退（接口已于 T010），覆盖 DP1“接口先行、能力后配”。 
-- [ ] T023 [P] [US2] 扩充 `go/internal/runtime/metrics/` 记录供应商延迟/错误以支持 DP2（接口→实现/接线）。 
-- [ ] T024 [P] [US2] 在 `go/pkg/providers/{ollama,gemini,openai,glm4,openrouter,siliconflow,cerebras,modelscope,groq}/` 完善客户端、错误映射、能力宣告与缺省模型配置，支持跳过/回退。 
-- [ ] T025 [US2] 在 `go/cmd/agno/main.go` 与 `go/internal/runtime/` 增加供应商选择/并行演示开关，日志写入 `artifacts/coverage/providers.log`，并更新 `.env.example` 注释（与 T003 对齐）。 
-- [ ] T026 [US2] 更新 `specs/001-agno-agents-refactor/contracts/deviations.md` 与 `quickstart.md`，记录各供应商差异/跳过条件与运行命令。 
+- [X] T022 [P] [US2] 在 `go/internal/model/router.go` 配置供应商能力宣告与优先级/回退（接口已于 T010），覆盖 DP1“接口先行、能力后配”。 
+- [X] T023 [P] [US2] 扩充 `go/internal/runtime/metrics/` 记录供应商延迟/错误以支持 DP2（接口→实现/接线）。 
+- [X] T024 [P] [US2] 在 `go/pkg/providers/{ollama,gemini,openai,glm4,openrouter,siliconflow,cerebras,modelscope,groq}/` 完善客户端、错误映射、能力宣告与缺省模型配置，支持跳过/回退。 
+- [X] T025 [US2] 在 `go/cmd/agno/main.go` 与 `go/internal/runtime/` 增加供应商选择/并行演示开关，日志写入 `artifacts/coverage/providers.log`，并更新 `.env.example` 注释（与 T003 对齐）。 
+- [X] T026 [US2] 更新 `specs/001-agno-agents-refactor/contracts/deviations.md` 与 `quickstart.md`，记录各供应商差异/跳过条件与运行命令。 
 
 ## Phase 5: 用户故事 3 - 质量与基准（优先级：P3）
 
@@ -60,13 +60,13 @@
 **独立测试**：`make coverage`（含契约+供应商+安全）、`make bench`；`artifacts/coverage.txt`/`bench.txt` 输出达标或阻断。 
 
 ### 测试/基准
-- [ ] T027 [P] [US3] 在 `go/tests/contract/security_contract_test.go` 添加 PII/Prompt 注入拦截用例，漏/误拦截写入 `artifacts/coverage.txt` 并阻断。 
-- [ ] T028 [P] [US3] 在 `go/tests/contract/rag_fallback_test.go` 添加知识库不可用回退用例，验证提示/错误输出与会话不污染。 
-- [ ] T029 [P] [US3] 扩展 `go/tests/bench/basics_bench_test.go` 对比 `artifacts/baseline/python-bench.json`，计算 p95/峰值内存降幅；若未达到 -20%/-25% 阈值则写入 `contracts/deviations.md`（含 owner/下一步）并让基准任务返回非零；达标与差异写入 `artifacts/bench.txt`。 
-- [ ] T030 [P] [US3] 编写聚合脚本 `scripts/coverage/aggregate_basics.go`（或等效）汇总契约/供应商/安全测试与五场景通过率、供应商成功/跳过比例、覆盖率；若五场景 <95% 或供应商 <90% 或覆盖率 <85%，生成差异报告至 `artifacts/coverage.txt` 并返回非零（供 constitution-check/CI 阻断）。 
+- [X] T027 [P] [US3] 在 `go/tests/contract/security_contract_test.go` 添加 PII/Prompt 注入拦截用例，漏/误拦截写入 `artifacts/coverage.txt` 并阻断。 
+- [X] T028 [P] [US3] 在 `go/tests/contract/rag_fallback_test.go` 添加知识库不可用回退用例，验证提示/错误输出与会话不污染。 
+- [X] T029 [P] [US3] 扩展 `go/tests/bench/basics_bench_test.go` 对比 `artifacts/baseline/python-bench.json`，计算 p95/峰值内存降幅；若未达到 -20%/-25% 阈值则写入 `contracts/deviations.md`（含 owner/下一步）并让基准任务返回非零；达标与差异写入 `artifacts/bench.txt`。 
+- [X] T030 [P] [US3] 编写聚合脚本 `scripts/coverage/aggregate_basics.go`（或等效）汇总契约/供应商/安全测试与五场景通过率、供应商成功/跳过比例、覆盖率；若五场景 <95% 或供应商 <90% 或覆盖率 <85%，生成差异报告至 `artifacts/coverage.txt` 并返回非零（供 constitution-check/CI 阻断）。 
 
 ### 实现/文档
-- [ ] T031 [US3] 更新 `specs/001-agno-agents-refactor/artifacts/coverage.txt`、`bench.txt` 与 `contracts/deviations.md`，为未达标项标注 owner/下一步；同步 `quickstart.md` 中的验证命令。 
+- [X] T031 [US3] 更新 `specs/001-agno-agents-refactor/artifacts/coverage.txt`、`bench.txt` 与 `contracts/deviations.md`，为未达标项标注 owner/下一步；同步 `quickstart.md` 中的验证命令。 
 - [ ] T032 [US3] 在 `../rex-agno/agno-Go/docs` 更新 Basics 章节（运行步骤、env、差异、回退/安全说明），并在 CI 前运行 `npm run docs:build`（Make docs 目标）。 
 
 ## Phase 6: Polish & Cross-Cutting
