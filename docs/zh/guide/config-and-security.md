@@ -102,3 +102,14 @@
     ```
 
   - 这些命令有助于确保供应商集成仍按预期工作，且没有引入不安全的配置变更。  
+
+### 5. 运行时认证与守护
+
+- **API 认证（FR-004）**：只接受 `X-API-Key`；Basic/Bearer/OAuth/自定义 Authorization 会被拒绝，负例覆盖于 `go/tests/contract/auth_middleware_negative_test.go`。  
+- **守护**：PII / Prompt 注入会返回 `ErrGuardrailViolation` 且不会写入历史，示例见 `go/tests/contract/security_contract_test.go`。  
+- **供应商跳过策略**：缺少密钥时标记为未配置，demo/测试会跳过并将原因写入 `specs/001-agno-agents-refactor/artifacts/coverage/providers.log`。  
+
+### 6. 命令与目录
+
+- 运行时命令在 `go/` 内执行（如 `cd go && go run ./cmd/agno ...` 或 `go test ./tests/...`）。  
+- Make 目标（fmt/lint/test/providers-test/coverage/bench/docs）在仓库根目录执行，`go/` 内部访问配置时使用相对路径（如 `../config/default.yaml`）。  

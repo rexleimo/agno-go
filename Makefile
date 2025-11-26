@@ -24,10 +24,10 @@ DEFAULT_GOMEMLIMIT ?= 2GiB
 DEFAULT_GOGC ?= 120
 GO_ENV_BASE := GOCACHE=$(GOCACHE_DIR)
 BENCH_ENV := $(GO_ENV_BASE) GOMEMLIMIT=$${GOMEMLIMIT:-$(DEFAULT_GOMEMLIMIT)} GOGC=$${GOGC:-$(DEFAULT_GOGC)}
-DOCS_DIR ?= ../rex-agno/agno-Go/docs
+DOCS_DIR ?= $(ROOT)/docs
 DOCS_CMD ?= npm run docs:build
 
-.PHONY: help fmt lint test providers-test coverage bench gen-fixtures release constitution-check tidy audit-no-python docs-build docs-serve docs-check
+.PHONY: help fmt lint test providers-test coverage bench gen-fixtures release constitution-check tidy audit-no-python docs docs-build docs-serve docs-check
 
 help: ## Show available targets
 	@echo "Available targets:"

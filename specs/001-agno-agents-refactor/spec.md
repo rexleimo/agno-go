@@ -99,7 +99,7 @@
 - **自动化与 Make**：扩展/复用 `make fmt lint test providers-test coverage bench gen-fixtures release constitution-check`，CI 复用 `.github/workflows/ci.yml`，确保新增目标在 CI 可跑。
 - **测试纪律 + 85% 覆盖率**：新增/迁移 Go 单测、契约测试、供应商集成测试与性能基准，覆盖核心实体与边界场景，保障综合覆盖率 ≥85% 并产出报告。
 - **密钥与安全**：所有密钥放置 `.env.example` 占位，使用环境注入与日志脱敏；供应商不可达/缺密钥时以跳过+记录方式处理，避免泄漏。
-- **文档同步（VitePress）**：完成实现后，同步更新与本次 Go 改动相关的 docs.agno.com/basics 对应 VitePress 文档章节，提交文档源并通过 VitePress 构建检查。
+- **文档同步（VitePress）**：完成实现后，同步更新与本次 Go 改动相关的 docs.agno.com/basics 对应 VitePress 文档章节，内容仅围绕 `./go` 实现的 Basics 五场景与完整的 provider 客户端示例，移除无关部分；采用官方 5 场景分节（前置/环境 → basic/memory/rag/tool+HITL/workflow 运行命令与契约测试 → 回退/安全/FR-004 认证 → 供应商跳过与日志 → 构建命令），提交文档源并通过 VitePress 构建检查。
 
 ## Clarifications
 
@@ -110,3 +110,8 @@
 - Q: VitePress 文档源路径与构建命令？ → A: 文档源位于 `../rex-agno/agno-Go/docs`（VitePress），使用 `npm run docs:build` 校验构建。
 - Q: Basics CLI/SDK 入口允许的认证与中间件范围？ → A: 仅允许 API Key Header 认证，允许的中间件仅日志/恢复/超时，禁止其他认证与自定义拦截。
 - Q: PII/Prompt 注入拦截测试结果存放与阻断策略？ → A: 记录在 `artifacts/coverage.txt`，漏拦截或误拦截均阻断 CI，并写明案例以对齐 SC-005。
+
+### Session 2025-11-26
+
+- Q: VitePress Basics 章节采用何种结构以对标 docs.agno.com/basics？ → A: 采用官方 5 场景分节（前置/环境 → basic/memory/rag/tool+HITL/workflow 运行命令与契约测试 → 回退/安全/FR-004 认证 → 供应商跳过与日志 → 构建命令），内容基于 Go 实现与测试命令编写。
+- Q: VitePress 文档是否仅保留本次重构的 Basics 场景并补全 provider 客户端示例，移除无关内容？ → A: 是，整篇文档围绕 `./go` 实现的 Basics 五场景与相关回归/构建命令，补全 provider 客户端示例，其余无关内容移除。

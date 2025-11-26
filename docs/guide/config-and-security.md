@@ -112,3 +112,19 @@ You can keep `config/default.yaml` under version control and only override value
 
   - These commands help ensure that provider integrations still behave as expected and
     that no unsafe configuration changes were introduced.
+
+### 5. Runtime authentication and guardrails
+
+- **API authentication (FR-004)**: only `X-API-Key` is accepted. Basic/Bearer/OAuth or any
+  custom `Authorization` scheme is rejected; the negative cases are covered in
+  `go/tests/contract/auth_middleware_negative_test.go`.
+- **Guardrails**: PII and prompt-injection attempts return `ErrGuardrailViolation` and are
+  not persisted to history (see `go/tests/contract/security_contract_test.go`).
+- **Provider skipping**: missing provider keys mark a provider as “not configured”; demos
+  and tests will skip and log the reason to
+  `specs/001-agno-agents-refactor/artifacts/coverage/providers.log`.
+
+### 6. Repo layout for commands
+
+- Runtime commands are issued from the Go module root `go/` (for example `cd go && go run ./cmd/agno ...` or `go test ./tests/...`).
+- Make targets (fmt/lint/test/providers-test/coverage/bench/docs) run from the repo root and reference paths like `../config/default.yaml` from inside `go/`.

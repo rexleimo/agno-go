@@ -67,7 +67,7 @@
 
 ### 实现/文档
 - [X] T031 [US3] 更新 `specs/001-agno-agents-refactor/artifacts/coverage.txt`、`bench.txt` 与 `contracts/deviations.md`，为未达标项标注 owner/下一步；同步 `quickstart.md` 中的验证命令。 
-- [ ] T032 [US3] 在 `../rex-agno/agno-Go/docs` 更新 Basics 章节（运行步骤、env、差异、回退/安全说明），并在 CI 前运行 `npm run docs:build`（Make docs 目标）。 
+- [X] T032 [US3] 在 `../rex-agno/agno-Go/docs` 更新 Basics 章节（运行步骤、env、差异、回退/安全说明），并在 CI 前运行 `npm run docs:build`（Make docs 目标）。 
 
 ## Phase 6: Polish & Cross-Cutting
 

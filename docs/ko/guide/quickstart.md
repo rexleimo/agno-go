@@ -1,47 +1,59 @@
-# 퀵스타트: Go 코드에서 Agno-Go 프로바이더 호출하기
+# 퀵스타트: Basics 시나리오 (docs.agno.com/basics 대응)
 
-이 가이드는 리포지토리에 포함된 **Go 프로바이더 클라이언트(`go/pkg/providers/*`)** 를 사용해서
-가장 간단한 채팅 호출을 만드는 방법을 설명합니다. 현재 1차 버전의 목표는 다음과 같습니다.
+범위: `./go` 모듈의 Basics 5 시나리오(basic / memory / rag / tool+HITL / workflow). 런타임 명령은 `go/`에서 실행, Make 는 리포지토리 루트. Go 1.25.1.  
+**TODO: Korean translation polish; mirrors EN.**
 
-1. 프로바이더(예: OpenAI) 환경 변수를 설정한다  
-2. `go/pkg/providers/openai` 를 사용해 Go 코드에서 호출한다  
-3. 응답 메시지를 출력해서 확인한다  
-
-> 주의: AgentOS HTTP 런타임(`/agents`, `/sessions`, `/messages` 등)은 아직 정리 중인 설계입니다.
-> 이 퀵스타트는 **HTTP 서버나 curl 예제에 의존하지 않고**, 테스트에서 이미 사용 중인 Go 프로바이더 클라이언트만을 다룹니다.
-
-## 사전 준비
-
-1. Go 1.25.1 설치
-2. 프로젝트 루트에서 환경 변수 파일 준비:
-
+## 1) 전제 및 환경
+리포지토리 루트:
 ```bash
-cd <your-project-root>
 cp .env.example .env
 ```
-
-`.env` 에 OpenAI 키를 설정합니다.
-
+Go 모듈 루트로 이동:
 ```bash
-OPENAI_API_KEY=your-openai-key
+cd go
+export GOCACHE=$PWD/../.cache/go-build   # optional
 ```
+- `AGNO_API_KEY` 필수 (`X-API-Key`만 허용, FR-004).
+- 프로바이더 변수(`*_API_KEY`, `*_CHAT_MODEL`, `*_EMBED_MODEL`)는 선택. 없으면 “미설정”으로 스킵 처리.
+- 설정: `../config/default.yaml` (타임아웃/재시도/동시성, memory store, env 에서 endpoint 로드).
 
-## 최소 예제: OpenAI Chat 호출
+## 2) 5 시나리오 실행 (CLI/fixtures)
+```bash
+cd go
+go run ./cmd/agno --config ../config/default.yaml \
+  --scenario <basic|memory|rag|tool|workflow> \
+  --fixtures ../specs/001-agno-agents-refactor/contracts/fixtures
+```
+- basic: 단발, stub 리플레이
+- memory: 멀티턴, MemoryStore 히스토리 저장
+- rag: 검색 불가 → 힌트/에러 폴백
+- tool: 툴 + HITL + 가드레일 (스트리밍 포함)
+- workflow: 분기/워크플로 플레이스홀더 (멀티모달 확장 여지)
 
-아래 코드는 리포지토리의 테스트와 동일한 형태로,
+## 3) 테스트 및 데모
+- 계약 테스트(목표 95% 이상):
+  ```bash
+  cd go
+  go test ./tests/contract -run Basics
+  ```
+- 프로바이더 데모(스킵 이유 로그):
+  ```bash
+  cd go
+  go run ./cmd/agno --demo --providers openai,gemini \
+    --parallel --providers-log ../specs/001-agno-agents-refactor/artifacts/coverage/providers.log
+  ```
+- 회귀 + 문서 빌드(리포지토리 루트):
+  ```bash
+  make constitution-check
+  ```
 
-- `internal/agent`  
-- `internal/model`  
-- `go/pkg/providers/openai`  
-
-를 그대로 재사용합니다.
-
+## 4) 프로바이더 클라이언트 예시 (Go)
+`go/pkg/providers/<provider>` 를 직접 사용. 예시(OpenAI):
 ```go
 package main
 
 import (
   "context"
-  "fmt"
   "log"
   "os"
   "time"
@@ -54,55 +66,37 @@ import (
 func main() {
   ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
   defer cancel()
-
   apiKey := os.Getenv("OPENAI_API_KEY")
   if apiKey == "" {
     log.Fatal("OPENAI_API_KEY not set")
   }
-
-  // 기본 OpenAI 퍼블릭 엔드포인트 사용 (.env 의 OPENAI_ENDPOINT 로 프록시를 설정할 수도 있음)
   client := openai.New("", apiKey, nil)
-
   resp, err := client.Chat(ctx, model.ChatRequest{
-    Model: agent.ModelConfig{
-      Provider: agent.ProviderOpenAI,
-      ModelID:  "gpt-4o-mini",
-      Stream:   false,
-    },
-    Messages: []agent.Message{
-      {Role: agent.RoleUser, Content: "Agno-Go를 짧게 소개해 주세요."},
-    },
+    Model:    agent.ModelConfig{Provider: agent.ProviderOpenAI, ModelID: "gpt-4o-mini", Stream: false},
+    Messages: []agent.Message{{Role: agent.RoleUser, Content: "Agno-Go를 한 문장으로 소개해 주세요."}},
   })
   if err != nil {
     log.Fatalf("chat error: %v", err)
   }
-
-  fmt.Println("assistant:", resp.Message.Content)
+  log.Println("assistant:", resp.Message.Content)
 }
 ```
+다른 프로바이더도 동일한 형태로 `pkg/providers/<provider>` 사용, 필수 env 설정 필요.
 
-위 코드를 다음 경로에 저장합니다.
+## 5) 폴백, 보안, 인증
+- RAG: hint 모드는 히스토리 미기록 가이던스, error 모드는 `ErrUnavailable`.
+- 가드레일: PII / 프롬프트 인젝션 시 `ErrGuardrailViolation` (히스토리 미기록).
+- 인증: `X-API-Key`만 허용. Basic/Bearer/OAuth/커스텀 Authorization 거부.
 
+## 6) 프로바이더 스킵 및 차이
+- 미설정/접속 불가 → `specs/001-agno-agents-refactor/artifacts/coverage/providers.log` 에 스킵 이유 기록.
+- Python 대비 차이 → `specs/001-agno-agents-refactor/contracts/deviations.md` (fixtures 다수는 shape 플레이스홀더).
+- 벤치: `specs/001-agno-agents-refactor/artifacts/baseline/python-bench.json` 과 비교(존재 시). 현행 Go 샘플은 `specs/001-agno-agents-refactor/artifacts/bench.txt`, 목표 p95 -20%, 피크 메모리 -25%.
+
+## 7) 문서 빌드 (VitePress)
 ```bash
-<your-project-root>/examples/openai_quickstart/main.go
+cd docs
+npm run docs:build   # 최초 npm install 필요할 수 있음
+# 또는:
+DOCS_DIR=$(pwd)/docs make docs
 ```
-
-프로젝트 루트에서 실행합니다.
-
-```bash
-cd <your-project-root>
-go run ./examples/openai_quickstart
-```
-
-모델에 따라 내용은 달라지겠지만, 대략 다음과 같은 출력이 나와야 합니다.
-
-```text
-assistant: Agno-Go는 Go로 구현된 AgentOS이며, ...
-```
-
-## 다음 단계
-
-- [구성 및 보안](./config-and-security) 문서를 읽고, 각 프로바이더의 키/엔드포인트/런타임 옵션을 어떻게 설정할지 확인하세요  
-- [프로바이더 매트릭스](./providers/matrix)에서 각 프로바이더가 지원하는 Chat / Embedding / Streaming 기능과 필요한 환경 변수를 확인하세요  
-- AgentOS HTTP 런타임(agents / sessions / messages)은 아직 안정화 중이며, 향후 별도의 문서에서 다룰 예정입니다. 그 전까지는 `go/pkg/providers/*`를 주요 공개 엔트리 포인트로 사용하는 것을 권장합니다  
-
