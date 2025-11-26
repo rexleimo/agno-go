@@ -39,6 +39,7 @@ tmp/
 
 # Dependencies
 vendor/
+node_modules/
 
 # Local env/config
 .env

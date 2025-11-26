@@ -1,0 +1,259 @@
+openapi: 3.1.0
+info:
+  title: Agno-Go Documentation Surface
+  version: 0.1.0
+  description: |
+    This OpenAPI document models the HTTP-facing behavior that the official
+    documentation must describe for Agno-Go AgentOS and its runtime server.
+    It does not introduce new runtime endpoints; instead, it captures the
+    existing HTTP surface so that docs, contracts, and fixtures remain aligned.
+servers:
+  - url: https://rexai.top/agno-Go
+    description: Public documentation site (static)
+  - url: http://localhost:8080
+    description: Local AgentOS runtime (example only)
+
+paths:
+  /health:
+    get:
+      summary: Health check
+      description: |
+        Returns the health status of the AgentOS runtime, including version and
+        provider statuses. Quickstart and core API docs must show at least one
+        example of calling this endpoint.
+      responses:
+        '200':
+          description: Health information
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  ts:
+                    type: string
+                    format: date-time
+                  version:
+                    type: string
+                  providers:
+                    type: array
+                    items:
+                      type: object
+
+  /agents:
+    post:
+      summary: Create an agent
+      description: |
+        Creates a new agent definition in the runtime. Documentation must include
+        a minimal example payload and show how this maps to later session and
+        message calls.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Agent'
+      responses:
+        '201':
+          description: Agent created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  agentId:
+                    type: string
+        '400':
+          description: Invalid payload or configuration
+
+  /agents/{agentId}:
+    get:
+      summary: Get agent definition
+      parameters:
+        - in: path
+          name: agentId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Agent definition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Agent'
+        '400':
+          description: Invalid agentId
+        '404':
+          description: Agent not found
+
+  /agents/{agentId}/sessions:
+    post:
+      summary: Create a session
+      description: |
+        Creates a session for a given agent. Docs should explain the meaning of
+        userId, metadata, and how sessions relate to messages.
+      parameters:
+        - in: path
+          name: agentId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                userId:
+                  type: string
+                metadata:
+                  type: object
+      responses:
+        '201':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  userId:
+                    type: string
+                  metadata:
+                    type: object
+
+  /agents/{agentId}/sessions/{sessionId}/messages:
+    post:
+      summary: Send a message to an agent session
+      description: |
+        Sends a message within a session. If the `stream` query parameter is
+        `true`, the response uses server-sent events; otherwise it returns a
+        single JSON payload. Quickstart and advanced guides must include both
+        non-streaming and streaming examples, as applicable.
+      parameters:
+        - in: path
+          name: agentId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: sessionId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: stream
+          required: false
+          schema:
+            type: boolean
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageRequest'
+      responses:
+        '200':
+          description: Non-streaming response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  messageId:
+                    type: string
+                  content:
+                    type: array
+                    items:
+                      type: object
+                  toolCalls:
+                    type: array
+                    items:
+                      type: object
+                  usage:
+                    type: object
+                  state:
+                    type: string
+        '207':
+          description: Streaming response (server-sent events)
+        '4XX':
+          description: Validation or state error
+
+  /agents/{agentId}/tools/{toolName}:
+    patch:
+      summary: Toggle a tool for an agent
+      description: |
+        Enables or disables a tool on an agent. Advanced docs may reference this
+        when demonstrating tool-based workflows.
+      parameters:
+        - in: path
+          name: agentId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: toolName
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: Tool toggle result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  toolName:
+                    type: string
+                  enabled:
+                    type: boolean
+                  tools:
+                    type: array
+                    items:
+                      type: object
+
+components:
+  schemas:
+    Agent:
+      type: object
+      description: High-level agent definition as exposed by the runtime.
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        model:
+          type: string
+        tools:
+          type: array
+          items:
+            type: object
+        config:
+          type: object
+
+    MessageRequest:
+      type: object
+      description: |
+        Request payload used when sending messages into an agent session.
+      properties:
+        role:
+          type: string
+        content:
+          type: string
+        stream:
+          type: boolean
+

@@ -1,0 +1,28 @@
+goos: darwin
+goarch: arm64
+pkg: github.com/rexleimo/agno-go/tests/bench
+cpu: Apple M3
+             │ /Users/molei/codes/agno-Go/specs/001-go-agno-rewrite/artifacts/bench/bench.txt │
+             │                                     sec/op                                     │
+ChatStream-8                                                                      30.00 ± ∞ ¹
+¹ need >= 6 samples for confidence interval at level 0.95
+
+             │ /Users/molei/codes/agno-Go/specs/001-go-agno-rewrite/artifacts/bench/bench.txt │
+             │                                      MB/s                                      │
+ChatStream-8                                                                      0.000 ± ∞ ¹
+¹ need >= 6 samples for confidence interval at level 0.95
+
+             │ /Users/molei/codes/agno-Go/specs/001-go-agno-rewrite/artifacts/bench/bench.txt │
+             │                                    ops/sec                                     │
+ChatStream-8                                                                     11.35k ± ∞ ¹
+¹ need >= 6 samples for confidence interval at level 0.95
+
+             │ /Users/molei/codes/agno-Go/specs/001-go-agno-rewrite/artifacts/bench/bench.txt │
+             │                                      B/op                                      │
+ChatStream-8                                                                    332.2Gi ± ∞ ¹
+¹ need >= 6 samples for confidence interval at level 0.95
+
+             │ /Users/molei/codes/agno-Go/specs/001-go-agno-rewrite/artifacts/bench/bench.txt │
+             │                                   allocs/op                                    │
+ChatStream-8                                                                     4.815M ± ∞ ¹
+¹ need >= 6 samples for confidence interval at level 0.95

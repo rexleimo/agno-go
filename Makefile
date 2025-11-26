@@ -27,7 +27,7 @@ BENCH_ENV := $(GO_ENV_BASE) GOMEMLIMIT=$${GOMEMLIMIT:-$(DEFAULT_GOMEMLIMIT)} GOG
 DOCS_DIR ?= ../rex-agno/agno-Go/docs
 DOCS_CMD ?= npm run docs:build
 
-.PHONY: help fmt lint test providers-test coverage bench gen-fixtures release constitution-check tidy audit-no-python docs
+.PHONY: help fmt lint test providers-test coverage bench gen-fixtures release constitution-check tidy audit-no-python docs-build docs-serve docs-check
 
 help: ## Show available targets
 	@echo "Available targets:"
@@ -120,3 +120,19 @@ $(GOCACHE_DIR):
 
 $(ARTIFACT_DIR):
 	@mkdir -p $(ARTIFACT_DIR)
+	
+docs-build: ## Build VitePress documentation site
+	@echo "==> docs: build"
+	@cd $(ROOT) && if [ ! -f "docs/package.json" ]; then echo "docs/package.json not found; initialize docs/ first"; exit 1; fi
+	@cd $(ROOT) && command -v pnpm >/dev/null 2>&1 && pnpm install --filter ./docs || npm install --prefix ./docs
+	@cd $(ROOT) && command -v pnpm >/dev/null 2>&1 && pnpm --filter ./docs run docs:build || npm --prefix ./docs run docs:build
+
+docs-serve: ## Serve VitePress docs locally for preview
+	@echo "==> docs: dev"
+	@cd $(ROOT) && command -v pnpm >/dev/null 2>&1 && pnpm --filter ./docs run docs:dev || npm --prefix ./docs run docs:dev
+
+docs-check: ## Run docs build and path safety checks
+	@echo "==> docs: check (build + path scan)"
+	@cd $(ROOT) && if [ ! -x "scripts/check-docs-paths.sh" ]; then echo "scripts/check-docs-paths.sh not found or not executable"; exit 1; fi
+	@cd $(ROOT) && $(ROOT)/scripts/check-docs-paths.sh
+	@$(MAKE) --no-print-directory docs-build

@@ -14,6 +14,8 @@ description: "功能实施任务模板"
 
 **栈约束**：任务必须指向真实路径，覆盖 Go 模块（`go/internal/...`、`go/pkg/...`、`go/tests/...`）、供应商适配器（`go/pkg/providers/<provider>/`）、治具/契约（`specs/.../contracts/fixtures`）、基准/报告（`specs/.../artifacts/`）、脚本（`scripts/`）以及 `Makefile`（自动化入口）。禁止将 `./agno` Python 代码作为运行时依赖。
 
+**文档与多语言**：涉及文档的任务必须指向 VitePress 工程中的真实路径（或对应仓库），说明影响的路由/侧边栏节点，并标明目标语言（en/zh/ja/ko）；如暂缺翻译，需在任务中显式标记待补项并规划补齐顺序。
+
 **组织方式**：任务按用户故事分组，确保每个故事都能独立实现与测试。
 
 ## 格式：`[ID] [P?] [Story] 描述`
@@ -29,6 +31,7 @@ description: "功能实施任务模板"
 - **状态/工具**：`go/pkg/memory/`、`go/pkg/tools/` 或等价目录；需保持与核心接口一致。
 - **治具与基准**：`specs/<feature>/contracts/fixtures/`（Python 对照治具）、`specs/<feature>/contracts/deviations.md`、`specs/<feature>/artifacts/`（覆盖率/基准/报告）。
 - **自动化与配置**：`Makefile`（fmt/lint/test/providers-test/coverage/bench/gen-fixtures/release）、`.env.example`（供应商变量占位）、`scripts/`（Go/标准工具脚本）。
+- **文档（VitePress 官方文档站）**：VitePress 文档工程源码（仓库/目录由项目说明或规格定义）；任务中需引用具体路径与受影响的语言（en/zh/ja/ko），并与 `specs/<feature>/quickstart.md` 对齐。
 - 下文示例均以该结构为例，交付时请替换为真实路径。
 
 <!-- 

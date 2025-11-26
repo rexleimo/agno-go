@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ESNext",
+    "jsx": "preserve",
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "types": []
+  },
+  "include": ["docs/.vitepress/**/*", "docs/**/*.ts", "docs/**/*.tsx", "docs/**/*.js"]
+}

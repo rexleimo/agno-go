@@ -1,0 +1,50 @@
+PASS
+ok  	github.com/rexleimo/agno-go/internal/agent	0.591s
+?   	github.com/rexleimo/agno-go/internal/deps	[no test files]
+?   	github.com/rexleimo/agno-go/internal/memory	[no test files]
+?   	github.com/rexleimo/agno-go/internal/model	[no test files]
+?   	github.com/rexleimo/agno-go/internal/runtime	[no test files]
+PASS
+ok  	github.com/rexleimo/agno-go/internal/runtime/config	0.277s
+PASS
+ok  	github.com/rexleimo/agno-go/internal/runtime/middleware	0.295s
+?   	github.com/rexleimo/agno-go/internal/tool	[no test files]
+?   	github.com/rexleimo/agno-go/pkg/memory	[no test files]
+?   	github.com/rexleimo/agno-go/pkg/providers	[no test files]
+?   	github.com/rexleimo/agno-go/pkg/providers/cerebras	[no test files]
+PASS
+ok  	github.com/rexleimo/agno-go/pkg/providers/gemini	0.332s
+?   	github.com/rexleimo/agno-go/pkg/providers/glm4	[no test files]
+PASS
+ok  	github.com/rexleimo/agno-go/pkg/providers/groq	0.308s
+?   	github.com/rexleimo/agno-go/pkg/providers/modelscope	[no test files]
+?   	github.com/rexleimo/agno-go/pkg/providers/ollama	[no test files]
+PASS
+ok  	github.com/rexleimo/agno-go/pkg/providers/openai	0.293s
+PASS
+ok  	github.com/rexleimo/agno-go/pkg/providers/openrouter	0.308s
+?   	github.com/rexleimo/agno-go/pkg/providers/shared	[no test files]
+?   	github.com/rexleimo/agno-go/pkg/providers/siliconflow	[no test files]
+?   	github.com/rexleimo/agno-go/pkg/providers/stub	[no test files]
+?   	github.com/rexleimo/agno-go/pkg/tools	[no test files]
+PASS
+ok  	github.com/rexleimo/agno-go/scripts/gen_fixtures	0.277s
+PASS
+ok  	github.com/rexleimo/agno-go/scripts/gen_provider_baseline	0.324s
+goos: darwin
+goarch: arm64
+pkg: github.com/rexleimo/agno-go/tests/bench
+cpu: Apple M3
+BenchmarkChatStream-8   	       1	30000068291 ns/op	   0.00 MB/s	     11347 ops/sec	356731787992 B/op	 4814676 allocs/op
+PASS
+ok  	github.com/rexleimo/agno-go/tests/bench	30.317s
+PASS
+ok  	github.com/rexleimo/agno-go/tests/contract	0.444s
+PASS
+ok  	github.com/rexleimo/agno-go/tests/memory	0.198s
+PASS
+ok  	github.com/rexleimo/agno-go/tests/model	0.130s
+PASS
+ok  	github.com/rexleimo/agno-go/tests/providers	0.155s
+PASS
+ok  	github.com/rexleimo/agno-go/tests/runtime	0.143s

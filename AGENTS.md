@@ -1,6 +1,6 @@
 # agno-Go 开发指引
 
-自动汇总于所有功能计划。最后更新： 2025-11-21
+自动汇总于所有功能计划。最后更新： 2025-11-22
 
 ## 在用技术
 - Go 1.25.1 作为唯一运行时；Python 3.11 仅用于离线治具生成
@@ -15,10 +15,12 @@
 /Users/rex/cool.cnb/agno-Go/
 ├── agno/                         # Python 参考实现（只读）
 ├── specs/001-go-agno-rewrite/    # 当前迭代规格、计划、契约、研究
+├── specs/001-vitepress-docs/     # 官方文档站规格、计划、契约与任务（VitePress 多语言）
 ├── go/                           # 计划新增的 Go 模块根（cmd/internal/pkg/tests）
 ├── scripts/                      # Go/标准工具脚本
-├── Makefile                      # fmt/lint/test/providers-test/coverage/bench/gen-fixtures/release/constitution-check
-├── .github/workflows/ci.yml      # 运行 make fmt/lint/test/providers-test/coverage/bench/constitution-check 并上传工件
+├── docs/                         # VitePress 官方文档工程（en/zh/ja/ko 多语言）
+├── Makefile                      # fmt/lint/test/providers-test/coverage/bench/gen-fixtures/release/constitution-check/docs-build/docs-check
+├── .github/workflows/ci.yml      # 运行 make fmt/lint/test/providers-test/coverage/bench/constitution-check/docs-check 并上传工件
 └── .env.example                  # 待补全的供应商占位
 ```
 
@@ -40,4 +42,5 @@
 - 契约/供应商回归推荐命令（复用本地缓存）：`GOCACHE=$PWD/.cache/go-build go test ./tests/contract ./tests/providers`，输出/跳过原因会写入 `specs/001-go-agno-rewrite/artifacts/coverage/providers.log`。
 - 替换治具后记得更新 `contracts/deviations.md` 记录与 Python 的差异。
 - 基线治具生成：可运行 `go run ./go/scripts/gen_provider_baseline`（读取 `.env` + `config/default.yaml`）生成/更新 fixtures；已生成 Gemini/GLM4/Groq/SiliconFlow 的 chat 基线，以及 Gemini/SiliconFlow 的 embedding；Groq/GLM4 embedding、Cerebras/ModelScope/Ollama 仍因限额/鉴权/接口兼容性保留占位（详见 `contracts/deviations.md`）。Ollama 本地建议 `OLLAMA_ENDPOINT=http://localhost:11434/api`。
+- 官方文档站：用户文档统一通过基于 VitePress 的站点 `https://rexai.top/agno-Go/` 提供，其源代码位于仓库根目录的 `docs/`（多语言 VitePress 工程），其内容应与 `specs/001-go-agno-rewrite` 和 `specs/001-vitepress-docs` 中的 quickstart/契约保持一致，并在英文、中文、日文、韩文四种语言之间保持结构与示例的对齐。
 <!-- MANUAL ADDITIONS END -->

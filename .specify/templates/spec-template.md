@@ -102,3 +102,4 @@
 - **自动化与 Make**：枚举需要新增或扩展的 make 目标（fmt/lint/test/providers-test/coverage/bench/gen-fixtures/release），并指明 CI 复用方式。
 - **测试纪律 + 85% 覆盖率**：阐明要追加的 Go 单元、契约、供应商集成测试与覆盖率策略，确保综合覆盖率 ≥85%。
 - **密钥与安全**：说明 `.env.example` 中的变量、secret 注入方式与脱敏措施，避免提交真实 key。
+- **VitePress 官方文档与多语言**：列出需要新增/更新的 VitePress 文档页面与导航（包括英文、中文、日文、韩文），并说明如何与 `quickstart.md` 中的示例与契约保持一致。
