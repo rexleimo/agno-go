@@ -78,9 +78,10 @@ func (m *WorkflowMetrics) Snapshot() map[string]interface{} {
 	}
 	if !m.completed.IsZero() {
 		result["completed_at"] = m.completed.UTC()
-	}
-	if duration := m.duration; duration > 0 {
-		result["duration_seconds"] = duration.Seconds()
+		// Always report the final duration once completed, even if it is
+		// zero (stop and snapshot within the same nanosecond).
+		// 完成后始终报告最终时长，即使为 0（同一纳秒内 stop 与 snapshot）。
+		result["duration_seconds"] = m.duration.Seconds()
 	} else if m.isRunning {
 		result["duration_seconds"] = time.Since(m.startedAt).Seconds()
 	}

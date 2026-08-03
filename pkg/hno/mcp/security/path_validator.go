@@ -46,14 +46,8 @@ func NewPathValidator(validator *CommandValidator) *PathValidator {
 // 7. 白名单检查
 // 8. 参数验证
 func (pv *PathValidator) ValidateExecutable(executable string, args []string) error {
-	// Layer 1: Check for shell metacharacters in executable
-	// 第 1 层: 检查可执行文件中的 shell 元字符
-	if err := pv.validator.checkBlockedChars(executable); err != nil {
-		return fmt.Errorf("executable contains dangerous characters: %w", err)
-	}
-
-	// Layer 2: Split command if needed (handle spaces)
-	// 第 2 层: 如果需要则分割命令（处理空格）
+	// Split command if needed (handle spaces)
+	// 如果需要则分割命令（处理空格）
 	parts := pv.splitCommand(executable)
 	if len(parts) == 0 {
 		return fmt.Errorf("empty executable after parsing")
@@ -63,20 +57,28 @@ func (pv *PathValidator) ValidateExecutable(executable string, args []string) er
 	// 使用第一部分作为实际的可执行文件
 	firstPart := parts[0]
 
-	// Layer 3: Relative path validation (./ or ../)
-	// 第 3 层: 相对路径验证 (./ 或 ../)
+	// Paths (relative or absolute) bypass the generic metacharacter check
+	// because path separators (/ and \) are not injection vectors. On
+	// Windows, drive paths like C:\... are absolute.
+	// 路径（相对或绝对）绕过通用元字符检查，因为路径分隔符（/ 和 \）
+	// 不是注入向量。Windows 上 C:\... 属于绝对路径。
 	if pv.isRelativePath(firstPart) {
 		return pv.validateRelativePath(firstPart, args)
 	}
-
-	// Layer 4: Absolute path validation
-	// 第 4 层: 绝对路径验证
 	if filepath.IsAbs(firstPart) {
 		return pv.validateAbsolutePath(firstPart, args)
 	}
 
-	// Layer 5: Check current directory
-	// 第 5 层: 检查当前目录
+	// Bare command name: reject shell metacharacters in the WHOLE input
+	// (e.g. "python | cat" or "python; rm -rf /" are injection attempts).
+	// 裸命令名：对完整输入做 shell 元字符检查
+	// （如 "python | cat" 或 "python; rm -rf /" 属于注入尝试）。
+	if err := pv.validator.checkBlockedChars(executable); err != nil {
+		return fmt.Errorf("executable contains dangerous characters: %w", err)
+	}
+
+	// Check current directory
+	// 检查当前目录
 	if pv.existsInCurrentDir(firstPart) {
 		// File exists in current directory, validate as relative path
 		// 文件存在于当前目录，作为相对路径验证
@@ -107,8 +109,8 @@ func (pv *PathValidator) ValidateExecutable(executable string, args []string) er
 // isRelativePath checks if the path is a relative path starting with ./ or ../
 // isRelativePath 检查路径是否为以 ./ 或 ../ 开头的相对路径
 func (pv *PathValidator) isRelativePath(path string) bool {
-	// Unix-style relative paths
-	// Unix 风格的相对路径
+	// Unix-style relative paths (also valid on Windows, e.g. ./script.bat)
+	// Unix 风格的相对路径（Windows 上也有效，如 ./script.bat）
 	if strings.HasPrefix(path, "./") || strings.HasPrefix(path, "../") {
 		return true
 	}

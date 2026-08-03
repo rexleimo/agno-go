@@ -2,17 +2,43 @@ package arxiv
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
 
+// arxivXML is a minimal valid arXiv Atom feed for tests.
+// arxivXML 是测试用的最小合法 arXiv Atom feed。
+const arxivXML = `<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <entry>
+    <id>http://arxiv.org/abs/2301.00001</id>
+    <title>Machine Learning Advances</title>
+    <author><name>Alice Example</name></author>
+    <author><name>Bob Example</name></author>
+  </entry>
+</feed>`
+
+// newTestToolkit spins up a local arXiv-like endpoint.
+// newTestToolkit 启动本地类 arXiv 端点。
+func newTestToolkit(t *testing.T) (*ArXivToolkit, *httptest.Server) {
+	t.Helper()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/atom+xml")
+		_, _ = w.Write([]byte(arxivXML))
+	}))
+	t.Cleanup(srv.Close)
+	return NewWithBase(srv.URL), srv
+}
+
 func TestArXivToolkit_SearchPapers(t *testing.T) {
-	toolkit := New()
+	toolkit, _ := newTestToolkit(t)
 
 	// Test searching for papers
 	result, err := toolkit.searchPapers(context.Background(), map[string]interface{}{
-		"query":        "machine learning",
-		"max_results":  5,
+		"query":       "machine learning",
+		"max_results": 5,
 	})
 
 	if err != nil {
@@ -68,7 +94,7 @@ func TestArXivToolkit_SearchPapers(t *testing.T) {
 }
 
 func TestArXivToolkit_GetPaperDetails(t *testing.T) {
-	toolkit := New()
+	toolkit, _ := newTestToolkit(t)
 
 	// Test getting paper details (using a known paper ID)
 	result, err := toolkit.getPaperDetails(context.Background(), map[string]interface{}{

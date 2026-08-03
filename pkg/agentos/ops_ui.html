@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HNO AgentOS · 运维平台</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --border: #e3e6ea;
+    --text: #1a1d21;
+    --muted: #6b7280;
+    --accent: #00ADD8;
+    --ok: #16a34a;
+    --warn: #d97706;
+    --err: #dc2626;
+    --mono: "SF Mono", "Cascadia Code", Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: var(--bg); color: var(--text); padding: 32px 24px;
+  }
+  header { max-width: 1080px; margin: 0 auto 24px; }
+  header h1 { font-size: 22px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+  header h1 .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--ok); display: inline-block; }
+  header p { color: var(--muted); font-size: 13px; margin-top: 6px; }
+  .grid { max-width: 1080px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .card.full { grid-column: 1 / -1; }
+  .card h2 { font-size: 15px; font-weight: 600; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; }
+  .card h2 .refresh { font-size: 12px; color: var(--muted); font-weight: 400; }
+  .stat { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .stat:last-child { border-bottom: none; }
+  .stat .label { color: var(--muted); }
+  .stat .value { font-family: var(--mono); font-weight: 500; }
+  .tag { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 12px; font-weight: 500; }
+  .tag.ok { background: #ecfdf3; color: var(--ok); }
+  .tag.warn { background: #fffaeb; color: var(--warn); }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; }
+  td.mono { font-family: var(--mono); font-size: 12px; }
+  .empty { color: var(--muted); font-size: 13px; padding: 12px 0; text-align: center; }
+  .skill-list li { list-style: none; padding: 10px 0; border-bottom: 1px solid var(--border); }
+  .skill-list li:last-child { border-bottom: none; }
+  .skill-list .name { font-weight: 600; font-size: 14px; }
+  .skill-list .desc { color: var(--muted); font-size: 13px; margin-top: 2px; }
+  footer { max-width: 1080px; margin: 24px auto 0; color: var(--muted); font-size: 12px; }
+  .ops-status { display: flex; gap: 8px; flex-wrap: wrap; }
+  .ops-pill { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 20px; font-size: 12px; background: #f0f2f5; }
+  .ops-pill.on { background: #ecfdf3; color: var(--ok); }
+  .ops-pill.off { background: #fef2f2; color: var(--err); }
+  @media (max-width: 760px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="dot"></span> HNO AgentOS · 运维平台</h1>
+  <p>Agent 运行时观测 · 技能目录 · 评估记录 · 数据每 10 秒自动刷新</p>
+</header>
+
+<div class="grid">
+  <!-- 运行状态 -->
+  <div class="card">
+    <h2>运行状态 <span class="refresh" id="uptime-label">—</span></h2>
+    <div id="observability">
+      <div class="empty">加载中…</div>
+    </div>
+  </div>
+
+  <!-- 技能目录 -->
+  <div class="card">
+    <h2>技能目录 <span class="refresh" id="skill-count">—</span></h2>
+    <ul class="skill-list" id="skills">
+      <li class="empty">加载中…</li>
+    </ul>
+  </div>
+
+  <!-- 评估记录 -->
+  <div class="card full">
+    <h2>评估记录 <span class="refresh" id="eval-count">—</span></h2>
+    <table>
+      <thead>
+        <tr><th>ID</th><th>模型</th><th>运行数</th><th>成功</th><th>通过率</th><th>耗时</th><th>时间</th></tr>
+      </thead>
+      <tbody id="eval-runs">
+        <tr><td colspan="7" class="empty">加载中…</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<footer>HNO AgentOS · 运维端点 /api/v1/ops/* · 自动刷新间隔 10s</footer>
+
+<script>
+const API = "{{.APIBase}}";
+
+async function fetchJSON(path) {
+  const resp = await fetch(API + path);
+  if (!resp.ok) throw new Error(path + " -> " + resp.status);
+  return resp.json();
+}
+
+function renderObservability(data) {
+  const el = document.getElementById("observability");
+  document.getElementById("uptime-label").textContent = "uptime " + (data.uptime || "—");
+  const agents = data.agents !== undefined ? data.agents : "—";
+  const sessions = data.sessions !== undefined ? data.sessions : "—";
+  const ops = data.ops || {};
+  const pill = (name, on) => `<span class="ops-pill ${on ? "on" : "off"}">${name} ${on ? "●" : "○"}</span>`;
+  el.innerHTML = `
+    <div class="stat"><span class="label">启动时间</span><span class="value">${data.started_at || "—"}</span></div>
+    <div class="stat"><span class="label">运行时长</span><span class="value">${data.uptime || "—"}</span></div>
+    <div class="stat"><span class="label">Agent 数</span><span class="value">${agents}</span></div>
+    <div class="stat"><span class="label">会话数</span><span class="value">${sessions}</span></div>
+    <div class="stat"><span class="label">能力</span><span class="ops-status">${pill("skills", !!ops.skills)}${pill("eval-runs", !!ops.eval_runs)}</span></div>
+  `;
+}
+
+function renderSkills(data) {
+  const el = document.getElementById("skills");
+  const skills = data.skills || [];
+  document.getElementById("skill-count").textContent = skills.length + " 个";
+  if (skills.length === 0) {
+    el.innerHTML = `<li class="empty">未注册技能</li>`;
+    return;
+  }
+  el.innerHTML = skills.map(s => `
+    <li><div class="name">${escapeHtml(s.name)}</div><div class="desc">${escapeHtml(s.description || "")}</div></li>
+  `).join("");
+}
+
+function renderEvalRuns(data) {
+  const tbody = document.getElementById("eval-runs");
+  const runs = data.eval_runs || [];
+  document.getElementById("eval-count").textContent = runs.length + " 条";
+  if (runs.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" class="empty">暂无评估记录 — 通过 POST ${API}/eval-runs 提交</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = runs.map(r => {
+    const rate = r.runs > 0 ? (100 * r.successes / r.runs).toFixed(0) + "%" : "—";
+    return `
+      <tr>
+        <td class="mono">${escapeHtml(r.id)}</td>
+        <td>${escapeHtml(r.model)}</td>
+        <td>${r.runs}</td>
+        <td>${r.successes}</td>
+        <td><span class="tag ${rate === "100%" ? "ok" : "warn"}">${rate}</span></td>
+        <td class="mono">${escapeHtml(r.duration || "—")}</td>
+        <td class="mono">${escapeHtml(r.timestamp || "—")}</td>
+      </tr>`;
+  }).join("");
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+
+async function refresh() {
+  try {
+    const [obs, skills, evals] = await Promise.all([
+      fetchJSON("/observability"),
+      fetchJSON("/skills"),
+      fetchJSON("/eval-runs"),
+    ]);
+    renderObservability(obs);
+    renderSkills(skills);
+    renderEvalRuns(evals);
+  } catch (err) {
+    console.error("ops refresh failed:", err);
+  }
+}
+
+refresh();
+setInterval(refresh, 10000);
+</script>
+</body>
+</html>

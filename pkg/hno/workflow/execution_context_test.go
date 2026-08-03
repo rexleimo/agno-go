@@ -294,8 +294,10 @@ func TestExecutionContext_NewExecutionContextWithSession(t *testing.T) {
 		t.Error("expected Data to be initialized")
 	}
 
-	if execCtx.Metadata == nil {
-		t.Error("expected Metadata to be initialized")
+	// Metadata is lazily initialized (nil until first write).
+	// Metadata 为懒初始化（首次写入前为 nil）。
+	if execCtx.Metadata != nil {
+		t.Error("expected Metadata to be nil (lazy initialization)")
 	}
 
 	if execCtx.SessionState == nil {

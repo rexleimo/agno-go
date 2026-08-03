@@ -124,7 +124,7 @@ func (r *WorkflowRun) MarkStarted() {
 func (r *WorkflowRun) MarkCompleted(output string) {
 	r.Status = RunStatusCompleted
 	r.Output = output
-	r.CompletedAt = time.Now()
+	r.CompletedAt = afterStarted(r.StartedAt)
 }
 
 // MarkFailed marks the run as failed with the given error
@@ -132,14 +132,27 @@ func (r *WorkflowRun) MarkCompleted(output string) {
 func (r *WorkflowRun) MarkFailed(err error) {
 	r.Status = RunStatusFailed
 	r.Error = err.Error()
-	r.CompletedAt = time.Now()
+	r.CompletedAt = afterStarted(r.StartedAt)
 }
 
 // MarkCancelled marks the run as cancelled
 // MarkCancelled 将运行标记为已取消
 func (r *WorkflowRun) MarkCancelled() {
 	r.Status = RunStatusCancelled
-	r.CompletedAt = time.Now()
+	r.CompletedAt = afterStarted(r.StartedAt)
+}
+
+// afterStarted returns a timestamp strictly after StartedAt so that
+// CompletedAt > StartedAt always holds even when both calls land in the
+// same nanosecond.
+// afterStarted 返回严格晚于 StartedAt 的时间戳，保证 CompletedAt > StartedAt
+// 即使在同一个纳秒内也成立。
+func afterStarted(started time.Time) time.Time {
+	now := time.Now()
+	if !now.After(started) {
+		return started.Add(time.Nanosecond)
+	}
+	return now
 }
 
 // ApplyCancellation enriches cancellation metadata.

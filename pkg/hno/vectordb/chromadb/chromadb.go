@@ -1,39 +1,29 @@
+// Package chromadb implements the VectorDB interface using ChromaDB via the
+// v2 API client (chroma-go v0.4.x). The v2 client is pure Go (no cgo), so
+// this package builds on Windows as well.
+//
+// chromadb 包通过 v2 API 客户端（chroma-go v0.4.x）实现 VectorDB 接口。
+// v2 客户端为纯 Go（无 cgo），因此本包在 Windows 上也能构建。
 package chromadb
 
 import (
 	"context"
 	"fmt"
+	"reflect"
 
-	chroma "github.com/amikos-tech/chroma-go"
-	"github.com/amikos-tech/chroma-go/types"
+	chroma "github.com/amikos-tech/chroma-go/pkg/api/v2"
+	"github.com/amikos-tech/chroma-go/pkg/embeddings"
 
 	"github.com/rexleimo/agno-go/pkg/hno/vectordb"
 )
 
-// Helper functions for embedding conversion
-
-// convertToChromaEmbeddings converts [][]float32 to []*types.Embedding
-func convertToChromaEmbeddings(embeddings [][]float32) []*types.Embedding {
-	return types.NewEmbeddingsFromFloat32(embeddings)
-}
-
-// convertFromChromaEmbeddings converts []*types.Embedding to [][]float32
-func convertFromChromaEmbeddings(embeddings []*types.Embedding) [][]float32 {
-	result := make([][]float32, len(embeddings))
-	for i, emb := range embeddings {
-		if emb != nil && emb.ArrayOfFloat32 != nil {
-			result[i] = *emb.ArrayOfFloat32
-		}
-	}
-	return result
-}
-
 // ChromaDB implements the VectorDB interface using ChromaDB
 type ChromaDB struct {
-	client         *chroma.Client
-	collection     *chroma.Collection
+	client         chroma.Client
+	collection     chroma.Collection
 	collectionName string
 	embeddingFunc  vectordb.EmbeddingFunction
+	distanceFunc   embeddings.DistanceMetric
 }
 
 // Config holds ChromaDB configuration
@@ -80,23 +70,30 @@ func New(config Config) (*ChromaDB, error) {
 	if config.Tenant == "" {
 		config.Tenant = "default_tenant"
 	}
+	distanceMetric := embeddings.L2
 	if config.DistanceFunction == "" {
 		config.DistanceFunction = vectordb.L2
+	}
+	switch config.DistanceFunction {
+	case vectordb.Cosine:
+		distanceMetric = embeddings.COSINE
+	case vectordb.InnerProduct:
+		distanceMetric = embeddings.IP
+	default:
+		distanceMetric = embeddings.L2
 	}
 
 	// Create client options
 	var clientOpts []chroma.ClientOption
-	clientOpts = append(clientOpts, chroma.WithBasePath(config.BaseURL))
-	clientOpts = append(clientOpts, chroma.WithTenant(config.Tenant))
-	clientOpts = append(clientOpts, chroma.WithDatabase(config.Database))
-
-	// Add cloud API key if provided
+	clientOpts = append(clientOpts, chroma.WithBaseURL(config.BaseURL))
 	if config.CloudAPIKey != "" {
-		clientOpts = append(clientOpts, chroma.WithAuth(types.NewTokenAuthCredentialsProvider(config.CloudAPIKey, types.XChromaTokenHeader)))
+		clientOpts = append(clientOpts, chroma.WithAuth(
+			chroma.NewTokenAuthCredentialsProvider(config.CloudAPIKey, chroma.XChromaTokenHeader),
+		))
 	}
 
 	// Create ChromaDB client
-	client, err := chroma.NewClient(clientOpts...)
+	client, err := chroma.NewHTTPClient(clientOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ChromaDB client: %w", err)
 	}
@@ -105,6 +102,7 @@ func New(config Config) (*ChromaDB, error) {
 		client:         client,
 		collectionName: config.CollectionName,
 		embeddingFunc:  config.EmbeddingFunction,
+		distanceFunc:   distanceMetric,
 	}
 
 	return db, nil
@@ -116,39 +114,26 @@ func (c *ChromaDB) CreateCollection(ctx context.Context, name string, metadata m
 		c.collectionName = name
 	}
 
-	// Convert distance function
-	distanceFunc := types.L2
-	if metadata != nil {
-		if df, ok := metadata["distance_function"].(vectordb.DistanceFunction); ok {
-			switch df {
-			case vectordb.Cosine:
-				distanceFunc = types.COSINE
-			case vectordb.InnerProduct:
-				distanceFunc = types.IP
-			default:
-				distanceFunc = types.L2
-			}
-		}
-	}
-
 	// Convert metadata to ChromaDB format
-	chromaMetadata := make(map[string]interface{})
+	var chromaMetadata chroma.CollectionMetadata
 	if metadata != nil {
+		clean := make(map[string]interface{})
 		for k, v := range metadata {
 			if k != "distance_function" {
-				chromaMetadata[k] = v
+				clean[k] = v
 			}
+		}
+		if len(clean) > 0 {
+			chromaMetadata = chroma.NewMetadataFromMap(clean)
 		}
 	}
 
-	// Create or get collection (createOrGet = true means get if exists)
-	collection, err := c.client.CreateCollection(
+	// Get or create collection
+	collection, err := c.client.GetOrCreateCollection(
 		ctx,
 		c.collectionName,
-		chromaMetadata,
-		true, // createOrGet = true
-		nil,  // embedding function (we handle it ourselves)
-		distanceFunc,
+		chroma.WithHNSWSpaceCreate(c.distanceFunc),
+		chroma.WithCollectionMetadataCreate(chromaMetadata),
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create collection: %w", err)
@@ -164,7 +149,7 @@ func (c *ChromaDB) DeleteCollection(ctx context.Context, name string) error {
 		name = c.collectionName
 	}
 
-	_, err := c.client.DeleteCollection(ctx, name)
+	err := c.client.DeleteCollection(ctx, name)
 	if err != nil {
 		return fmt.Errorf("failed to delete collection: %w", err)
 	}
@@ -189,23 +174,24 @@ func (c *ChromaDB) Add(ctx context.Context, documents []vectordb.Document) error
 	}
 
 	// Prepare data for ChromaDB
-	ids := make([]string, len(documents))
+	ids := make([]chroma.DocumentID, len(documents))
 	contents := make([]string, len(documents))
-	metadatas := make([]map[string]interface{}, len(documents))
-	embeddings := make([][]float32, len(documents))
+	metadatas := make([]chroma.DocumentMetadata, len(documents))
+	embeddingsList := make([][]float32, len(documents))
 
 	for i, doc := range documents {
-		ids[i] = doc.ID
+		ids[i] = chroma.DocumentID(doc.ID)
 		contents[i] = doc.Content
-		metadatas[i] = doc.Metadata
-		embeddings[i] = doc.Embedding
+		if doc.Metadata != nil {
+			metadatas[i] = chroma.NewMetadataFromMap(doc.Metadata)
+		}
+		embeddingsList[i] = doc.Embedding
 	}
 
-	// Generate embeddings if needed and embedding function is provided
+	// Generate embeddings if needed
 	if c.embeddingFunc != nil {
-		// Check if any documents need embeddings
 		needsEmbedding := false
-		for _, emb := range embeddings {
+		for _, emb := range embeddingsList {
 			if len(emb) == 0 {
 				needsEmbedding = true
 				break
@@ -218,20 +204,27 @@ func (c *ChromaDB) Add(ctx context.Context, documents []vectordb.Document) error
 				return fmt.Errorf("failed to generate embeddings: %w", err)
 			}
 
-			// Use generated embeddings for documents that don't have them
-			for i, emb := range embeddings {
-				if len(emb) == 0 {
-					embeddings[i] = generatedEmbeddings[i]
+			for i, emb := range embeddingsList {
+				if len(emb) == 0 && i < len(generatedEmbeddings) {
+					embeddingsList[i] = generatedEmbeddings[i]
 				}
 			}
 		}
 	}
 
 	// Convert embeddings to ChromaDB format
-	chromaEmbeddings := convertToChromaEmbeddings(embeddings)
+	chromaEmbeddings, err := convertToChromaEmbeddings(embeddingsList)
+	if err != nil {
+		return fmt.Errorf("failed to convert embeddings: %w", err)
+	}
 
 	// Add to ChromaDB
-	_, err := c.collection.Add(ctx, chromaEmbeddings, metadatas, contents, ids)
+	err = c.collection.Add(ctx,
+		chroma.WithIDs(ids...),
+		chroma.WithTexts(contents...),
+		chroma.WithEmbeddings(chromaEmbeddings...),
+		chroma.WithMetadatas(metadatas...),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to add documents: %w", err)
 	}
@@ -249,23 +242,23 @@ func (c *ChromaDB) Update(ctx context.Context, documents []vectordb.Document) er
 		return nil
 	}
 
-	// Prepare data for ChromaDB
-	ids := make([]string, len(documents))
+	ids := make([]chroma.DocumentID, len(documents))
 	contents := make([]string, len(documents))
-	metadatas := make([]map[string]interface{}, len(documents))
-	embeddings := make([][]float32, len(documents))
+	metadatas := make([]chroma.DocumentMetadata, len(documents))
+	embeddingsList := make([][]float32, len(documents))
 
 	for i, doc := range documents {
-		ids[i] = doc.ID
+		ids[i] = chroma.DocumentID(doc.ID)
 		contents[i] = doc.Content
-		metadatas[i] = doc.Metadata
-		embeddings[i] = doc.Embedding
+		if doc.Metadata != nil {
+			metadatas[i] = chroma.NewMetadataFromMap(doc.Metadata)
+		}
+		embeddingsList[i] = doc.Embedding
 	}
 
-	// Generate embeddings if needed
 	if c.embeddingFunc != nil {
 		needsEmbedding := false
-		for _, emb := range embeddings {
+		for _, emb := range embeddingsList {
 			if len(emb) == 0 {
 				needsEmbedding = true
 				break
@@ -278,19 +271,27 @@ func (c *ChromaDB) Update(ctx context.Context, documents []vectordb.Document) er
 				return fmt.Errorf("failed to generate embeddings: %w", err)
 			}
 
-			for i, emb := range embeddings {
-				if len(emb) == 0 {
-					embeddings[i] = generatedEmbeddings[i]
+			for i, emb := range embeddingsList {
+				if len(emb) == 0 && i < len(generatedEmbeddings) {
+					embeddingsList[i] = generatedEmbeddings[i]
 				}
 			}
 		}
 	}
 
-	// Convert embeddings to ChromaDB format
-	chromaEmbeddings := convertToChromaEmbeddings(embeddings)
+	chromaEmbeddings, err := convertToChromaEmbeddings(embeddingsList)
+	if err != nil {
+		return fmt.Errorf("failed to convert embeddings: %w", err)
+	}
 
-	// Modify in ChromaDB (Update is for collection metadata, Modify is for documents)
-	_, err := c.collection.Modify(ctx, chromaEmbeddings, metadatas, contents, ids)
+	// Upsert semantics: v2 Update requires existing docs; Upsert covers both.
+	// v2 的 Update 要求文档已存在；Upsert 同时覆盖新建与更新。
+	err = c.collection.Upsert(ctx,
+		chroma.WithIDs(ids...),
+		chroma.WithTexts(contents...),
+		chroma.WithEmbeddings(chromaEmbeddings...),
+		chroma.WithMetadatas(metadatas...),
+	)
 	if err != nil {
 		return fmt.Errorf("failed to update documents: %w", err)
 	}
@@ -308,7 +309,12 @@ func (c *ChromaDB) Delete(ctx context.Context, ids []string) error {
 		return nil
 	}
 
-	_, err := c.collection.Delete(ctx, ids, nil, nil)
+	docIDs := make([]chroma.DocumentID, len(ids))
+	for i, id := range ids {
+		docIDs[i] = chroma.DocumentID(id)
+	}
+
+	err := c.collection.Delete(ctx, chroma.WithIDs(docIDs...))
 	if err != nil {
 		return fmt.Errorf("failed to delete documents: %w", err)
 	}
@@ -346,46 +352,55 @@ func (c *ChromaDB) QueryWithEmbedding(ctx context.Context, embedding []float32, 
 	}
 
 	// Convert embedding to ChromaDB format
-	chromaEmb := types.NewEmbeddingFromFloat32(embedding)
+	chromaEmb := embeddings.NewEmbeddingFromFloat32(embedding)
 
 	// Build query options
-	queryOpts := []types.CollectionQueryOption{
-		types.WithQueryEmbedding(chromaEmb),
-		types.WithNResults(int32(limit)),
-		types.WithInclude("documents", "metadatas", "distances"),
+	queryOpts := []chroma.CollectionQueryOption{
+		chroma.WithQueryEmbeddings(chromaEmb),
+		chroma.WithNResults(limit),
+		chroma.WithInclude(chroma.IncludeDocuments, chroma.IncludeMetadatas, chroma.IncludeDistances),
 	}
 
 	// Add filter if provided
 	if filter != nil {
-		queryOpts = append(queryOpts, types.WithWhereMap(filter))
+		wf := whereFromMap(filter)
+		if wf != nil {
+			queryOpts = append(queryOpts, chroma.WithWhere(wf))
+		}
 	}
 
-	// Query ChromaDB using QueryWithOptions
-	queryResult, err := c.collection.QueryWithOptions(ctx, queryOpts...)
+	// Query ChromaDB
+	queryResult, err := c.collection.Query(ctx, queryOpts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query: %w", err)
 	}
 
 	// Convert to our SearchResult format
 	results := make([]vectordb.SearchResult, 0)
-	if queryResult != nil && len(queryResult.Ids) > 0 {
-		for i := range queryResult.Ids[0] {
+	idGroups := queryResult.GetIDGroups()
+	if len(idGroups) > 0 {
+		ids := idGroups[0]
+		docGroups := queryResult.GetDocumentsGroups()
+		metaGroups := queryResult.GetMetadatasGroups()
+		distGroups := queryResult.GetDistancesGroups()
+
+		for i := range ids {
 			result := vectordb.SearchResult{
-				ID: queryResult.Ids[0][i],
+				ID: string(ids[i]),
 			}
 
-			if queryResult.Documents != nil && len(queryResult.Documents) > 0 {
-				result.Content = queryResult.Documents[0][i]
+			if len(docGroups) > 0 && i < len(docGroups[0]) {
+				result.Content = docGroups[0][i].ContentString()
 			}
 
-			if queryResult.Metadatas != nil && len(queryResult.Metadatas) > 0 {
-				result.Metadata = queryResult.Metadatas[0][i]
+			if len(metaGroups) > 0 && i < len(metaGroups[0]) {
+				result.Metadata = metadataToMap(metaGroups[0][i])
 			}
 
-			if queryResult.Distances != nil && len(queryResult.Distances) > 0 {
-				result.Distance = queryResult.Distances[0][i]
-				// Calculate score (inverse of distance)
-				result.Score = 1.0 / (1.0 + queryResult.Distances[0][i])
+			if len(distGroups) > 0 && i < len(distGroups[0]) {
+				d := float64(distGroups[0][i])
+				result.Distance = float32(d)
+				result.Score = float32(1.0 / (1.0 + d))
 			}
 
 			results = append(results, result)
@@ -405,13 +420,15 @@ func (c *ChromaDB) Get(ctx context.Context, ids []string) ([]vectordb.Document, 
 		return []vectordb.Document{}, nil
 	}
 
+	docIDs := make([]chroma.DocumentID, len(ids))
+	for i, id := range ids {
+		docIDs[i] = chroma.DocumentID(id)
+	}
+
 	// Get documents from ChromaDB
-	result, err := c.collection.Get(
-		ctx,
-		nil, // where
-		nil, // whereDocuments
-		ids,
-		[]types.QueryEnum{"documents", "metadatas", "embeddings"},
+	result, err := c.collection.Get(ctx,
+		chroma.WithIDs(docIDs...),
+		chroma.WithInclude(chroma.IncludeDocuments, chroma.IncludeMetadatas, chroma.IncludeEmbeddings),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get documents: %w", err)
@@ -419,24 +436,27 @@ func (c *ChromaDB) Get(ctx context.Context, ids []string) ([]vectordb.Document, 
 
 	// Convert to our Document format
 	documents := make([]vectordb.Document, 0)
-	if result != nil && len(result.Ids) > 0 {
-		for i := range result.Ids {
+	resIDs := result.GetIDs()
+	if len(resIDs) > 0 {
+		docList := result.GetDocuments()
+		metaList := result.GetMetadatas()
+		embList := result.GetEmbeddings()
+
+		for i := range resIDs {
 			doc := vectordb.Document{
-				ID: result.Ids[i],
+				ID: string(resIDs[i]),
 			}
 
-			if result.Documents != nil && len(result.Documents) > i {
-				doc.Content = result.Documents[i]
+			if i < len(docList) {
+				doc.Content = docList[i].ContentString()
 			}
 
-			if result.Metadatas != nil && len(result.Metadatas) > i {
-				doc.Metadata = result.Metadatas[i]
+			if i < len(metaList) {
+				doc.Metadata = metadataToMap(metaList[i])
 			}
 
-			if result.Embeddings != nil && len(result.Embeddings) > i && result.Embeddings[i] != nil {
-				if result.Embeddings[i].ArrayOfFloat32 != nil {
-					doc.Embedding = *result.Embeddings[i].ArrayOfFloat32
-				}
+			if i < len(embList) && embList[i] != nil {
+				doc.Embedding = embList[i].ContentAsFloat32()
 			}
 
 			documents = append(documents, doc)
@@ -457,13 +477,156 @@ func (c *ChromaDB) Count(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("failed to count documents: %w", err)
 	}
 
-	return int(count), nil
+	return count, nil
 }
 
 // Close closes the connection to the vector database
 func (c *ChromaDB) Close() error {
-	// ChromaDB Go client doesn't require explicit closing
+	if c.client != nil {
+		_ = c.client.Close()
+	}
 	c.collection = nil
 	c.client = nil
+	return nil
+}
+
+// convertToChromaEmbeddings converts [][]float32 to []embeddings.Embedding
+func convertToChromaEmbeddings(embeddingsList [][]float32) ([]embeddings.Embedding, error) {
+	out := make([]embeddings.Embedding, 0, len(embeddingsList))
+	for _, e := range embeddingsList {
+		if len(e) == 0 {
+			// Empty embedding: caller must have provided text for server-side
+			// embedding, but v2 requires embeddings when WithEmbeddings is used.
+			// Return a zero-length embedding placeholder.
+			// 空嵌入：调用方需提供文本供服务端嵌入。v2 使用 WithEmbeddings 时
+			// 需要嵌入值，这里返回零长度占位。
+			out = append(out, embeddings.NewEmbeddingFromFloat32([]float32{}))
+			continue
+		}
+		out = append(out, embeddings.NewEmbeddingFromFloat32(e))
+	}
+	return out, nil
+}
+
+// whereFromMap converts a plain map filter into a ChromaDB WhereFilter
+// (AND of equality clauses). Unsupported value types are skipped.
+//
+// whereFromMap 将普通 map 过滤器转换为 ChromaDB WhereFilter
+// （相等子句的 AND 组合）。不支持的值类型被跳过。
+func whereFromMap(filter map[string]interface{}) chroma.WhereFilter {
+	clauses := make([]chroma.WhereClause, 0, len(filter))
+	for k, v := range filter {
+		if k == "" {
+			continue
+		}
+		switch val := v.(type) {
+		case string:
+			clauses = append(clauses, chroma.EqString(k, val))
+		case int:
+			clauses = append(clauses, chroma.EqInt(k, val))
+		case int64:
+			clauses = append(clauses, chroma.EqInt(k, int(val)))
+		case float64:
+			clauses = append(clauses, chroma.EqFloat(k, float32(val)))
+		case float32:
+			clauses = append(clauses, chroma.EqFloat(k, val))
+		case bool:
+			clauses = append(clauses, chroma.EqBool(k, val))
+		}
+	}
+	if len(clauses) == 0 {
+		return nil
+	}
+	if len(clauses) == 1 {
+		return clauses[0]
+	}
+	return chroma.And(clauses...)
+}
+
+// metadataToMap converts a v2 DocumentMetadata into a plain map. The v2
+// interface has no key enumeration, so we reflect over the concrete
+// implementation's internal map (works for DocumentMetadataImpl from the
+// official client). Returns nil on failure.
+//
+// metadataToMap 将 v2 DocumentMetadata 转换为普通 map。v2 接口没有
+// key 枚举方法，因此对官方客户端的 DocumentMetadataImpl 内部 map
+// 做反射读取。失败时返回 nil。
+func metadataToMap(m chroma.DocumentMetadata) map[string]interface{} {
+	if m == nil {
+		return nil
+	}
+	v := reflect.ValueOf(m)
+	if v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return nil
+	}
+	f := v.FieldByName("metadata")
+	if !f.IsValid() || f.Kind() != reflect.Map {
+		return nil
+	}
+	out := make(map[string]interface{})
+	iter := f.MapRange()
+	for iter.Next() {
+		key, _ := iter.Key().Interface().(string)
+		if key == "" {
+			continue
+		}
+		mv := iter.Value()
+		if mv.Kind() == reflect.Ptr {
+			mv = mv.Elem()
+		}
+		out[key] = metadataValueToInterface(mv)
+	}
+	return out
+}
+
+// metadataValueToInterface extracts the underlying value of a MetadataValue.
+// metadataValueToInterface 提取 MetadataValue 的底层值。
+func metadataValueToInterface(mv reflect.Value) interface{} {
+	if !mv.IsValid() {
+		return nil
+	}
+	// Field order matches MetadataValue: Bool, Float64, Int, StringValue,
+	// NilValue, StringArray, IntArray, FloatArray, BoolArray.
+	// 字段顺序与 MetadataValue 一致。
+	for i := 0; i < mv.NumField(); i++ {
+		f := mv.Field(i)
+		if f.Kind() == reflect.Ptr {
+			if f.IsNil() {
+				continue
+			}
+			f = f.Elem()
+			if f.Kind() == reflect.String {
+				return f.String()
+			}
+			if f.Kind() == reflect.Int64 {
+				return f.Int()
+			}
+			if f.Kind() == reflect.Float64 {
+				return f.Float()
+			}
+			if f.Kind() == reflect.Bool {
+				return f.Bool()
+			}
+			continue
+		}
+		if f.Kind() == reflect.Bool {
+			// NilValue marker: return nil.
+			// NilValue 标记：返回 nil。
+			if f.Bool() {
+				return nil
+			}
+			continue
+		}
+		if f.Kind() == reflect.Slice && !f.IsNil() {
+			out := make([]interface{}, 0, f.Len())
+			for j := 0; j < f.Len(); j++ {
+				out = append(out, f.Index(j).Interface())
+			}
+			return out
+		}
+	}
 	return nil
 }

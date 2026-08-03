@@ -8,7 +8,7 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
-	"github.com/rexleimo/agno-go/pkg/hno/db/batch"
+	"github.com/rexleimo/agno-go/pkg/hno/session/db/batch"
 	"github.com/rexleimo/agno-go/pkg/hno/session"
 )
 

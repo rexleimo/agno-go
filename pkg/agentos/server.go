@@ -12,6 +12,7 @@ import (
 	"github.com/rexleimo/agno-go/pkg/hno/agent"
 	"github.com/rexleimo/agno-go/pkg/hno/embeddings/openai"
 	"github.com/rexleimo/agno-go/pkg/hno/session"
+	"github.com/rexleimo/agno-go/pkg/hno/skills"
 	"github.com/rexleimo/agno-go/pkg/hno/team"
 	"github.com/rexleimo/agno-go/pkg/hno/vectordb"
 	"github.com/rexleimo/agno-go/pkg/hno/vectordb/chromadb"
@@ -28,6 +29,8 @@ type Server struct {
 	httpServer       *http.Server
 	knowledgeService *KnowledgeService // 知识库服务
 	summaryManager   *session.SummaryManager
+	ops              *opsHandler // 运维端点（S4）
+	opsUI            *opsUI      // 运维平台 UI（S4）
 	instantiatedAt   time.Time
 	docsMounted      bool
 }
@@ -83,6 +86,10 @@ type Config struct {
 
 	// SummaryManager 会话摘要管理器
 	SummaryManager *session.SummaryManager
+
+	// SkillsRegistry 技能注册表（可选，用于 /ops/skills 端点）
+	// SkillsRegistry is the optional skills registry (for /ops/skills)
+	SkillsRegistry *skills.Registry
 
 	// HealthPath allows overriding the health check endpoint path.
 	HealthPath string
@@ -276,6 +283,13 @@ func NewServer(config *Config) (*Server, error) {
 		summaryManager: config.SummaryManager,
 		instantiatedAt: time.Now().UTC(),
 	}
+	server.ops = newOpsHandler(config.SkillsRegistry)
+	if ui, err := newOpsUI(); err == nil {
+		server.opsUI = ui
+		ui.register(router)
+	} else {
+		config.Logger.Warn("failed to load ops UI", "error", err)
+	}
 
 	// 初始化知识库服务（如果配置了）
 	// Initialize knowledge service (if configured)
@@ -422,6 +436,12 @@ func (s *Server) registerRoutes() {
 			if s.knowledgeService.config.EnableHealth {
 				knowledge.GET("/health", s.handleKnowledgeHealth)
 			}
+		}
+
+		// Ops endpoints (S4): /skills /observability /eval-runs
+		// 运维端点（S4）：/skills /observability /eval-runs
+		if s.ops != nil {
+			s.ops.register(v1)
 		}
 	}
 }

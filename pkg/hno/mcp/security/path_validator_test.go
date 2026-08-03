@@ -429,6 +429,22 @@ func TestPathValidator_Windows(t *testing.T) {
 		t.Skip("Windows-specific test")
 	}
 
+	// Create a real script so relative-path validation can succeed.
+	// 创建真实脚本文件，让相对路径验证可以通过。
+	dir := t.TempDir()
+	scriptPath := filepath.Join(dir, "script.bat")
+	if err := os.WriteFile(scriptPath, []byte("@echo off"), 0o644); err != nil {
+		t.Fatalf("create script: %v", err)
+	}
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(oldWD) })
+
 	pv := NewPathValidator(nil)
 
 	tests := []struct {
@@ -437,14 +453,19 @@ func TestPathValidator_Windows(t *testing.T) {
 		wantErr    bool
 	}{
 		{
+			// On Windows, backslash is a path separator, not an injection
+			// vector; a relative path using it is valid.
+			// Windows 上反斜杠是路径分隔符而非注入字符，用其书写的相对路径合法。
 			name:       "windows relative path with backslash",
 			executable: ".\\script.bat",
-			wantErr:    true, // Backslash is blocked
+			wantErr:    false,
 		},
 		{
+			// Forward-slash relative paths are also valid on Windows.
+			// 正斜杠相对路径在 Windows 上同样合法。
 			name:       "windows relative path with forward slash",
 			executable: "./script.bat",
-			wantErr:    false, // Forward slash should work
+			wantErr:    false,
 		},
 	}
 

@@ -32,18 +32,28 @@ func NewContext() *RunContext {
 }
 
 // Clone performs a shallow copy of the run context including metadata map.
+// Fields are copied individually so the embedded mutex is not duplicated.
+// Clone 对运行上下文做浅拷贝（含 metadata map）。
+// 逐字段复制，避免复制内嵌的互斥锁。
 func (rc *RunContext) Clone() *RunContext {
 	if rc == nil {
 		return nil
 	}
-	copyCtx := *rc
+	copyCtx := &RunContext{
+		RunID:       rc.RunID,
+		ParentRunID: rc.ParentRunID,
+		SessionID:   rc.SessionID,
+		UserID:      rc.UserID,
+		WorkflowID:  rc.WorkflowID,
+		TeamID:      rc.TeamID,
+	}
 	if rc.Metadata != nil {
 		copyCtx.Metadata = make(map[string]interface{}, len(rc.Metadata))
 		for k, v := range rc.Metadata {
 			copyCtx.Metadata[k] = v
 		}
 	}
-	return &copyCtx
+	return copyCtx
 }
 
 // EnsureRunID initialises the run identifier when absent and returns it.

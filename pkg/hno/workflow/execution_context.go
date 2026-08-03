@@ -50,7 +50,6 @@ func NewExecutionContext(input string) *ExecutionContext {
 	return &ExecutionContext{
 		Input:           input,
 		Data:            make(map[string]interface{}),
-		Metadata:        make(map[string]interface{}),
 		SessionState:    NewSessionState(),
 		WorkflowHistory: make([]HistoryEntry, 0),
 	}
@@ -62,7 +61,6 @@ func NewExecutionContextWithSession(input, sessionID, userID string) *ExecutionC
 	return &ExecutionContext{
 		Input:           input,
 		Data:            make(map[string]interface{}),
-		Metadata:        make(map[string]interface{}),
 		SessionState:    NewSessionState(),
 		SessionID:       sessionID,
 		UserID:          userID,

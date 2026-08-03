@@ -2,6 +2,8 @@ package websearch
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 )
 
@@ -104,13 +106,19 @@ func TestWebSearchToolkit_WebSearchMissingQuery(t *testing.T) {
 }
 
 func TestWebSearchToolkit_ExtractWebContent(t *testing.T) {
+	// Local HTTP server: real HTTP behavior without external flakiness.
+	// 本地 HTTP 服务器：真实 HTTP 行为，无外部网络波动。
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"hello":"world"}`))
+	}))
+	defer srv.Close()
+
 	toolkit := New()
 	ctx := context.Background()
 
-	// Test URL content extraction with a simple URL
-	// Note: This will make an actual HTTP request
 	result, err := toolkit.Execute(ctx, "extract_web_content", map[string]interface{}{
-		"url": "https://httpbin.org/get",
+		"url": srv.URL,
 	})
 
 	if err != nil {
@@ -122,8 +130,8 @@ func TestWebSearchToolkit_ExtractWebContent(t *testing.T) {
 		t.Fatalf("Expected map result, got %T", result)
 	}
 
-	if resultMap["url"] != "https://httpbin.org/get" {
-		t.Errorf("Expected URL 'https://httpbin.org/get', got '%v'", resultMap["url"])
+	if resultMap["url"] != srv.URL {
+		t.Errorf("Expected URL %q, got %v", srv.URL, resultMap["url"])
 	}
 
 	if resultMap["status"] != 200 {

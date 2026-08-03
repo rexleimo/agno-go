@@ -15,14 +15,27 @@ import (
 // ArXivToolkit provides access to arXiv scientific papers
 // This is a simplified implementation that provides basic arXiv search capabilities
 
+const defaultAPIBase = "http://export.arxiv.org/api/query"
+
 type ArXivToolkit struct {
 	*toolkit.BaseToolkit
+	// apiBase is the arXiv API endpoint; overridable for tests.
+	// apiBase 是 arXiv API 端点；测试时可覆盖。
+	apiBase string
 }
 
 // New creates a new ArXiv toolkit
 func New() *ArXivToolkit {
+	return NewWithBase(defaultAPIBase)
+}
+
+// NewWithBase creates a toolkit targeting a custom API endpoint (used by
+// tests to avoid hitting the real arXiv service).
+// NewWithBase 创建指向自定义 API 端点的 toolkit（测试用，避免打真实 arXiv）。
+func NewWithBase(apiBase string) *ArXivToolkit {
 	t := &ArXivToolkit{
 		BaseToolkit: toolkit.NewBaseToolkit("arxiv"),
+		apiBase:     apiBase,
 	}
 
 	// Register arXiv search function
@@ -106,7 +119,7 @@ func (a *ArXivToolkit) searchPapers(ctx context.Context, args map[string]interfa
 	}
 
 	// Build arXiv API URL
-	baseURL := "http://export.arxiv.org/api/query"
+	baseURL := a.apiBase
 	params := url.Values{}
 	params.Add("search_query", query)
 	params.Add("start", "0")
@@ -161,24 +174,24 @@ func (a *ArXivToolkit) searchPapers(ctx context.Context, args map[string]interfa
 		}
 
 		result := map[string]interface{}{
-			"paper_id":   paperID,
-			"title":      strings.TrimSpace(entry.Title),
-			"summary":    strings.TrimSpace(entry.Summary),
-			"authors":    authorNames,
-			"published":  entry.Published,
-			"updated":    entry.Updated,
-			"category":   entry.Category.Term,
-			"url":        entry.ID,
+			"paper_id":  paperID,
+			"title":     strings.TrimSpace(entry.Title),
+			"summary":   strings.TrimSpace(entry.Summary),
+			"authors":   authorNames,
+			"published": entry.Published,
+			"updated":   entry.Updated,
+			"category":  entry.Category.Term,
+			"url":       entry.ID,
 		}
 
 		results = append(results, result)
 	}
 
 	return map[string]interface{}{
-		"query":        query,
-		"results":      results,
-		"total_found":  len(results),
-		"max_results":  maxResults,
+		"query":       query,
+		"results":     results,
+		"total_found": len(results),
+		"max_results": maxResults,
 	}, nil
 }
 
@@ -190,7 +203,7 @@ func (a *ArXivToolkit) getPaperDetails(ctx context.Context, args map[string]inte
 	}
 
 	// Build arXiv API URL for specific paper
-	baseURL := "http://export.arxiv.org/api/query"
+	baseURL := a.apiBase
 	params := url.Values{}
 	params.Add("id_list", paperID)
 
@@ -240,15 +253,15 @@ func (a *ArXivToolkit) getPaperDetails(ctx context.Context, args map[string]inte
 	}
 
 	result := map[string]interface{}{
-		"paper_id":   paperID,
-		"title":      strings.TrimSpace(entry.Title),
-		"summary":    strings.TrimSpace(entry.Summary),
-		"authors":    authorNames,
-		"published":  entry.Published,
-		"updated":    entry.Updated,
-		"category":   entry.Category.Term,
-		"url":        entry.ID,
-		"pdf_url":    pdfURL,
+		"paper_id":  paperID,
+		"title":     strings.TrimSpace(entry.Title),
+		"summary":   strings.TrimSpace(entry.Summary),
+		"authors":   authorNames,
+		"published": entry.Published,
+		"updated":   entry.Updated,
+		"category":  entry.Category.Term,
+		"url":       entry.ID,
+		"pdf_url":   pdfURL,
 	}
 
 	return map[string]interface{}{
