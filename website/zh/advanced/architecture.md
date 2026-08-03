@@ -1,6 +1,6 @@
 # 架构 / Architecture
 
-Agno-Go 遵循简洁、模块化的架构设计,专注于简单性、效率和可扩展性。
+HNO 遵循简洁、模块化的架构设计,专注于简单性、效率和可扩展性。
 
 ## 核心理念 / Core Philosophy
 
@@ -389,4 +389,4 @@ defer cancel()
 - [性能基准 / Performance Benchmarks](/advanced/performance)
 - [部署指南 / Deployment Guide](/advanced/deployment)
 - [API 参考 / API Reference](/api/)
-- [源代码 / Source Code](https://github.com/rexleimo/agno-Go)
+- [源代码 / Source Code](https://github.com/rexleimo/HNO)

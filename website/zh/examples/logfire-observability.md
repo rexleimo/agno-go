@@ -1,6 +1,6 @@
 # Logfire 可观测性示例
 
-该示例演示如何使用 OpenTelemetry 为 Agno-Go 智能体接入 [Logfire](https://logfire.dev)，以便在观测平台中查看推理内容、token 消耗以及工具执行数据。
+该示例演示如何使用 OpenTelemetry 为 HNO 智能体接入 [Logfire](https://logfire.dev)，以便在观测平台中查看推理内容、token 消耗以及工具执行数据。
 
 ## 前置条件
 
@@ -35,5 +35,5 @@ Logfire 中会看到类似的 span：
 
 ## 参考文档
 
-- [`docs/release/logfire_observability.md`](https://github.com/rexleimo/agno-Go/blob/main/docs/release/logfire_observability.md) – 详细操作指南（GitHub）。
+- [`docs/release/logfire_observability.md`](https://github.com/rexleimo/HNO/blob/main/docs/release/logfire_observability.md) – 详细操作指南（GitHub）。
 - [`website/zh/advanced/observability.md`](../advanced/observability.md) – 项目观测方案概览，包括 SSE 事件流。

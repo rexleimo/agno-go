@@ -5,7 +5,7 @@ description: 벡터 검색을 위한 OpenAI/VLLM 임베딩 설정.
 
 # 임베딩
 
-임베딩은 텍스트를 벡터로 변환하여 유사도 검색에 사용합니다. Agno-Go 는 통합 인터페이스를 제공하며 Chroma 등 VectorDB 에서 사용할 수 있습니다.
+임베딩은 텍스트를 벡터로 변환하여 유사도 검색에 사용합니다. HNO 는 통합 인터페이스를 제공하며 Chroma 등 VectorDB 에서 사용할 수 있습니다.
 
 ## OpenAI
 

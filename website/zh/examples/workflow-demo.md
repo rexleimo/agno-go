@@ -2,7 +2,7 @@
 
 ## 概述
 
-本示例演示 Agno-Go 强大的 Workflow 引擎,包含 5 个原语构建块:Step、Condition、Loop、Parallel 和 Router。Workflow 提供确定性、受控的执行流 - 非常适合需要精确控制和可观测性的复杂多步骤流程。
+本示例演示 HNO 强大的 Workflow 引擎,包含 5 个原语构建块:Step、Condition、Loop、Parallel 和 Router。Workflow 提供确定性、受控的执行流 - 非常适合需要精确控制和可观测性的复杂多步骤流程。
 
 ## 你将学到
 

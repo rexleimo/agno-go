@@ -1,12 +1,12 @@
 # 테스팅
 
-Agno-Go 개발을 위한 종합적인 테스트 가이드입니다.
+HNO 개발을 위한 종합적인 테스트 가이드입니다.
 
 ---
 
 ## 개요
 
-Agno-Go는 코드베이스 전체에서 **80.8% 테스트 커버리지**를 통해 높은 품질을 유지합니다. 이 가이드는 테스트 표준, 패턴 및 모범 사례를 다룹니다.
+HNO는 코드베이스 전체에서 **80.8% 테스트 커버리지**를 통해 높은 품질을 유지합니다. 이 가이드는 테스트 표준, 패턴 및 모범 사례를 다룹니다.
 
 ### 테스트 커버리지 현황
 
@@ -556,7 +556,7 @@ go test -timeout 30s ./...
 - [아키텍처](/advanced/architecture) 리뷰하여 디자인 패턴 학습
 - [성능](/advanced/performance) 확인하여 벤치마크 이해
 - [배포](/advanced/deployment) 읽고 프로덕션 설정 학습
-- [기여 가이드](https://github.com/rexleimo/agno-Go/blob/main/CONTRIBUTING.md) 탐색
+- [기여 가이드](https://github.com/rexleimo/HNO/blob/main/CONTRIBUTING.md) 탐색
 
 ---
 

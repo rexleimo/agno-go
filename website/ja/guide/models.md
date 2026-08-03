@@ -1,6 +1,6 @@
 # Models - LLMプロバイダー
 
-Agno-Goは統一されたインターフェースで複数のLLMプロバイダーをサポートしています。
+HNOは統一されたインターフェースで複数のLLMプロバイダーをサポートしています。
 
 ---
 
@@ -287,7 +287,7 @@ GLMはJWT（JSON Web Token）認証を使用します：
 
 1. Ollamaをインストール: https://ollama.ai
 2. モデルをプル: `ollama pull llama2`
-3. Agno-Goで使用:
+3. HNOで使用:
 
 ```go
 import "github.com/rexleimo/agno-go/pkg/hno/models/ollama"
@@ -600,7 +600,7 @@ if messageCount > 50 {
 
 ## 推論モデルサポート ⭐ 新機能
 
-Agno-Go v1.2.1 は高度なモデルに推論サポートを追加しました:
+HNO v1.2.1 は高度なモデルに推論サポートを追加しました:
 
 ### サポートされているモデル
 - **Gemini** - 高度な推論能力

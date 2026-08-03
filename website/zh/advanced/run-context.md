@@ -5,7 +5,7 @@ description: 通过 hooks、工具与模型调用传播 run_context_id，并在�
 
 # 运行上下文（Run Context）
 
-Agno-Go 在一次运行中传播上下文标识，流式事件会携带 `run_context_id` 便于端到端关联。
+HNO 在一次运行中传播上下文标识，流式事件会携带 `run_context_id` 便于端到端关联。
 
 ## SSE 事件
 

@@ -6,7 +6,7 @@ The **Model Context Protocol (MCP)** is an open standard that enables seamless i
 
 **模型上下文协议 (MCP)** 是一个开放标准,能够在 LLM 应用程序和外部数据源及工具之间实现无缝集成。由 Anthropic 开发,MCP 通过标准化接口为 AI 模型与各种服务的连接提供了通用协议。
 
-## Why Use MCP with Agno-Go?
+## Why Use MCP with HNO?
 
 - **🔌 Extensibility** - Connect your agents to any MCP-compatible server
   - **可扩展性** - 将您的 agent 连接到任何兼容 MCP 的服务器
@@ -19,9 +19,9 @@ The **Model Context Protocol (MCP)** is an open standard that enables seamless i
 
 ## Architecture
 
-Agno-Go's MCP implementation consists of several key components:
+HNO's MCP implementation consists of several key components:
 
-Agno-Go 的 MCP 实现由几个关键组件组成:
+HNO 的 MCP 实现由几个关键组件组成:
 
 ```
 pkg/hno/mcp/
@@ -144,9 +144,9 @@ ag, err := agent.New(agent.Config{
 
 ## Security Features | 安全功能
 
-Agno-Go's MCP implementation prioritizes security:
+HNO's MCP implementation prioritizes security:
 
-Agno-Go 的 MCP 实现将安全放在首位:
+HNO 的 MCP 实现将安全放在首位:
 
 ### Command Whitelist | 命令白名单
 
@@ -240,9 +240,9 @@ resourceContent := handler.CreateResourceContent("file:///path", "text/plain")
 
 ## Known MCP Servers | 已知的 MCP 服务器
 
-Compatible MCP servers you can use with Agno-Go:
+Compatible MCP servers you can use with HNO:
 
-可与 Agno-Go 一起使用的兼容 MCP 服务器:
+可与 HNO 一起使用的兼容 MCP 服务器:
 
 | Server | Description | Installation |
 |--------|-------------|--------------|
@@ -257,9 +257,9 @@ More servers available at [MCP Servers Registry](https://github.com/modelcontext
 
 ## Performance | 性能
 
-Agno-Go's MCP implementation is highly optimized:
+HNO's MCP implementation is highly optimized:
 
-Agno-Go 的 MCP 实现经过高度优化:
+HNO 的 MCP 实现经过高度优化:
 
 - **MCP Client Init | MCP 客户端初始化**: <100μs
 - **Tool Discovery | 工具发现**: <50μs per server | 每个服务器 <50μs
@@ -301,7 +301,7 @@ Current implementation status:
 - Try the [MCP Demo Example](../examples/mcp-demo.md) | 尝试 [MCP 演示示例](../examples/mcp-demo.md)
 - Read the [MCP Implementation Guide](../../pkg/hno/mcp/IMPLEMENTATION.md) | 阅读 [MCP 实现指南](../../pkg/hno/mcp/IMPLEMENTATION.md)
 - Explore the [MCP Protocol Specification](https://spec.modelcontextprotocol.io/) | 探索 [MCP 协议规范](https://spec.modelcontextprotocol.io/)
-- Join discussions on [GitHub](https://github.com/rexleimo/agno-Go/discussions)
+- Join discussions on [GitHub](https://github.com/rexleimo/HNO/discussions)
 
 ## Troubleshooting | 故障排除
 

@@ -150,7 +150,7 @@ Parallel Step ├─→ Branch B: Set("key2", "value_B")
 
 ### 解决方案
 
-Agno-Go 使用 **深拷贝 + 最终写入优先** 策略:
+HNO 使用 **深拷贝 + 最终写入优先** 策略:
 
 1. 每个并行分支获得独立的 SessionState 副本
 2. 分支独立执行,互不干扰

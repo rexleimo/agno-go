@@ -1,6 +1,6 @@
 ---
 title: 版本发布说明
-description: Agno-Go 版本历史和发布说明
+description: HNO 版本历史和发布说明
 outline: deep
 ---
 
@@ -142,7 +142,7 @@ outline: deep
 - 最小化知识入库端点
   - `POST /api/v1/knowledge/content` 支持 `text/plain` 与 `application/json`
 
-企业验收步骤请参考 [`docs/ENTERPRISE_MIGRATION_PLAN.md`](https://github.com/rexleimo/agno-Go/blob/main/docs/ENTERPRISE_MIGRATION_PLAN.md)。
+企业验收步骤请参考 [`docs/ENTERPRISE_MIGRATION_PLAN.md`](https://github.com/rexleimo/HNO/blob/main/docs/ENTERPRISE_MIGRATION_PLAN.md)。
 
 ## Version 1.1.0 (2025-10-08)
 
@@ -425,7 +425,7 @@ model, _ := glm.New("glm-4", glm.Config{
 
 ### 🎉 初始版本
 
-Agno-Go v1.0 是 Agno 多智能体框架的高性能 Go 实现。
+HNO v1.0 是 Agno 多智能体框架的高性能 Go 实现。
 
 #### 核心功能
 - **Agent** - 带工具支持的单个自主 Agent（74.7% 覆盖率）

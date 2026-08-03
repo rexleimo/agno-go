@@ -6,7 +6,7 @@
 
 **Model Context Protocol (MCP)** is an open standard that enables seamless integration between LLM applications and external data sources and tools.
 
-## Agno-Go에서 MCP를 사용하는 이유
+## HNO에서 MCP를 사용하는 이유
 
 - **🔌 확장성** - 에이전트를 모든 MCP 호환 서버에 연결
   - **Extensibility** - Connect your agents to any MCP-compatible server
@@ -152,7 +152,7 @@ toolkit, err := mcptoolkit.New(ctx, mcptoolkit.Config{
 - [MCP 데모](../examples/mcp-demo.md)를 시도해보세요
 - [MCP 구현 가이드](../../pkg/hno/mcp/IMPLEMENTATION.md)를 읽어보세요
 - [MCP 프로토콜 사양](https://spec.modelcontextprotocol.io/)을 탐색하세요
-- [GitHub](https://github.com/rexleimo/agno-Go/discussions)에서 토론에 참여하세요
+- [GitHub](https://github.com/rexleimo/HNO/discussions)에서 토론에 참여하세요
 
 ## 문제 해결 | Troubleshooting
 

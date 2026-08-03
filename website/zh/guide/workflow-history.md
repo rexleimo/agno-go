@@ -6,7 +6,7 @@
 
 ### 什么是 Workflow History?
 
-Workflow History 是 Agno-Go 框架的核心功能，它通过以下机制实现:
+Workflow History 是 HNO 框架的核心功能，它通过以下机制实现:
 
 1. **会话级存储**: 每个 session 独立存储其运行历史
 2. **自动注入**: 历史自动注入到 Agent 的 system message

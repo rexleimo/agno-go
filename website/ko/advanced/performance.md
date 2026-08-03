@@ -1,6 +1,6 @@
 # 성능
 
-Agno-Go는 극한의 성능을 위해 설계되어, Python Agno 대비 16배 빠른 에이전트 인스턴스화를 달성합니다.
+HNO는 극한의 성능을 위해 설계되어, Python Agno 대비 16배 빠른 에이전트 인스턴스화를 달성합니다.
 
 ## 요약
 
@@ -288,7 +288,7 @@ go test -race ./...
 
 ## 결론
 
-Agno-Go는 **성능 목표를 초과 달성**:
+HNO는 **성능 목표를 초과 달성**:
 
 - ✅ 목표 대비 5배 빠름 (180ns vs 1μs)
 - ✅ 목표 대비 60% 적은 메모리 (1.2KB vs 3KB)
@@ -304,4 +304,4 @@ Agno-Go는 **성능 목표를 초과 달성**:
 
 - [아키텍처](/advanced/architecture)
 - [배포](/advanced/deployment)
-- [벤치마크 코드](https://github.com/rexleimo/agno-Go/tree/main/pkg/hno/agent/agent_bench_test.go)
+- [벤치마크 코드](https://github.com/rexleimo/HNO/tree/main/pkg/hno/agent/agent_bench_test.go)

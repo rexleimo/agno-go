@@ -2,19 +2,19 @@
 layout: home
 
 hero:
-  name: "Agno-Go"
+  name: "HNO"
   text: "高性能マルチエージェントフレームワーク"
   tagline: "Python より 16 倍高速 | 180ns インスタンス化 | エージェントあたり 1.2KB メモリ"
   image:
     src: /logo.png
-    alt: Agno-Go
+    alt: HNO
   actions:
     - theme: brand
       text: はじめる
       link: /ja/guide/quick-start
     - theme: alt
       text: GitHub で見る
-      link: https://github.com/rexleimo/agno-Go
+      link: https://github.com/rexleimo/HNO
 
 features:
   - icon: 🚀
@@ -90,17 +90,17 @@ func main() {
 
 ## パフォーマンス比較
 
-| 指標 | Python Agno | Agno-Go | 改善 |
+| 指標 | Python Agno | HNO | 改善 |
 |--------|-------------|---------|-------------|
 | エージェント作成 | ~3μs | ~180ns | **16 倍高速** |
 | メモリ/エージェント | ~6.5KB | ~1.2KB | **5.4 倍削減** |
 | 並行性 | GIL 制限 | ネイティブ goroutine | **無制限** |
 
-## なぜ Agno-Go?
+## なぜ HNO?
 
 ### 本番環境向けに構築
 
-Agno-Go は単なるフレームワークではなく、完全な本番システムです。付属の **AgentOS** サーバーは以下を提供:
+HNO は単なるフレームワークではなく、完全な本番システムです。付属の **AgentOS** サーバーは以下を提供:
 
 - OpenAPI 3.0 仕様の RESTful API
 - マルチターン会話のセッション管理
@@ -127,8 +127,8 @@ Agno-Go は単なるフレームワークではなく、完全な本番システ
 
 ```bash
 # リポジトリをクローン
-git clone https://github.com/rexleimo/agno-Go.git
-cd agno-Go
+git clone https://github.com/rexleimo/HNO.git
+cd HNO
 
 # API キーを設定
 export OPENAI_API_KEY=sk-your-key-here
@@ -153,12 +153,12 @@ curl http://localhost:8080/health
 
 ## コミュニティ
 
-- **GitHub**: [rexleimo/agno-Go](https://github.com/rexleimo/agno-Go)
-- **Issues**: [バグ報告と機能リクエスト](https://github.com/rexleimo/agno-Go/issues)
-- **Discussions**: [質問とアイデア共有](https://github.com/rexleimo/agno-Go/discussions)
+- **GitHub**: [rexleimo/HNO](https://github.com/rexleimo/HNO)
+- **Issues**: [バグ報告と機能リクエスト](https://github.com/rexleimo/HNO/issues)
+- **Discussions**: [質問とアイデア共有](https://github.com/rexleimo/HNO/discussions)
 
 ## ライセンス
 
-Agno-Go は [MIT ライセンス](https://github.com/rexleimo/agno-Go/blob/main/LICENSE) でリリースされています。
+HNO は [MIT ライセンス](https://github.com/rexleimo/HNO/blob/main/LICENSE) でリリースされています。
 
 [Agno (Python)](https://github.com/agno-agi/agno) フレームワークからインスピレーションを得ています。

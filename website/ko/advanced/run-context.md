@@ -5,7 +5,7 @@ description: hooks, 도구, 모델 호출 전반에 run_context_id를 전파하�
 
 # 실행 컨텍스트 (Run Context)
 
-Agno-Go는 실행 단위 컨텍스트 식별자를 전파하며, SSE 이벤트에 `run_context_id`를 포함해 엔드투엔드 상관을 지원합니다.
+HNO는 실행 단위 컨텍스트 식별자를 전파하며, SSE 이벤트에 `run_context_id`를 포함해 엔드투엔드 상관을 지원합니다.
 
 ## SSE 이벤트
 

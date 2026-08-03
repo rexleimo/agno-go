@@ -5,7 +5,7 @@ description: Configure embeddings providers (OpenAI, VLLM) for vector search.
 
 # Embeddings
 
-Embeddings convert text into numeric vectors for similarity search. Agno-Go provides a common interface used by vector databases (e.g., Chroma).
+Embeddings convert text into numeric vectors for similarity search. HNO provides a common interface used by vector databases (e.g., Chroma).
 
 ## OpenAI
 

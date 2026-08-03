@@ -1,7 +1,7 @@
 # EvoLink Media Agents
 
 ## Overview
-This example shows how to use the EvoLink provider inside Agno-Go to generate text, images, and video via `pkg/hno/models/evolink/*`.
+This example shows how to use the EvoLink provider inside HNO to generate text, images, and video via `pkg/hno/models/evolink/*`.
 
 ## Setup
 - Export env variables:

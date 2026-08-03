@@ -1,6 +1,6 @@
 # 관측성(Observability) 및 텔레메트리
 
-Agno-Go는 런타임 동작을 파악할 수 있도록 SSE 이벤트와 OpenTelemetry를 제공합니다.
+HNO는 런타임 동작을 파악할 수 있도록 SSE 이벤트와 OpenTelemetry를 제공합니다.
 
 ## AgentOS SSE 스트림
 
@@ -27,7 +27,7 @@ go run -tags logfire cmd/examples/logfire_observability/main.go
 
 자세한 단계별 가이드는 GitHub 문서를 참고하세요:
 
-- https://github.com/rexleimo/agno-Go/blob/main/docs/release/logfire_observability.md
+- https://github.com/rexleimo/HNO/blob/main/docs/release/logfire_observability.md
 
 다음 단계:
 - SSE 이벤트를 원하는 관측/모니터링 백엔드로 전달

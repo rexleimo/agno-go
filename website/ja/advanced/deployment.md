@@ -8,8 +8,8 @@
 
 ```bash
 # 1. リポジトリをクローン
-git clone https://github.com/rexleimo/agno-Go.git
-cd agno-Go
+git clone https://github.com/rexleimo/HNO.git
+cd HNO
 
 # 2. 環境を設定
 cp .env.example .env
@@ -312,7 +312,7 @@ aws secretsmanager create-secret \
 組み込みガードレールを使用:
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/hno/guardrails"
+import "github.com/rexleimo/HNO/pkg/hno/guardrails"
 
 promptGuard := guardrails.NewPromptInjectionGuardrail()
 agent.PreHooks = []hooks.Hook{promptGuard}
@@ -438,4 +438,4 @@ export LOG_LEVEL=debug
 - [パフォーマンス](/advanced/performance)
 - [APIリファレンス](/api/)
 - [サンプル](/examples/)
-- [GitHubリポジトリ](https://github.com/rexleimo/agno-Go)
+- [GitHubリポジトリ](https://github.com/rexleimo/HNO)

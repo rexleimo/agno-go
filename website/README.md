@@ -1,6 +1,6 @@
-# Agno-Go Documentation
+# HNO Documentation
 
-This directory contains the VitePress documentation site for Agno-Go.
+This directory contains the VitePress documentation site for HNO.
 
 ## Local Development
 
@@ -37,7 +37,7 @@ website/
 │   └── config.mjs         # VitePress configuration (ESM). If using TypeScript, use config.ts
 ├── index.md               # Homepage (Hero + Features)
 ├── guide/                 # User guides
-│   ├── index.md          # What is Agno-Go?
+│   ├── index.md          # What is HNO?
 │   ├── quick-start.md    # 5-minute tutorial
 │   ├── installation.md   # Setup instructions
 │   ├── agent.md          # Agent guide
@@ -72,7 +72,7 @@ website/
 Edit `.vitepress/config.mjs` (or `.vitepress/config.ts` if using TypeScript) to modify:
 
 - Site title and description
-- Base URL (set to `/agno-Go/` for GitHub Pages)
+- Base URL (set to `/HNO/` for GitHub Pages)
 - Navigation menu
 - Sidebar structure
 - Theme options
@@ -80,11 +80,11 @@ Edit `.vitepress/config.mjs` (or `.vitepress/config.ts` if using TypeScript) to 
 
 ### Important: Base URL
 
-The `base` option is set to `/agno-Go/` to match the GitHub repository name. If deploying elsewhere, update this value in `.vitepress/config.mjs`:
+The `base` option is set to `/HNO/` to match the GitHub repository name. If deploying elsewhere, update this value in `.vitepress/config.mjs`:
 
 ```ts
 export default defineConfig({
-  base: '/agno-Go/', // Change this for different deployments
+  base: '/HNO/', // Change this for different deployments
   // ...
 })
 ```
@@ -97,7 +97,7 @@ The site automatically deploys to GitHub Pages when changes are pushed to `main`
 
 1. Push changes to `main`
 2. GitHub Actions builds the site
-3. Deployed to `https://rexleimo.github.io/agno-Go/`
+3. Deployed to `https://rexleimo.github.io/HNO/`
 
 **Workflow**: `.github/workflows/deploy-docs.yml`
 
@@ -123,7 +123,7 @@ VitePress supports GitHub-Flavored Markdown plus additional features:
 package main
 
 func main() {
-    fmt.Println("Hello, Agno-Go!")
+    fmt.Println("Hello, HNO!")
 }
 \`\`\`
 
@@ -257,4 +257,4 @@ To contribute to documentation:
 
 ## License
 
-MIT License - Same as Agno-Go project
+MIT License - Same as HNO project

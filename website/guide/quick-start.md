@@ -1,6 +1,6 @@
 # Quick Start
 
-Get started with Agno-Go in less than 5 minutes!
+Get started with HNO in less than 5 minutes!
 
 ## Prerequisites
 
@@ -13,14 +13,14 @@ Get started with Agno-Go in less than 5 minutes!
 ### Option 1: Using Go Get
 
 ```bash
-go get github.com/rexleimo/agno-Go
+go get github.com/rexleimo/HNO
 ```
 
 ### Option 2: Clone Repository
 
 ```bash
-git clone https://github.com/rexleimo/agno-Go.git
-cd agno-Go
+git clone https://github.com/rexleimo/HNO.git
+cd HNO
 go mod download
 ```
 
@@ -39,8 +39,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-Go/pkg/hno/agent"
-    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
+    "github.com/rexleimo/HNO/pkg/hno/agent"
+    "github.com/rexleimo/HNO/pkg/hno/models/openai"
 )
 
 func main() {
@@ -104,10 +104,10 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-Go/pkg/hno/agent"
-    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
-    "github.com/rexleimo/agno-Go/pkg/hno/tools/calculator"
-    "github.com/rexleimo/agno-Go/pkg/hno/tools/toolkit"
+    "github.com/rexleimo/HNO/pkg/hno/agent"
+    "github.com/rexleimo/HNO/pkg/hno/models/openai"
+    "github.com/rexleimo/HNO/pkg/hno/tools/calculator"
+    "github.com/rexleimo/HNO/pkg/hno/tools/toolkit"
 )
 
 func main() {
@@ -167,8 +167,8 @@ import (
     "os"
     "strings"
 
-    "github.com/rexleimo/agno-Go/pkg/hno/agent"
-    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
+    "github.com/rexleimo/HNO/pkg/hno/agent"
+    "github.com/rexleimo/HNO/pkg/hno/models/openai"
 )
 
 func main() {
@@ -381,12 +381,12 @@ export LOG_LEVEL=debug
 
 ```go
 import (
-    "github.com/rexleimo/agno-Go/pkg/hno/agent"
-    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
-    "github.com/rexleimo/agno-Go/pkg/hno/tools/calculator"
-    "github.com/rexleimo/agno-Go/pkg/hno/team"
-    "github.com/rexleimo/agno-Go/pkg/hno/workflow"
-    "github.com/rexleimo/agno-Go/pkg/agentos"
+    "github.com/rexleimo/HNO/pkg/hno/agent"
+    "github.com/rexleimo/HNO/pkg/hno/models/openai"
+    "github.com/rexleimo/HNO/pkg/hno/tools/calculator"
+    "github.com/rexleimo/HNO/pkg/hno/team"
+    "github.com/rexleimo/HNO/pkg/hno/workflow"
+    "github.com/rexleimo/HNO/pkg/agentos"
 )
 ```
 

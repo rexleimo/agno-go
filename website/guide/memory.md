@@ -6,7 +6,7 @@ Manage conversation history and context for your agents.
 
 ## What is Memory?
 
-Memory stores conversation history, allowing agents to maintain context across multiple interactions. Agno-Go provides built-in memory management with automatic truncation.
+Memory stores conversation history, allowing agents to maintain context across multiple interactions. HNO provides built-in memory management with automatic truncation.
 
 ### Key Features
 
@@ -389,8 +389,8 @@ agent.Memory.AddMessage(systemMsg)
 
 ## Memory vs Context Window
 
-### Memory (Agno-Go)
-- Managed by Agno-Go
+### Memory (HNO)
+- Managed by HNO
 - Configurable message limit
 - Automatic truncation
 

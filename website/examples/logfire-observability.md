@@ -1,6 +1,6 @@
 # Logfire Observability
 
-This example instruments an Agno-Go agent with OpenTelemetry and forwards spans to [Logfire](https://logfire.dev). It is useful when you want to correlate reasoning content, token usage, and tool activity inside your observability platform.
+This example instruments an HNO agent with OpenTelemetry and forwards spans to [Logfire](https://logfire.dev). It is useful when you want to correlate reasoning content, token usage, and tool activity inside your observability platform.
 
 ## Requirements
 
@@ -35,5 +35,5 @@ In Logfire you will see spans similar to:
 
 ## Related Docs
 
-- [`docs/release/logfire_observability.md`](https://github.com/rexleimo/agno-Go/blob/main/docs/release/logfire_observability.md) – deep dive guide (GitHub).
+- [`docs/release/logfire_observability.md`](https://github.com/rexleimo/HNO/blob/main/docs/release/logfire_observability.md) – deep dive guide (GitHub).
 - [`website/advanced/observability.md`](../advanced/observability.md) – overview of the observability stack, including the SSE event stream.

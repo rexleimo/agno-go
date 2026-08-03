@@ -1,6 +1,6 @@
 # アーキテクチャ
 
-Agno-Goは、シンプルさ、効率性、拡張性を重視した、クリーンでモジュール化されたアーキテクチャに従っています。
+HNOは、シンプルさ、効率性、拡張性を重視した、クリーンでモジュール化されたアーキテクチャに従っています。
 
 ## コア哲学
 
@@ -389,4 +389,4 @@ KISS原則に従う - 過度な設計を避ける。
 - [パフォーマンスベンチマーク](/advanced/performance)
 - [デプロイメントガイド](/advanced/deployment)
 - [APIリファレンス](/api/)
-- [ソースコード](https://github.com/rexleimo/agno-Go)
+- [ソースコード](https://github.com/rexleimo/HNO)

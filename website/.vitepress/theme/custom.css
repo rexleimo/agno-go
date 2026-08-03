@@ -1,0 +1,117 @@
+/* HNO 官网 UI 规范（docs/design/website-ui-design.md 落地）
+ * 原则：白底、深色文字、一个强调色、大留白、无动效装饰。
+ * 禁止：深色霓虹渐变 / 粒子动效 / 渐变文字 / emoji 图标 / 毛玻璃。
+ */
+
+:root {
+  /* 色板 */
+  --hno-bg: #ffffff;
+  --hno-ink: #0d0d0d;
+  --hno-muted: #5f6368;
+  --hno-accent: #00ADD8;
+  --hno-accent-deep: #007b9e;
+  --hno-border: rgba(13, 13, 13, 0.08);
+  --hno-code-bg: #fafafa;
+
+  /* VitePress 变量映射 */
+  --vp-c-brand-1: var(--hno-accent);
+  --vp-c-brand-2: var(--hno-accent-deep);
+  --vp-c-brand-3: var(--hno-accent);
+  --vp-c-bg: var(--hno-bg);
+  --vp-c-text-1: var(--hno-ink);
+  --vp-c-text-2: var(--hno-muted);
+  --vp-c-border: var(--hno-border);
+  --vp-c-divider: var(--hno-border);
+  --vp-font-family-base: "Inter", -apple-system, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+  --vp-font-family-mono: "Geist Mono", "SF Mono", "Cascadia Code", Consolas,
+    monospace;
+  --vp-layout-max-width: 1440px;
+}
+
+/* 导航：白底 + 底边 1px 细线 */
+.VPNav {
+  border-bottom: 1px solid var(--hno-border);
+}
+.VPNavBarTitle .title {
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+/* 正文窄栏：阅读优先 ~720px */
+.VPDoc .content-container {
+  max-width: 720px;
+}
+
+/* 卡片：白底 + 5% 黑边框 + 16px 圆角 + 24px 内边距，无阴影 */
+.vp-doc .custom-block,
+.vp-doc table,
+.vp-doc .tip {
+  border-radius: 16px;
+}
+
+/* 代码块：#fafafa 底、细边框、8px 圆角、等宽字体 */
+.vp-doc div[class*="language-"] {
+  background: var(--hno-code-bg);
+  border: 1px solid var(--hno-border);
+  border-radius: 8px;
+}
+
+/* 链接：唯一彩色是强调色 */
+.vp-doc a {
+  color: var(--hno-accent-deep);
+  text-decoration: none;
+}
+.vp-doc a:hover {
+  text-decoration: underline;
+}
+
+/* 按钮：主=近黑底白字；次=白底细边框 */
+:root {
+  --vp-button-brand-bg: var(--hno-ink);
+  --vp-button-brand-text: #ffffff;
+  --vp-button-brand-hover-bg: rgba(13, 13, 13, 0.9);
+  --vp-button-alt-bg: var(--hno-bg);
+  --vp-button-alt-border: 1px solid rgba(13, 13, 13, 0.08);
+  --vp-button-alt-text: var(--hno-ink);
+}
+
+/* 首页 Hero：白底大标题，无渐变无装饰 */
+.VPHomeHero .name {
+  font-size: 48px !important;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  background: none;
+  -webkit-text-fill-color: var(--hno-ink) !important;
+  color: var(--hno-ink) !important;
+}
+.VPHomeHero .text {
+  color: var(--hno-muted);
+  font-weight: 400;
+}
+.VPHomeHero .image {
+  display: none; /* 无 AI 味配图 */
+}
+
+/* 特性卡片：白底细边框无阴影 */
+.VPFeature {
+  border: 1px solid var(--hno-border);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: none !important;
+  background: var(--hno-bg) !important;
+}
+.VPFeature .icon {
+  background: transparent !important;
+  border: none !important;
+}
+.VPFeature .icon svg {
+  color: var(--hno-accent);
+  width: 24px;
+  height: 24px;
+}
+
+/* 页脚：细线分隔，低调 */
+.VPFooter {
+  border-top: 1px solid var(--hno-border);
+}

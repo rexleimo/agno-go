@@ -1,6 +1,6 @@
 ---
 title: 릴리스 노트
-description: Agno-Go의 버전 히스토리 및 릴리스 노트
+description: HNO의 버전 히스토리 및 릴리스 노트
 outline: deep
 ---
 
@@ -142,7 +142,7 @@ outline: deep
 - 최소 지식 적재 엔드포인트
   - `POST /api/v1/knowledge/content` 는 `text/plain` 및 `application/json` 지원
 
-엔터프라이즈 검수 절차: [`docs/ENTERPRISE_MIGRATION_PLAN.md`](https://github.com/rexleimo/agno-Go/blob/main/docs/ENTERPRISE_MIGRATION_PLAN.md) 참고.
+엔터프라이즈 검수 절차: [`docs/ENTERPRISE_MIGRATION_PLAN.md`](https://github.com/rexleimo/HNO/blob/main/docs/ENTERPRISE_MIGRATION_PLAN.md) 참고.
 
 ## 버전 1.1.0 (2025-10-08)
 
@@ -411,7 +411,7 @@ go get github.com/rexleimo/agno-go@v1.1.0
 
 ### 🎉 초기 릴리스
 
-Agno-Go v1.0은 Agno 멀티 에이전트 프레임워크의 고성능 Go 구현입니다.
+HNO v1.0은 Agno 멀티 에이전트 프레임워크의 고성능 Go 구현입니다.
 
 #### 핵심 기능
 - **Agent** - 도구 지원이 있는 단일 자율 에이전트

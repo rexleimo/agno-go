@@ -1,6 +1,6 @@
 # 예제
 
-Agno-Go의 모든 기능을 보여주는 실제 예제입니다.
+HNO의 모든 기능을 보여주는 실제 예제입니다.
 
 ## 사용 가능한 예제
 
@@ -21,7 +21,7 @@ export OPENAI_API_KEY=sk-your-key
 go run cmd/examples/simple_agent/main.go
 ```
 
-[소스 코드 보기](https://github.com/rexleimo/agno-Go/tree/main/cmd/examples/simple_agent)
+[소스 코드 보기](https://github.com/rexleimo/HNO/tree/main/cmd/examples/simple_agent)
 
 ---
 
@@ -42,7 +42,7 @@ export ANTHROPIC_API_KEY=sk-ant-your-key
 go run cmd/examples/claude_agent/main.go
 ```
 
-[소스 코드 보기](https://github.com/rexleimo/agno-Go/tree/main/cmd/examples/claude_agent)
+[소스 코드 보기](https://github.com/rexleimo/HNO/tree/main/cmd/examples/claude_agent)
 
 ---
 
@@ -69,7 +69,7 @@ ollama pull llama3
 go run cmd/examples/ollama_agent/main.go
 ```
 
-[소스 코드 보기](https://github.com/rexleimo/agno-Go/tree/main/cmd/examples/ollama_agent)
+[소스 코드 보기](https://github.com/rexleimo/HNO/tree/main/cmd/examples/ollama_agent)
 
 ---
 
@@ -90,7 +90,7 @@ export OPENAI_API_KEY=sk-your-key
 go run cmd/examples/team_demo/main.go
 ```
 
-[소스 코드 보기](https://github.com/rexleimo/agno-Go/tree/main/cmd/examples/team_demo)
+[소스 코드 보기](https://github.com/rexleimo/HNO/tree/main/cmd/examples/team_demo)
 
 ---
 
@@ -111,7 +111,7 @@ export OPENAI_API_KEY=sk-your-key
 go run cmd/examples/workflow_demo/main.go
 ```
 
-[소스 코드 보기](https://github.com/rexleimo/agno-Go/tree/main/cmd/examples/workflow_demo)
+[소스 코드 보기](https://github.com/rexleimo/HNO/tree/main/cmd/examples/workflow_demo)
 
 ---
 
@@ -139,7 +139,7 @@ export OPENAI_API_KEY=sk-your-key
 go run cmd/examples/rag_demo/main.go
 ```
 
-[소스 코드 보기](https://github.com/rexleimo/agno-Go/tree/main/cmd/examples/rag_demo)
+[소스 코드 보기](https://github.com/rexleimo/HNO/tree/main/cmd/examples/rag_demo)
 
 ---
 
@@ -155,11 +155,11 @@ import (
     "fmt"
     "os"
 
-    "github.com/rexleimo/agno-Go/pkg/hno/agent"
-    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
-    "github.com/rexleimo/agno-Go/pkg/hno/tools/calculator"
-    "github.com/rexleimo/agno-Go/pkg/hno/tools/http"
-    "github.com/rexleimo/agno-Go/pkg/hno/tools/toolkit"
+    "github.com/rexleimo/HNO/pkg/hno/agent"
+    "github.com/rexleimo/HNO/pkg/hno/models/openai"
+    "github.com/rexleimo/HNO/pkg/hno/tools/calculator"
+    "github.com/rexleimo/HNO/pkg/hno/tools/http"
+    "github.com/rexleimo/HNO/pkg/hno/tools/toolkit"
 )
 
 func main() {
@@ -193,9 +193,9 @@ import (
     "fmt"
     "os"
 
-    "github.com/rexleimo/agno-Go/pkg/hno/agent"
-    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
-    "github.com/rexleimo/agno-Go/pkg/hno/team"
+    "github.com/rexleimo/HNO/pkg/hno/agent"
+    "github.com/rexleimo/HNO/pkg/hno/models/openai"
+    "github.com/rexleimo/HNO/pkg/hno/team"
 )
 
 func main() {
@@ -238,9 +238,9 @@ import (
     "os"
     "strings"
 
-    "github.com/rexleimo/agno-Go/pkg/hno/agent"
-    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
-    "github.com/rexleimo/agno-Go/pkg/hno/workflow"
+    "github.com/rexleimo/HNO/pkg/hno/agent"
+    "github.com/rexleimo/HNO/pkg/hno/models/openai"
+    "github.com/rexleimo/HNO/pkg/hno/workflow"
 )
 
 func main() {
@@ -303,4 +303,4 @@ func main() {
 3. 설명과 사용법이 포함된 README.md 추가
 4. Pull Request 제출
 
-[기여 가이드라인](https://github.com/rexleimo/agno-Go/blob/main/CONTRIBUTING.md)
+[기여 가이드라인](https://github.com/rexleimo/HNO/blob/main/CONTRIBUTING.md)

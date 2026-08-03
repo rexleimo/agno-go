@@ -2,7 +2,7 @@
 
 ## 概要
 
-この例では、Agno-Go のマルチエージェントチーム協力機能を示します。Team を使用すると、複数のエージェントが異なる協調モードで協力できます: Sequential、Parallel、Leader-Follower、Consensus。各モードは、異なる種類のタスクと協力パターンに適しています。
+この例では、HNO のマルチエージェントチーム協力機能を示します。Team を使用すると、複数のエージェントが異なる協調モードで協力できます: Sequential、Parallel、Leader-Follower、Consensus。各モードは、異なる種類のタスクと協力パターンに適しています。
 
 ## 学べること
 

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This example demonstrates how to connect to an MCP (Model Context Protocol) server and use its tools through the Agno-Go MCP client. You'll learn how to set up security validation, create transports, connect to MCP servers, and integrate MCP tools with your Agno agents.
+This example demonstrates how to connect to an MCP (Model Context Protocol) server and use its tools through the HNO MCP client. You'll learn how to set up security validation, create transports, connect to MCP servers, and integrate MCP tools with your Agno agents.
 
 ## You Will Learn
 
@@ -63,7 +63,7 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Agno-Go MCP Demo ===")
+	fmt.Println("=== HNO MCP Demo ===")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -244,7 +244,7 @@ fmt.Printf("Result: %v\n", result.Content)
 ## Expected Output
 
 ```
-=== Agno-Go MCP Demo ===
+=== HNO MCP Demo ===
 
 Step 1: Creating security validator...
 ✓ Command validated: python [-m mcp_server_calculator]

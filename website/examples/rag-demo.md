@@ -2,7 +2,7 @@
 
 ## Overview
 
-This example demonstrates how to build a RAG system using Agno-Go. RAG combines information retrieval from a knowledge base with LLM text generation to provide accurate, grounded answers. The system uses ChromaDB for vector storage, OpenAI embeddings, and a custom RAG toolkit to enable semantic search capabilities.
+This example demonstrates how to build a RAG system using HNO. RAG combines information retrieval from a knowledge base with LLM text generation to provide accurate, grounded answers. The system uses ChromaDB for vector storage, OpenAI embeddings, and a custom RAG toolkit to enable semantic search capabilities.
 
 ## What You'll Learn
 

@@ -1,6 +1,6 @@
 # 进阶主题
 
-深入了解 Agno-Go 的高级概念、性能优化、部署策略和测试最佳实践。
+深入了解 HNO 的高级概念、性能优化、部署策略和测试最佳实践。
 
 ## 概览
 
@@ -15,7 +15,7 @@
 
 ### [架构](/zh/advanced/architecture)
 
-了解 Agno-Go 的模块化架构和设计理念:
+了解 HNO 的模块化架构和设计理念:
 
 - 核心接口 (Model, Toolkit, Memory)
 - 抽象模式 (Agent, Team, Workflow)
@@ -126,7 +126,7 @@ go run -tags redis ./cmd/vectordb_migrate --action up --provider redis \
 
 ### KISS (Keep It Simple, Stupid)
 
-Agno-Go 拥抱简单性:
+HNO 拥抱简单性:
 
 - **专注范围**: 3 个 LLM 提供商 (OpenAI, Anthropic, Ollama) 而不是 8+
 - **核心工具**: 5 个核心工具而不是 15+
@@ -154,25 +154,25 @@ Go 的并发模型使得:
 
 ## 贡献
 
-有兴趣为 Agno-Go 做贡献? 查看:
+有兴趣为 HNO 做贡献? 查看:
 
 - [架构文档](/zh/advanced/architecture) - 理解代码库
 - [测试指南](/zh/advanced/testing) - 学习测试标准
-- [GitHub 仓库](https://github.com/rexleimo/agno-Go) - 提交 PR
-- [开发指南](https://github.com/rexleimo/agno-Go/blob/main/CLAUDE.md) - 开发环境设置
+- [GitHub 仓库](https://github.com/rexleimo/HNO) - 提交 PR
+- [开发指南](https://github.com/rexleimo/HNO/blob/main/CLAUDE.md) - 开发环境设置
 
 ## 其他资源
 
 ### 文档
 
-- [Go 包文档](https://pkg.go.dev/github.com/rexleimo/agno-Go)
+- [Go 包文档](https://pkg.go.dev/github.com/rexleimo/HNO)
 - [Python Agno 框架](https://github.com/agno-agi/agno) (灵感来源)
-- [VitePress 文档源码](https://github.com/rexleimo/agno-Go/tree/main/website)
+- [VitePress 文档源码](https://github.com/rexleimo/HNO/tree/main/website)
 
 ### 社区
 
-- [GitHub Issues](https://github.com/rexleimo/agno-Go/issues)
-- [GitHub Discussions](https://github.com/rexleimo/agno-Go/discussions)
+- [GitHub Issues](https://github.com/rexleimo/HNO/issues)
+- [GitHub Discussions](https://github.com/rexleimo/HNO/discussions)
 - [发布说明](/zh/release-notes)
 
 ## 下一步
@@ -184,4 +184,4 @@ Go 的并发模型使得:
 
 ---
 
-**注意**: 本节假设您已熟悉 Agno-Go 的基本概念。如果您是新手,请从 [指南](/zh/guide/) 部分开始。
+**注意**: 本节假设您已熟悉 HNO 的基本概念。如果您是新手,请从 [指南](/zh/guide/) 部分开始。

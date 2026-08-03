@@ -1,4 +1,4 @@
-# Translation Summary - Agno-Go Documentation
+# Translation Summary - HNO Documentation
 
 ## Completed Translations (Chinese/中文)
 
@@ -43,7 +43,7 @@ All files translated to `website/zh/advanced/`:
 ## File Structure
 
 ```
-agno-Go/website/
+HNO/website/
 ├── advanced/                  # Original English files
 │   ├── architecture.md
 │   ├── performance.md
@@ -78,9 +78,9 @@ agno-Go/website/
 
 ### Content Example:
 ```markdown
-Agno-Go 遵循简洁、模块化的架构设计,专注于简单性、效率和可扩展性。
+HNO 遵循简洁、模块化的架构设计,专注于简单性、效率和可扩展性。
 
-Agno-Go follows a clean, modular architecture designed for simplicity, 
+HNO follows a clean, modular architecture designed for simplicity, 
 efficiency, and extensibility.
 ```
 
@@ -136,12 +136,12 @@ type Model interface {
 ## Verification
 
 All translated files are located at:
-- `/Users/molei/codes/aiagent/agno-Go/website/zh/advanced/`
-- `/Users/molei/codes/aiagent/agno-Go/website/zh/examples/`
+- `/Users/molei/codes/aiagent/HNO/website/zh/advanced/`
+- `/Users/molei/codes/aiagent/HNO/website/zh/examples/`
 
 To verify:
 ```bash
-cd /Users/molei/codes/aiagent/agno-Go/website/zh
+cd /Users/molei/codes/aiagent/HNO/website/zh
 ls -R
 ```
 

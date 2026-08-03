@@ -1,6 +1,6 @@
-# Agno-Go란 무엇인가요?
+# HNO란 무엇인가요?
 
-**Agno-Go**는 Go로 구축된 고성능 멀티 에이전트 시스템 프레임워크입니다. Python Agno 프레임워크의 설계 철학을 계승하여 Go의 동시성 모델과 성능 이점을 활용하여 효율적이고 확장 가능한 AI 에이전트 시스템을 구축합니다.
+**HNO**는 Go로 구축된 고성능 멀티 에이전트 시스템 프레임워크입니다. Python Agno 프레임워크의 설계 철학을 계승하여 Go의 동시성 모델과 성능 이점을 활용하여 효율적이고 확장 가능한 AI 에이전트 시스템을 구축합니다.
 
 ## 주요 기능
 
@@ -12,7 +12,7 @@
 
 ### 🤖 프로덕션 준비 완료
 
-Agno-Go는 프로덕션 HTTP 서버인 **AgentOS**를 포함합니다:
+HNO는 프로덕션 HTTP 서버인 **AgentOS**를 포함합니다:
 
 - OpenAPI 3.0 사양을 갖춘 RESTful API
 - 다중 턴 대화를 위한 세션 관리
@@ -89,7 +89,7 @@ KISS 원칙을 따라 높은 품질의 필수 도구를 제공합니다:
 
 ## 사용 사례
 
-Agno-Go는 다음에 완벽합니다:
+HNO는 다음에 완벽합니다:
 
 - **프로덕션 AI 애플리케이션** - AgentOS HTTP 서버로 배포
 - **멀티 에이전트 시스템** - 여러 AI 에이전트 조정
@@ -119,12 +119,12 @@ Agno-Go는 다음에 완벽합니다:
 
 ## 커뮤니티
 
-- **GitHub**: [rexleimo/agno-Go](https://github.com/rexleimo/agno-Go)
-- **Issues**: [버그 신고](https://github.com/rexleimo/agno-Go/issues)
-- **Discussions**: [질문하기](https://github.com/rexleimo/agno-Go/discussions)
+- **GitHub**: [rexleimo/HNO](https://github.com/rexleimo/HNO)
+- **Issues**: [버그 신고](https://github.com/rexleimo/HNO/issues)
+- **Discussions**: [질문하기](https://github.com/rexleimo/HNO/discussions)
 
 ## 라이선스
 
-Agno-Go는 [MIT License](https://github.com/rexleimo/agno-Go/blob/main/LICENSE) 하에 릴리스되었습니다.
+HNO는 [MIT License](https://github.com/rexleimo/HNO/blob/main/LICENSE) 하에 릴리스되었습니다.
 
 [Agno (Python)](https://github.com/agno-agi/agno) 프레임워크에서 영감을 받았습니다.

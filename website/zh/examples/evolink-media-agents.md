@@ -1,7 +1,7 @@
 # EvoLink 媒体智能体（Media Agents）
 
 ## 概览
-本文演示如何在 Agno-Go 中使用 EvoLink Provider，通过 `pkg/hno/models/evolink/*` 生成文本、图片与视频。
+本文演示如何在 HNO 中使用 EvoLink Provider，通过 `pkg/hno/models/evolink/*` 生成文本、图片与视频。
 
 ## 环境准备
 - 设置环境变量：

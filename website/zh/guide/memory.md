@@ -6,7 +6,7 @@
 
 ## 什么是 Memory?
 
-Memory 存储对话历史,允许 Agent 在多次交互中保持上下文。Agno-Go 提供了带自动截断的内置记忆管理。
+Memory 存储对话历史,允许 Agent 在多次交互中保持上下文。HNO 提供了带自动截断的内置记忆管理。
 
 ### 核心特性
 
@@ -389,8 +389,8 @@ agent.Memory.AddMessage(systemMsg)
 
 ## Memory vs Context Window
 
-### Memory (Agno-Go)
-- 由 Agno-Go 管理
+### Memory (HNO)
+- 由 HNO 管理
 - 可配置的消息限制
 - 自动截断
 

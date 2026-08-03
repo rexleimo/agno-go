@@ -1,6 +1,6 @@
-# Agno-Goとは？
+# HNOとは？
 
-**Agno-Go**は、Goで構築された高性能なマルチエージェントシステムフレームワークです。Python Agnoフレームワークの設計思想を継承し、Goの並行処理モデルとパフォーマンスの利点を活用して、効率的でスケーラブルなAIエージェントシステムを構築します。
+**HNO**は、Goで構築された高性能なマルチエージェントシステムフレームワークです。Python Agnoフレームワークの設計思想を継承し、Goの並行処理モデルとパフォーマンスの利点を活用して、効率的でスケーラブルなAIエージェントシステムを構築します。
 
 ## 主な機能
 
@@ -12,7 +12,7 @@
 
 ### 🤖 本番環境対応
 
-Agno-Goには、本番環境HTTPサーバーである**AgentOS**が含まれています：
+HNOには、本番環境HTTPサーバーである**AgentOS**が含まれています：
 
 - OpenAPI 3.0仕様を備えたRESTful API
 - マルチターン会話のためのセッション管理
@@ -89,7 +89,7 @@ KISSの原則に従い、高品質な必須ツールを提供：
 
 ## ユースケース
 
-Agno-Goは以下に最適です：
+HNOは以下に最適です：
 
 - **本番環境AIアプリケーション** - AgentOS HTTPサーバーでデプロイ
 - **マルチエージェントシステム** - 複数のAIエージェントの調整
@@ -119,12 +119,12 @@ Agno-Goは以下に最適です：
 
 ## コミュニティ
 
-- **GitHub**: [rexleimo/agno-Go](https://github.com/rexleimo/agno-Go)
-- **Issues**: [バグ報告](https://github.com/rexleimo/agno-Go/issues)
-- **Discussions**: [質問する](https://github.com/rexleimo/agno-Go/discussions)
+- **GitHub**: [rexleimo/HNO](https://github.com/rexleimo/HNO)
+- **Issues**: [バグ報告](https://github.com/rexleimo/HNO/issues)
+- **Discussions**: [質問する](https://github.com/rexleimo/HNO/discussions)
 
 ## ライセンス
 
-Agno-Goは[MITライセンス](https://github.com/rexleimo/agno-Go/blob/main/LICENSE)の下でリリースされています。
+HNOは[MITライセンス](https://github.com/rexleimo/HNO/blob/main/LICENSE)の下でリリースされています。
 
 [Agno (Python)](https://github.com/agno-agi/agno)フレームワークから着想を得ています。

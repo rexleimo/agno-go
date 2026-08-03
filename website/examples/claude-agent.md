@@ -2,11 +2,11 @@
 
 ## Overview
 
-This example demonstrates how to use Anthropic's Claude model with Agno-Go. Claude is known for its thoughtful, detailed responses and strong reasoning capabilities. This example shows multiple use cases including simple conversation, calculator tool usage, complex calculations, and mathematical reasoning.
+This example demonstrates how to use Anthropic's Claude model with HNO. Claude is known for its thoughtful, detailed responses and strong reasoning capabilities. This example shows multiple use cases including simple conversation, calculator tool usage, complex calculations, and mathematical reasoning.
 
 ## What You'll Learn
 
-- How to integrate Anthropic Claude with Agno-Go
+- How to integrate Anthropic Claude with HNO
 - How to configure Claude models (Opus, Sonnet, Haiku)
 - How to use Claude with tool-calling capabilities
 - Best practices for Claude instructions

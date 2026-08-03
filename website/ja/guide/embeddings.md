@@ -5,7 +5,7 @@ description: ベクター検索のための OpenAI / VLLM 埋め込み設定。
 
 # Embeddings 埋め込み
 
-テキストを数値ベクトルに変換し、類似度検索に使用します。Agno-Go は統一インターフェースを提供し、Chroma などの VectorDB から利用できます。
+テキストを数値ベクトルに変換し、類似度検索に使用します。HNO は統一インターフェースを提供し、Chroma などの VectorDB から利用できます。
 
 ## OpenAI
 

@@ -6,7 +6,7 @@ Give your agents access to external functionality with tools.
 
 ## What are Tools?
 
-Tools are functions that agents can call to interact with external systems, perform calculations, fetch data, and more. Agno-Go provides a flexible toolkit system for extending agent capabilities.
+Tools are functions that agents can call to interact with external systems, perform calculations, fetch data, and more. HNO provides a flexible toolkit system for extending agent capabilities.
 
 ### Built-in Tools
 
@@ -376,7 +376,7 @@ httpTool := http.New(http.Config{
 1. User sends request to agent
 2. Agent (LLM) decides if tools are needed
 3. LLM generates tool call with parameters
-4. Agno-Go executes tool function
+4. HNO executes tool function
 5. Tool result returned to LLM
 6. LLM generates final response
 

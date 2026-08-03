@@ -6,7 +6,7 @@
 
 ## 什么是 Tools?
 
-Tools 是 Agent 可以调用的函数,用于与外部系统交互、执行计算、获取数据等。Agno-Go 提供了灵活的工具系统用于扩展 Agent 能力。
+Tools 是 Agent 可以调用的函数,用于与外部系统交互、执行计算、获取数据等。HNO 提供了灵活的工具系统用于扩展 Agent 能力。
 
 ### 内置工具
 
@@ -376,7 +376,7 @@ httpTool := http.New(http.Config{
 1. 用户向 Agent 发送请求
 2. Agent (LLM) 决定是否需要工具
 3. LLM 生成带参数的工具调用
-4. Agno-Go 执行工具函数
+4. HNO 执行工具函数
 5. 工具结果返回给 LLM
 6. LLM 生成最终响应
 

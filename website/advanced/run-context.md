@@ -5,7 +5,7 @@ description: Correlate events and propagate context through hooks, tools, and mo
 
 # Run Context
 
-Agno-Go propagates a per-run context identifier through hooks, tools, and model calls. Streaming events include `run_context_id` for end-to-end correlation.
+HNO propagates a per-run context identifier through hooks, tools, and model calls. Streaming events include `run_context_id` for end-to-end correlation.
 
 ## SSE Events
 

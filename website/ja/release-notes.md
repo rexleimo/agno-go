@@ -1,6 +1,6 @@
 ---
 title: リリースノート
-description: Agno-Goのバージョン履歴とリリースノート
+description: HNOのバージョン履歴とリリースノート
 outline: deep
 ---
 
@@ -142,7 +142,7 @@ outline: deep
 - 最小限のナレッジ取り込みエンドポイント
   - `POST /api/v1/knowledge/content` は `text/plain` と `application/json` をサポート
 
-企業向けの検収手順は [`docs/ENTERPRISE_MIGRATION_PLAN.md`](https://github.com/rexleimo/agno-Go/blob/main/docs/ENTERPRISE_MIGRATION_PLAN.md) を参照してください。
+企業向けの検収手順は [`docs/ENTERPRISE_MIGRATION_PLAN.md`](https://github.com/rexleimo/HNO/blob/main/docs/ENTERPRISE_MIGRATION_PLAN.md) を参照してください。
 
 ## バージョン 1.1.0 (2025-10-08)
 
@@ -411,7 +411,7 @@ go get github.com/rexleimo/agno-go@v1.1.0
 
 ### 🎉 初回リリース
 
-Agno-Go v1.0は、Agnoマルチエージェントフレームワークの高性能Go実装です。
+HNO v1.0は、Agnoマルチエージェントフレームワークの高性能Go実装です。
 
 #### コア機能
 - **Agent** - ツールサポート付き単一自律エージェント

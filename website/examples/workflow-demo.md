@@ -2,7 +2,7 @@
 
 ## Overview
 
-This example demonstrates Agno-Go's powerful workflow engine with 5 primitive building blocks: Step, Condition, Loop, Parallel, and Router. Workflows provide deterministic, controlled execution flow - perfect for complex multi-step processes that require precise control and observability.
+This example demonstrates HNO's powerful workflow engine with 5 primitive building blocks: Step, Condition, Loop, Parallel, and Router. Workflows provide deterministic, controlled execution flow - perfect for complex multi-step processes that require precise control and observability.
 
 ## What You'll Learn
 

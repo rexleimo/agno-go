@@ -6,7 +6,7 @@
 
 ## Memory란?
 
-Memory는 대화 히스토리를 저장하여, 에이전트가 여러 상호작용에 걸쳐 컨텍스트를 유지할 수 있게 합니다. Agno-Go는 자동 절삭 기능이 있는 내장 메모리 관리를 제공합니다.
+Memory는 대화 히스토리를 저장하여, 에이전트가 여러 상호작용에 걸쳐 컨텍스트를 유지할 수 있게 합니다. HNO는 자동 절삭 기능이 있는 내장 메모리 관리를 제공합니다.
 
 ### 주요 기능
 
@@ -389,8 +389,8 @@ agent.Memory.AddMessage(systemMsg)
 
 ## Memory vs Context Window
 
-### Memory (Agno-Go)
-- Agno-Go에서 관리
+### Memory (HNO)
+- HNO에서 관리
 - 구성 가능한 메시지 제한
 - 자동 절삭
 

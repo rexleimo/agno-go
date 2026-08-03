@@ -1,6 +1,6 @@
 # API 레퍼런스
 
-Agno-Go v1.0의 완전한 API 레퍼런스입니다.
+HNO v1.0의 완전한 API 레퍼런스입니다.
 
 ## 핵심 모듈
 
@@ -18,7 +18,7 @@ Agno-Go v1.0의 완전한 API 레퍼런스입니다.
 ### Agent
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/hno/agent"
+import "github.com/rexleimo/HNO/pkg/hno/agent"
 
 agent.New(config) (*Agent, error)
 agent.Run(ctx, input) (*RunOutput, error)
@@ -30,7 +30,7 @@ agent.ClearMemory()
 ### Team
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/hno/team"
+import "github.com/rexleimo/HNO/pkg/hno/team"
 
 team.New(config) (*Team, error)
 team.Run(ctx, input) (*RunOutput, error)
@@ -43,7 +43,7 @@ team.Run(ctx, input) (*RunOutput, error)
 ### Workflow
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/hno/workflow"
+import "github.com/rexleimo/HNO/pkg/hno/workflow"
 
 workflow.New(config) (*Workflow, error)
 workflow.Run(ctx, input) (*RunOutput, error)
@@ -57,9 +57,9 @@ workflow.Run(ctx, input) (*RunOutput, error)
 
 ```go
 import (
-    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
-    "github.com/rexleimo/agno-Go/pkg/hno/models/anthropic"
-    "github.com/rexleimo/agno-Go/pkg/hno/models/ollama"
+    "github.com/rexleimo/HNO/pkg/hno/models/openai"
+    "github.com/rexleimo/HNO/pkg/hno/models/anthropic"
+    "github.com/rexleimo/HNO/pkg/hno/models/ollama"
 )
 
 openai.New(modelID, config) (*OpenAI, error)
@@ -73,9 +73,9 @@ ollama.New(modelID, config) (*Ollama, error)
 
 ```go
 import (
-    "github.com/rexleimo/agno-Go/pkg/hno/tools/calculator"
-    "github.com/rexleimo/agno-Go/pkg/hno/tools/http"
-    "github.com/rexleimo/agno-Go/pkg/hno/tools/file"
+    "github.com/rexleimo/HNO/pkg/hno/tools/calculator"
+    "github.com/rexleimo/HNO/pkg/hno/tools/http"
+    "github.com/rexleimo/HNO/pkg/hno/tools/file"
 )
 
 calculator.New() *Calculator
@@ -90,7 +90,7 @@ file.New(config) *File
 ### 에러 처리
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/hno/types"
+import "github.com/rexleimo/HNO/pkg/hno/types"
 
 output, err := agent.Run(ctx, input)
 if err != nil {
@@ -208,20 +208,20 @@ GET /api/v1/sessions/{session_id}/history
 
 완전한 OpenAPI 3.0 명세를 확인하세요:
 
-- [OpenAPI YAML](https://github.com/rexleimo/agno-Go/blob/main/pkg/agentos/openapi.yaml)
-- [Swagger UI](https://github.com/rexleimo/agno-Go/tree/main/pkg/agentos#api-documentation)
+- [OpenAPI YAML](https://github.com/rexleimo/HNO/blob/main/pkg/agentos/openapi.yaml)
+- [Swagger UI](https://github.com/rexleimo/HNO/tree/main/pkg/agentos#api-documentation)
 
 ## 예제
 
 저장소의 실제 작동 예제를 참고하세요:
 
-- [Simple Agent](https://github.com/rexleimo/agno-Go/tree/main/cmd/examples/simple_agent)
-- [Team Demo](https://github.com/rexleimo/agno-Go/tree/main/cmd/examples/team_demo)
-- [Workflow Demo](https://github.com/rexleimo/agno-Go/tree/main/cmd/examples/workflow_demo)
-- [RAG Demo](https://github.com/rexleimo/agno-Go/tree/main/cmd/examples/rag_demo)
+- [Simple Agent](https://github.com/rexleimo/HNO/tree/main/cmd/examples/simple_agent)
+- [Team Demo](https://github.com/rexleimo/HNO/tree/main/cmd/examples/team_demo)
+- [Workflow Demo](https://github.com/rexleimo/HNO/tree/main/cmd/examples/workflow_demo)
+- [RAG Demo](https://github.com/rexleimo/HNO/tree/main/cmd/examples/rag_demo)
 
 ## 패키지 문서
 
 전체 Go 패키지 문서는 pkg.go.dev에서 확인할 수 있습니다:
 
-[pkg.go.dev/github.com/rexleimo/agno-Go](https://pkg.go.dev/github.com/rexleimo/agno-Go)
+[pkg.go.dev/github.com/rexleimo/HNO](https://pkg.go.dev/github.com/rexleimo/HNO)

@@ -1,6 +1,6 @@
-# 什么是 Agno-Go?
+# 什么是 HNO?
 
-**Agno-Go** 是一个使用 Go 语言构建的高性能多智能体系统框架。它继承了 Python Agno 框架的设计理念,利用 Go 的并发模型和性能优势来构建高效、可扩展的 AI Agent 系统。
+**HNO** 是一个使用 Go 语言构建的高性能多智能体系统框架。它继承了 Python Agno 框架的设计理念,利用 Go 的并发模型和性能优势来构建高效、可扩展的 AI Agent 系统。
 
 ## 核心特性
 
@@ -12,7 +12,7 @@
 
 ### 🤖 生产就绪
 
-Agno-Go 包含 **AgentOS**,一个生产级 HTTP 服务器:
+HNO 包含 **AgentOS**,一个生产级 HTTP 服务器:
 
 - 符合 OpenAPI 3.0 规范的 RESTful API
 - 多轮对话的会话管理
@@ -89,7 +89,7 @@ Agno-Go 包含 **AgentOS**,一个生产级 HTTP 服务器:
 
 ## 使用场景
 
-Agno-Go 非常适合:
+HNO 非常适合:
 
 - **生产 AI 应用** - 使用 AgentOS HTTP 服务器部署
 - **多智能体系统** - 协调多个 AI Agent
@@ -119,12 +119,12 @@ Agno-Go 非常适合:
 
 ## 社区
 
-- **GitHub**: [rexleimo/agno-Go](https://github.com/rexleimo/agno-Go)
-- **Issues**: [报告 Bug](https://github.com/rexleimo/agno-Go/issues)
-- **Discussions**: [提问题](https://github.com/rexleimo/agno-Go/discussions)
+- **GitHub**: [rexleimo/HNO](https://github.com/rexleimo/HNO)
+- **Issues**: [报告 Bug](https://github.com/rexleimo/HNO/issues)
+- **Discussions**: [提问题](https://github.com/rexleimo/HNO/discussions)
 
 ## 许可证
 
-Agno-Go 使用 [MIT License](https://github.com/rexleimo/agno-Go/blob/main/LICENSE) 发布。
+HNO 使用 [MIT License](https://github.com/rexleimo/HNO/blob/main/LICENSE) 发布。
 
 灵感来源于 [Agno (Python)](https://github.com/agno-agi/agno) 框架。

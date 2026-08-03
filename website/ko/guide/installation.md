@@ -1,6 +1,6 @@
 # 설치
 
-이 가이드는 Agno-Go를 설치하고 설정하는 다양한 방법을 다룹니다.
+이 가이드는 HNO를 설치하고 설정하는 다양한 방법을 다룹니다.
 
 ## 전제 조건
 
@@ -10,18 +10,18 @@
 
 ## 방법 1: Go Get (권장)
 
-Agno-Go를 Go 모듈 의존성으로 설치:
+HNO를 Go 모듈 의존성으로 설치:
 
 ```bash
-go get github.com/rexleimo/agno-Go
+go get github.com/rexleimo/HNO
 ```
 
 그런 다음 코드에서 임포트:
 
 ```go
 import (
-    "github.com/rexleimo/agno-Go/pkg/hno/agent"
-    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
+    "github.com/rexleimo/HNO/pkg/hno/agent"
+    "github.com/rexleimo/HNO/pkg/hno/models/openai"
 )
 ```
 
@@ -31,8 +31,8 @@ import (
 
 ```bash
 # 리포지토리 복제
-git clone https://github.com/rexleimo/agno-Go.git
-cd agno-Go
+git clone https://github.com/rexleimo/HNO.git
+cd HNO
 
 # 의존성 다운로드
 go mod download
@@ -127,8 +127,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-Go/pkg/hno/agent"
-    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
+    "github.com/rexleimo/HNO/pkg/hno/agent"
+    "github.com/rexleimo/HNO/pkg/hno/models/openai"
 )
 
 func main() {
@@ -318,13 +318,13 @@ AGENTOS_ADDRESS=:9090
 
 문제가 발생하면:
 
-1. [GitHub Issues](https://github.com/rexleimo/agno-Go/issues) 확인
-2. [Discussions](https://github.com/rexleimo/agno-Go/discussions)에서 질문
+1. [GitHub Issues](https://github.com/rexleimo/HNO/issues) 확인
+2. [Discussions](https://github.com/rexleimo/HNO/discussions)에서 질문
 3. [문서](/guide/) 검토
 
 ## 다음 단계
 
-이제 Agno-Go가 설치되었습니다:
+이제 HNO가 설치되었습니다:
 
 1. [Quick Start](/guide/quick-start) - 첫 번째 에이전트 구축
 2. [Core Concepts](/guide/agent) - Agent, Team, Workflow에 대해 배우기

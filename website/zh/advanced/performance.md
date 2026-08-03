@@ -1,6 +1,6 @@
 # 性能 / Performance
 
-Agno-Go 专为极致性能而设计,实现比 Python Agno 快 16 倍的智能体实例化速度。
+HNO 专为极致性能而设计,实现比 Python Agno 快 16 倍的智能体实例化速度。
 
 ## 执行摘要 / Executive Summary
 
@@ -288,7 +288,7 @@ go test -race ./...
 
 ## 结论 / Conclusion
 
-Agno-Go **超越性能目标**:
+HNO **超越性能目标**:
 
 - ✅ 比目标快 5 倍(180ns vs 1μs)
 - ✅ 比目标少 60% 内存(1.2KB vs 3KB)
@@ -304,4 +304,4 @@ Agno-Go **超越性能目标**:
 
 - [架构 / Architecture](/advanced/architecture)
 - [部署 / Deployment](/advanced/deployment)
-- [基准测试代码 / Benchmark Code](https://github.com/rexleimo/agno-Go/tree/main/pkg/hno/agent/agent_bench_test.go)
+- [基准测试代码 / Benchmark Code](https://github.com/rexleimo/HNO/tree/main/pkg/hno/agent/agent_bench_test.go)

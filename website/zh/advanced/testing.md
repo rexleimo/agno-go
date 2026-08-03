@@ -1,12 +1,12 @@
 # 测试 / Testing
 
-Agno-Go 开发的综合测试指南。
+HNO 开发的综合测试指南。
 
 ---
 
 ## 概述 / Overview
 
-Agno-Go 通过全面的测试保持高质量,整个代码库的**测试覆盖率达 80.8%**。本指南涵盖测试标准、模式和最佳实践。
+HNO 通过全面的测试保持高质量,整个代码库的**测试覆盖率达 80.8%**。本指南涵盖测试标准、模式和最佳实践。
 
 ### 测试覆盖率状态 / Test Coverage Status
 
@@ -556,7 +556,7 @@ go test -timeout 30s ./...
 - 查看[架构 / Architecture](/advanced/architecture)了解设计模式
 - 检查[性能 / Performance](/advanced/performance)了解基准测试
 - 阅读[部署 / Deployment](/advanced/deployment)了解生产设置
-- 探索[贡献指南 / Contributing Guide](https://github.com/rexleimo/agno-Go/blob/main/CONTRIBUTING.md)
+- 探索[贡献指南 / Contributing Guide](https://github.com/rexleimo/HNO/blob/main/CONTRIBUTING.md)
 
 ---
 

@@ -150,7 +150,7 @@ This creates a race condition in traditional implementations. How do we handle c
 
 ### The Solution
 
-Agno-Go uses a **deep copy + last-write-wins** strategy:
+HNO uses a **deep copy + last-write-wins** strategy:
 
 1. Each parallel branch gets an independent SessionState copy
 2. Branches execute independently without interference

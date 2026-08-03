@@ -5,7 +5,7 @@ description: 可插拔 VectorDB、迁移 CLI 与 Embeddings。
 
 # 向量索引（Vector Indexing）
 
-Agno-Go 提供可插拔 `VectorDB` 接口：默认 Chroma，可选 Redis（`-tags redis`）。并包含简单迁移 CLI。
+HNO 提供可插拔 `VectorDB` 接口：默认 Chroma，可选 Redis（`-tags redis`）。并包含简单迁移 CLI。
 
 ## Provider
 

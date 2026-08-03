@@ -1,6 +1,6 @@
 # Observability & Telemetry
 
-Agno-Go exposes several layers of runtime visibility so that production operators can monitor reasoning-heavy workloads, token consumption, and long-running sessions.
+HNO exposes several layers of runtime visibility so that production operators can monitor reasoning-heavy workloads, token consumption, and long-running sessions.
 
 ## AgentOS SSE Stream
 
@@ -30,7 +30,7 @@ Reasoning events are emitted whenever the model returns `ReasoningContent`. This
    ```
 3. The example records span metadata such as loop count, aggregated token usage, and reasoning excerpts (with optional redacted content).
 
-Full step-by-step instructions live in [`docs/release/logfire_observability.md`](https://github.com/rexleimo/agno-Go/blob/main/docs/release/logfire_observability.md).
+Full step-by-step instructions live in [`docs/release/logfire_observability.md`](https://github.com/rexleimo/HNO/blob/main/docs/release/logfire_observability.md).
 
 ## Next Steps
 

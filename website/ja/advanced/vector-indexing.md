@@ -5,7 +5,7 @@ description: プラガブルな VectorDB、マイグレーション CLI、埋め
 
 # ベクターインデックス（Vector Indexing）
 
-Agno-Go はプラガブルな `VectorDB` インターフェースを提供します。デフォルトは Chroma、オプションで Redis（`-tags redis`）。簡易マイグレーション CLI 付き。
+HNO はプラガブルな `VectorDB` インターフェースを提供します。デフォルトは Chroma、オプションで Redis（`-tags redis`）。簡易マイグレーション CLI 付き。
 
 ## Provider
 

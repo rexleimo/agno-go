@@ -1,6 +1,6 @@
 # 高度な内容
 
-Agno-Go の高度な概念、パフォーマンス最適化、デプロイ戦略、テストのベストプラクティスを深く学びます。
+HNO の高度な概念、パフォーマンス最適化、デプロイ戦略、テストのベストプラクティスを深く学びます。
 
 ## 概要
 
@@ -15,7 +15,7 @@ Agno-Go の高度な概念、パフォーマンス最適化、デプロイ戦略
 
 ### [アーキテクチャ](/ja/advanced/architecture)
 
-Agno-Go のモジュラーアーキテクチャと設計哲学について学ぶ:
+HNO のモジュラーアーキテクチャと設計哲学について学ぶ:
 
 - コアインターフェース (Model, Toolkit, Memory)
 - 抽象化パターン (Agent, Team, Workflow)
@@ -126,7 +126,7 @@ go run -tags redis ./cmd/vectordb_migrate --action up --provider redis \
 
 ### KISS (Keep It Simple, Stupid)
 
-Agno-Go はシンプルさを重視します:
+HNO はシンプルさを重視します:
 
 - **焦点を絞った範囲**: 8+ ではなく 3 つの LLM プロバイダー (OpenAI, Anthropic, Ollama)
 - **必須ツール**: 15+ ではなく 5 つのコアツール
@@ -154,25 +154,25 @@ Go の並行モデルにより実現:
 
 ## 貢献
 
-Agno-Go への貢献に興味がありますか? チェックアウト:
+HNO への貢献に興味がありますか? チェックアウト:
 
 - [アーキテクチャドキュメント](/ja/advanced/architecture) - コードベースを理解する
 - [テストガイド](/ja/advanced/testing) - テスト標準を学ぶ
-- [GitHub リポジトリ](https://github.com/rexleimo/agno-Go) - PR を送信
-- [開発ガイド](https://github.com/rexleimo/agno-Go/blob/main/CLAUDE.md) - 開発環境のセットアップ
+- [GitHub リポジトリ](https://github.com/rexleimo/HNO) - PR を送信
+- [開発ガイド](https://github.com/rexleimo/HNO/blob/main/CLAUDE.md) - 開発環境のセットアップ
 
 ## その他のリソース
 
 ### ドキュメント
 
-- [Go パッケージドキュメント](https://pkg.go.dev/github.com/rexleimo/agno-Go)
+- [Go パッケージドキュメント](https://pkg.go.dev/github.com/rexleimo/HNO)
 - [Python Agno フレームワーク](https://github.com/agno-agi/agno) (インスピレーション)
-- [VitePress ドキュメントソース](https://github.com/rexleimo/agno-Go/tree/main/website)
+- [VitePress ドキュメントソース](https://github.com/rexleimo/HNO/tree/main/website)
 
 ### コミュニティ
 
-- [GitHub Issues](https://github.com/rexleimo/agno-Go/issues)
-- [GitHub Discussions](https://github.com/rexleimo/agno-Go/discussions)
+- [GitHub Issues](https://github.com/rexleimo/HNO/issues)
+- [GitHub Discussions](https://github.com/rexleimo/HNO/discussions)
 - [リリースノート](/ja/release-notes)
 
 ## 次のステップ
@@ -184,4 +184,4 @@ Agno-Go への貢献に興味がありますか? チェックアウト:
 
 ---
 
-**注意**: このセクションは Agno-Go の基本概念に精通していることを前提としています。初心者の場合は、[ガイド](/ja/guide/) セクションから始めてください。
+**注意**: このセクションは HNO の基本概念に精通していることを前提としています。初心者の場合は、[ガイド](/ja/guide/) セクションから始めてください。

@@ -1,6 +1,6 @@
 # GLM Agent 示例
 
-本示例演示如何在 Agno-Go 中使用 GLM (智谱AI)，中国领先的国产大语言模型平台。
+本示例演示如何在 HNO 中使用 GLM (智谱AI)，中国领先的国产大语言模型平台。
 
 ## 概述
 
@@ -184,7 +184,7 @@ func main() {
 1. 克隆仓库:
 ```bash
 git clone https://github.com/rexleimo/agno-go.git
-cd agno-Go
+cd HNO
 ```
 
 2. 设置 API 密钥:
@@ -270,4 +270,4 @@ GLM 使用 JWT (JSON Web Token) 认证:
 
 - [GLM 官方网站](https://www.bigmodel.cn/)
 - [GLM API 文档](https://open.bigmodel.cn/dev/api)
-- [Agno-Go 仓库](https://github.com/rexleimo/agno-go)
+- [HNO 仓库](https://github.com/rexleimo/agno-go)

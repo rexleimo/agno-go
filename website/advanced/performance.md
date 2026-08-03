@@ -1,6 +1,6 @@
 # Performance
 
-Agno-Go is designed for extreme performance, achieving 16x faster agent instantiation compared to Python Agno.
+HNO is designed for extreme performance, achieving 16x faster agent instantiation compared to Python Agno.
 
 ## Executive Summary
 
@@ -288,7 +288,7 @@ go test -race ./...
 
 ## Conclusion
 
-Agno-Go **exceeds performance targets**:
+HNO **exceeds performance targets**:
 
 - ✅ 5x faster than target (180ns vs 1μs)
 - ✅ 60% less memory than target (1.2KB vs 3KB)
@@ -304,4 +304,4 @@ Agno-Go **exceeds performance targets**:
 
 - [Architecture](/advanced/architecture)
 - [Deployment](/advanced/deployment)
-- [Benchmark Code](https://github.com/rexleimo/agno-Go/tree/main/pkg/hno/agent/agent_bench_test.go)
+- [Benchmark Code](https://github.com/rexleimo/HNO/tree/main/pkg/hno/agent/agent_bench_test.go)

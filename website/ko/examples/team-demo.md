@@ -2,7 +2,7 @@
 
 ## 개요
 
-이 예제는 Agno-Go의 멀티 Agent 팀 협업 기능을 보여줍니다. Team을 사용하면 여러 Agent가 Sequential, Parallel, Leader-Follower, Consensus 등 다양한 협업 모드를 사용하여 함께 작업할 수 있습니다. 각 모드는 서로 다른 유형의 작업 및 협업 패턴에 적합합니다.
+이 예제는 HNO의 멀티 Agent 팀 협업 기능을 보여줍니다. Team을 사용하면 여러 Agent가 Sequential, Parallel, Leader-Follower, Consensus 등 다양한 협업 모드를 사용하여 함께 작업할 수 있습니다. 각 모드는 서로 다른 유형의 작업 및 협업 패턴에 적합합니다.
 
 ## 학습 내용
 

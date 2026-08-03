@@ -1,6 +1,6 @@
 ---
 title: Release Notes
-description: Version history and release notes for Agno-Go
+description: Version history and release notes for HNO
 outline: deep
 ---
 
@@ -143,7 +143,7 @@ outline: deep
 - Minimal knowledge ingestion endpoint
   - `POST /api/v1/knowledge/content` supports `text/plain` and `application/json`
 
-Enterprise validation steps: see [`docs/ENTERPRISE_MIGRATION_PLAN.md`](https://github.com/rexleimo/agno-Go/blob/main/docs/ENTERPRISE_MIGRATION_PLAN.md).
+Enterprise validation steps: see [`docs/ENTERPRISE_MIGRATION_PLAN.md`](https://github.com/rexleimo/HNO/blob/main/docs/ENTERPRISE_MIGRATION_PLAN.md).
 
 ## Version 1.1.0 (2025-10-08)
 
@@ -426,7 +426,7 @@ model, _ := glm.New("glm-4", glm.Config{
 
 ### 🎉 Initial Release
 
-Agno-Go v1.0 is a high-performance Go implementation of the Agno multi-agent framework.
+HNO v1.0 is a high-performance Go implementation of the Agno multi-agent framework.
 
 #### Core Features
 - **Agent** - Single autonomous agent with tool support (74.7% coverage)

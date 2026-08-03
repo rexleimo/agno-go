@@ -2,19 +2,19 @@
 layout: home
 
 hero:
-  name: "Agno-Go"
+  name: "HNO"
   text: "高性能多智能体框架"
   tagline: "比 Python 快 16 倍 | 180ns 实例化 | 每个智能体仅 1.2KB 内存"
   image:
     src: /logo.png
-    alt: Agno-Go
+    alt: HNO
   actions:
     - theme: brand
       text: 快速开始
       link: /zh/guide/quick-start
     - theme: alt
       text: 在 GitHub 上查看
-      link: https://github.com/rexleimo/agno-Go
+      link: https://github.com/rexleimo/HNO
 
 features:
   - icon: 🚀
@@ -90,13 +90,13 @@ func main() {
 
 ## 性能对比
 
-| 指标 | Python Agno | Agno-Go | 改进 |
+| 指标 | Python Agno | HNO | 改进 |
 |--------|-------------|---------|-------------|
 | 智能体创建 | ~3μs | ~180ns | **快 16 倍** |
 | 内存/智能体 | ~6.5KB | ~1.2KB | **减少 5.4 倍** |
 | 并发性 | GIL 限制 | 原生 goroutine | **无限制** |
 
-## 为什么选择 Agno-Go?
+## 为什么选择 HNO?
 ### v1.2.9 有哪些更新 / What's New in v1.2.9
 
 - **EvoLink 媒体智能体** – 在 `pkg/hno/providers/evolink` 与 `pkg/hno/models/evolink/*` 下提供文本、图片、视频模型, 并在 EvoLink 媒体示例页中给出端到端工作流。 / First-class EvoLink provider for text, image, and video with end-to-end examples in the EvoLink Media Agents docs.
@@ -105,7 +105,7 @@ func main() {
 
 ### 为生产而生
 
-Agno-Go 不仅是一个框架——它是一个完整的生产系统。包含的 **AgentOS** 服务器提供:
+HNO 不仅是一个框架——它是一个完整的生产系统。包含的 **AgentOS** 服务器提供:
 
 - 带 OpenAPI 3.0 规范的 RESTful API
 - 多轮对话的会话管理
@@ -132,8 +132,8 @@ Agno-Go 不仅是一个框架——它是一个完整的生产系统。包含的
 
 ```bash
 # 克隆仓库
-git clone https://github.com/rexleimo/agno-Go.git
-cd agno-Go
+git clone https://github.com/rexleimo/HNO.git
+cd HNO
 
 # 设置 API 密钥
 export OPENAI_API_KEY=sk-your-key-here
@@ -158,12 +158,12 @@ curl http://localhost:8080/health
 
 ## 社区
 
-- **GitHub**: [rexleimo/agno-Go](https://github.com/rexleimo/agno-Go)
-- **Issues**: [报告问题和请求功能](https://github.com/rexleimo/agno-Go/issues)
-- **Discussions**: [提问和分享想法](https://github.com/rexleimo/agno-Go/discussions)
+- **GitHub**: [rexleimo/HNO](https://github.com/rexleimo/HNO)
+- **Issues**: [报告问题和请求功能](https://github.com/rexleimo/HNO/issues)
+- **Discussions**: [提问和分享想法](https://github.com/rexleimo/HNO/discussions)
 
 ## 许可证
 
-Agno-Go 基于 [MIT 许可证](https://github.com/rexleimo/agno-Go/blob/main/LICENSE) 发布。
+HNO 基于 [MIT 许可证](https://github.com/rexleimo/HNO/blob/main/LICENSE) 发布。
 
 灵感来自 [Agno (Python)](https://github.com/agno-agi/agno) 框架。

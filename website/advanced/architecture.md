@@ -1,6 +1,6 @@
 # Architecture
 
-Agno-Go follows a clean, modular architecture designed for simplicity, efficiency, and extensibility.
+HNO follows a clean, modular architecture designed for simplicity, efficiency, and extensibility.
 
 ## Core Philosophy
 
@@ -8,25 +8,35 @@ Agno-Go follows a clean, modular architecture designed for simplicity, efficienc
 
 ## Overall Architecture
 
+HNO is organized in three layers. The application layer (agents, teams,
+workflows) composes on a **shared orchestration kernel**, which drives a thin
+adapter layer of model providers and tools.
+
 ```
-┌─────────────────────────────────────────┐
-│          Application Layer              │
-│  (CLI Tools, Web API, Custom Apps)      │
-└──────────────┬──────────────────────────┘
-               │
-┌──────────────▼──────────────────────────┐
-│         Core Abstractions               │
-│  ┌─────────┐  ┌──────┐  ┌──────────┐   │
-│  │  Agent  │  │ Team │  │ Workflow │   │
-│  └─────────┘  └──────┘  └──────────┘   │
-└──────────────┬──────────────────────────┘
-               │
-┌──────────────▼──────────────────────────┐
-│        Foundation Layer                  │
-│  ┌────────┐ ┌───────┐ ┌──────┐         │
-│  │ Models │ │ Tools │ │Memory│ ...     │
-│  └────────┘ └───────┘ └──────┘         │
-└─────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                    Application Layer                     │
+│  ┌─────────┐   ┌──────────┐   ┌────────────┐            │
+│  │  Agent  │   │   Team   │   │  Workflow  │  (+Skills) │
+│  └────┬────┘   └────┬─────┘   └─────┬──────┘            │
+└───────┼─────────────┼───────────────┼───────────────────┘
+        │             │               │
+┌───────▼─────────────▼───────────────▼───────────────────┐
+│              Shared Orchestration Kernel                │
+│              run.Loop (Unit interface)                  │
+│              ┌────────────────────────────┐             │
+│              │ Team: Scheduler strategy   │             │
+│              │ Workflow: GenericStep[In,Out]            │
+└───────┬─────────────┬───────────────┬───────────────────┘
+        │             │               │
+┌───────▼─────────────▼───────────────▼───────────────────┐
+│                   Adapter Layer                         │
+│  ┌──────────────────────┐   ┌──────────────────────┐    │
+│  │ Model (17 providers) │   │ Toolkit (23 built-in)│    │
+│  │ OpenAICompat 统一 10  │   │ MCP bridge          │    │
+│  │ Anthropic / Gemini   │   │ Skills registry      │    │
+│  └──────────────────────┘   └──────────────────────┘    │
+│  Observability: OTel spans · cost · retry · breaker     │
+└─────────────────────────────────────────────────────────┘
 ```
 
 ## Core Interfaces
@@ -67,11 +77,47 @@ type Function struct {
 
 ```go
 type Memory interface {
-    Add(message types.Message) error
-    GetMessages() []types.Message
-    Clear() error
+    Add(msg *types.Message, userIDs ...string)
+    GetMessages(userIDs ...string) []*types.Message
+    Clear(userIDs ...string)
+    Size(userIDs ...string) int
+    Search(query string, limit int, userIDs ...string) ([]*types.Message, error)
 }
 ```
+
+### 4. Shared Orchestration Kernel
+
+Agents, teams and workflows all run on a single loop kernel (`run.Loop`).
+Each executable element adapts to the `Unit` interface; the orchestrator
+supplies a `Next` strategy. New orchestrator types (supervisors, routers,
+consensus drivers) compose in tens of lines without duplicating loop logic.
+
+```go
+// run.Loop: the shared orchestration kernel
+type Unit interface {
+    ID() string
+    Execute(ctx context.Context, input string) (output string, events Events, err error)
+}
+
+loop := &run.Loop{
+    Next: func(history []run.UnitOutput) (run.Unit, string, error) {
+        // Orchestration strategy: pick the next unit and its input.
+        return nextUnit, nextInput, nil // nil unit signals completion
+    },
+}
+outputs, err := loop.Run(ctx)
+```
+
+Teams plug in a `Scheduler` strategy (sequential, parallel, leader-follower,
+consensus); workflows plug in typed steps (`GenericStep[In, Out]`).
+
+### 5. OpenAI-Compatible Provider Abstraction
+
+Ten providers (DeepSeek, Groq, ModelScope, Together, InternLM, LM Studio,
+Portkey, SambaNova, Vercel, OpenRouter) share one `OpenAICompat` adapter:
+they are thin shells specifying their provider name, default base URL and
+API key requirements. Anthropic and Gemini implement their native protocols
+directly against the same `Model` interface.
 
 ## Component Details
 
@@ -389,4 +435,4 @@ Follow the KISS principle - don't over-engineer.
 - [Performance Benchmarks](/advanced/performance)
 - [Deployment Guide](/advanced/deployment)
 - [API Reference](/api/)
-- [Source Code](https://github.com/rexleimo/agno-Go)
+- [Source Code](https://github.com/rexleimo/HNO)

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This example demonstrates the basic usage of Agno-Go to create a simple AI agent with tool-calling capabilities. The agent uses OpenAI's GPT-4o-mini model and is equipped with a calculator toolkit to perform mathematical operations.
+This example demonstrates the basic usage of HNO to create a simple AI agent with tool-calling capabilities. The agent uses OpenAI's GPT-4o-mini model and is equipped with a calculator toolkit to perform mathematical operations.
 
 ## What You'll Learn
 

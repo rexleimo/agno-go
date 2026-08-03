@@ -1,6 +1,6 @@
 # 可观测性与遥测
 
-Agno-Go 提供多层可观测性，便于在生产环境监控推理过程、token 消耗与长会话状态。
+HNO 提供多层可观测性，便于在生产环境监控推理过程、token 消耗与长会话状态。
 
 ## AgentOS SSE 事件流
 
@@ -30,7 +30,7 @@ Agno-Go 提供多层可观测性，便于在生产环境监控推理过程、tok
    ```
 3. 示例会记录循环次数、token 统计以及推理文本（包括可选的脱敏内容）。
 
-详细步骤参见 [`docs/release/logfire_observability.md`](https://github.com/rexleimo/agno-Go/blob/main/docs/release/logfire_observability.md)。
+详细步骤参见 [`docs/release/logfire_observability.md`](https://github.com/rexleimo/HNO/blob/main/docs/release/logfire_observability.md)。
 
 ## 下一步
 

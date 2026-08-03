@@ -2,7 +2,7 @@
 
 ## 개요
 
-이 예제는 MCP (Model Context Protocol) 서버에 연결하고 Agno-Go MCP 클라이언트를 통해 해당 도구를 사용하는 방법을 보여줍니다. 보안 검증 설정, 전송 생성, MCP 서버 연결, MCP 도구와 Agno 에이전트 통합 방법을 배우게 됩니다.
+이 예제는 MCP (Model Context Protocol) 서버에 연결하고 HNO MCP 클라이언트를 통해 해당 도구를 사용하는 방법을 보여줍니다. 보안 검증 설정, 전송 생성, MCP 서버 연결, MCP 도구와 Agno 에이전트 통합 방법을 배우게 됩니다.
 
 ## 학습 내용
 
@@ -63,7 +63,7 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Agno-Go MCP Demo ===")
+	fmt.Println("=== HNO MCP Demo ===")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -244,7 +244,7 @@ fmt.Printf("Result: %v\n", result.Content)
 ## 예상 출력
 
 ```
-=== Agno-Go MCP Demo ===
+=== HNO MCP Demo ===
 
 Step 1: Creating security validator...
 ✓ Command validated: python [-m mcp_server_calculator]

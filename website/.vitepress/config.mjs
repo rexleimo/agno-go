@@ -2,29 +2,29 @@ import { defineConfig } from 'vitepress'
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
-  title: "Agno-Go",
+  title: "HNO",
   description: "High-performance multi-agent system framework built with Go",
-  base: '/agno-Go/',
+  base: '/HNO/',
   ignoreDeadLinks: true,
-  sitemap: { hostname: 'https://rexleimo.github.io/agno-Go/' },
+  sitemap: { hostname: 'https://rexleimo.github.io/HNO/' },
 
   head: [
     // Use existing logo as favicon to avoid 404s
-    ['link', { rel: 'icon', type: 'image/png', href: '/agno-Go/logo.png' }],
-    ['link', { rel: 'shortcut icon', href: '/agno-Go/logo.png' }],
-    ['link', { rel: 'apple-touch-icon', href: '/agno-Go/logo.png' }],
+    ['link', { rel: 'icon', type: 'image/png', href: '/HNO/logo.png' }],
+    ['link', { rel: 'shortcut icon', href: '/HNO/logo.png' }],
+    ['link', { rel: 'apple-touch-icon', href: '/HNO/logo.png' }],
     ['meta', { name: 'theme-color', content: '#3eaf7c' }],
     ['meta', { name: 'og:type', content: 'website' }],
-    ['meta', { name: 'og:site_name', content: 'Agno-Go' }],
-    ['meta', { name: 'og:image', content: '/agno-Go/logo.png' }],
-    ['meta', { name: 'og:url', content: 'https://rexleimo.github.io/agno-Go/' }],
+    ['meta', { name: 'og:site_name', content: 'HNO' }],
+    ['meta', { name: 'og:image', content: '/HNO/logo.png' }],
+    ['meta', { name: 'og:url', content: 'https://rexleimo.github.io/HNO/' }],
   ],
 
   locales: {
     root: {
       label: 'English',
       lang: 'en',
-      title: 'Agno-Go',
+      title: 'HNO',
       description: 'High-performance multi-agent system framework built with Go',
       themeConfig: {
         nav: [
@@ -35,7 +35,7 @@ export default defineConfig({
           {
             text: 'v1.2.9',
             items: [
-              { text: 'Changelog', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
+              { text: 'Changelog', link: 'https://github.com/rexleimo/HNO/blob/main/CHANGELOG.md' },
               { text: 'Release Notes', link: '/release-notes' }
             ]
           }
@@ -45,7 +45,7 @@ export default defineConfig({
             {
               text: 'Introduction',
               items: [
-                { text: 'What is Agno-Go?', link: '/guide/' },
+                { text: 'What is HNO?', link: '/guide/' },
                 { text: 'Quick Start', link: '/guide/quick-start' },
                 { text: 'Installation', link: '/guide/installation' }
               ]
@@ -118,7 +118,7 @@ export default defineConfig({
           ]
         },
         editLink: {
-          pattern: 'https://github.com/rexleimo/agno-Go/edit/main/website/:path',
+          pattern: 'https://github.com/rexleimo/HNO/edit/main/website/:path',
           text: 'Edit this page on GitHub'
         },
         lastUpdated: {
@@ -129,7 +129,7 @@ export default defineConfig({
     zh: {
       label: '简体中文',
       lang: 'zh-CN',
-      title: 'Agno-Go',
+      title: 'HNO',
       description: '基于 Go 构建的高性能多智能体系统框架',
       themeConfig: {
         nav: [
@@ -140,7 +140,7 @@ export default defineConfig({
           {
             text: 'v1.2.9',
             items: [
-              { text: '更新日志', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
+              { text: '更新日志', link: 'https://github.com/rexleimo/HNO/blob/main/CHANGELOG.md' },
               { text: '发布说明', link: '/zh/release-notes' }
             ]
           }
@@ -150,7 +150,7 @@ export default defineConfig({
             {
               text: '介绍',
               items: [
-                { text: '什么是 Agno-Go?', link: '/zh/guide/' },
+                { text: '什么是 HNO?', link: '/zh/guide/' },
                 { text: '快速开始', link: '/zh/guide/quick-start' },
                 { text: '安装', link: '/zh/guide/installation' }
               ]
@@ -223,7 +223,7 @@ export default defineConfig({
           ]
         },
         editLink: {
-          pattern: 'https://github.com/rexleimo/agno-Go/edit/main/website/:path',
+          pattern: 'https://github.com/rexleimo/HNO/edit/main/website/:path',
           text: '在 GitHub 上编辑此页'
         },
         lastUpdated: {
@@ -234,7 +234,7 @@ export default defineConfig({
     ja: {
       label: '日本語',
       lang: 'ja',
-      title: 'Agno-Go',
+      title: 'HNO',
       description: 'Go で構築された高性能マルチエージェントシステムフレームワーク',
       themeConfig: {
         nav: [
@@ -245,7 +245,7 @@ export default defineConfig({
           {
             text: 'v1.2.9',
             items: [
-              { text: '変更履歴', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
+              { text: '変更履歴', link: 'https://github.com/rexleimo/HNO/blob/main/CHANGELOG.md' },
               { text: 'リリースノート', link: '/ja/release-notes' }
             ]
           }
@@ -255,7 +255,7 @@ export default defineConfig({
             {
               text: '導入',
               items: [
-                { text: 'Agno-Go とは?', link: '/ja/guide/' },
+                { text: 'HNO とは?', link: '/ja/guide/' },
                 { text: 'クイックスタート', link: '/ja/guide/quick-start' },
                 { text: 'インストール', link: '/ja/guide/installation' }
               ]
@@ -328,7 +328,7 @@ export default defineConfig({
           ]
         },
         editLink: {
-          pattern: 'https://github.com/rexleimo/agno-Go/edit/main/website/:path',
+          pattern: 'https://github.com/rexleimo/HNO/edit/main/website/:path',
           text: 'GitHub でこのページを編集'
         },
         lastUpdated: {
@@ -339,7 +339,7 @@ export default defineConfig({
     ko: {
       label: '한국어',
       lang: 'ko',
-      title: 'Agno-Go',
+      title: 'HNO',
       description: 'Go로 구축된 고성능 멀티 에이전트 시스템 프레임워크',
       themeConfig: {
         nav: [
@@ -350,7 +350,7 @@ export default defineConfig({
           {
             text: 'v1.2.9',
             items: [
-              { text: '변경 로그', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
+              { text: '변경 로그', link: 'https://github.com/rexleimo/HNO/blob/main/CHANGELOG.md' },
               { text: '릴리스 노트', link: '/ko/release-notes' }
             ]
           }
@@ -360,7 +360,7 @@ export default defineConfig({
             {
               text: '소개',
               items: [
-                { text: 'Agno-Go란?', link: '/ko/guide/' },
+                { text: 'HNO란?', link: '/ko/guide/' },
                 { text: '빠른 시작', link: '/ko/guide/quick-start' },
                 { text: '설치', link: '/ko/guide/installation' }
               ]
@@ -433,7 +433,7 @@ export default defineConfig({
           ]
         },
         editLink: {
-          pattern: 'https://github.com/rexleimo/agno-Go/edit/main/website/:path',
+          pattern: 'https://github.com/rexleimo/HNO/edit/main/website/:path',
           text: 'GitHub에서 이 페이지 수정하기'
         },
         lastUpdated: {
@@ -454,7 +454,7 @@ export default defineConfig({
       {
         text: 'v1.2.9',
         items: [
-          { text: 'Changelog', link: 'https://github.com/rexleimo/agno-Go/blob/main/CHANGELOG.md' },
+          { text: 'Changelog', link: 'https://github.com/rexleimo/HNO/blob/main/CHANGELOG.md' },
           { text: 'Release Notes', link: '/release-notes' }
         ]
       }
@@ -465,7 +465,7 @@ export default defineConfig({
         {
           text: 'Introduction',
           items: [
-            { text: 'What is Agno-Go?', link: '/guide/' },
+            { text: 'What is HNO?', link: '/guide/' },
             { text: 'Quick Start', link: '/guide/quick-start' },
             { text: 'Installation', link: '/guide/installation' }
           ]
@@ -536,12 +536,12 @@ export default defineConfig({
     },
 
     socialLinks: [
-      { icon: 'github', link: 'https://github.com/rexleimo/agno-Go' }
+      { icon: 'github', link: 'https://github.com/rexleimo/HNO' }
     ],
 
     footer: {
       message: 'Released under the MIT License.',
-      copyright: 'Copyright © 2025 Agno-Go Team'
+      copyright: 'Copyright © 2025 HNO Team'
     },
 
     search: {
@@ -549,7 +549,7 @@ export default defineConfig({
     },
 
     editLink: {
-      pattern: 'https://github.com/rexleimo/agno-Go/edit/main/website/:path',
+      pattern: 'https://github.com/rexleimo/HNO/edit/main/website/:path',
       text: 'Edit this page on GitHub'
     },
 

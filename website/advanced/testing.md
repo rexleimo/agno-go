@@ -1,12 +1,12 @@
 # Testing
 
-Comprehensive testing guide for Agno-Go development.
+Comprehensive testing guide for HNO development.
 
 ---
 
 ## Overview
 
-Agno-Go maintains high quality through comprehensive testing with **80.8% test coverage** across the codebase. This guide covers testing standards, patterns, and best practices.
+HNO maintains high quality through comprehensive testing with **80.8% test coverage** across the codebase. This guide covers testing standards, patterns, and best practices.
 
 ### Test Coverage Status
 
@@ -556,7 +556,7 @@ go test -timeout 30s ./...
 - Review [Architecture](/advanced/architecture) for design patterns
 - Check [Performance](/advanced/performance) for benchmarks
 - Read [Deployment](/advanced/deployment) for production setup
-- Explore [Contributing Guide](https://github.com/rexleimo/agno-Go/blob/main/CONTRIBUTING.md)
+- Explore [Contributing Guide](https://github.com/rexleimo/HNO/blob/main/CONTRIBUTING.md)
 
 ---
 

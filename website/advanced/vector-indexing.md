@@ -5,7 +5,7 @@ description: Pluggable VectorDB providers, migrations CLI, and embeddings.
 
 # Vector Indexing
 
-Agno-Go ships a pluggable `VectorDB` interface with a Chroma provider by default and an optional Redis provider (build tag `redis`). A simple migrations CLI is included.
+HNO ships a pluggable `VectorDB` interface with a Chroma provider by default and an optional Redis provider (build tag `redis`). A simple migrations CLI is included.
 
 ## Providers
 

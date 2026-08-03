@@ -2,19 +2,19 @@
 layout: home
 
 hero:
-  name: "Agno-Go"
+  name: "HNO"
   text: "고성능 멀티 에이전트 프레임워크"
   tagline: "Python보다 16배 빠름 | 180ns 인스턴스화 | 에이전트당 1.2KB 메모리"
   image:
     src: /logo.png
-    alt: Agno-Go
+    alt: HNO
   actions:
     - theme: brand
       text: 시작하기
       link: /ko/guide/quick-start
     - theme: alt
       text: GitHub에서 보기
-      link: https://github.com/rexleimo/agno-Go
+      link: https://github.com/rexleimo/HNO
 
 features:
   - icon: 🚀
@@ -90,17 +90,17 @@ func main() {
 
 ## 성능 비교
 
-| 지표 | Python Agno | Agno-Go | 개선 |
+| 지표 | Python Agno | HNO | 개선 |
 |--------|-------------|---------|-------------|
 | 에이전트 생성 | ~3μs | ~180ns | **16배 빠름** |
 | 메모리/에이전트 | ~6.5KB | ~1.2KB | **5.4배 감소** |
 | 동시성 | GIL 제한 | 네이티브 고루틴 | **무제한** |
 
-## 왜 Agno-Go인가?
+## 왜 HNO인가?
 
 ### 프로덕션을 위한 설계
 
-Agno-Go는 단순한 프레임워크가 아닌 완전한 프로덕션 시스템입니다. 포함된 **AgentOS** 서버는 다음을 제공합니다:
+HNO는 단순한 프레임워크가 아닌 완전한 프로덕션 시스템입니다. 포함된 **AgentOS** 서버는 다음을 제공합니다:
 
 - OpenAPI 3.0 사양을 갖춘 RESTful API
 - 다중 턴 대화를 위한 세션 관리
@@ -127,8 +127,8 @@ Agno-Go는 단순한 프레임워크가 아닌 완전한 프로덕션 시스템�
 
 ```bash
 # 저장소 복제
-git clone https://github.com/rexleimo/agno-Go.git
-cd agno-Go
+git clone https://github.com/rexleimo/HNO.git
+cd HNO
 
 # API 키 설정
 export OPENAI_API_KEY=sk-your-key-here
@@ -153,12 +153,12 @@ curl http://localhost:8080/health
 
 ## 커뮤니티
 
-- **GitHub**: [rexleimo/agno-Go](https://github.com/rexleimo/agno-Go)
-- **Issues**: [버그 리포트 및 기능 요청](https://github.com/rexleimo/agno-Go/issues)
-- **Discussions**: [질문 및 아이디어 공유](https://github.com/rexleimo/agno-Go/discussions)
+- **GitHub**: [rexleimo/HNO](https://github.com/rexleimo/HNO)
+- **Issues**: [버그 리포트 및 기능 요청](https://github.com/rexleimo/HNO/issues)
+- **Discussions**: [질문 및 아이디어 공유](https://github.com/rexleimo/HNO/discussions)
 
 ## 라이센스
 
-Agno-Go는 [MIT 라이센스](https://github.com/rexleimo/agno-Go/blob/main/LICENSE)로 배포됩니다.
+HNO는 [MIT 라이센스](https://github.com/rexleimo/HNO/blob/main/LICENSE)로 배포됩니다.
 
 [Agno (Python)](https://github.com/agno-agi/agno) 프레임워크에서 영감을 받았습니다.

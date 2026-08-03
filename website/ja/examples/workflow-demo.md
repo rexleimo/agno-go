@@ -2,7 +2,7 @@
 
 ## 概要
 
-この例では、Agno-Go の強力な Workflow エンジンと 5 つの基本構成要素を示します: Step、Condition、Loop、Parallel、Router。Workflow は決定論的で制御された実行フローを提供します - 正確な制御と可観測性を必要とする複雑な多段階プロセスに最適です。
+この例では、HNO の強力な Workflow エンジンと 5 つの基本構成要素を示します: Step、Condition、Loop、Parallel、Router。Workflow は決定論的で制御された実行フローを提供します - 正確な制御と可観測性を必要とする複雑な多段階プロセスに最適です。
 
 ## 学べること
 

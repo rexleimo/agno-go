@@ -6,7 +6,7 @@ outline: deep
 
 # Multi-Tenant Support
 
-**Multi-Tenant Support** enables Agno-Go to serve multiple users with a single Agent instance while ensuring complete isolation of conversation history and session state between users.
+**Multi-Tenant Support** enables HNO to serve multiple users with a single Agent instance while ensuring complete isolation of conversation history and session state between users.
 
 ---
 

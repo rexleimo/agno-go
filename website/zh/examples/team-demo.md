@@ -2,7 +2,7 @@
 
 ## 概述
 
-本示例演示 Agno-Go 的多 Agent Team 协作能力。Team 允许多个 Agent 使用不同的协调模式协同工作:Sequential、Parallel、Leader-Follower 和 Consensus。每种模式适合不同类型的任务和协作模式。
+本示例演示 HNO 的多 Agent Team 协作能力。Team 允许多个 Agent 使用不同的协调模式协同工作:Sequential、Parallel、Leader-Follower 和 Consensus。每种模式适合不同类型的任务和协作模式。
 
 ## 你将学到
 

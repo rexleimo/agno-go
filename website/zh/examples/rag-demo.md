@@ -2,7 +2,7 @@
 
 ## 概述
 
-本示例演示如何使用 Agno-Go 构建 RAG 系统。RAG 将从知识库检索信息与 LLM 文本生成相结合,以提供准确、有根据的答案。该系统使用 ChromaDB 进行向量存储、OpenAI 嵌入和自定义 RAG toolkit 来实现语义搜索能力。
+本示例演示如何使用 HNO 构建 RAG 系统。RAG 将从知识库检索信息与 LLM 文本生成相结合,以提供准确、有根据的答案。该系统使用 ChromaDB 进行向量存储、OpenAI 嵌入和自定义 RAG toolkit 来实现语义搜索能力。
 
 ## 你将学到
 

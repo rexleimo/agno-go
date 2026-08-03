@@ -1,6 +1,6 @@
 # Logfire 관측성
 
-OpenTelemetry로 Agno-Go 에이전트를 계측하고 [Logfire](https://logfire.dev)로 스팬을 전송하는 예제입니다. 추론 내용, 토큰 사용량, 도구 실행을 관측 플랫폼에서 상호 연계할 수 있습니다.
+OpenTelemetry로 HNO 에이전트를 계측하고 [Logfire](https://logfire.dev)로 스팬을 전송하는 예제입니다. 추론 내용, 토큰 사용량, 도구 실행을 관측 플랫폼에서 상호 연계할 수 있습니다.
 
 ## 실행
 
@@ -21,5 +21,5 @@ go run -tags logfire cmd/examples/logfire_observability/main.go
 
 ## 관련 문서
 
-- 심화 가이드(GitHub): https://github.com/rexleimo/agno-Go/blob/main/docs/release/logfire_observability.md
+- 심화 가이드(GitHub): https://github.com/rexleimo/HNO/blob/main/docs/release/logfire_observability.md
 - 개요: `/ko/advanced/observability`

@@ -2,7 +2,7 @@
 
 ## 概述
 
-本示例演示如何连接到 MCP (模型上下文协议) 服务器并通过 Agno-Go MCP 客户端使用其工具。您将学习如何设置安全验证、创建传输、连接到 MCP 服务器以及将 MCP 工具与您的 Agno agents 集成。
+本示例演示如何连接到 MCP (模型上下文协议) 服务器并通过 HNO MCP 客户端使用其工具。您将学习如何设置安全验证、创建传输、连接到 MCP 服务器以及将 MCP 工具与您的 Agno agents 集成。
 
 ## 你将学到
 
@@ -63,7 +63,7 @@ import (
 )
 
 func main() {
-	fmt.Println("=== Agno-Go MCP Demo ===")
+	fmt.Println("=== HNO MCP Demo ===")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -244,7 +244,7 @@ fmt.Printf("Result: %v\n", result.Content)
 ## 预期输出
 
 ```
-=== Agno-Go MCP Demo ===
+=== HNO MCP Demo ===
 
 Step 1: Creating security validator...
 ✓ Command validated: python [-m mcp_server_calculator]

@@ -148,7 +148,7 @@ fmt.Printf("Final orders: %v\n", orders)
 
 ### 解決策
 
-Agno-Goは**ディープコピー + last-write-wins**戦略を使用します：
+HNOは**ディープコピー + last-write-wins**戦略を使用します：
 
 1. 各並列ブランチは独立したSessionStateコピーを取得
 2. ブランチは干渉なしで独立して実行

@@ -2,11 +2,11 @@
 
 ## Overview
 
-This example demonstrates how to use local LLMs with Agno-Go through Ollama. Ollama allows you to run powerful language models locally on your machine, providing privacy, cost savings, and offline capabilities. This is perfect for development, testing, and privacy-sensitive applications.
+This example demonstrates how to use local LLMs with HNO through Ollama. Ollama allows you to run powerful language models locally on your machine, providing privacy, cost savings, and offline capabilities. This is perfect for development, testing, and privacy-sensitive applications.
 
 ## What You'll Learn
 
-- How to integrate Ollama with Agno-Go
+- How to integrate Ollama with HNO
 - How to run agents with local LLMs
 - How to use tool-calling with local models
 - Benefits and limitations of local models

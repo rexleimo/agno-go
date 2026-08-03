@@ -1,6 +1,6 @@
 # Installation
 
-This guide covers different ways to install and set up Agno-Go.
+This guide covers different ways to install and set up HNO.
 
 ## Prerequisites
 
@@ -10,18 +10,18 @@ This guide covers different ways to install and set up Agno-Go.
 
 ## Method 1: Go Get (Recommended)
 
-Install Agno-Go as a Go module dependency:
+Install HNO as a Go module dependency:
 
 ```bash
-go get github.com/rexleimo/agno-Go
+go get github.com/rexleimo/HNO
 ```
 
 Then import in your code:
 
 ```go
 import (
-    "github.com/rexleimo/agno-Go/pkg/hno/agent"
-    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
+    "github.com/rexleimo/HNO/pkg/hno/agent"
+    "github.com/rexleimo/HNO/pkg/hno/models/openai"
 )
 ```
 
@@ -31,8 +31,8 @@ Clone the repository to explore examples and contribute:
 
 ```bash
 # Clone repository
-git clone https://github.com/rexleimo/agno-Go.git
-cd agno-Go
+git clone https://github.com/rexleimo/HNO.git
+cd HNO
 
 # Download dependencies
 go mod download
@@ -127,8 +127,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-Go/pkg/hno/agent"
-    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
+    "github.com/rexleimo/HNO/pkg/hno/agent"
+    "github.com/rexleimo/HNO/pkg/hno/models/openai"
 )
 
 func main() {
@@ -318,13 +318,13 @@ AGENTOS_ADDRESS=:9090
 
 If you encounter issues:
 
-1. Check [GitHub Issues](https://github.com/rexleimo/agno-Go/issues)
-2. Ask in [Discussions](https://github.com/rexleimo/agno-Go/discussions)
+1. Check [GitHub Issues](https://github.com/rexleimo/HNO/issues)
+2. Ask in [Discussions](https://github.com/rexleimo/HNO/discussions)
 3. Review [documentation](/guide/)
 
 ## Next Steps
 
-Now that Agno-Go is installed:
+Now that HNO is installed:
 
 1. [Quick Start](/guide/quick-start) - Build your first agent
 2. [Core Concepts](/guide/agent) - Learn about Agent, Team, Workflow

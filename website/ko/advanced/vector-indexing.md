@@ -5,7 +5,7 @@ description: 플러그형 VectorDB, 마이그레이션 CLI, 임베딩 활용.
 
 # 벡터 인덱싱 (Vector Indexing)
 
-Agno-Go 는 플러그형 `VectorDB` 인터페이스를 제공합니다. 기본은 Chroma, 선택적으로 Redis(`-tags redis`)를 지원하며 간단한 마이그레이션 CLI를 포함합니다.
+HNO 는 플러그형 `VectorDB` 인터페이스를 제공합니다. 기본은 Chroma, 선택적으로 Redis(`-tags redis`)를 지원하며 간단한 마이그레이션 CLI를 포함합니다.
 
 ## Provider
 

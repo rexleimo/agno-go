@@ -1,6 +1,6 @@
-# What is Agno-Go?
+# What is HNO?
 
-**Agno-Go** is a high-performance multi-agent system framework built with Go. Inheriting the design philosophy from the Python Agno framework, it leverages Go's concurrency model and performance advantages to build efficient, scalable AI agent systems.
+**HNO** is a high-performance multi-agent system framework built with Go. Inheriting the design philosophy from the Python Agno framework, it leverages Go's concurrency model and performance advantages to build efficient, scalable AI agent systems.
 
 ## Key Features
 
@@ -12,7 +12,7 @@
 
 ### 🤖 Production-Ready
 
-Agno-Go includes **AgentOS**, a production HTTP server with:
+HNO includes **AgentOS**, a production HTTP server with:
 
 - RESTful API with OpenAPI 3.0 specification
 - Session management for multi-turn conversations
@@ -89,7 +89,7 @@ Why build multi-agent systems with Go?
 
 ## Use Cases
 
-Agno-Go is perfect for:
+HNO is perfect for:
 
 - **Production AI Applications** - Deploy with AgentOS HTTP server
 - **Multi-Agent Systems** - Coordinate multiple AI agents
@@ -119,12 +119,12 @@ Ready to get started?
 
 ## Community
 
-- **GitHub**: [rexleimo/agno-Go](https://github.com/rexleimo/agno-Go)
-- **Issues**: [Report bugs](https://github.com/rexleimo/agno-Go/issues)
-- **Discussions**: [Ask questions](https://github.com/rexleimo/agno-Go/discussions)
+- **GitHub**: [rexleimo/HNO](https://github.com/rexleimo/HNO)
+- **Issues**: [Report bugs](https://github.com/rexleimo/HNO/issues)
+- **Discussions**: [Ask questions](https://github.com/rexleimo/HNO/discussions)
 
 ## License
 
-Agno-Go is released under the [MIT License](https://github.com/rexleimo/agno-Go/blob/main/LICENSE).
+HNO is released under the [MIT License](https://github.com/rexleimo/HNO/blob/main/LICENSE).
 
 Inspired by [Agno (Python)](https://github.com/agno-agi/agno) framework.

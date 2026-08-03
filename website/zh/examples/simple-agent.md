@@ -2,7 +2,7 @@
 
 ## 概述
 
-本示例演示了 Agno-Go 的基本用法,创建一个具有工具调用能力的简单 AI Agent。该 Agent 使用 OpenAI 的 GPT-4o-mini 模型,并配备了计算器工具集来执行数学运算。
+本示例演示了 HNO 的基本用法,创建一个具有工具调用能力的简单 AI Agent。该 Agent 使用 OpenAI 的 GPT-4o-mini 模型,并配备了计算器工具集来执行数学运算。
 
 ## 你将学到
 

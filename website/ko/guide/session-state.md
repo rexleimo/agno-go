@@ -148,7 +148,7 @@ fmt.Printf("Final orders: %v\n", orders)
 
 ### 해결책
 
-Agno-Go는 **딥 카피 + last-write-wins** 전략을 사용합니다:
+HNO는 **딥 카피 + last-write-wins** 전략을 사용합니다:
 
 1. 각 병렬 브랜치는 독립적인 SessionState 복사본을 가져옵니다
 2. 브랜치는 간섭 없이 독립적으로 실행됩니다

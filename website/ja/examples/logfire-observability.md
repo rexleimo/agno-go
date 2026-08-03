@@ -1,6 +1,6 @@
 # Logfire オブザーバビリティ
 
-OpenTelemetry で Agno-Go のエージェントを計測し、[Logfire](https://logfire.dev) にスパンを送信する例です。推論内容、トークン使用量、ツール実行をオブザーバビリティ基盤で相関できます。
+OpenTelemetry で HNO のエージェントを計測し、[Logfire](https://logfire.dev) にスパンを送信する例です。推論内容、トークン使用量、ツール実行をオブザーバビリティ基盤で相関できます。
 
 ## 実行
 
@@ -21,5 +21,5 @@ go run -tags logfire cmd/examples/logfire_observability/main.go
 
 ## 関連ドキュメント
 
-- 深掘りガイド（GitHub）: https://github.com/rexleimo/agno-Go/blob/main/docs/release/logfire_observability.md
+- 深掘りガイド（GitHub）: https://github.com/rexleimo/HNO/blob/main/docs/release/logfire_observability.md
 - 概要: `/ja/advanced/observability`

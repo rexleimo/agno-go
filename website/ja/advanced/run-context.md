@@ -5,7 +5,7 @@ description: hooks・ツール・モデル呼び出しに run_context_id を伝�
 
 # 実行コンテキスト（Run Context）
 
-Agno-Go は実行ごとのコンテキスト識別子を伝播し、SSE では `run_context_id` を含めてエンドツーエンドの相関を可能にします。
+HNO は実行ごとのコンテキスト識別子を伝播し、SSE では `run_context_id` を含めてエンドツーエンドの相関を可能にします。
 
 ## SSE イベント
 

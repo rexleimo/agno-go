@@ -2,7 +2,7 @@
 
 ## Overview
 
-This example demonstrates Agno-Go's multi-agent team collaboration capabilities. Teams allow multiple agents to work together using different coordination modes: Sequential, Parallel, Leader-Follower, and Consensus. Each mode is suited for different types of tasks and collaboration patterns.
+This example demonstrates HNO's multi-agent team collaboration capabilities. Teams allow multiple agents to work together using different coordination modes: Sequential, Parallel, Leader-Follower, and Consensus. Each mode is suited for different types of tasks and collaboration patterns.
 
 ## What You'll Learn
 

@@ -1,6 +1,6 @@
 # 고급 주제
 
-Agno-Go의 고급 개념, 성능 최적화, 배포 전략 및 테스트 모범 사례를 심도 있게 알아봅니다.
+HNO의 고급 개념, 성능 최적화, 배포 전략 및 테스트 모범 사례를 심도 있게 알아봅니다.
 
 ## 개요
 
@@ -15,7 +15,7 @@ Agno-Go의 고급 개념, 성능 최적화, 배포 전략 및 테스트 모범 �
 
 ### [아키텍처](/ko/advanced/architecture)
 
-Agno-Go의 모듈식 아키텍처와 설계 철학에 대해 알아보기:
+HNO의 모듈식 아키텍처와 설계 철학에 대해 알아보기:
 
 - 핵심 인터페이스 (Model, Toolkit, Memory)
 - 추상화 패턴 (Agent, Team, Workflow)
@@ -126,7 +126,7 @@ go run -tags redis ./cmd/vectordb_migrate --action up --provider redis \
 
 ### KISS (Keep It Simple, Stupid)
 
-Agno-Go는 단순함을 추구합니다:
+HNO는 단순함을 추구합니다:
 
 - **집중된 범위**: 8+ 대신 3개의 LLM 제공자 (OpenAI, Anthropic, Ollama)
 - **필수 도구**: 15+ 대신 5개의 핵심 도구
@@ -154,25 +154,25 @@ Go의 동시성 모델이 가능하게 하는 것:
 
 ## 기여하기
 
-Agno-Go에 기여하고 싶으신가요? 확인해보세요:
+HNO에 기여하고 싶으신가요? 확인해보세요:
 
 - [아키텍처 문서](/ko/advanced/architecture) - 코드베이스 이해하기
 - [테스트 가이드](/ko/advanced/testing) - 테스트 표준 배우기
-- [GitHub 저장소](https://github.com/rexleimo/agno-Go) - PR 제출하기
-- [개발 가이드](https://github.com/rexleimo/agno-Go/blob/main/CLAUDE.md) - 개발 환경 설정
+- [GitHub 저장소](https://github.com/rexleimo/HNO) - PR 제출하기
+- [개발 가이드](https://github.com/rexleimo/HNO/blob/main/CLAUDE.md) - 개발 환경 설정
 
 ## 추가 리소스
 
 ### 문서
 
-- [Go 패키지 문서](https://pkg.go.dev/github.com/rexleimo/agno-Go)
+- [Go 패키지 문서](https://pkg.go.dev/github.com/rexleimo/HNO)
 - [Python Agno 프레임워크](https://github.com/agno-agi/agno) (영감의 원천)
-- [VitePress 문서 소스](https://github.com/rexleimo/agno-Go/tree/main/website)
+- [VitePress 문서 소스](https://github.com/rexleimo/HNO/tree/main/website)
 
 ### 커뮤니티
 
-- [GitHub Issues](https://github.com/rexleimo/agno-Go/issues)
-- [GitHub Discussions](https://github.com/rexleimo/agno-Go/discussions)
+- [GitHub Issues](https://github.com/rexleimo/HNO/issues)
+- [GitHub Discussions](https://github.com/rexleimo/HNO/discussions)
 - [릴리스 노트](/ko/release-notes)
 
 ## 다음 단계
@@ -184,4 +184,4 @@ Agno-Go에 기여하고 싶으신가요? 확인해보세요:
 
 ---
 
-**참고**: 이 섹션은 Agno-Go의 기본 개념에 익숙하다고 가정합니다. 처음이라면 [가이드](/ko/guide/) 섹션부터 시작하세요.
+**참고**: 이 섹션은 HNO의 기본 개념에 익숙하다고 가정합니다. 처음이라면 [가이드](/ko/guide/) 섹션부터 시작하세요.

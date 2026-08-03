@@ -2,11 +2,11 @@
 
 ## 概述
 
-本示例演示如何在 Agno-Go 中使用 Anthropic 的 Claude 模型。Claude 以其深思熟虑、详细的响应和强大的推理能力而闻名。本示例展示了多个用例,包括简单对话、计算器工具使用、复杂计算和数学推理。
+本示例演示如何在 HNO 中使用 Anthropic 的 Claude 模型。Claude 以其深思熟虑、详细的响应和强大的推理能力而闻名。本示例展示了多个用例,包括简单对话、计算器工具使用、复杂计算和数学推理。
 
 ## 你将学到
 
-- 如何将 Anthropic Claude 与 Agno-Go 集成
+- 如何将 Anthropic Claude 与 HNO 集成
 - 如何配置 Claude 模型 (Opus, Sonnet, Haiku)
 - 如何使用 Claude 的工具调用能力
 - Claude 指令的最佳实践

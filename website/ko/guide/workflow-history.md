@@ -6,7 +6,7 @@ Workflow History feature allows workflows to maintain context across multiple ru
 
 ### What is Workflow History?
 
-Workflow History is a core feature of the Agno-Go framework, implemented through:
+Workflow History is a core feature of the HNO framework, implemented through:
 
 1. **Session-level Storage**: Each session independently stores its run history
 2. **Automatic Injection**: History automatically injected into agent's system message

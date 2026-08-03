@@ -5,7 +5,7 @@ description: 配置 OpenAI/VLLM 嵌入以支持向量检索。
 
 # Embeddings 嵌入
 
-嵌入将文本转换为向量，用于相似度检索。Agno-Go 提供统一接口，供 Chroma 等向量数据库调用。
+嵌入将文本转换为向量，用于相似度检索。HNO 提供统一接口，供 Chroma 等向量数据库调用。
 
 ## OpenAI
 
