@@ -259,6 +259,7 @@ type OllamaRequest struct {
 	Stream   bool                   `json:"stream"`
 	Options  map[string]interface{} `json:"options,omitempty"`
 	Tools    []OllamaTool           `json:"tools,omitempty"`
+	Format   string                 `json:"format,omitempty"`
 }
 
 // OllamaMessage represents a message in the conversation

@@ -11,7 +11,10 @@ import (
 )
 
 // ctxModel is a tiny model that first asks to call a tool, then completes.
-type ctxModel struct{ models.BaseModel; step int }
+type ctxModel struct {
+	models.BaseModel
+	step int
+}
 
 func (m *ctxModel) Invoke(ctx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error) {
 	if m.step == 0 {

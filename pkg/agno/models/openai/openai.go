@@ -3,7 +3,9 @@ package openai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -122,9 +124,56 @@ func (o *OpenAI) InvokeStream(ctx context.Context, req *models.InvokeRequest) (<
 		defer close(chunks)
 		defer stream.Close()
 
+		// Accumulate streaming tool-call deltas by index. Many
+		// OpenAI-compatible servers (llama.cpp included) send tool-call
+		// arguments incrementally across multiple chunks; emitting each
+		// delta as a complete call would produce broken calls.
+		// 按索引累积流式工具调用增量。许多 OpenAI 兼容服务器
+		// （包括 llama.cpp）会跨多个 chunk 增量发送工具调用参数；
+		// 将每个增量当作完整调用发出会产生损坏的调用。
+		partialCalls := make(map[int]*partialToolCall)
+
+		flushToolCalls := func() {
+			if len(partialCalls) == 0 {
+				return
+			}
+			calls := make([]types.ToolCall, 0, len(partialCalls))
+			for i := 0; i < len(partialCalls); i++ {
+				pc := partialCalls[i]
+				if pc == nil || pc.id == "" {
+					continue
+				}
+				calls = append(calls, types.ToolCall{
+					ID:   pc.id,
+					Type: pc.typ,
+					Function: types.ToolCallFunction{
+						Name:      pc.name,
+						Arguments: pc.arguments,
+					},
+				})
+				delete(partialCalls, i)
+			}
+			if len(calls) > 0 {
+				select {
+				case chunks <- types.ResponseChunk{ToolCalls: calls}:
+				case <-ctx.Done():
+				}
+			}
+		}
+
 		for {
 			response, err := stream.Recv()
 			if err != nil {
+				// Treat EOF as a normal stream end. Some OpenAI-compatible
+				// servers (e.g. llama.cpp) close the connection without
+				// sending the standard "[DONE]" sentinel.
+				// 将 EOF 视为正常流结束。部分 OpenAI 兼容服务器
+				// （如 llama.cpp）在关闭连接时不发送标准的 "[DONE]" 哨兵。
+				if errors.Is(err, io.EOF) {
+					flushToolCalls()
+					chunks <- types.ResponseChunk{Done: true}
+					return
+				}
 				chunks <- types.ResponseChunk{
 					Done:  true,
 					Error: err,
@@ -141,18 +190,29 @@ func (o *OpenAI) InvokeStream(ctx context.Context, req *models.InvokeRequest) (<
 				Content: delta.Content,
 			}
 
-			// Handle tool calls in stream
-			if len(delta.ToolCalls) > 0 {
-				chunk.ToolCalls = make([]types.ToolCall, len(delta.ToolCalls))
-				for i, tc := range delta.ToolCalls {
-					chunk.ToolCalls[i] = types.ToolCall{
-						ID:   tc.ID,
-						Type: string(tc.Type),
-						Function: types.ToolCallFunction{
-							Name:      tc.Function.Name,
-							Arguments: tc.Function.Arguments,
-						},
-					}
+			// Accumulate tool-call deltas instead of emitting them raw.
+			// 累积工具调用增量，而非原样发出。
+			for _, tc := range delta.ToolCalls {
+				idx := 0
+				if tc.Index != nil {
+					idx = *tc.Index
+				}
+				pc := partialCalls[idx]
+				if pc == nil {
+					pc = &partialToolCall{}
+					partialCalls[idx] = pc
+				}
+				if tc.ID != "" {
+					pc.id = tc.ID
+				}
+				if tc.Type != "" {
+					pc.typ = string(tc.Type)
+				}
+				if tc.Function.Name != "" {
+					pc.name = tc.Function.Name
+				}
+				if tc.Function.Arguments != "" {
+					pc.arguments += tc.Function.Arguments
 				}
 			}
 
@@ -169,6 +229,15 @@ func (o *OpenAI) InvokeStream(ctx context.Context, req *models.InvokeRequest) (<
 	}()
 
 	return chunks, nil
+}
+
+// partialToolCall accumulates a streaming tool-call across chunks.
+// partialToolCall 跨 chunk 累积流式工具调用。
+type partialToolCall struct {
+	id        string
+	typ       string
+	name      string
+	arguments string
 }
 
 // buildChatRequest converts InvokeRequest to OpenAI ChatCompletionRequest

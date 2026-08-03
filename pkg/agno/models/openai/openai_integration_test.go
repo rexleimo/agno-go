@@ -234,6 +234,7 @@ func TestOpenAI_InvokeStream_ContextCancellation(t *testing.T) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
 	chunks, err := model.InvokeStream(ctx, &models.InvokeRequest{
 		Messages: []*types.Message{
