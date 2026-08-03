@@ -71,15 +71,15 @@ S8 社区运营    生态扩展 + 持续增长
 **目标**：框架级技能包，对齐 Agent Skills 开放标准。
 
 **交付物**：
-- [ ] `pkg/agno/skills`：Metadata/Skill + SKILL.md 解析（frontmatter 校验）
-- [ ] Loader（FS/embed.FS）+ Registry（Catalog/Activate + LRU）
-- [ ] 渐进式披露：目录注入 + use_skill 工具
-- [ ] 3 个示例技能（web-research / pdf-summary / code-review）
+- [x] `pkg/agno/skills`：Metadata/Skill + SKILL.md 解析（frontmatter 校验）
+- [x] Loader（FS/embed.FS）+ Registry（Catalog/Activate + LRU）
+- [x] 渐进式披露：目录注入 + use_skill 工具
+- [x] 3 个示例技能（web-research / pdf-summary / code-review）
 
 **验收标准**：
-- [ ] SKILL.md 解析校验测试（name 正则/保留字/路径安全）
-- [ ] 渐进式披露测试（目录 100 tokens / 激活加载 body / 按需资源）
-- [ ] 示例技能端到端演示（真实跑通一个）
+- [x] SKILL.md 解析校验测试（name 正则/保留字/路径安全）
+- [x] 渐进式披露测试（目录 100 tokens / 激活加载 body / 按需资源）
+- [x] 示例技能端到端演示（真实跑通一个）
 
 ---
 

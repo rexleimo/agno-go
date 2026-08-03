@@ -10,6 +10,7 @@ import (
 	"github.com/rexleimo/agno-go/pkg/agno/hooks"
 	"github.com/rexleimo/agno-go/pkg/agno/memory"
 	"github.com/rexleimo/agno-go/pkg/agno/models"
+	"github.com/rexleimo/agno-go/pkg/agno/skills"
 	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
@@ -29,6 +30,13 @@ type Config struct {
 	EnableCache   bool
 	CacheProvider cache.Provider
 	CacheTTL      time.Duration
+
+	// Skills registry enables the skills mechanism: the catalog is injected
+	// into the context and a use_skill tool is registered for on-demand
+	// loading (progressive disclosure).
+	// Skills 注册表启用技能机制：目录注入上下文，并注册 use_skill 工具
+	// 供按需加载（渐进式披露）。
+	Skills *skills.Registry
 
 	// Storage control flags (nil means use default: true) / 存储控制标志 (nil 表示使用默认值: true)
 	// StoreToolMessages controls whether tool-related messages are included in RunOutput.
@@ -118,8 +126,23 @@ func New(config Config) (*Agent, error) {
 
 	// Add system message if instructions provided
 	// 如果提供了指令则添加系统消息
-	if config.Instructions != "" {
-		agent.Memory.Add(types.NewSystemMessage(config.Instructions), config.UserID)
+	instructions := config.Instructions
+
+	// Skills: inject the catalog into instructions (progressive disclosure
+	// level 1) and register the use_skill tool (level 2).
+	// Skills：将目录注入指令（渐进式披露第一级），并注册 use_skill 工具（第二级）。
+	if config.Skills != nil {
+		if catalog := config.Skills.CatalogText(); catalog != "" {
+			if instructions != "" {
+				instructions += "\n\n"
+			}
+			instructions += catalog
+		}
+		agent.Toolkits = append(agent.Toolkits, skills.NewUseSkillToolkit(config.Skills))
+	}
+
+	if instructions != "" {
+		agent.Memory.Add(types.NewSystemMessage(instructions), config.UserID)
 	}
 
 	return agent, nil
