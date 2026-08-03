@@ -1,164 +1,114 @@
 # Models Package
 
-This package provides common utilities for implementing model providers in Agno-Go.
+This package provides the model abstraction layer and shared utilities for
+implementing model providers. 本包提供模型抽象层与实现 provider 的共享工具。
 
-## Common Utilities (common.go)
+## Architecture / 架构
 
-### HTTPClient
-
-A shared HTTP client for making API requests:
-
-```go
-client := models.NewHTTPClient()
-
-headers := map[string]string{
-    "Authorization": "Bearer " + apiKey,
-    "Custom-Header": "value",
-}
-
-body := map[string]interface{}{
-    "prompt": "Hello",
-    "max_tokens": 100,
-}
-
-resp, err := client.PostJSON(ctx, "https://api.example.com/chat", headers, body)
+```
+agent / team / workflow  (只依赖 Model 接口)
+        │
+        ▼
+   Model 接口 (base.go)  ← 所有 provider 实现此接口
+   Invoke / InvokeStream / GetID / GetName / GetProvider
+        │
+        ▼
+   抽象层组件 (公共复用)：
+   PostJSON / PostJSONRaw (http.go)
+   SSEDecoder (sse.go)
+   NewToolCall / MarshalMap / ToInt / ToBool / NewToolCallID (converters.go)
+   BaseModel / Model 接口 / 可选能力接口 (base.go)
+        │
+        ▼
+   适配层：pkg/agno/models/<provider>/  (每个只写协议差异)
 ```
 
-### Response Handling
+## Shared Utilities / 公共组件
+
+### HTTP (http.go)
 
 ```go
-// For successful responses
-var result MyResponseStruct
-err := models.ReadJSONResponse(resp, &result)
+// 同步请求：自动 marshal、设置 headers、校验状态码、解码响应
+err := models.PostJSON(ctx, client, url, headers, payload, &out)
 
-// For error responses
-err := models.ReadErrorResponse(resp)
+// 流式请求：返回原始响应体（调用方负责 Close 与状态码检查）
+resp, err := models.PostJSONRaw(ctx, client, url, headers, payload)
 ```
 
-### Helper Functions
-
-**ConvertMessages**: Convert types.Message to generic format
-```go
-messages := []*types.Message{
-    {Role: types.RoleUser, Content: "Hello"},
-}
-genericMessages := models.ConvertMessages(messages)
-```
-
-**MergeConfig**: Merge request-level and model-level configuration
-```go
-temperature, maxTokens := models.MergeConfig(
-    req.Temperature,    // request level
-    model.Temperature,  // model level
-    req.MaxTokens,      // request level
-    model.MaxTokens,    // model level
-)
-```
-
-**BuildToolDefinitions**: Convert tool definitions to generic format
-```go
-tools := []models.ToolDefinition{...}
-genericTools := models.BuildToolDefinitions(tools)
-```
-
-## Usage in Model Providers
-
-### Example: Using HTTPClient
+### SSE (sse.go)
 
 ```go
-type MyModel struct {
-    models.BaseModel
-    httpClient *models.HTTPClient
-    apiKey     string
-}
-
-func New(apiKey string) *MyModel {
-    return &MyModel{
-        BaseModel:  models.BaseModel{...},
-        httpClient: models.NewHTTPClient(),
-        apiKey:     apiKey,
-    }
-}
-
-func (m *MyModel) Invoke(ctx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error) {
-    // Build request
-    headers := map[string]string{
-        "Authorization": "Bearer " + m.apiKey,
-    }
-
-    body := map[string]interface{}{
-        "messages": models.ConvertMessages(req.Messages),
-        "temperature": req.Temperature,
-    }
-
-    // Make API call
-    resp, err := m.httpClient.PostJSON(ctx, m.baseURL, headers, body)
-    if err != nil {
-        return nil, err
-    }
-
-    // Parse response
-    var apiResp MyAPIResponse
-    if err := models.ReadJSONResponse(resp, &apiResp); err != nil {
-        return nil, err
-    }
-
-    // Convert to ModelResponse
-    return m.convertResponse(&apiResp), nil
+decoder := models.NewSSEDecoder(resp.Body)
+for {
+    data, err := decoder.Next()   // io.EOF 结束；[DONE] 哨兵自动跳过
+    if err != nil { ... }
+    // data 是事件负载（多行 data: 已按规范拼接）
 }
 ```
 
-## Benefits
+### 类型转换 (converters.go)
 
-1. **Code Reuse**: Reduces duplicate HTTP client code across providers
-2. **Consistency**: Standardized error handling and response parsing
-3. **Maintainability**: Changes to HTTP logic apply to all providers
-4. **Testing**: Easier to mock and test with shared utilities
+```go
+tc := models.NewToolCall(id, name, argsJSON)          // 构造 ToolCall
+s := models.MarshalMap(map[string]interface{}{...})   // map → JSON 字符串
+i, ok := models.ToInt(value)                          // 任意数值/string/json.Number → int
+b, ok := models.ToBool(value)                         // → bool
+id := models.NewToolCallID()                          // 唯一工具调用 ID
+```
 
-## Providers
+### 能力接口 (base.go)
 
-### Current Implementations
+provider 可选择性实现，框架用类型断言探测：
 
-- **OpenAI** (`openai/openai.go`): Uses official OpenAI Go SDK
-  - Coverage: 44.6%
-  - Features: GPT-4, GPT-3.5, function calling, streaming
+```go
+models.StructuredOutputModel  // InvokeStructured：结构化输出
+models.MultimodalModel        // SupportsImages：图像输入
+models.ReasoningModel         // ExtractReasoning：思维链提取
+```
 
-- **Anthropic** (`anthropic/anthropic.go`): Custom HTTP implementation
-  - Coverage: 50.9%
-  - Features: Claude 3 Opus, Sonnet, Haiku, streaming
-  - Can benefit from HTTPClient refactoring
+## Provider 目录结构
 
-- **Gemini** (`gemini/gemini.go`): Custom HTTP implementation with SSE streaming
-  - Coverage: 77.0%
-  - Features: Gemini Pro, Gemini Ultra, function calling, SSE streaming
-  - Supports system instructions, tool calls, and function responses
-  - Example: `cmd/examples/gemini_agent/`
+```
+pkg/agno/models/<provider>/
+├── <provider>.go    # struct + Config + New + Invoke + InvokeStream + ValidateConfig
+├── request.go       # buildXxxRequest（InvokeRequest → 线上格式）
+├── response.go      # convertResponse / convertToChunk（线上格式 → ModelResponse）
+└── capabilities.go  # 可选能力接口实现
+```
 
-- **DeepSeek** (`deepseek/deepseek.go`): OpenAI-compatible SDK integration
-  - Coverage: 81.6%
-  - Features: DeepSeek-V3 (deepseek-chat), DeepSeek-R1 (deepseek-reasoner)
-  - Full OpenAI API compatibility, function calling, streaming
-  - Cost-effective with context caching
-  - Example: `cmd/examples/deepseek_agent/`
+## 新增 Provider
 
-- **ModelScope** (`modelscope/modelscope.go`): OpenAI-compatible SDK via DashScope
-  - Coverage: 78.9%
-  - Features: Qwen models (qwen-plus, qwen-turbo, qwen-max), Chinese-optimized
-  - Full OpenAI API compatibility through Alibaba Cloud DashScope
-  - Excellent Chinese language support
-  - Example: `cmd/examples/modelscope_agent/`
+完整指南见 [docs/design/provider-development-guide.md](../../docs/design/provider-development-guide.md)。
 
-- **Ollama** (`ollama/ollama.go`): Custom HTTP implementation
-  - Coverage: 43.8%
-  - Features: All Ollama models (Llama 2, Mistral, etc.), streaming
-  - Can benefit from HTTPClient refactoring
+要点：
+1. 新建目录 `pkg/agno/models/<provider>/`
+2. 实现 `Model` 接口（嵌入 `BaseModel`，Provider 字段填 provider 名）
+3. 复用公共组件（PostJSON / SSEDecoder / NewToolCall / MarshalMap），不复制实现
+4. 表驱动测试 + httptest mock；有真实 API 的加集成测试（无 key 自动跳过）
+5. 本地真机验证：`cmd/protocolsim`（协议模拟器）+ llama.cpp
 
-### Adding a New Provider
+## Providers / 已实现 provider
 
-1. Create a new directory: `pkg/agno/models/yourprovider/`
-2. Implement the `Model` interface from `base.go`
-3. Use common utilities from `common.go`
-4. Add tests with >70% coverage
-5. Update this README
+- **OpenAI** (`openai/`): 官方 SDK；GPT-4/GPT-3.5/函数调用/流式；结构化输出+多模态能力
+- **Anthropic** (`anthropic/`): 裸 HTTP + SSE；Claude 3 系列/流式/思考模式
+- **Gemini** (`gemini/`): 裸 HTTP + SSE；Gemini Pro/Ultra/函数调用
+- **DeepSeek** (`deepseek/`): OpenAI 兼容 SDK；deepseek-chat/deepseek-reasoner
+- **ModelScope** (`modelscope/`): OpenAI 兼容 SDK（DashScope）；Qwen 系列
+- **Ollama** (`ollama/`): 裸 HTTP + JSON lines 流式；本地模型
+- **GLM** (`glm/`): 智谱 GLM 系列
+- **Cohere** (`cohere/`): Cohere API
+- **Groq** (`groq/`): OpenAI 兼容；Groq 高速推理
+- **InternLM** (`internlm/`): 书生浦语
+- **LMStudio** (`lmstudio/`): OpenAI 兼容；本地 LM Studio
+- **OpenRouter** (`openrouter/`): 多模型路由
+- **Portkey** (`portkey/`): 网关/多提供商路由
+- **SambaNova** (`sambanova/`): SambaNova 推理
+- **Together** (`together/`): OpenAI 兼容
+- **Vercel** (`vercel/`): Vercel AI Gateway
+- **EvoLink** (`evolink/`): 多模态（image/text/video 子包）
 
-See [CLAUDE.md](../../CLAUDE.md#adding-a-model-provider) for detailed instructions.
+## 本地验证工具
+
+- `cmd/protocolsim`：协议模拟器（Anthropic Messages / Gemini generateContent / OpenAI Responses 端点 → 任意 OpenAI 兼容后端）
+- `cmd/examples/simtest` / `geminitest` / `responsetest`：各协议端到端验证
+- `cmd/examples/llama_test`：llama.cpp 真机验证（同步/流式/工具）

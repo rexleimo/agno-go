@@ -46,21 +46,21 @@ func (a *Anthropic) buildClaudeRequest(req *models.InvokeRequest) *ClaudeRequest
 				if v, ok := cfgMap["Type"].(string); ok && v != "" {
 					thinkingCfg.Type = v
 				}
-				if budget, ok := valueToInt(cfgMap["budget_tokens"]); ok {
+				if budget, ok := models.ToInt(cfgMap["budget_tokens"]); ok {
 					thinkingCfg.BudgetTokens = budget
 				}
-				if budget, ok := valueToInt(cfgMap["budgetTokens"]); ok {
+				if budget, ok := models.ToInt(cfgMap["budgetTokens"]); ok {
 					thinkingCfg.BudgetTokens = budget
 				}
-				if maxTokens, ok := valueToInt(cfgMap["max_output_tokens"]); ok {
+				if maxTokens, ok := models.ToInt(cfgMap["max_output_tokens"]); ok {
 					thinkingCfg.MaxOutputTokens = maxTokens
 				}
-				if maxTokens, ok := valueToInt(cfgMap["maxOutputTokens"]); ok {
+				if maxTokens, ok := models.ToInt(cfgMap["maxOutputTokens"]); ok {
 					thinkingCfg.MaxOutputTokens = maxTokens
 				}
 			}
 		}
-		if budget, ok := valueToInt(req.Extra["thinking_budget"]); ok {
+		if budget, ok := models.ToInt(req.Extra["thinking_budget"]); ok {
 			if thinkingCfg == nil {
 				thinkingCfg = &ThinkingConfig{Type: "enabled"}
 			}
@@ -69,7 +69,7 @@ func (a *Anthropic) buildClaudeRequest(req *models.InvokeRequest) *ClaudeRequest
 				thinkingCfg.Type = "enabled"
 			}
 		}
-		if budget, ok := valueToInt(req.Extra["thinkingBudget"]); ok {
+		if budget, ok := models.ToInt(req.Extra["thinkingBudget"]); ok {
 			if thinkingCfg == nil {
 				thinkingCfg = &ThinkingConfig{Type: "enabled"}
 			}

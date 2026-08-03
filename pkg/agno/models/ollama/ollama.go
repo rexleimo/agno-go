@@ -55,32 +55,10 @@ func New(modelID string, config Config) (*Ollama, error) {
 func (o *Ollama) Invoke(ctx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error) {
 	ollamaReq := o.buildOllamaRequest(req)
 
-	reqBody, err := json.Marshal(ollamaReq)
-	if err != nil {
-		return nil, types.NewAPIError("failed to marshal request", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", o.config.BaseURL+"/api/chat", bytes.NewBuffer(reqBody))
-	if err != nil {
-		return nil, types.NewAPIError("failed to create HTTP request", err)
-	}
-
-	httpReq.Header.Set("Content-Type", "application/json")
-
-	resp, err := o.httpClient.Do(httpReq)
-	if err != nil {
-		return nil, types.NewAPIError("failed to call Ollama API", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, types.NewAPIError(fmt.Sprintf("API error: %s", string(body)), nil)
-	}
-
 	var ollamaResp OllamaResponse
-	if err := json.NewDecoder(resp.Body).Decode(&ollamaResp); err != nil {
-		return nil, types.NewAPIError("failed to decode response", err)
+	err := models.PostJSON(ctx, o.httpClient, o.config.BaseURL+"/api/chat", nil, ollamaReq, &ollamaResp)
+	if err != nil {
+		return nil, err
 	}
 
 	return o.convertResponse(&ollamaResp), nil

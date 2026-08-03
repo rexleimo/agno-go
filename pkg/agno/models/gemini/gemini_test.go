@@ -686,9 +686,14 @@ func TestConvertResponse(t *testing.T) {
 }
 
 func TestSSEDecoder(t *testing.T) {
+	// SSE decoding is now covered by the shared models.SSEDecoder tests
+	// (pkg/agno/models/sse_test.go). This test is kept as a thin wrapper to
+	// verify the provider still wires the shared decoder correctly.
+	// SSE 解码现由共享 models.SSEDecoder 测试覆盖（pkg/agno/models/sse_test.go）。
+	// 此测试保留为薄包装，验证 provider 仍正确接入共享解码器。
 	data := "data: {\"test\": \"message1\"}\n\ndata: {\"test\": \"message2\"}\n\n"
 
-	decoder := NewSSEDecoder(strings.NewReader(data))
+	decoder := models.NewSSEDecoder(strings.NewReader(data))
 
 	messages := []string{}
 	for {

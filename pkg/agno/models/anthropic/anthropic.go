@@ -1,13 +1,9 @@
 package anthropic
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
@@ -114,32 +110,10 @@ func (a *Anthropic) SupportsReasoning() bool {
 func (a *Anthropic) Invoke(ctx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error) {
 	claudeReq := a.buildClaudeRequest(req)
 
-	reqBody, err := json.Marshal(claudeReq)
-	if err != nil {
-		return nil, types.NewAPIError("failed to marshal request", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", a.config.BaseURL+"/messages", bytes.NewBuffer(reqBody))
-	if err != nil {
-		return nil, types.NewAPIError("failed to create HTTP request", err)
-	}
-
-	a.setHeaders(httpReq)
-
-	resp, err := a.httpClient.Do(httpReq)
-	if err != nil {
-		return nil, types.NewAPIError("failed to call Anthropic API", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return nil, types.NewAPIError(fmt.Sprintf("API error: %s", string(body)), nil)
-	}
-
 	var claudeResp ClaudeResponse
-	if err := json.NewDecoder(resp.Body).Decode(&claudeResp); err != nil {
-		return nil, types.NewAPIError("failed to decode response", err)
+	err := models.PostJSON(ctx, a.httpClient, a.config.BaseURL+"/messages", a.authHeaders(), claudeReq, &claudeResp)
+	if err != nil {
+		return nil, err
 	}
 
 	return a.convertResponse(&claudeResp), nil
@@ -177,14 +151,7 @@ func (a *Anthropic) convertResponse(resp *ClaudeResponse) *types.ModelResponse {
 				contentBuilder.WriteString(block.Text)
 			}
 		case "tool_use":
-			modelResp.ToolCalls = append(modelResp.ToolCalls, types.ToolCall{
-				ID:   block.ID,
-				Type: "function",
-				Function: types.ToolCallFunction{
-					Name:      block.Name,
-					Arguments: jsonToString(block.Input),
-				},
-			})
+			modelResp.ToolCalls = append(modelResp.ToolCalls, models.NewToolCall(block.ID, block.Name, models.MarshalMap(block.Input)))
 		case "thinking":
 			if block.Thinking != "" {
 				if reasoningBuilder.Len() > 0 {
@@ -245,11 +212,13 @@ func (a *Anthropic) convertResponse(resp *ClaudeResponse) *types.ModelResponse {
 
 // convertStreamEvent converts stream event to ResponseChunk
 
-// setHeaders sets required headers for Anthropic API
-func (a *Anthropic) setHeaders(req *http.Request) {
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("x-api-key", a.config.APIKey)
-	req.Header.Set("anthropic-version", apiVersion)
+// authHeaders returns the required headers for the Anthropic API.
+// authHeaders 返回 Anthropic API 所需的请求头。
+func (a *Anthropic) authHeaders() map[string]string {
+	return map[string]string{
+		"x-api-key":         a.config.APIKey,
+		"anthropic-version": apiVersion,
+	}
 }
 
 // ClaudeResponse represents the Anthropic API response
@@ -281,56 +250,6 @@ type ClaudeUsage struct {
 	InputTokens    int `json:"input_tokens"`
 	OutputTokens   int `json:"output_tokens"`
 	ThinkingTokens int `json:"thinking_tokens,omitempty"`
-}
-
-// Helper function to convert map to JSON string
-func jsonToString(data map[string]interface{}) string {
-	if data == nil {
-		return "{}"
-	}
-	jsonBytes, _ := json.Marshal(data)
-	return string(jsonBytes)
-}
-
-func valueToInt(value interface{}) (int, bool) {
-	switch v := value.(type) {
-	case int:
-		return v, true
-	case int8:
-		return int(v), true
-	case int16:
-		return int(v), true
-	case int32:
-		return int(v), true
-	case int64:
-		return int(v), true
-	case uint:
-		return int(v), true
-	case uint8:
-		return int(v), true
-	case uint16:
-		return int(v), true
-	case uint32:
-		return int(v), true
-	case uint64:
-		return int(v), true
-	case float32:
-		return int(v), true
-	case float64:
-		return int(v), true
-	case string:
-		if v == "" {
-			return 0, false
-		}
-		if i, err := strconv.Atoi(v); err == nil {
-			return i, true
-		}
-	case json.Number:
-		if i, err := v.Int64(); err == nil {
-			return int(i), true
-		}
-	}
-	return 0, false
 }
 
 // ValidateConfig validates the Anthropic configuration

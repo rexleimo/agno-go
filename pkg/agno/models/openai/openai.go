@@ -2,7 +2,6 @@ package openai
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -91,19 +90,8 @@ func (o *OpenAI) Invoke(ctx context.Context, req *models.InvokeRequest) (*types.
 	}
 
 	// Convert tool calls if present
-	if len(choice.Message.ToolCalls) > 0 {
-		modelResp.ToolCalls = make([]types.ToolCall, len(choice.Message.ToolCalls))
-		for i, tc := range choice.Message.ToolCalls {
-			modelResp.ToolCalls[i] = types.ToolCall{
-				ID:   tc.ID,
-				Type: string(tc.Type),
-				Function: types.ToolCallFunction{
-					Name:      tc.Function.Name,
-					Arguments: tc.Function.Arguments,
-				},
-			}
-		}
-	}
+	// 转换工具调用（如有）
+	modelResp.ToolCalls = toToolCalls(choice.Message.ToolCalls)
 
 	return modelResp, nil
 }
@@ -229,89 +217,6 @@ func (o *OpenAI) InvokeStream(ctx context.Context, req *models.InvokeRequest) (<
 	}()
 
 	return chunks, nil
-}
-
-// partialToolCall accumulates a streaming tool-call across chunks.
-// partialToolCall 跨 chunk 累积流式工具调用。
-type partialToolCall struct {
-	id        string
-	typ       string
-	name      string
-	arguments string
-}
-
-// buildChatRequest converts InvokeRequest to OpenAI ChatCompletionRequest
-func (o *OpenAI) buildChatRequest(req *models.InvokeRequest) openai.ChatCompletionRequest {
-	chatReq := openai.ChatCompletionRequest{
-		Model:    o.ID,
-		Messages: make([]openai.ChatCompletionMessage, len(req.Messages)),
-	}
-
-	// Convert messages
-	for i, msg := range req.Messages {
-		chatMsg := openai.ChatCompletionMessage{
-			Role:    string(msg.Role),
-			Content: msg.Content,
-			Name:    msg.Name,
-		}
-
-		// Handle tool call responses
-		if msg.ToolCallID != "" {
-			chatMsg.ToolCallID = msg.ToolCallID
-		}
-
-		// Handle tool calls in message
-		if len(msg.ToolCalls) > 0 {
-			chatMsg.ToolCalls = make([]openai.ToolCall, len(msg.ToolCalls))
-			for j, tc := range msg.ToolCalls {
-				chatMsg.ToolCalls[j] = openai.ToolCall{
-					ID:   tc.ID,
-					Type: openai.ToolType(tc.Type),
-					Function: openai.FunctionCall{
-						Name:      tc.Function.Name,
-						Arguments: tc.Function.Arguments,
-					},
-				}
-			}
-		}
-
-		chatReq.Messages[i] = chatMsg
-	}
-
-	// Convert tools
-	if len(req.Tools) > 0 {
-		chatReq.Tools = make([]openai.Tool, len(req.Tools))
-		for i, tool := range req.Tools {
-			paramsJSON, _ := json.Marshal(tool.Function.Parameters)
-			var params map[string]interface{}
-			json.Unmarshal(paramsJSON, &params)
-
-			chatReq.Tools[i] = openai.Tool{
-				Type: openai.ToolType(tool.Type),
-				Function: &openai.FunctionDefinition{
-					Name:        tool.Function.Name,
-					Description: tool.Function.Description,
-					Parameters:  params,
-				},
-			}
-		}
-	}
-
-	// Set temperature
-	if req.Temperature > 0 {
-		chatReq.Temperature = float32(req.Temperature)
-	} else if o.config.Temperature > 0 {
-		chatReq.Temperature = float32(o.config.Temperature)
-	}
-
-	// Set max tokens
-	if req.MaxTokens > 0 {
-		chatReq.MaxTokens = req.MaxTokens
-	} else if o.config.MaxTokens > 0 {
-		chatReq.MaxTokens = o.config.MaxTokens
-	}
-
-	return chatReq
 }
 
 // ValidateConfig validates the OpenAI configuration

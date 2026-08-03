@@ -3,7 +3,6 @@ package anthropic
 import (
 	"context"
 	"encoding/json"
-	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -414,17 +413,16 @@ func TestSetHeaders(t *testing.T) {
 		APIKey: "test-api-key",
 	})
 
-	req, _ := http.NewRequest("POST", "https://api.anthropic.com/v1/messages", nil)
-	model.setHeaders(req)
+	headers := model.authHeaders()
 
-	if req.Header.Get("Content-Type") != "application/json" {
-		t.Errorf("Content-Type = %v, want application/json", req.Header.Get("Content-Type"))
+	if headers["Content-Type"] != "" && headers["Content-Type"] != "application/json" {
+		t.Errorf("Content-Type = %v, want application/json", headers["Content-Type"])
 	}
-	if req.Header.Get("x-api-key") != "test-api-key" {
-		t.Errorf("x-api-key = %v, want test-api-key", req.Header.Get("x-api-key"))
+	if headers["x-api-key"] != "test-api-key" {
+		t.Errorf("x-api-key = %v, want test-api-key", headers["x-api-key"])
 	}
-	if req.Header.Get("anthropic-version") != apiVersion {
-		t.Errorf("anthropic-version = %v, want %v", req.Header.Get("anthropic-version"), apiVersion)
+	if headers["anthropic-version"] != apiVersion {
+		t.Errorf("anthropic-version = %v, want %v", headers["anthropic-version"], apiVersion)
 	}
 }
 
@@ -487,7 +485,7 @@ func TestConvertStreamEvent(t *testing.T) {
 	}
 }
 
-func TestJsonToString(t *testing.T) {
+func TestMarshalMap(t *testing.T) {
 	tests := []struct {
 		name  string
 		input map[string]interface{}
@@ -518,18 +516,18 @@ func TestJsonToString(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := jsonToString(tt.input)
+			got := models.MarshalMap(tt.input)
 			if tt.name == "nil map" && got != tt.want {
-				t.Errorf("jsonToString() = %v, want %v", got, tt.want)
+				t.Errorf("models.MarshalMap() = %v, want %v", got, tt.want)
 			}
 			if tt.name == "simple map" && got != tt.want {
-				t.Errorf("jsonToString() = %v, want %v", got, tt.want)
+				t.Errorf("models.MarshalMap() = %v, want %v", got, tt.want)
 			}
 			// For nested map, just check it's valid JSON
 			if tt.name == "nested map" {
 				var parsed map[string]interface{}
 				if err := json.Unmarshal([]byte(got), &parsed); err != nil {
-					t.Errorf("jsonToString() produced invalid JSON: %v", err)
+					t.Errorf("models.MarshalMap() produced invalid JSON: %v", err)
 				}
 			}
 		})

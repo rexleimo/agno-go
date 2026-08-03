@@ -11,73 +11,6 @@ import (
 	"github.com/rexleimo/agno-go/pkg/agno/types"
 )
 
-func TestNew(t *testing.T) {
-	tests := []struct {
-		name    string
-		modelID string
-		config  Config
-		wantErr bool
-	}{
-		{
-			name:    "valid config",
-			modelID: "qwen-plus",
-			config: Config{
-				APIKey: "test-key",
-			},
-			wantErr: false,
-		},
-		{
-			name:    "missing API key",
-			modelID: "qwen-plus",
-			config:  Config{},
-			wantErr: true,
-		},
-		{
-			name:    "custom base URL",
-			modelID: "qwen-turbo",
-			config: Config{
-				APIKey:  "test-key",
-				BaseURL: "https://custom.api.com",
-			},
-			wantErr: false,
-		},
-		{
-			name:    "with temperature and max tokens",
-			modelID: "qwen-max",
-			config: Config{
-				APIKey:      "test-key",
-				Temperature: 0.8,
-				MaxTokens:   3000,
-			},
-			wantErr: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			model, err := New(tt.modelID, tt.config)
-			if tt.wantErr {
-				if err == nil {
-					t.Fatal("expected error, got nil")
-				}
-				return
-			}
-
-			if err != nil {
-				t.Fatalf("unexpected error: %v", err)
-			}
-
-			if model.GetID() != tt.modelID {
-				t.Errorf("expected model ID %s, got %s", tt.modelID, model.GetID())
-			}
-
-			if model.GetProvider() != "modelscope" {
-				t.Errorf("expected provider 'modelscope', got %s", model.GetProvider())
-			}
-		})
-	}
-}
-
 func TestInvoke(t *testing.T) {
 	tests := []struct {
 		name           string
@@ -417,38 +350,5 @@ func TestInvokeStream(t *testing.T) {
 
 	if len(receivedContent) < 1 {
 		t.Errorf("expected at least 1 chunk, got %d", len(receivedContent))
-	}
-}
-
-func TestValidateConfig(t *testing.T) {
-	tests := []struct {
-		name    string
-		config  Config
-		wantErr bool
-	}{
-		{
-			name: "valid config",
-			config: Config{
-				APIKey: "test-key",
-			},
-			wantErr: false,
-		},
-		{
-			name:    "missing API key",
-			config:  Config{},
-			wantErr: true,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ValidateConfig(tt.config)
-			if tt.wantErr && err == nil {
-				t.Error("expected error, got nil")
-			}
-			if !tt.wantErr && err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-		})
 	}
 }

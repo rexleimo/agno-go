@@ -1,14 +1,12 @@
 package glm
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/rexleimo/agno-go/pkg/agno/models"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
@@ -135,32 +133,23 @@ func (g *GLM) InvokeStream(ctx context.Context, req *models.InvokeRequest) (<-ch
 		defer close(chunks)
 		defer resp.Body.Close()
 
-		scanner := bufio.NewScanner(resp.Body)
-		for scanner.Scan() {
-			line := scanner.Text()
-
-			// Skip empty lines
-			// 跳过空行
-			if line == "" {
-				continue
-			}
-
-			// Check for [DONE] marker
-			// 检查 [DONE] 标记
-			if strings.TrimSpace(line) == "data: [DONE]" {
-				chunks <- types.ResponseChunk{Done: true}
+		// Use the shared SSE decoder.
+		// 使用共享 SSE 解码器。
+		decoder := models.NewSSEDecoder(resp.Body)
+		for {
+			data, err := decoder.Next()
+			if err != nil {
+				if err != io.EOF {
+					chunks <- types.ResponseChunk{Done: true, Error: err}
+				}
 				return
 			}
-
-			// Parse SSE format: "data: {...}"
-			// 解析 SSE 格式: "data: {...}"
-			if !strings.HasPrefix(line, "data: ") {
+			if len(data) == 0 {
 				continue
 			}
 
-			data := strings.TrimPrefix(line, "data: ")
 			var streamResp glmStreamResponse
-			if err := json.Unmarshal([]byte(data), &streamResp); err != nil {
+			if err := json.Unmarshal(data, &streamResp); err != nil {
 				chunks <- types.ResponseChunk{
 					Done:  true,
 					Error: fmt.Errorf("failed to parse streaming response: %w", err),
@@ -205,13 +194,6 @@ func (g *GLM) InvokeStream(ctx context.Context, req *models.InvokeRequest) (<-ch
 					}
 					return
 				}
-			}
-		}
-
-		if err := scanner.Err(); err != nil {
-			chunks <- types.ResponseChunk{
-				Done:  true,
-				Error: fmt.Errorf("error reading stream: %w", err),
 			}
 		}
 	}()

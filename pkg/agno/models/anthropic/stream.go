@@ -1,14 +1,11 @@
 package anthropic
 
 import (
-	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/rexleimo/agno-go/pkg/agno/models"
 	"github.com/rexleimo/agno-go/pkg/agno/types"
@@ -18,21 +15,9 @@ func (a *Anthropic) InvokeStream(ctx context.Context, req *models.InvokeRequest)
 	claudeReq := a.buildClaudeRequest(req)
 	claudeReq.Stream = true
 
-	reqBody, err := json.Marshal(claudeReq)
+	resp, err := models.PostJSONRaw(ctx, a.httpClient, a.config.BaseURL+"/messages", a.authHeaders(), claudeReq)
 	if err != nil {
-		return nil, types.NewAPIError("failed to marshal request", err)
-	}
-
-	httpReq, err := http.NewRequestWithContext(ctx, "POST", a.config.BaseURL+"/messages", bytes.NewBuffer(reqBody))
-	if err != nil {
-		return nil, types.NewAPIError("failed to create HTTP request", err)
-	}
-
-	a.setHeaders(httpReq)
-
-	resp, err := a.httpClient.Do(httpReq)
-	if err != nil {
-		return nil, types.NewAPIError("failed to call Anthropic API", err)
+		return nil, err
 	}
 
 	if resp.StatusCode != http.StatusOK {
@@ -47,24 +32,28 @@ func (a *Anthropic) InvokeStream(ctx context.Context, req *models.InvokeRequest)
 		defer close(chunks)
 		defer resp.Body.Close()
 
-		// Anthropic streams use SSE framing (event:/data: lines), not raw
-		// JSON lines. Each "data:" payload is a StreamEvent.
-		// Anthropic 流式使用 SSE 帧（event:/data: 行），而非原始 JSON 行。
-		// 每个 "data:" 负载都是一个 StreamEvent。
-		scanner := bufio.NewScanner(resp.Body)
-		scanner.Buffer(make([]byte, 1024*1024), 1024*1024)
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if !strings.HasPrefix(line, "data:") {
-				continue
+		// Anthropic streams use SSE framing (event:/data: lines). Use the
+		// shared models.SSEDecoder for parsing.
+		// Anthropic 流式使用 SSE 帧（event:/data: 行）。使用共享的
+		// models.SSEDecoder 解析。
+		decoder := models.NewSSEDecoder(resp.Body)
+		for {
+			data, err := decoder.Next()
+			if err != nil {
+				if err != io.EOF {
+					chunks <- types.ResponseChunk{
+						Done:  true,
+						Error: err,
+					}
+				}
+				return
 			}
-			data := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-			if data == "" {
+			if len(data) == 0 {
 				continue
 			}
 
 			var event StreamEvent
-			if err := json.Unmarshal([]byte(data), &event); err != nil {
+			if err := json.Unmarshal(data, &event); err != nil {
 				chunks <- types.ResponseChunk{
 					Done:  true,
 					Error: fmt.Errorf("failed to decode stream event: %w", err),
@@ -84,13 +73,6 @@ func (a *Anthropic) InvokeStream(ctx context.Context, req *models.InvokeRequest)
 					Error: ctx.Err(),
 				}
 				return
-			}
-		}
-
-		if err := scanner.Err(); err != nil && err != io.EOF {
-			chunks <- types.ResponseChunk{
-				Done:  true,
-				Error: fmt.Errorf("stream read error: %w", err),
 			}
 		}
 	}()
