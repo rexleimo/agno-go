@@ -43,20 +43,20 @@ go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 
 ```bash
 # agent 패키지 테스트
-go test -v ./pkg/agno/agent/...
+go test -v ./pkg/hno/agent/...
 
 # 커버리지와 함께 테스트
-go test -v -cover ./pkg/agno/agent/...
+go test -v -cover ./pkg/hno/agent/...
 ```
 
 ### 특정 테스트
 
 ```bash
 # 특정 테스트 함수 실행
-go test -v -run TestAgentRun ./pkg/agno/agent/
+go test -v -run TestAgentRun ./pkg/hno/agent/
 
 # 패턴과 일치하는 테스트 실행
-go test -v -run TestAgent.* ./pkg/agno/agent/
+go test -v -run TestAgent.* ./pkg/hno/agent/
 ```
 
 ### 커버리지 보고서
@@ -101,8 +101,8 @@ import (
     "context"
     "testing"
 
-    "github.com/rexleimo/agno-go/pkg/agno/models"
-    "github.com/rexleimo/agno-go/pkg/agno/types"
+    "github.com/rexleimo/agno-go/pkg/hno/models"
+    "github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
 func TestAgentRun(t *testing.T) {
@@ -299,16 +299,16 @@ func BenchmarkAgentCreation(b *testing.B) {
 
 ```bash
 # 모든 벤치마크 실행
-go test -bench=. ./pkg/agno/agent/
+go test -bench=. ./pkg/hno/agent/
 
 # 특정 벤치마크 실행
-go test -bench=BenchmarkAgentCreation ./pkg/agno/agent/
+go test -bench=BenchmarkAgentCreation ./pkg/hno/agent/
 
 # 메모리 할당 통계와 함께
-go test -bench=. -benchmem ./pkg/agno/agent/
+go test -bench=. -benchmem ./pkg/hno/agent/
 
 # 정확성을 위한 여러 실행
-go test -bench=. -benchtime=10s -count=5 ./pkg/agno/agent/
+go test -bench=. -benchtime=10s -count=5 ./pkg/hno/agent/
 ```
 
 ### 벤치마크 출력
@@ -385,8 +385,8 @@ package testutil
 
 import (
     "testing"
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models"
 )
 
 func CreateTestAgent(t *testing.T) *agent.Agent {

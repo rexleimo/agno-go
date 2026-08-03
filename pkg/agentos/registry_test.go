@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/rexleimo/agno-go/pkg/agno/agent"
-	"github.com/rexleimo/agno-go/pkg/agno/models/openai"
+	"github.com/rexleimo/agno-go/pkg/hno/agent"
+	"github.com/rexleimo/agno-go/pkg/hno/models/openai"
 )
 
 func createTestAgent(t *testing.T, name string) *agent.Agent {

@@ -10,7 +10,7 @@
 - 提供最小迁移/导入工具与测试用例。
 
 目录结构（拟）
-- `pkg/agno/session/sqlite/`
+- `pkg/hno/session/sqlite/`
   - `storage.go`（实现 `session.Storage`）
   - `models.go`（行对象与扫描器）
   - `schema.sql`（表结构/索引/触发器）

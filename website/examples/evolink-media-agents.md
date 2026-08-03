@@ -1,7 +1,7 @@
 # EvoLink Media Agents
 
 ## Overview
-This example shows how to use the EvoLink provider inside Agno-Go to generate text, images, and video via `pkg/agno/models/evolink/*`.
+This example shows how to use the EvoLink provider inside Agno-Go to generate text, images, and video via `pkg/hno/models/evolink/*`.
 
 ## Setup
 - Export env variables:
@@ -53,9 +53,9 @@ import (
   "fmt"
   "os"
 
-  evoText "github.com/rexleimo/agno-go/pkg/agno/models/evolink/text"
-  "github.com/rexleimo/agno-go/pkg/agno/models"
-  "github.com/rexleimo/agno-go/pkg/agno/types"
+  evoText "github.com/rexleimo/agno-go/pkg/hno/models/evolink/text"
+  "github.com/rexleimo/agno-go/pkg/hno/models"
+  "github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
 func main() {
@@ -76,9 +76,9 @@ import (
   "fmt"
   "os"
 
-  evoImg "github.com/rexleimo/agno-go/pkg/agno/models/evolink/image"
-  "github.com/rexleimo/agno-go/pkg/agno/models"
-  "github.com/rexleimo/agno-go/pkg/agno/types"
+  evoImg "github.com/rexleimo/agno-go/pkg/hno/models/evolink/image"
+  "github.com/rexleimo/agno-go/pkg/hno/models"
+  "github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
 func main() {
@@ -99,9 +99,9 @@ import (
   "fmt"
   "os"
 
-  evoVid "github.com/rexleimo/agno-go/pkg/agno/models/evolink/video"
-  "github.com/rexleimo/agno-go/pkg/agno/models"
-  "github.com/rexleimo/agno-go/pkg/agno/types"
+  evoVid "github.com/rexleimo/agno-go/pkg/hno/models/evolink/video"
+  "github.com/rexleimo/agno-go/pkg/hno/models"
+  "github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
 func main() {

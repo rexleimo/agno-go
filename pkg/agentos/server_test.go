@@ -10,10 +10,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rexleimo/agno-go/pkg/agno/agent"
-	"github.com/rexleimo/agno-go/pkg/agno/models"
-	"github.com/rexleimo/agno-go/pkg/agno/session"
-	"github.com/rexleimo/agno-go/pkg/agno/types"
+	"github.com/rexleimo/agno-go/pkg/hno/agent"
+	"github.com/rexleimo/agno-go/pkg/hno/models"
+	"github.com/rexleimo/agno-go/pkg/hno/session"
+	"github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
 type simpleModel struct {

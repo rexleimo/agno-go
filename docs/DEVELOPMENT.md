@@ -250,7 +250,7 @@ func BenchmarkAgentCreation(b *testing.B) {
 
 ### Adding a Model Provider | 添加模型提供商
 
-1. Create directory | 创建目录: `pkg/agno/models/<your_model>/`
+1. Create directory | 创建目录: `pkg/hno/models/<your_model>/`
 2. Implement `models.Model` interface | 实现 `models.Model` 接口:
    ```go
    type Model interface {
@@ -286,7 +286,7 @@ func (m *YourModel) Invoke(ctx context.Context, req *models.InvokeRequest) (*typ
 
 ### Adding a Tool | 添加工具
 
-1. Create directory | 创建目录: `pkg/agno/tools/<your_tool>/`
+1. Create directory | 创建目录: `pkg/hno/tools/<your_tool>/`
 2. Embed `toolkit.BaseToolkit` | 嵌入 `toolkit.BaseToolkit`
 3. Register functions | 注册函数
 4. Add unit tests | 添加单元测试
@@ -327,16 +327,16 @@ func (t *MyToolkit) myHandler(args map[string]interface{}) (interface{}, error) 
 
 ### Built-in Tool Integrations | 内置工具集成
 
-Agno-Go ships with several production-ready toolkits. They can be imported directly from `pkg/agno/tools/...` or registered via configuration builders.
+Agno-Go ships with several production-ready toolkits. They can be imported directly from `pkg/hno/tools/...` or registered via configuration builders.
 
 | Toolkit | Package | Configuration Notes |
 | --- | --- | --- |
-| Claude Agent Skills | `pkg/agno/tools/claude` | Requires an Anthropic API key (`ANTHROPIC_API_KEY`); optional custom base URL for self-hosted gateways. |
-| Tavily Search + Reader | `pkg/agno/tools/tavily` | Requires `TAVILY_API_KEY`; supports quick answers and reader mode with `extract=true`. |
-| PPTX Reader | `pkg/agno/tools/file` (`read_pptx`) | No external credentials; parses slide text for ingestion pipelines. |
-| Jira Worklogs | `pkg/agno/tools/jira` | Provide Jira base URL and a PAT/Bearer token; adds worklogs via REST v3. |
-| Gmail Mark-as-Read | `pkg/agno/tools/gmail` | Requires OAuth access token; removes the `UNREAD` label for a message. |
-| ElevenLabs Speech | `pkg/agno/tools/elevenlabs` | Requires `ELEVENLABS_API_KEY`; exposes `generate_speech` with stability/similarity controls. |
+| Claude Agent Skills | `pkg/hno/tools/claude` | Requires an Anthropic API key (`ANTHROPIC_API_KEY`); optional custom base URL for self-hosted gateways. |
+| Tavily Search + Reader | `pkg/hno/tools/tavily` | Requires `TAVILY_API_KEY`; supports quick answers and reader mode with `extract=true`. |
+| PPTX Reader | `pkg/hno/tools/file` (`read_pptx`) | No external credentials; parses slide text for ingestion pipelines. |
+| Jira Worklogs | `pkg/hno/tools/jira` | Provide Jira base URL and a PAT/Bearer token; adds worklogs via REST v3. |
+| Gmail Mark-as-Read | `pkg/hno/tools/gmail` | Requires OAuth access token; removes the `UNREAD` label for a message. |
+| ElevenLabs Speech | `pkg/hno/tools/elevenlabs` | Requires `ELEVENLABS_API_KEY`; exposes `generate_speech` with stability/similarity controls. |
 
 Each toolkit includes contract tests (`*_test.go`) demonstrating expected payloads. When wiring them into an agent, pass the configuration struct (e.g. `claude.Config`, `jira.Config`) with the required keys and the shared `toolkit.ToModelToolDefinitions` helper will expose them to LLMs.
 
@@ -379,9 +379,9 @@ server, _ := agentos.NewServer(&agentos.Config{
 
 | Backend | Package | Notes |
 | --- | --- | --- |
-| Postgres | `pkg/agno/db/postgres` | Batch writer + `jsonb` columns keep sessions, runs, summaries, and cancellation snapshots consistent.<br>批量写入器与 `jsonb` 列确保会话、运行、摘要与取消快照保持一致。 |
-| MongoDB | `pkg/agno/db/mongo` | `ReplaceOne` with `upsert=true`, 200 ms default timeout, cancellations stored under `cancellations[run_id]`.<br>`ReplaceOne` 使用 `upsert=true`，默认超时 200 ms，取消信息存储在 `cancellations[run_id]` 中。 |
-| SQLite | `pkg/agno/db/sqlite` | `modernc.org/sqlite` driver, `busy_timeout=200ms`, JSON persisted as text with helpers for marshal/unmarshal.<br>基于 `modernc.org/sqlite`，设置 `busy_timeout=200ms`，JSON 以文本形式存储并辅以编解码工具。 |
+| Postgres | `pkg/hno/session/db/postgres` | Batch writer + `jsonb` columns keep sessions, runs, summaries, and cancellation snapshots consistent.<br>批量写入器与 `jsonb` 列确保会话、运行、摘要与取消快照保持一致。 |
+| MongoDB | `pkg/hno/session/db/mongo` | `ReplaceOne` with `upsert=true`, 200 ms default timeout, cancellations stored under `cancellations[run_id]`.<br>`ReplaceOne` 使用 `upsert=true`，默认超时 200 ms，取消信息存储在 `cancellations[run_id]` 中。 |
+| SQLite | `pkg/hno/session/db/sqlite` | `modernc.org/sqlite` driver, `busy_timeout=200ms`, JSON persisted as text with helpers for marshal/unmarshal.<br>基于 `modernc.org/sqlite`，设置 `busy_timeout=200ms`，JSON 以文本形式存储并辅以编解码工具。 |
 
 All adapters honour context cancellation via the shared `ensureContext` helper, so always propagate `context.Context` from HTTP handlers or background jobs. | 所有适配器通过 `ensureContext` 共享辅助函数响应取消，因此请始终从 HTTP 处理器或后台任务传递 `context.Context`。
 
@@ -463,13 +463,13 @@ chore:    Maintenance | 维护
 make test
 
 # Run specific package | 运行特定包
-go test -v ./pkg/agno/agent/...
+go test -v ./pkg/hno/agent/...
 
 # Generate coverage report | 生成覆盖率报告
 make coverage
 
 # Run benchmarks | 运行性能测试
-go test -bench=. -benchmem ./pkg/agno/agent/
+go test -bench=. -benchmem ./pkg/hno/agent/
 ```
 
 ### Code Quality | 代码质量

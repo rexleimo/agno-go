@@ -5,7 +5,7 @@ An **Agent** is an autonomous AI entity that can use tools, maintain conversatio
 ## Overview
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/agno/agent"
+import "github.com/rexleimo/agno-Go/pkg/hno/agent"
 
 agent, err := agent.New(agent.Config{
     Name:         "My Agent",
@@ -70,8 +70,8 @@ package main
 import (
     "context"
     "fmt"
-    "github.com/rexleimo/agno-Go/pkg/agno/agent"
-    "github.com/rexleimo/agno-Go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-Go/pkg/hno/agent"
+    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
 )
 
 func main() {
@@ -94,8 +94,8 @@ func main() {
 
 ```go
 import (
-    "github.com/rexleimo/agno-Go/pkg/agno/tools/calculator"
-    "github.com/rexleimo/agno-Go/pkg/agno/tools/http"
+    "github.com/rexleimo/agno-Go/pkg/hno/tools/calculator"
+    "github.com/rexleimo/agno-Go/pkg/hno/tools/http"
 )
 
 ag, _ := agent.New(agent.Config{
@@ -116,7 +116,7 @@ output, _ := ag.Run(ctx, "Calculate 15 * 23 and fetch https://api.github.com")
 ### Custom Memory
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/agno/memory"
+import "github.com/rexleimo/agno-Go/pkg/hno/memory"
 
 // Create memory with custom limit
 mem := memory.NewInMemory(50) // Keep last 50 messages
@@ -132,7 +132,7 @@ ag, _ := agent.New(agent.Config{
 Validate inputs and outputs with hooks:
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/agno/guardrails"
+import "github.com/rexleimo/agno-Go/pkg/hno/guardrails"
 
 // Built-in prompt injection guard
 promptGuard := guardrails.NewPromptInjectionGuardrail()

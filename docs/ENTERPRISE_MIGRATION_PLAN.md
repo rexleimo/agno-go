@@ -13,12 +13,12 @@
 | P0 | 知识库搜索与配置 API | ✅ 已完成 | `pkg/agentos/knowledge_*` |
 | P1 | 事件流过滤 (SSE) | ✅ 已完成 | `pkg/agentos/events*` |
 | P1 | 内容抽取中间件 | ✅ 已完成 | `pkg/agentos/middleware/extract_content.go` |
-| P1 | Google Sheets 工具 | ✅ 已完成 | `pkg/agno/tools/googlesheets/` |
+| P1 | Google Sheets 工具 | ✅ 已完成 | `pkg/hno/tools/googlesheets/` |
 | P2 | 最小化知识入库接口 | ✅ 已完成 | `pkg/agentos/knowledge_handlers.go:handleAddContent` |
 
 ## 可迁移项（按优先级）
 - ✅ P0｜知识库搜索与配置 API
-  - 新增 `POST /api/v1/knowledge/search`、`GET /api/v1/knowledge/config`，复用 `pkg/agno/knowledge`、`pkg/agno/vectordb/chromadb`。
+  - 新增 `POST /api/v1/knowledge/search`、`GET /api/v1/knowledge/config`，复用 `pkg/hno/knowledge`、`pkg/hno/vectordb/chromadb`。
   - **实现**: `pkg/agentos/knowledge_types.go` (168 行), `pkg/agentos/knowledge_handlers.go` (440 行)
   - **测试**: 100% 通过，包含分页、过滤、错误处理
 - ✅ P1｜事件流过滤（SSE）
@@ -31,7 +31,7 @@
   - **测试覆盖**: 91.7%，包含 JSON/Form/分页/大小限制/无效输入
 - ✅ P1｜Google Sheets 工具（服务账号）
   - 新增工具包，支持服务账号 JSON，提供读写接口。
-  - **实现**: `pkg/agno/tools/googlesheets/googlesheets.go` (320 行), `googlesheets_test.go` (345 行)
+  - **实现**: `pkg/hno/tools/googlesheets/googlesheets.go` (320 行), `googlesheets_test.go` (345 行)
   - **功能**: read_range, write_range, append_rows
   - **示例**: `cmd/examples/googlesheets_example/` (包含完整 README)
 - ✅ P2｜最小化知识入库接口
@@ -57,7 +57,7 @@
 - 中间件
   - 新增 `pkg/agentos/middleware/extract_content.go` 并在 `NewServer` 启用。
 - Google Sheets 工具
-  - 新增 `pkg/agno/tools/googlesheets/*`，示例与测试覆盖读/写/追加。
+  - 新增 `pkg/hno/tools/googlesheets/*`，示例与测试覆盖读/写/追加。
 - 示例与测试
   - 新增 `cmd/examples/knowledge_api`；补充 handler/middleware/tool 单测与分页过滤集成测。
 
@@ -112,7 +112,7 @@
 - Google Sheets 工具（P1）
   - 认证：设置 `GOOGLE_SHEETS_CREDENTIALS`（文件路径或 JSON 字符串）
   - 预期：`read_range`/`write_range`/`append_rows` 正常；错误凭证返回明确错误
-  - 示例：`go test ./pkg/agno/tools/googlesheets -v` 全部通过
+  - 示例：`go test ./pkg/hno/tools/googlesheets -v` 全部通过
 
 - 最小化知识入库（P2）
   - 端点：`POST /api/v1/knowledge/content`
@@ -210,10 +210,10 @@ middleware.ExtractContentMiddleware(middleware.ExtractContentConfig{
 ### 4. Google Sheets 工具包 (P1)
 
 **新增文件**:
-- `pkg/agno/tools/googlesheets/googlesheets.go` - 主实现
+- `pkg/hno/tools/googlesheets/googlesheets.go` - 主实现
   - 服务账号认证（支持文件路径和 JSON 字符串）
   - 三个函数：`read_range`, `write_range`, `append_rows`
-- `pkg/agno/tools/googlesheets/googlesheets_test.go` - 测试套件
+- `pkg/hno/tools/googlesheets/googlesheets_test.go` - 测试套件
 - `cmd/examples/googlesheets_example/` - 完整示例
   - `main.go` - 示例程序（演示模式 + 完整模式）
   - `README.md` - 详细设置指南
@@ -295,7 +295,7 @@ curl -X POST http://localhost:8080/api/v1/knowledge/content \
 ## 小目标路线图（针对“不可/不建议迁移”的分步实现）
 - M1｜持久化会话与迁移基础（SQLite）
   - 范围：实现 `session.Storage` 的 SQLite 实现与迁移框架，保留 `updated_at` 语义。
-  - 任务：`pkg/agno/session/sqlite/*`、`scripts/init-db.sql`、在 `pkg/agentos/server.go` 提供存储选择；`cmd/tools/session_migrate`（可选）。
+  - 任务：`pkg/hno/session/sqlite/*`、`scripts/init-db.sql`、在 `pkg/agentos/server.go` 提供存储选择；`cmd/tools/session_migrate`（可选）。
   - 验收：CRUD + List 通过；并发读写测试；重启后数据一致；`updated_at` 不回退。
 - M2｜多向量库适配器（PGVector 或 Qdrant 二选一）
   - 范围：扩展 `vectordb.VectorDB`（含 Upsert/Delete/Filter/IDs），新增 `pgvector/*` 或 `qdrant/*` 实现。
@@ -303,9 +303,9 @@ curl -X POST http://localhost:8080/api/v1/knowledge/content \
   - 验收：增删改查与语义检索通过；删除与元数据写入有回归测试。
 - M3｜Reader 与内容管道（最小支持 PDF/DOCX）
   - 范围：定义 Reader 接口并实现 `Text/Markdown`；新增 `PDFReader`（unidoc/unipdf）与 `DocxReader`（gooxml）。
-  - 任务：`pkg/agno/knowledge/reader/*`、扩展 `POST /knowledge/content`；与 chunker、向量库串联。
+  - 任务：`pkg/hno/knowledge/reader/*`、扩展 `POST /knowledge/content`；与 chunker、向量库串联。
   - 验收：小/大文件解析稳定、分块边界合理、资源占用受控；失败路径具备可观测日志。
 - M4｜抓取与动态渲染（Scrape 替代方案）
   - 范围：先静态抓取（`goquery`/readability），后可选动态渲染（`chromedp`）。
-  - 任务：`pkg/agno/tools/webfetch/*`；`/knowledge/content` 支持 URL 输入并调用抓取。
+  - 任务：`pkg/hno/tools/webfetch/*`；`/knowledge/content` 支持 URL 输入并调用抓取。
   - 验收：静态页面正文抽取准确；启用渲染能抓到主内容；具备限流与超时控制。

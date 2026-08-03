@@ -20,8 +20,8 @@ go get github.com/rexleimo/agno-Go
 
 ```go
 import (
-    "github.com/rexleimo/agno-Go/pkg/agno/agent"
-    "github.com/rexleimo/agno-Go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-Go/pkg/hno/agent"
+    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
 )
 ```
 
@@ -127,8 +127,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-Go/pkg/agno/agent"
-    "github.com/rexleimo/agno-Go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-Go/pkg/hno/agent"
+    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
 )
 
 func main() {
@@ -200,7 +200,7 @@ make install-tools
 make test
 
 # Run specific package
-go test -v ./pkg/agno/agent/...
+go test -v ./pkg/hno/agent/...
 
 # Generate coverage report
 make coverage

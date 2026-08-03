@@ -47,7 +47,7 @@ import (
     "context"
     "fmt"
 
-    "github.com/rexleimo/agno-go/pkg/agno/workflow"
+    "github.com/rexleimo/agno-go/pkg/hno/workflow"
 )
 
 func main() {
@@ -156,7 +156,7 @@ Agno-Go는 **딥 카피 + last-write-wins** 전략을 사용합니다:
 4. 충돌이 존재하면 나중 브랜치가 이전 브랜치를 덮어씁니다
 
 ```go
-// pkg/agno/workflow/parallel.go
+// pkg/hno/workflow/parallel.go
 
 func (p *Parallel) Execute(ctx context.Context, execCtx *ExecutionContext) (*ExecutionContext, error) {
     // 1. 각 브랜치에 독립적인 SessionState 복사본 생성
@@ -185,7 +185,7 @@ func (p *Parallel) Execute(ctx context.Context, execCtx *ExecutionContext) (*Exe
 ### 병합 전략
 
 ```go
-// pkg/agno/workflow/session_state.go
+// pkg/hno/workflow/session_state.go
 
 func MergeParallelSessionStates(original *SessionState, modified []*SessionState) *SessionState {
     merged := NewSessionState()
@@ -396,7 +396,7 @@ if !ok {
 
 테스트 실행:
 ```bash
-cd pkg/agno/workflow
+cd pkg/hno/workflow
 go test -v -run TestSessionState
 ```
 

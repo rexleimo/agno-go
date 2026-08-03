@@ -312,7 +312,7 @@ aws secretsmanager create-secret \
 내장 가드레일 사용:
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/agno/guardrails"
+import "github.com/rexleimo/agno-Go/pkg/hno/guardrails"
 
 promptGuard := guardrails.NewPromptInjectionGuardrail()
 agent.PreHooks = []hooks.Hook{promptGuard}

@@ -317,11 +317,11 @@ invoke_agent {agent.name}        (INTERNAL; gen_ai.operation.name=invoke_agent)
 
 - 对齐 **Agent Skills 开放标准**（https://agentskills.io/specification）：本地目录技能包，`SKILL.md` + scripts/references/assets；frontmatter 只认规范字段（可扩展 `metadata`）。
 - **渐进式披露**是核心：目录常驻 system prompt，body 按需加载，文件按需读取 —— 保证"技能数增长不线性吃上下文"。
-- 与现有代码共存：`pkg/agno/tools/claude/skills.go` 是**远程 Anthropic Skills API 工具**（`invoke_claude_skill`，POST /v1/agent-skills/messages），属于 toolkit 层，**保留不动**；新建本地技能机制为独立包，二者语义不同（远程托管执行 vs 本地指令包）。
+- 与现有代码共存：`pkg/hno/tools/claude/skills.go` 是**远程 Anthropic Skills API 工具**（`invoke_claude_skill`，POST /v1/agent-skills/messages），属于 toolkit 层，**保留不动**；新建本地技能机制为独立包，二者语义不同（远程托管执行 vs 本地指令包）。
 
 ### 7.2 包结构与接口
 
-新建 `pkg/agno/skills/`：
+新建 `pkg/hno/skills/`：
 
 ```go
 // 元数据（渐进式披露第一级，~100 tokens/技能）
@@ -391,7 +391,7 @@ func (r *Registry) Lookup(name string) (Metadata, bool)
 
 ### 7.6 与 MCP 的关系
 
-- 技能包可声明其依赖的 MCP server（metadata 或独立 `skill.mcp.json`），Agent 装配时按需拉起；`pkg/agno/mcp` 复用。
+- 技能包可声明其依赖的 MCP server（metadata 或独立 `skill.mcp.json`），Agent 装配时按需拉起；`pkg/hno/mcp` 复用。
 - 不把技能内容塞进 MCP：MCP 管连接与工具，技能管指令（见第 2 节结论）。
 
 ### 7.7 可观测性接线（OTel）
@@ -405,7 +405,7 @@ go.mod 已有 `go.opentelemetry.io/otel v1.38.0` + otlptrace/otlptracehttp/sdk�
 
 ### 7.8 评估扩展
 
-- `pkg/agno/eval` 现状：`Scenario{Input, ExpectedContains}`（子串判词）→ 保留为确定性层，新增：
+- `pkg/hno/eval` 现状：`Scenario{Input, ExpectedContains}`（子串判词）→ 保留为确定性层，新增：
   - `JudgeEval`（LLM-as-judge：criteria、numeric/binary、threshold、judge model、num_iterations、avg_score）——对齐 agno AgentAsJudgeEval；
   - `AccuracyEval`（expected_output + judge）——对齐 agno AccuracyEval；
   - `ToolTraceAssert`（校验 tool call 序列，对齐 DeepEval Tool Correctness）；

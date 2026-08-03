@@ -35,10 +35,10 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
-    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
-    "github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 )
 
 func main() {
@@ -73,7 +73,7 @@ Perform mathematical operations.
 ### Example
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
+import "github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
 
 agent, _ := agent.New(agent.Config{
     Model:    model,
@@ -98,7 +98,7 @@ Make HTTP requests to external APIs.
 ### Example
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/tools/http"
+import "github.com/rexleimo/agno-go/pkg/hno/tools/http"
 
 agent, _ := agent.New(agent.Config{
     Model:    model,
@@ -136,7 +136,7 @@ Read and write files with built-in safety controls.
 ### Example
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/tools/file"
+import "github.com/rexleimo/agno-go/pkg/hno/tools/file"
 
 fileTool := file.New(file.Config{
     AllowedPaths: []string{"/tmp", "./data"},  // Restrict access
@@ -193,7 +193,7 @@ Build your own tools by implementing the Toolkit interface.
 ```go
 package mytool
 
-import "github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+import "github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 
 type MyToolkit struct {
     *toolkit.BaseToolkit
@@ -450,7 +450,7 @@ Read and write data to Google Sheets using service account authentication.
 ### Usage
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/tools/googlesheets"
+import "github.com/rexleimo/agno-go/pkg/hno/tools/googlesheets"
 
 // Load credentials from JSON file
 sheetsTool, err := googlesheets.New(googlesheets.Config{
@@ -479,10 +479,10 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
-    "github.com/rexleimo/agno-go/pkg/agno/tools/googlesheets"
-    "github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/googlesheets"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 )
 
 func main() {

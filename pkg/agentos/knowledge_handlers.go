@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/rexleimo/agno-go/pkg/agno/vectordb"
+	"github.com/rexleimo/agno-go/pkg/hno/vectordb"
 )
 
 // KnowledgeService 封装知识库操作

@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `pkg/agno` hosts agents, models, toolkits, and shared business logic. HTTP + server runtime lives under `pkg/agentos`.
+- `pkg/hno` hosts agents, models, toolkits, and shared business logic. HTTP + server runtime lives under `pkg/agentos`.
 - CLI and server binaries reside in `cmd/`; each example (for instance `cmd/examples/evolink_media`) includes its own `main.go`.
 - Shared services live in `internal/` (e.g., `internal/http`, `internal/session`, `internal/storage`). Tests sit beside the code they cover.
 - Docs live in `docs/`, the VitePress site in `website/`, deployment assets under `deploy/`.

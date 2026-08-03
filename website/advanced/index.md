@@ -86,10 +86,10 @@ go run -tags redis ./cmd/vectordb_migrate --action up --provider redis \
 make benchmark
 
 # Run specific benchmark
-go test -bench=BenchmarkAgentCreation -benchmem ./pkg/agno/agent/
+go test -bench=BenchmarkAgentCreation -benchmem ./pkg/hno/agent/
 
 # Generate CPU profile
-go test -bench=. -cpuprofile=cpu.out ./pkg/agno/agent/
+go test -bench=. -cpuprofile=cpu.out ./pkg/hno/agent/
 ```
 
 [See detailed performance metrics →](/advanced/performance)

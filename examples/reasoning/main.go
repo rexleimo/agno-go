@@ -6,8 +6,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/rexleimo/agno-go/pkg/agno/agent"
-	openaiModel "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+	"github.com/rexleimo/agno-go/pkg/hno/agent"
+	openaiModel "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 )
 
 func main() {

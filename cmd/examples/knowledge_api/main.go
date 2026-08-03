@@ -41,7 +41,7 @@ func main() {
 		VectorDBConfig: &agentos.VectorDBConfig{
 			Type:           "chromadb",
 			BaseURL:        chromaURL,
-			CollectionName: "agno_knowledge",
+			CollectionName: "hno_knowledge",
 			Database:       "default_database",
 			Tenant:         "default_tenant",
 		},

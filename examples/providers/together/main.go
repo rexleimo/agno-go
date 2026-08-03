@@ -4,8 +4,8 @@ import (
     "context"
     "fmt"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    together "github.com/rexleimo/agno-go/pkg/agno/models/together"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    together "github.com/rexleimo/agno-go/pkg/hno/models/together"
 )
 
 // Minimal example showing Together AI model instantiation.

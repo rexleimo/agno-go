@@ -77,7 +77,7 @@ type Memory interface {
 
 ### Agent
 
-**文件 / File**: `pkg/agno/agent/agent.go`
+**文件 / File**: `pkg/hno/agent/agent.go`
 
 自主 AI 实体,具备以下能力:
 - 使用 LLM 进行推理
@@ -94,7 +94,7 @@ ClearMemory()
 
 ### Team
 
-**文件 / File**: `pkg/agno/team/team.go`
+**文件 / File**: `pkg/hno/team/team.go`
 
 多智能体协作,支持 4 种协作模式:
 
@@ -105,7 +105,7 @@ ClearMemory()
 
 ### Workflow
 
-**文件 / File**: `pkg/agno/workflow/workflow.go`
+**文件 / File**: `pkg/hno/workflow/workflow.go`
 
 基于步骤的编排,支持 5 种原语:
 
@@ -117,7 +117,7 @@ ClearMemory()
 
 ### Models
 
-**目录 / Directory**: `pkg/agno/models/`
+**目录 / Directory**: `pkg/hno/models/`
 
 LLM 提供商实现:
 - `openai/` - OpenAI GPT 模型
@@ -127,7 +127,7 @@ LLM 提供商实现:
 
 ### Tools
 
-**目录 / Directory**: `pkg/agno/tools/`
+**目录 / Directory**: `pkg/hno/tools/`
 
 可扩展的工具系统:
 - `calculator/` - 数学运算

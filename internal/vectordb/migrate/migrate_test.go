@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/rexleimo/agno-go/pkg/agno/vectordb"
+	"github.com/rexleimo/agno-go/pkg/hno/vectordb"
 )
 
 type fakeDB struct {

@@ -64,9 +64,9 @@ package main
 import (
     "context"
     "fmt"
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
-    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
 )
 
 func main() {
@@ -99,7 +99,7 @@ func main() {
 ## 为什么选择 Agno-Go?
 ### v1.2.9 有哪些更新 / What's New in v1.2.9
 
-- **EvoLink 媒体智能体** – 在 `pkg/agno/providers/evolink` 与 `pkg/agno/models/evolink/*` 下提供文本、图片、视频模型, 并在 EvoLink 媒体示例页中给出端到端工作流。 / First-class EvoLink provider for text, image, and video with end-to-end examples in the EvoLink Media Agents docs.
+- **EvoLink 媒体智能体** – 在 `pkg/hno/providers/evolink` 与 `pkg/hno/models/evolink/*` 下提供文本、图片、视频模型, 并在 EvoLink 媒体示例页中给出端到端工作流。 / First-class EvoLink provider for text, image, and video with end-to-end examples in the EvoLink Media Agents docs.
 - **知识上传分块** – `POST /api/v1/knowledge/content` 支持 `chunk_size`、`chunk_overlap`(JSON、`text/plain` query 参数与 multipart 表单), 并在分块 metadata 中记录这两个值以及 `chunker_type`, 与 Python AgentOS 对齐。 / `POST /api/v1/knowledge/content` now supports `chunk_size` and `chunk_overlap` across JSON, `text/plain` query params, and multipart uploads, and records these values plus `chunker_type` in chunk metadata.
 - **AgentOS HTTP 提示** – 文档新增如何自定义健康检查路径、使用 `/openapi.yaml` 与 `/docs`, 以及在变更路由后调用 `server.Resync()` 的最佳实践。 / Docs now explain how to customize health endpoints, rely on `/openapi.yaml` and `/docs`, and when to call `server.Resync()` after router changes.
 

@@ -44,7 +44,7 @@ Agno-Go supports multiple LLM providers with a unified interface.
 ### Setup
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+import "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 
 model, err := openai.New("gpt-4o-mini", openai.Config{
     APIKey:      os.Getenv("OPENAI_API_KEY"),
@@ -84,8 +84,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 )
 
 func main() {
@@ -114,7 +114,7 @@ func main() {
 ### Setup
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+import "github.com/rexleimo/agno-go/pkg/hno/models/anthropic"
 
 model, err := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
     APIKey:    os.Getenv("ANTHROPIC_API_KEY"),
@@ -152,8 +152,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/anthropic"
 )
 
 func main() {
@@ -183,7 +183,7 @@ func main() {
 ### Setup
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/glm"
+import "github.com/rexleimo/agno-go/pkg/hno/models/glm"
 
 model, err := glm.New("glm-4", glm.Config{
     APIKey:      os.Getenv("ZHIPUAI_API_KEY"),  // Format: {key_id}.{key_secret}
@@ -234,10 +234,10 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/glm"
-    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
-    "github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/glm"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 )
 
 func main() {
@@ -285,7 +285,7 @@ This is handled automatically by the SDK.
 3. Use in Agno-Go:
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/ollama"
+import "github.com/rexleimo/agno-go/pkg/hno/models/ollama"
 
 model, err := ollama.New("llama2", ollama.Config{
     BaseURL: "http://localhost:11434",  // Ollama server
@@ -319,8 +319,8 @@ import (
     "fmt"
     "log"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/ollama"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/ollama"
 )
 
 func main() {
@@ -607,7 +607,7 @@ Agno-Go v1.2.1 adds reasoning support for advanced models:
 ### Usage
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/reasoning"
+import "github.com/rexleimo/agno-go/pkg/hno/reasoning"
 
 // Enable reasoning for models that support it
 model, _ := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
@@ -634,8 +634,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/anthropic"
 )
 
 func main() {
@@ -684,48 +684,48 @@ This release adds several providers with OpenAI-compatible or native integration
 
 ### Cohere
 ```go
-import cohere "github.com/rexleimo/agno-go/pkg/agno/models/cohere"
+import cohere "github.com/rexleimo/agno-go/pkg/hno/models/cohere"
 model, err := cohere.New("command", cohere.Config{ APIKey: os.Getenv("COHERE_API_KEY") })
 ```
 
 ### Together AI
 ```go
-import together "github.com/rexleimo/agno-go/pkg/agno/models/together"
+import together "github.com/rexleimo/agno-go/pkg/hno/models/together"
 model, err := together.New("meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo", together.Config{ APIKey: os.Getenv("TOGETHER_API_KEY") })
 ```
 
 ### OpenRouter
 ```go
-import openrouter "github.com/rexleimo/agno-go/pkg/agno/models/openrouter"
+import openrouter "github.com/rexleimo/agno-go/pkg/hno/models/openrouter"
 model, err := openrouter.New("openrouter/auto", openrouter.Config{ APIKey: os.Getenv("OPENROUTER_API_KEY") })
 ```
 
 ### LM Studio (local)
 ```go
-import lmstudio "github.com/rexleimo/agno-go/pkg/agno/models/lmstudio"
+import lmstudio "github.com/rexleimo/agno-go/pkg/hno/models/lmstudio"
 model, err := lmstudio.New("local-model", lmstudio.Config{}) // default base: http://localhost:1234/v1
 ```
 
 ### Vercel AI
 ```go
-import vercel "github.com/rexleimo/agno-go/pkg/agno/models/vercel"
+import vercel "github.com/rexleimo/agno-go/pkg/hno/models/vercel"
 model, err := vercel.New("gpt-4o-mini", vercel.Config{ APIKey: os.Getenv("VERCEL_API_KEY"), BaseURL: "https://example.com/v1" })
 ```
 
 ### Portkey
 ```go
-import portkey "github.com/rexleimo/agno-go/pkg/agno/models/portkey"
+import portkey "github.com/rexleimo/agno-go/pkg/hno/models/portkey"
 model, err := portkey.New("gpt-4o-mini", portkey.Config{ APIKey: os.Getenv("PORTKEY_API_KEY") })
 ```
 
 ### InternLM
 ```go
-import internlm "github.com/rexleimo/agno-go/pkg/agno/models/internlm"
+import internlm "github.com/rexleimo/agno-go/pkg/hno/models/internlm"
 model, err := internlm.New("internlm2.5", internlm.Config{ APIKey: os.Getenv("INTERNLM_API_KEY"), BaseURL: "https://your-internlm-endpoint/v1" })
 ```
 
 ### SambaNova
 ```go
-import sambanova "github.com/rexleimo/agno-go/pkg/agno/models/sambanova"
+import sambanova "github.com/rexleimo/agno-go/pkg/hno/models/sambanova"
 model, err := sambanova.New("Meta-Llama-3.1-70B-Instruct", sambanova.Config{ APIKey: os.Getenv("SAMBANOVA_API_KEY") })
 ```

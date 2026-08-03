@@ -77,7 +77,7 @@ type Memory interface {
 
 ### Agent
 
-**ファイル**: `pkg/agno/agent/agent.go`
+**ファイル**: `pkg/hno/agent/agent.go`
 
 以下の機能を持つ自律的なAIエンティティ:
 - 推論にLLMを使用
@@ -94,7 +94,7 @@ ClearMemory()
 
 ### Team
 
-**ファイル**: `pkg/agno/team/team.go`
+**ファイル**: `pkg/hno/team/team.go`
 
 4つの協調モードを持つマルチエージェント協調:
 
@@ -105,7 +105,7 @@ ClearMemory()
 
 ### Workflow
 
-**ファイル**: `pkg/agno/workflow/workflow.go`
+**ファイル**: `pkg/hno/workflow/workflow.go`
 
 5つのプリミティブを持つステップベースのオーケストレーション:
 
@@ -117,7 +117,7 @@ ClearMemory()
 
 ### Models
 
-**ディレクトリ**: `pkg/agno/models/`
+**ディレクトリ**: `pkg/hno/models/`
 
 LLMプロバイダーの実装:
 - `openai/` - OpenAI GPTモデル
@@ -127,7 +127,7 @@ LLMプロバイダーの実装:
 
 ### Tools
 
-**ディレクトリ**: `pkg/agno/tools/`
+**ディレクトリ**: `pkg/hno/tools/`
 
 拡張可能なツールキットシステム:
 - `calculator/` - 数学演算

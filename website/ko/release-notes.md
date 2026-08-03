@@ -9,7 +9,7 @@ outline: deep
 ## Version 1.2.9 (2025-11-14)
 
 ### ✨ 하이라이트
-- **EvoLink 프로바이더**: `pkg/agno/providers/evolink` 및 `pkg/agno/models/evolink/*` 아래에서 텍스트·이미지·비디오 생성을 지원하고, EvoLink 제약에 맞는 옵션 구조체와 비동기 태스크 폴링을 제공합니다.
+- **EvoLink 프로바이더**: `pkg/hno/providers/evolink` 및 `pkg/hno/models/evolink/*` 아래에서 텍스트·이미지·비디오 생성을 지원하고, EvoLink 제약에 맞는 옵션 구조체와 비동기 태스크 폴링을 제공합니다.
 - **EvoLink 미디어 에이전트 예제**: `website/examples/evolink-media-agents.md` 와 중국어 페이지를 통해 텍스트 → 이미지 → 비디오로 이어지는 워크플로를 단계별로 설명합니다.
 - **지식 업로드 청킹**: `POST /api/v1/knowledge/content` 가 JSON, `text/plain`(쿼리 파라미터), multipart 업로드에서 `chunk_size` 와 `chunk_overlap` 를 수용하고, 각 청크 메타데이터에 `chunk_size`·`chunk_overlap`·`chunker_type` 을 기록해 Python AgentOS와 동작을 맞춥니다.
 - **AgentOS HTTP 팁**: AgentOS API 문서에 사용자 정의 헬스 체크 경로, `/openapi.yaml`·`/docs` 라우트, 라우터 변경 후 `server.Resync()` 호출 시점에 대한 안내를 추가했습니다.

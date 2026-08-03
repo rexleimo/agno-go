@@ -47,7 +47,7 @@ import (
     "context"
     "fmt"
 
-    "github.com/rexleimo/agno-go/pkg/agno/workflow"
+    "github.com/rexleimo/agno-go/pkg/hno/workflow"
 )
 
 func main() {
@@ -158,7 +158,7 @@ Agno-Go uses a **deep copy + last-write-wins** strategy:
 4. If conflicts exist, later branches override earlier ones
 
 ```go
-// pkg/agno/workflow/parallel.go
+// pkg/hno/workflow/parallel.go
 
 func (p *Parallel) Execute(ctx context.Context, execCtx *ExecutionContext) (*ExecutionContext, error) {
     // 1. Create independent SessionState copy for each branch
@@ -187,7 +187,7 @@ func (p *Parallel) Execute(ctx context.Context, execCtx *ExecutionContext) (*Exe
 ### Merge Strategy
 
 ```go
-// pkg/agno/workflow/session_state.go
+// pkg/hno/workflow/session_state.go
 
 func MergeParallelSessionStates(original *SessionState, modified []*SessionState) *SessionState {
     merged := NewSessionState()
@@ -646,7 +646,7 @@ Complete test coverage includes:
 
 Run tests:
 ```bash
-cd pkg/agno/workflow
+cd pkg/hno/workflow
 go test -v -run TestSessionState
 ```
 

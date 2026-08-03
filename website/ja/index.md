@@ -64,9 +64,9 @@ package main
 import (
     "context"
     "fmt"
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
-    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
 )
 
 func main() {

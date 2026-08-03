@@ -7,7 +7,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/rexleimo/agno-go/pkg/agno/mcp/client"
+	"github.com/rexleimo/agno-go/pkg/hno/mcp/client"
 )
 
 // This example demonstrates using custom binary executables with MCP

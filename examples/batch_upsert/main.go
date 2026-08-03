@@ -8,8 +8,8 @@ import (
 	"time"
 
 	_ "github.com/lib/pq"
-	"github.com/rexleimo/agno-go/pkg/agno/db/batch"
-	"github.com/rexleimo/agno-go/pkg/agno/session"
+	"github.com/rexleimo/agno-go/pkg/hno/db/batch"
+	"github.com/rexleimo/agno-go/pkg/hno/session"
 )
 
 func main() {

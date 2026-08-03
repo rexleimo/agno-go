@@ -9,7 +9,7 @@ outline: deep
 ## Version 1.2.9 (2025-11-14)
 
 ### ✨ Highlights
-- EvoLink provider for text, images, and video via `pkg/agno/models/evolink/*`, with new EvoLink Media Agents example pages showing end-to-end media workflows.
+- EvoLink provider for text, images, and video via `pkg/hno/models/evolink/*`, with new EvoLink Media Agents example pages showing end-to-end media workflows.
 - Knowledge upload chunking: `POST /api/v1/knowledge/content` now accepts `chunk_size` and `chunk_overlap` (JSON, `text/plain` query params, and multipart form fields) and records these values together with `chunker_type` in chunk metadata.
 - AgentOS HTTP documentation now covers custom health endpoints, `/openapi.yaml`, `/docs`, and `server.Resync()` guidance on the AgentOS API page.
 

@@ -11,11 +11,11 @@ import (
 	"time"
 
 	"github.com/rexleimo/agno-go/internal/protocolsim"
-	"github.com/rexleimo/agno-go/pkg/agno/agent"
-	"github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
-	"github.com/rexleimo/agno-go/pkg/agno/run"
-	"github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
-	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+	"github.com/rexleimo/agno-go/pkg/hno/agent"
+	"github.com/rexleimo/agno-go/pkg/hno/models/anthropic"
+	"github.com/rexleimo/agno-go/pkg/hno/run"
+	"github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
+	"github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 )
 
 func main() {

@@ -9,9 +9,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/rexleimo/agno-go/pkg/agno/agent"
-	"github.com/rexleimo/agno-go/pkg/agno/models/openai"
-	"github.com/rexleimo/agno-go/pkg/agno/skills"
+	"github.com/rexleimo/agno-go/pkg/hno/agent"
+	"github.com/rexleimo/agno-go/pkg/hno/models/openai"
+	"github.com/rexleimo/agno-go/pkg/hno/skills"
 )
 
 func main() {

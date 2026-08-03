@@ -20,7 +20,7 @@
 ## 아키텍처 | Architecture
 
 ```
-pkg/agno/mcp/
+pkg/hno/mcp/
 ├── protocol/       # JSON-RPC 2.0 및 MCP 메시지 타입
 ├── client/         # MCP 클라이언트 코어 및 전송
 ├── security/       # 명령 검증 및 보안
@@ -49,9 +49,9 @@ uvx mcp install @modelcontextprotocol/server-calculator
 
 ```go
 import (
-    "github.com/rexleimo/agno-go/pkg/agno/mcp/client"
-    "github.com/rexleimo/agno-go/pkg/agno/mcp/security"
-    mcptoolkit "github.com/rexleimo/agno-go/pkg/agno/mcp/toolkit"
+    "github.com/rexleimo/agno-go/pkg/hno/mcp/client"
+    "github.com/rexleimo/agno-go/pkg/hno/mcp/security"
+    mcptoolkit "github.com/rexleimo/agno-go/pkg/hno/mcp/toolkit"
 )
 
 // 보안 검증기 생성
@@ -145,12 +145,12 @@ toolkit, err := mcptoolkit.New(ctx, mcptoolkit.Config{
 2. **도구를 적절히 필터링** - 에이전트에 필요한 도구만 노출
 3. **오류를 우아하게 처리** - MCP 서버가 실패하거나 시간 초과될 수 있음
 4. **연결 닫기** - 리소스 정리를 위해 항상 `defer toolkit.Close()`
-5. **모의 서버로 테스트** - `pkg/agno/mcp/client/testing.go`의 테스트 유틸리티 사용
+5. **모의 서버로 테스트** - `pkg/hno/mcp/client/testing.go`의 테스트 유틸리티 사용
 
 ## 다음 단계 | Next Steps
 
 - [MCP 데모](../examples/mcp-demo.md)를 시도해보세요
-- [MCP 구현 가이드](../../pkg/agno/mcp/IMPLEMENTATION.md)를 읽어보세요
+- [MCP 구현 가이드](../../pkg/hno/mcp/IMPLEMENTATION.md)를 읽어보세요
 - [MCP 프로토콜 사양](https://spec.modelcontextprotocol.io/)을 탐색하세요
 - [GitHub](https://github.com/rexleimo/agno-Go/discussions)에서 토론에 참여하세요
 

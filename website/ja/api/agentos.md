@@ -120,8 +120,8 @@ server.Shutdown(ctx)
 
 ```go
 // import (
-//     "github.com/rexleimo/agno-go/pkg/agno/models/openai"
-//     "github.com/rexleimo/agno-go/pkg/agno/session"
+//     "github.com/rexleimo/agno-go/pkg/hno/models/openai"
+//     "github.com/rexleimo/agno-go/pkg/hno/session"
 // )
 summaryModel, _ := openai.New("gpt-4o-mini", openai.Config{
     APIKey: os.Getenv("OPENAI_API_KEY"),

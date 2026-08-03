@@ -23,9 +23,9 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/rexleimo/agno-go/pkg/agno/agent"
-	openaiModel "github.com/rexleimo/agno-go/pkg/agno/models/openai"
-	"github.com/rexleimo/agno-go/pkg/agno/types"
+	"github.com/rexleimo/agno-go/pkg/hno/agent"
+	openaiModel "github.com/rexleimo/agno-go/pkg/hno/models/openai"
+	"github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
 func main() {

@@ -9,7 +9,7 @@
 ## 1. 包结构（一个包只做一件事）
 
 ```
-pkg/agno/
+pkg/hno/
 ├── agent/         编排层（配置壳）：agent.go / config.go / message_builder.go / tool_executor.go / stream_aggregator.go
 ├── runner/        引擎层（唯一循环）：runner.go / stop.go / state.go / stream.go
 ├── models/        适配层（对接 LLM）：base.go（接口）+ <provider>/ 每 provider 一个文件
@@ -75,9 +75,9 @@ types / session / memory     （基础层）
 
 ```
 README.md → docs/design/architecture-explained.md（人话架构）
-  → pkg/agno/runner/runner.go（引擎核心，~200 行）
-  → pkg/agno/agent/agent.go（编排，~150 行）
-  → pkg/agno/models/base.go（接口，~80 行）
+  → pkg/hno/runner/runner.go（引擎核心，~200 行）
+  → pkg/hno/agent/agent.go（编排，~150 行）
+  → pkg/hno/models/base.go（接口，~80 行）
   → 任一 provider（如 models/openai/openai.go）作为适配示例
   → cmd/examples/simple_agent/main.go（端到端示例）
 ```
@@ -95,8 +95,8 @@ README.md → docs/design/architecture-explained.md（人话架构）
 
 | 代码位置 | 对应文档 |
 |---------|---------|
-| pkg/agno/runner | docs/design/agent-runtime-mechanics.md |
-| pkg/agno/agent | docs/design/go-agent-framework-design.md |
+| pkg/hno/runner | docs/design/agent-runtime-mechanics.md |
+| pkg/hno/agent | docs/design/go-agent-framework-design.md |
 | 整体架构 | docs/design/architecture-explained.md |
 | 分层规则 | 本文档 |
 

@@ -237,20 +237,20 @@ go test -bench=. -benchmem ./...
 ### 특정 벤치마크 실행
 
 ```bash
-go test -bench=BenchmarkAgentCreation -benchmem ./pkg/agno/agent/
+go test -bench=BenchmarkAgentCreation -benchmem ./pkg/hno/agent/
 ```
 
 ### CPU 프로파일 생성
 
 ```bash
-go test -bench=. -cpuprofile=cpu.prof ./pkg/agno/agent/
+go test -bench=. -cpuprofile=cpu.prof ./pkg/hno/agent/
 go tool pprof cpu.prof
 ```
 
 ### 메모리 프로파일 생성
 
 ```bash
-go test -bench=. -memprofile=mem.prof ./pkg/agno/agent/
+go test -bench=. -memprofile=mem.prof ./pkg/hno/agent/
 go tool pprof mem.prof
 ```
 
@@ -304,4 +304,4 @@ Agno-Go는 **성능 목표를 초과 달성**:
 
 - [아키텍처](/advanced/architecture)
 - [배포](/advanced/deployment)
-- [벤치마크 코드](https://github.com/rexleimo/agno-Go/tree/main/pkg/agno/agent/agent_bench_test.go)
+- [벤치마크 코드](https://github.com/rexleimo/agno-Go/tree/main/pkg/hno/agent/agent_bench_test.go)

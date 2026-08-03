@@ -237,20 +237,20 @@ go test -bench=. -benchmem ./...
 ### 特定ベンチマーク実行
 
 ```bash
-go test -bench=BenchmarkAgentCreation -benchmem ./pkg/agno/agent/
+go test -bench=BenchmarkAgentCreation -benchmem ./pkg/hno/agent/
 ```
 
 ### CPUプロファイル生成
 
 ```bash
-go test -bench=. -cpuprofile=cpu.prof ./pkg/agno/agent/
+go test -bench=. -cpuprofile=cpu.prof ./pkg/hno/agent/
 go tool pprof cpu.prof
 ```
 
 ### メモリプロファイル生成
 
 ```bash
-go test -bench=. -memprofile=mem.prof ./pkg/agno/agent/
+go test -bench=. -memprofile=mem.prof ./pkg/hno/agent/
 go tool pprof mem.prof
 ```
 
@@ -304,4 +304,4 @@ Agno-Goは**パフォーマンス目標を超えています**:
 
 - [アーキテクチャ](/advanced/architecture)
 - [デプロイメント](/advanced/deployment)
-- [ベンチマークコード](https://github.com/rexleimo/agno-Go/tree/main/pkg/agno/agent/agent_bench_test.go)
+- [ベンチマークコード](https://github.com/rexleimo/agno-Go/tree/main/pkg/hno/agent/agent_bench_test.go)

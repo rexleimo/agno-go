@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rexleimo/agno-go/pkg/agno/media"
+	"github.com/rexleimo/agno-go/pkg/hno/media"
 )
 
 // EventType 表示事件类型

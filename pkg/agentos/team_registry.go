@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/rexleimo/agno-go/pkg/agno/team"
+	"github.com/rexleimo/agno-go/pkg/hno/team"
 )
 
 // TeamRegistry manages registered teams.

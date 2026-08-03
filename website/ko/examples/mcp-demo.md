@@ -57,9 +57,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/rexleimo/agno-go/pkg/agno/mcp/client"
-	"github.com/rexleimo/agno-go/pkg/agno/mcp/security"
-	mcptoolkit "github.com/rexleimo/agno-go/pkg/agno/mcp/toolkit"
+	"github.com/rexleimo/agno-go/pkg/hno/mcp/client"
+	"github.com/rexleimo/agno-go/pkg/hno/mcp/security"
+	mcptoolkit "github.com/rexleimo/agno-go/pkg/hno/mcp/toolkit"
 )
 
 func main() {
@@ -285,8 +285,8 @@ MCP 툴킷을 얻으면 모든 Agno 에이전트와 함께 사용할 수 있습�
 
 ```go
 import (
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 )
 
 // 모델 생성

@@ -44,7 +44,7 @@ Agno-Go 通过统一接口支持多个 LLM 提供商。
 ### 设置
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+import "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 
 model, err := openai.New("gpt-4o-mini", openai.Config{
     APIKey:      os.Getenv("OPENAI_API_KEY"),
@@ -84,8 +84,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 )
 
 func main() {
@@ -114,7 +114,7 @@ func main() {
 ### 设置
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+import "github.com/rexleimo/agno-go/pkg/hno/models/anthropic"
 
 model, err := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
     APIKey:    os.Getenv("ANTHROPIC_API_KEY"),
@@ -152,8 +152,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/anthropic"
 )
 
 func main() {
@@ -183,7 +183,7 @@ func main() {
 ### 设置
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/glm"
+import "github.com/rexleimo/agno-go/pkg/hno/models/glm"
 
 model, err := glm.New("glm-4", glm.Config{
     APIKey:      os.Getenv("ZHIPUAI_API_KEY"),  // 格式: {key_id}.{key_secret}
@@ -234,10 +234,10 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/glm"
-    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
-    "github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/glm"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 )
 
 func main() {
@@ -285,7 +285,7 @@ GLM 使用 JWT (JSON Web Token) 认证：
 3. 在 Agno-Go 中使用:
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/ollama"
+import "github.com/rexleimo/agno-go/pkg/hno/models/ollama"
 
 model, err := ollama.New("llama2", ollama.Config{
     BaseURL: "http://localhost:11434",  // Ollama server
@@ -319,8 +319,8 @@ import (
     "fmt"
     "log"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/ollama"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/ollama"
 )
 
 func main() {
@@ -607,7 +607,7 @@ Agno-Go v1.2.1 为高级模型添加了推理支持：
 ### 使用方法
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/reasoning"
+import "github.com/rexleimo/agno-go/pkg/hno/reasoning"
 
 // 为支持推理的模型启用推理功能
 model, _ := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
@@ -634,8 +634,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/anthropic"
 )
 
 func main() {

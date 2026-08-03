@@ -155,11 +155,11 @@ import (
     "fmt"
     "os"
 
-    "github.com/rexleimo/agno-Go/pkg/agno/agent"
-    "github.com/rexleimo/agno-Go/pkg/agno/models/openai"
-    "github.com/rexleimo/agno-Go/pkg/agno/tools/calculator"
-    "github.com/rexleimo/agno-Go/pkg/agno/tools/http"
-    "github.com/rexleimo/agno-Go/pkg/agno/tools/toolkit"
+    "github.com/rexleimo/agno-Go/pkg/hno/agent"
+    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-Go/pkg/hno/tools/calculator"
+    "github.com/rexleimo/agno-Go/pkg/hno/tools/http"
+    "github.com/rexleimo/agno-Go/pkg/hno/tools/toolkit"
 )
 
 func main() {
@@ -193,9 +193,9 @@ import (
     "fmt"
     "os"
 
-    "github.com/rexleimo/agno-Go/pkg/agno/agent"
-    "github.com/rexleimo/agno-Go/pkg/agno/models/openai"
-    "github.com/rexleimo/agno-Go/pkg/agno/team"
+    "github.com/rexleimo/agno-Go/pkg/hno/agent"
+    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-Go/pkg/hno/team"
 )
 
 func main() {
@@ -238,9 +238,9 @@ import (
     "os"
     "strings"
 
-    "github.com/rexleimo/agno-Go/pkg/agno/agent"
-    "github.com/rexleimo/agno-Go/pkg/agno/models/openai"
-    "github.com/rexleimo/agno-Go/pkg/agno/workflow"
+    "github.com/rexleimo/agno-Go/pkg/hno/agent"
+    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-Go/pkg/hno/workflow"
 )
 
 func main() {

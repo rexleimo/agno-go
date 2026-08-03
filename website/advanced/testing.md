@@ -43,20 +43,20 @@ go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
 
 ```bash
 # Test agent package
-go test -v ./pkg/agno/agent/...
+go test -v ./pkg/hno/agent/...
 
 # Test with coverage
-go test -v -cover ./pkg/agno/agent/...
+go test -v -cover ./pkg/hno/agent/...
 ```
 
 ### Specific Test
 
 ```bash
 # Run specific test function
-go test -v -run TestAgentRun ./pkg/agno/agent/
+go test -v -run TestAgentRun ./pkg/hno/agent/
 
 # Run tests matching pattern
-go test -v -run TestAgent.* ./pkg/agno/agent/
+go test -v -run TestAgent.* ./pkg/hno/agent/
 ```
 
 ### Coverage Report
@@ -101,8 +101,8 @@ import (
     "context"
     "testing"
 
-    "github.com/rexleimo/agno-go/pkg/agno/models"
-    "github.com/rexleimo/agno-go/pkg/agno/types"
+    "github.com/rexleimo/agno-go/pkg/hno/models"
+    "github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
 func TestAgentRun(t *testing.T) {
@@ -299,16 +299,16 @@ func BenchmarkAgentCreation(b *testing.B) {
 
 ```bash
 # Run all benchmarks
-go test -bench=. ./pkg/agno/agent/
+go test -bench=. ./pkg/hno/agent/
 
 # Run specific benchmark
-go test -bench=BenchmarkAgentCreation ./pkg/agno/agent/
+go test -bench=BenchmarkAgentCreation ./pkg/hno/agent/
 
 # With memory allocation stats
-go test -bench=. -benchmem ./pkg/agno/agent/
+go test -bench=. -benchmem ./pkg/hno/agent/
 
 # Multiple runs for accuracy
-go test -bench=. -benchtime=10s -count=5 ./pkg/agno/agent/
+go test -bench=. -benchtime=10s -count=5 ./pkg/hno/agent/
 ```
 
 ### Benchmark Output
@@ -385,8 +385,8 @@ package testutil
 
 import (
     "testing"
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models"
 )
 
 func CreateTestAgent(t *testing.T) *agent.Agent {

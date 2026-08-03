@@ -312,7 +312,7 @@ aws secretsmanager create-secret \
 使用内置防护:
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/agno/guardrails"
+import "github.com/rexleimo/agno-Go/pkg/hno/guardrails"
 
 promptGuard := guardrails.NewPromptInjectionGuardrail()
 agent.PreHooks = []hooks.Hook{promptGuard}

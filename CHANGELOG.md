@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.2.9] - 2025-11-14
 
 ### ✨ Added
-- EvoLink provider for text, images, and video exposed under `pkg/agno/providers/evolink` and `pkg/agno/models/evolink/*`, enabling agents and workflows to call EvoLink via the standard model interfaces.
+- EvoLink provider for text, images, and video exposed under `pkg/hno/providers/evolink` and `pkg/hno/models/evolink/*`, enabling agents and workflows to call EvoLink via the standard model interfaces.
 - New EvoLink Media Agents documentation (`website/examples/evolink-media-agents.md`, `website/zh/examples/evolink-media-agents.md`) with end-to-end examples for text → image → video pipelines.
 - Knowledge upload chunking: `POST /api/v1/knowledge/content` now accepts `chunk_size` and `chunk_overlap` for JSON, `text/plain` (query params), and multipart form uploads, propagating these values into stored chunk metadata.
 - AgentOS HTTP tips surfaced in docs, covering custom health endpoints, `/openapi.yaml` and `/docs` routes, and `server.Resync()` usage.
@@ -198,26 +198,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Workflow Session Storage (S005)
 - **In-Memory Session Management** - Complete workflow session lifecycle management
-  - **pkg/agno/workflow/memory_storage.go** - MemoryStorage implementation (393 lines)
+  - **pkg/hno/workflow/memory_storage.go** - MemoryStorage implementation (393 lines)
     - Session creation, retrieval, updating, deletion
     - Concurrent-safe with sync.RWMutex
     - Configurable max sessions limit
     - Automatic session pruning
-  - **pkg/agno/workflow/session.go** - WorkflowSession structure (300 lines)
+  - **pkg/hno/workflow/session.go** - WorkflowSession structure (300 lines)
     - Session metadata and run history
     - History retrieval with flexible count
     - Statistics tracking (total/completed/success/failed runs)
-  - **pkg/agno/workflow/run.go** - WorkflowRun structure (158 lines)
+  - **pkg/hno/workflow/run.go** - WorkflowRun structure (158 lines)
     - Individual run execution tracking
     - Input/output/error recording
     - Timestamp and status management
-  - **pkg/agno/workflow/storage.go** - WorkflowStorage interface (141 lines)
+  - **pkg/hno/workflow/storage.go** - WorkflowStorage interface (141 lines)
     - Abstract storage interface for extensibility
     - Support for custom storage implementations (Redis, PostgreSQL, etc.)
 
 #### Workflow History Injection (S008)
 - **Agent Temporary Instructions Support** - Enable history context injection without modifying agent's original configuration
-  - **pkg/agno/agent/agent.go** - Enhanced with temporary instructions mechanism
+  - **pkg/hno/agent/agent.go** - Enhanced with temporary instructions mechanism
     - `tempInstructions string` - Temporary override for instructions (single execution only)
     - `instructionsMu sync.RWMutex` - Thread-safe concurrent access protection
     - `GetInstructions()` - Retrieves current instructions (temporary takes precedence)
@@ -230,7 +230,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Backward compatible**: Empty tempInstructions behaves identically to original implementation
 
 - **History Injection Utilities** - Flexible history formatting and injection helpers
-  - **pkg/agno/workflow/history_injection.go** - History injection helper functions (151 lines)
+  - **pkg/hno/workflow/history_injection.go** - History injection helper functions (151 lines)
     - `InjectHistoryToAgent()` - Injects formatted history into agent's temporary instructions
     - `buildEnhancedInstructions()` - Combines original instructions with history context
     - `RestoreAgentInstructions()` - Explicitly restores original instructions (optional, auto-cleared)
@@ -243,7 +243,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - `DefaultHistoryFormatOptions()` - Sensible defaults with XML-style tags
 
 - **Step Integration** - Seamless workflow history injection
-  - **pkg/agno/workflow/step.go** - Updated Step execution with history support
+  - **pkg/hno/workflow/step.go** - Updated Step execution with history support
     - Automatically injects history when `shouldAddHistory()` returns true
     - Retrieves formatted history from `ExecutionContext.GetHistoryContext()`
     - No changes required to existing workflow code
@@ -297,13 +297,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### 📝 Files Added/Modified
 
 **New Files:**
-- `pkg/agno/workflow/history_injection.go` - History injection utilities (151 lines)
-- `pkg/agno/agent/agent_instructions_test.go` - Instruction tests (308 lines)
-- `pkg/agno/workflow/history_injection_test.go` - Injection tests (380 lines)
+- `pkg/hno/workflow/history_injection.go` - History injection utilities (151 lines)
+- `pkg/hno/agent/agent_instructions_test.go` - Instruction tests (308 lines)
+- `pkg/hno/workflow/history_injection_test.go` - Injection tests (380 lines)
 
 **Modified Files:**
-- `pkg/agno/agent/agent.go` - Added temporary instructions support
-- `pkg/agno/workflow/step.go` - Integrated history injection
+- `pkg/hno/agent/agent.go` - Added temporary instructions support
+- `pkg/hno/workflow/step.go` - Integrated history injection
 - `docs/task/S008-agent-history-injection.md` - Marked as Done
 
 ### ✅ Acceptance Criteria
@@ -322,8 +322,8 @@ All S008 acceptance criteria met or exceeded:
 
 ```go
 import (
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/workflow"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/workflow"
 )
 
 // Create agent with original instructions
@@ -355,7 +355,7 @@ fmt.Println(agent.Instructions) // "You are a helpful assistant"
 
 #### Groq Model Integration
 - **Groq Ultra-Fast Inference Support** - Industry-leading LLM inference speed
-  - **pkg/agno/models/groq/** - Complete Groq model implementation (287 lines)
+  - **pkg/hno/models/groq/** - Complete Groq model implementation (287 lines)
     - `groq.go` - Main implementation using OpenAI-compatible API
     - `types.go` - Model constants and metadata (7+ models)
     - `groq_test.go` - Comprehensive unit tests (580+ lines)
@@ -409,7 +409,7 @@ fmt.Println(agent.Instructions) // "You are a helpful assistant"
 
 #### Workflow Session State Management
 - **Thread-Safe Session State** - Cross-step session management with race condition fix
-  - **pkg/agno/workflow/session_state.go** - SessionState implementation (192 lines)
+  - **pkg/hno/workflow/session_state.go** - SessionState implementation (192 lines)
     - Thread-safe with sync.RWMutex
     - Deep copy via JSON serialization for parallel branch isolation
     - Smart merging: only applies actual changes (last-write-wins)
@@ -421,7 +421,7 @@ fmt.Println(agent.Instructions) // "You are a helpful assistant"
     - Clone SessionState for each parallel branch
     - Merge modified states after parallel execution
     - Prevents data races in concurrent workflow steps
-  - **pkg/agno/workflow/SESSION_STATE.md** - Comprehensive documentation
+  - **pkg/hno/workflow/SESSION_STATE.md** - Comprehensive documentation
   - **Test Coverage:** 79.4% with race detector validation ✅
 
 #### Multi-Tenant Memory Support
@@ -443,11 +443,11 @@ fmt.Println(agent.Instructions) // "You are a helpful assistant"
 
 #### Model Timeout Configuration
 - **Configurable Request Timeout** - Fine-grained timeout control for LLM calls
-  - **OpenAI Model** (`pkg/agno/models/openai/openai.go`):
+  - **OpenAI Model** (`pkg/hno/models/openai/openai.go`):
     - Added `Timeout time.Duration` to Config
     - Default: 60 seconds
     - Applied to underlying HTTP client
-  - **Anthropic Claude** (`pkg/agno/models/anthropic/anthropic.go`):
+  - **Anthropic Claude** (`pkg/hno/models/anthropic/anthropic.go`):
     - Added `Timeout time.Duration` to Config
     - Default: 60 seconds
     - Applied to HTTP client
@@ -506,21 +506,21 @@ fmt.Println(agent.Instructions) // "You are a helpful assistant"
 
 **New Files:**
 - `pkg/agentos/a2a/*.go` - A2A interface (5 files, 1001 lines)
-- `pkg/agno/workflow/session_state.go` - Session state (192 lines)
-- `pkg/agno/workflow/session_state_test.go` - Tests (543 lines)
+- `pkg/hno/workflow/session_state.go` - Session state (192 lines)
+- `pkg/hno/workflow/session_state_test.go` - Tests (543 lines)
 - `pkg/agentos/a2a/README.md` - A2A documentation
-- `pkg/agno/workflow/SESSION_STATE.md` - Session state guide
+- `pkg/hno/workflow/SESSION_STATE.md` - Session state guide
 - `cmd/examples/a2a_server/main.go` - A2A example server
 
 **Modified Files:**
-- `pkg/agno/memory/memory.go` - Multi-tenant support
-- `pkg/agno/memory/memory_test.go` - New multi-tenant tests
-- `pkg/agno/agent/agent.go` - UserID support
-- `pkg/agno/agent/agent_test.go` - Multi-tenant test
-- `pkg/agno/workflow/workflow.go` - SessionState fields
-- `pkg/agno/workflow/parallel.go` - Race condition fix
-- `pkg/agno/models/openai/openai.go` - Timeout support
-- `pkg/agno/models/anthropic/anthropic.go` - Timeout support
+- `pkg/hno/memory/memory.go` - Multi-tenant support
+- `pkg/hno/memory/memory_test.go` - New multi-tenant tests
+- `pkg/hno/agent/agent.go` - UserID support
+- `pkg/hno/agent/agent_test.go` - Multi-tenant test
+- `pkg/hno/workflow/workflow.go` - SessionState fields
+- `pkg/hno/workflow/parallel.go` - Race condition fix
+- `pkg/hno/models/openai/openai.go` - Timeout support
+- `pkg/hno/models/anthropic/anthropic.go` - Timeout support
 
 ### ✅ Migration Status
 
@@ -576,7 +576,7 @@ a2a.RegisterRoutes(router)
 ### 📖 Documentation
 
 - [A2A README](pkg/agentos/a2a/README.md) - Complete A2A protocol guide
-- [Session State Guide](pkg/agno/workflow/SESSION_STATE.md) - Workflow session management
+- [Session State Guide](pkg/hno/workflow/SESSION_STATE.md) - Workflow session management
 - [CHANGELOG.md](CHANGELOG.md) - This file
 
 ## [1.0.3] - 2025-10-06
@@ -619,9 +619,9 @@ Current benchmark results on Apple M3:
 
 ### 📝 Files Changed
 
-- `pkg/agno/utils/serialize.go` - Enhanced documentation with examples and performance notes
-- `pkg/agno/utils/serialize_test.go` - Added 3 new test cases for error handling
-- `pkg/agno/agent/agent_bench_test.go` - Simplified benchmark following Python patterns
+- `pkg/hno/utils/serialize.go` - Enhanced documentation with examples and performance notes
+- `pkg/hno/utils/serialize_test.go` - Added 3 new test cases for error handling
+- `pkg/hno/agent/agent_bench_test.go` - Simplified benchmark following Python patterns
 
 ### ✅ Migration Status
 
@@ -645,11 +645,11 @@ Completed migration items from Python Agno:
   - Test coverage: 57.2%
 
 #### Implementation Details
-- **pkg/agno/models/glm/glm.go** - Main model implementation (410 lines)
-- **pkg/agno/models/glm/auth.go** - JWT authentication logic (59 lines)
-- **pkg/agno/models/glm/types.go** - GLM API type definitions (105 lines)
-- **pkg/agno/models/glm/glm_test.go** - Comprehensive unit tests (320 lines)
-- **pkg/agno/models/glm/README.md** - Complete usage documentation
+- **pkg/hno/models/glm/glm.go** - Main model implementation (410 lines)
+- **pkg/hno/models/glm/auth.go** - JWT authentication logic (59 lines)
+- **pkg/hno/models/glm/types.go** - GLM API type definitions (105 lines)
+- **pkg/hno/models/glm/glm_test.go** - Comprehensive unit tests (320 lines)
+- **pkg/hno/models/glm/README.md** - Complete usage documentation
 
 #### Examples & Documentation
 - **cmd/examples/glm_agent/** - GLM agent example with calculator tools
@@ -711,7 +711,7 @@ Total LLM providers increased from 6 to 7:
 
 - README.md - Added GLM to supported models list with example code
 - CLAUDE.md - Added GLM environment variables and configuration
-- Created pkg/agno/models/glm/README.md with comprehensive usage guide
+- Created pkg/hno/models/glm/README.md with comprehensive usage guide
 - All code comments are bilingual (English/中文)
 
 ## [1.0.0] - 2025-10-02
@@ -859,7 +859,7 @@ Agno-Go v1.0 is a high-performance Go implementation of the Agno multi-agent fra
 **Project Structure:**
 ```
 agno-Go/
-├── pkg/agno/          # Core framework
+├── pkg/hno/          # Core framework
 │   ├── agent/         # Agent implementation
 │   ├── team/          # Team coordination
 │   ├── workflow/      # Workflow engine
@@ -926,8 +926,8 @@ response = agent.run("Hello!")
 **Go:**
 ```go
 import (
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 )
 
 model, _ := openai.New("gpt-4", openai.Config{...})

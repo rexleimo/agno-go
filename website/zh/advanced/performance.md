@@ -237,20 +237,20 @@ go test -bench=. -benchmem ./...
 ### 运行特定基准测试 / Run Specific Benchmark
 
 ```bash
-go test -bench=BenchmarkAgentCreation -benchmem ./pkg/agno/agent/
+go test -bench=BenchmarkAgentCreation -benchmem ./pkg/hno/agent/
 ```
 
 ### 生成 CPU 性能分析 / Generate CPU Profile
 
 ```bash
-go test -bench=. -cpuprofile=cpu.prof ./pkg/agno/agent/
+go test -bench=. -cpuprofile=cpu.prof ./pkg/hno/agent/
 go tool pprof cpu.prof
 ```
 
 ### 生成内存性能分析 / Generate Memory Profile
 
 ```bash
-go test -bench=. -memprofile=mem.prof ./pkg/agno/agent/
+go test -bench=. -memprofile=mem.prof ./pkg/hno/agent/
 go tool pprof mem.prof
 ```
 
@@ -304,4 +304,4 @@ Agno-Go **超越性能目标**:
 
 - [架构 / Architecture](/advanced/architecture)
 - [部署 / Deployment](/advanced/deployment)
-- [基准测试代码 / Benchmark Code](https://github.com/rexleimo/agno-Go/tree/main/pkg/agno/agent/agent_bench_test.go)
+- [基准测试代码 / Benchmark Code](https://github.com/rexleimo/agno-Go/tree/main/pkg/hno/agent/agent_bench_test.go)

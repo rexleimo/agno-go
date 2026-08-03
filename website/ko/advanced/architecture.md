@@ -77,7 +77,7 @@ type Memory interface {
 
 ### Agent
 
-**파일**: `pkg/agno/agent/agent.go`
+**파일**: `pkg/hno/agent/agent.go`
 
 다음을 수행하는 자율적인 AI 엔티티:
 - 추론을 위해 LLM 사용
@@ -94,7 +94,7 @@ ClearMemory()
 
 ### Team
 
-**파일**: `pkg/agno/team/team.go`
+**파일**: `pkg/hno/team/team.go`
 
 4가지 조정 모드를 가진 다중 에이전트 협업:
 
@@ -105,7 +105,7 @@ ClearMemory()
 
 ### Workflow
 
-**파일**: `pkg/agno/workflow/workflow.go`
+**파일**: `pkg/hno/workflow/workflow.go`
 
 5가지 프리미티브를 가진 단계 기반 오케스트레이션:
 
@@ -117,7 +117,7 @@ ClearMemory()
 
 ### Models
 
-**디렉토리**: `pkg/agno/models/`
+**디렉토리**: `pkg/hno/models/`
 
 LLM 제공자 구현:
 - `openai/` - OpenAI GPT 모델
@@ -127,7 +127,7 @@ LLM 제공자 구현:
 
 ### Tools
 
-**디렉토리**: `pkg/agno/tools/`
+**디렉토리**: `pkg/hno/tools/`
 
 확장 가능한 툴킷 시스템:
 - `calculator/` - 수학 연산

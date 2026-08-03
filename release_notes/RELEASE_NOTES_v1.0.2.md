@@ -73,10 +73,10 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/models/glm"
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
-    "github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+    "github.com/rexleimo/agno-go/pkg/hno/models/glm"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 )
 
 func main() {
@@ -126,7 +126,7 @@ go run cmd/examples/glm_agent/main.go
 The GLM integration follows Agno-Go's clean architecture principles:
 
 ```
-pkg/agno/models/glm/
+pkg/hno/models/glm/
 ├── glm.go          # Main model implementation (410 lines)
 ├── auth.go         # JWT authentication logic (59 lines)
 ├── types.go        # API type definitions (105 lines)
@@ -225,7 +225,7 @@ Agno-Go now supports **7 major LLM providers**:
 
 ### New Documentation
 
-- **pkg/agno/models/glm/README.md** - Comprehensive GLM usage guide
+- **pkg/hno/models/glm/README.md** - Comprehensive GLM usage guide
   - Quick start examples
   - Configuration reference
   - Authentication details
@@ -263,11 +263,11 @@ No breaking changes! This is a **feature-only release**.
 
 ```go
 // Before (v1.0.0)
-import "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+import "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 model, _ := openai.New("gpt-4", config)
 
 // After (v1.0.2) - GLM option now available
-import "github.com/rexleimo/agno-go/pkg/agno/models/glm"
+import "github.com/rexleimo/agno-go/pkg/hno/models/glm"
 model, _ := glm.New("glm-4", glm.Config{
     APIKey: os.Getenv("ZHIPUAI_API_KEY"),
 })

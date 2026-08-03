@@ -18,7 +18,7 @@ Agno-Go v1.0 的完整 API 参考文档。
 ### Agent
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/agno/agent"
+import "github.com/rexleimo/agno-Go/pkg/hno/agent"
 
 agent.New(config) (*Agent, error)
 agent.Run(ctx, input) (*RunOutput, error)
@@ -30,7 +30,7 @@ agent.ClearMemory()
 ### Team
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/agno/team"
+import "github.com/rexleimo/agno-Go/pkg/hno/team"
 
 team.New(config) (*Team, error)
 team.Run(ctx, input) (*RunOutput, error)
@@ -43,7 +43,7 @@ team.Run(ctx, input) (*RunOutput, error)
 ### Workflow
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/agno/workflow"
+import "github.com/rexleimo/agno-Go/pkg/hno/workflow"
 
 workflow.New(config) (*Workflow, error)
 workflow.Run(ctx, input) (*RunOutput, error)
@@ -57,9 +57,9 @@ workflow.Run(ctx, input) (*RunOutput, error)
 
 ```go
 import (
-    "github.com/rexleimo/agno-Go/pkg/agno/models/openai"
-    "github.com/rexleimo/agno-Go/pkg/agno/models/anthropic"
-    "github.com/rexleimo/agno-Go/pkg/agno/models/ollama"
+    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-Go/pkg/hno/models/anthropic"
+    "github.com/rexleimo/agno-Go/pkg/hno/models/ollama"
 )
 
 openai.New(modelID, config) (*OpenAI, error)
@@ -73,9 +73,9 @@ ollama.New(modelID, config) (*Ollama, error)
 
 ```go
 import (
-    "github.com/rexleimo/agno-Go/pkg/agno/tools/calculator"
-    "github.com/rexleimo/agno-Go/pkg/agno/tools/http"
-    "github.com/rexleimo/agno-Go/pkg/agno/tools/file"
+    "github.com/rexleimo/agno-Go/pkg/hno/tools/calculator"
+    "github.com/rexleimo/agno-Go/pkg/hno/tools/http"
+    "github.com/rexleimo/agno-Go/pkg/hno/tools/file"
 )
 
 calculator.New() *Calculator
@@ -90,7 +90,7 @@ file.New(config) *File
 ### 错误处理 / Error Handling
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/agno/types"
+import "github.com/rexleimo/agno-Go/pkg/hno/types"
 
 output, err := agent.Run(ctx, input)
 if err != nil {

@@ -1,7 +1,7 @@
 # Release Notes — v1.2.9 (2025-11-14)
 
 ## ✨ Highlights
-- **EvoLink provider for media agents** – Added first-class EvoLink support under `pkg/agno/providers/evolink` and `pkg/agno/models/evolink/*` for text, image, and video generations, with async task polling and typed option structs matching EvoLink constraints.
+- **EvoLink provider for media agents** – Added first-class EvoLink support under `pkg/hno/providers/evolink` and `pkg/hno/models/evolink/*` for text, image, and video generations, with async task polling and typed option structs matching EvoLink constraints.
 - **EvoLink Media Agents docs** – New example pages (`website/examples/evolink-media-agents.md`, `website/zh/examples/evolink-media-agents.md`) showing how to wire EvoLink models into agents and workflows, including environment variables, model tables, and end-to-end pipelines.
 - **Knowledge upload chunking** – `POST /api/v1/knowledge/content` now accepts `chunk_size` and `chunk_overlap` across JSON, `text/plain` (query params), and multipart uploads, and records these values in chunk metadata together with `chunker_type`.
 - **AgentOS HTTP tips** – Documentation now explains how to customize health endpoints, rely on `/openapi.yaml` and `/docs`, and when to call `server.Resync()` after router changes.

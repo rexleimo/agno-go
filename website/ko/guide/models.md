@@ -44,7 +44,7 @@ Agno-Go는 통합 인터페이스로 여러 LLM 제공업체를 지원합니다.
 ### 설정
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+import "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 
 model, err := openai.New("gpt-4o-mini", openai.Config{
     APIKey:      os.Getenv("OPENAI_API_KEY"),
@@ -84,8 +84,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 )
 
 func main() {
@@ -114,7 +114,7 @@ func main() {
 ### 설정
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+import "github.com/rexleimo/agno-go/pkg/hno/models/anthropic"
 
 model, err := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
     APIKey:    os.Getenv("ANTHROPIC_API_KEY"),
@@ -152,8 +152,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/anthropic"
 )
 
 func main() {
@@ -183,7 +183,7 @@ func main() {
 ### 설정
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/glm"
+import "github.com/rexleimo/agno-go/pkg/hno/models/glm"
 
 model, err := glm.New("glm-4", glm.Config{
     APIKey:      os.Getenv("ZHIPUAI_API_KEY"),  // 형식: {key_id}.{key_secret}
@@ -234,10 +234,10 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/glm"
-    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
-    "github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/glm"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 )
 
 func main() {
@@ -285,7 +285,7 @@ GLM은 JWT(JSON Web Token) 인증을 사용합니다:
 3. Agno-Go에서 사용:
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/ollama"
+import "github.com/rexleimo/agno-go/pkg/hno/models/ollama"
 
 model, err := ollama.New("llama2", ollama.Config{
     BaseURL: "http://localhost:11434",  // Ollama 서버
@@ -319,8 +319,8 @@ import (
     "fmt"
     "log"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/ollama"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/ollama"
 )
 
 func main() {
@@ -442,7 +442,7 @@ agent, _ := agent.New(agent.Config{
 #### OpenAI
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+import "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 
 model, err := openai.New("gpt-4", openai.Config{
     APIKey:  os.Getenv("OPENAI_API_KEY"),
@@ -453,7 +453,7 @@ model, err := openai.New("gpt-4", openai.Config{
 #### Anthropic Claude
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+import "github.com/rexleimo/agno-go/pkg/hno/models/anthropic"
 
 model, err := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
     APIKey:  os.Getenv("ANTHROPIC_API_KEY"),
@@ -605,7 +605,7 @@ Agno-Go v1.2.1은 고급 모델에 추론 지원을 추가했습니다:
 ### 사용 방법
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/reasoning"
+import "github.com/rexleimo/agno-go/pkg/hno/reasoning"
 
 // 추론을 지원하는 모델의 추론 활성화
 model, _ := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
@@ -632,8 +632,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/anthropic"
 )
 
 func main() {

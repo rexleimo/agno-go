@@ -21,7 +21,7 @@
 
 ### 步骤 1: 扩展 Agent 接口 (1h)
 
-**文件**: `pkg/agno/agent/agent.go`
+**文件**: `pkg/hno/agent/agent.go`
 
 ```go
 // Agent 添加临时 instructions 支持
@@ -117,7 +117,7 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 
 ### 步骤 3: 实现历史注入辅助函数 (1h)
 
-**文件**: `pkg/agno/workflow/history_injection.go` (新文件)
+**文件**: `pkg/hno/workflow/history_injection.go` (新文件)
 
 ```go
 package workflow
@@ -125,7 +125,7 @@ package workflow
 import (
     "fmt"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
 )
 
 // InjectHistoryToAgent 将历史上下文注入到 agent
@@ -247,7 +247,7 @@ func DefaultHistoryFormatOptions() *HistoryFormatOptions {
 
 ### 步骤 4: 更新 Step 使用新的注入机制 (1h)
 
-**文件**: `pkg/agno/workflow/step.go`
+**文件**: `pkg/hno/workflow/step.go`
 
 ```go
 func (s *Step) Execute(ctx context.Context, execCtx *ExecutionContext, workflowConfig HistoryConfig) (*ExecutionContext, error) {
@@ -291,7 +291,7 @@ func (s *Step) Execute(ctx context.Context, execCtx *ExecutionContext, workflowC
 
 ### 单元测试
 
-**文件**: `pkg/agno/agent/agent_instructions_test.go`
+**文件**: `pkg/hno/agent/agent_instructions_test.go`
 
 ```go
 package agent
@@ -352,7 +352,7 @@ func TestAgent_ConcurrentInstructionsAccess(t *testing.T) {
 }
 ```
 
-**文件**: `pkg/agno/workflow/history_injection_test.go`
+**文件**: `pkg/hno/workflow/history_injection_test.go`
 
 ```go
 package workflow
@@ -361,7 +361,7 @@ import (
     "testing"
     "time"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
 )
 
 func TestInjectHistoryToAgent(t *testing.T) {
@@ -461,11 +461,11 @@ func TestFormatHistoryForAgent(t *testing.T) {
 
 ## 相关文件
 
-- `pkg/agno/agent/agent.go` - 主要修改
-- `pkg/agno/workflow/history_injection.go` - 新文件
-- `pkg/agno/workflow/step.go` - 更新使用
-- `pkg/agno/agent/agent_instructions_test.go` - 新测试
-- `pkg/agno/workflow/history_injection_test.go` - 新测试
+- `pkg/hno/agent/agent.go` - 主要修改
+- `pkg/hno/workflow/history_injection.go` - 新文件
+- `pkg/hno/workflow/step.go` - 更新使用
+- `pkg/hno/agent/agent_instructions_test.go` - 新测试
+- `pkg/hno/workflow/history_injection_test.go` - 新测试
 
 ---
 

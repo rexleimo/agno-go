@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/rexleimo/agno-go/pkg/agno/media"
-	"github.com/rexleimo/agno-go/pkg/agno/types"
+	"github.com/rexleimo/agno-go/pkg/hno/media"
+	"github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
 func TestEventTypes(t *testing.T) {

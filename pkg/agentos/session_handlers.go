@@ -9,9 +9,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/rexleimo/agno-go/pkg/agno/agent"
-	"github.com/rexleimo/agno-go/pkg/agno/session"
-	"github.com/rexleimo/agno-go/pkg/agno/types"
+	"github.com/rexleimo/agno-go/pkg/hno/agent"
+	"github.com/rexleimo/agno-go/pkg/hno/session"
+	"github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
 // CreateSessionRequest represents the request to create a new session

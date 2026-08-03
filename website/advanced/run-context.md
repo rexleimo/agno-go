@@ -19,7 +19,7 @@ The AgentOS `POST /api/v1/agents/{id}/run?stream_events=true` endpoint emits SSE
 ```go
 import (
   "context"
-  "github.com/rexleimo/agno-go/pkg/agno/agent"
+  "github.com/rexleimo/agno-go/pkg/hno/agent"
 )
 
 ctx := agent.WithRunContext(context.Background(), "rc-123")

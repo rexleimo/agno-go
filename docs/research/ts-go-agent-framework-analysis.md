@@ -71,7 +71,7 @@
 
 - **Flow[In, Out, Stream] 泛型**是 Go 表达"可复用流程"的优雅方式——对应我们 workflow 的 Step 泛型化。
 - **tracing 内置**：span 自动创建 + OTLP 导出是"可观测性内置"的 Go 实证，比"事后加插件"优雅得多。
-- Registry 模式可借鉴为 `pkg/agno/registry`（命名注册 provider/工具/技能）。
+- Registry 模式可借鉴为 `pkg/hno/registry`（命名注册 provider/工具/技能）。
 
 ---
 

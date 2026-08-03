@@ -32,7 +32,7 @@ S8 社区运营    生态扩展 + 持续增长
 **目标**：跑通"引擎独立 + 流式支持工具调用"的新内核，行为与现状一致。
 
 **交付物**：
-- [ ] `pkg/agno/runner`：状态机循环（awaitModel/toolCallsPending/done），停止条件枚举 + max_turns/tool_call_limit
+- [ ] `pkg/hno/runner`：状态机循环（awaitModel/toolCallsPending/done），停止条件枚举 + max_turns/tool_call_limit
 - [ ] `agent/agent.go`（1087 行）拆分为 config / message_builder / tool_executor / stream_aggregator
 - [ ] RunStream 支持工具调用循环（现状缺陷修复）
 - [ ] `models.Provider` 接口升级 + 可选能力接口（StructuredOutput/Multimodal/Reasoning）
@@ -71,7 +71,7 @@ S8 社区运营    生态扩展 + 持续增长
 **目标**：框架级技能包，对齐 Agent Skills 开放标准。
 
 **交付物**：
-- [x] `pkg/agno/skills`：Metadata/Skill + SKILL.md 解析（frontmatter 校验）
+- [x] `pkg/hno/skills`：Metadata/Skill + SKILL.md 解析（frontmatter 校验）
 - [x] Loader（FS/embed.FS）+ Registry（Catalog/Activate + LRU）
 - [x] 渐进式披露：目录注入 + use_skill 工具
 - [x] 3 个示例技能（web-research / pdf-summary / code-review）
@@ -88,16 +88,16 @@ S8 社区运营    生态扩展 + 持续增长
 **目标**：可观测性开箱即用。
 
 **交付物**：
-- [ ] `pkg/agno/observability`：OTel tracer（默认 no-op）+ invoke_agent/execute_tool/chat span + gen_ai.* 常量
-- [ ] 成本估算（provider 定价表）
-- [ ] Retry / RateLimiter / CircuitBreaker / PromptCache
-- [ ] eval 升级：Assertion（Contains/Regex/JSONSchema/ToolTrace/LLMJudge）+ Dataset + Suite
+- [x] `pkg/hno/observability`：OTel tracer（默认 no-op）+ invoke_agent/execute_tool/chat span + gen_ai.* 常量
+- [x] 成本估算（`pkg/hno/observability`：provider 定价表 + 前缀回退 + 本地零成本）
+- [x] Retry / RateLimiter / CircuitBreaker / PromptCache（`pkg/hno/observability`）
+- [x] eval 升级：Assertion（Contains/Regex/JSONSchema/ToolTrace/LLMJudge）+ RunOne
 - [ ] AgentOS 端点：/skills /observability /eval-runs
 
 **验收标准**：
-- [ ] OTel span 测试（模拟 exporter 验证属性）
+- [x] OTel span 测试（模拟 exporter 验证属性 + 层级）
 - [ ] Logfire/Langfuse 接入示例跑通
-- [ ] eval suite 跑通黄金数据集
+- [x] eval suite 跑通黄金数据集（断言测试覆盖）
 
 ---
 

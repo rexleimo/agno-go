@@ -5,7 +5,7 @@
 ## 概要
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/agno/agent"
+import "github.com/rexleimo/agno-Go/pkg/hno/agent"
 
 agent, err := agent.New(agent.Config{
     Name:         "My Agent",
@@ -56,8 +56,8 @@ package main
 import (
     "context"
     "fmt"
-    "github.com/rexleimo/agno-Go/pkg/agno/agent"
-    "github.com/rexleimo/agno-Go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-Go/pkg/hno/agent"
+    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
 )
 
 func main() {
@@ -80,8 +80,8 @@ func main() {
 
 ```go
 import (
-    "github.com/rexleimo/agno-Go/pkg/agno/tools/calculator"
-    "github.com/rexleimo/agno-Go/pkg/agno/tools/http"
+    "github.com/rexleimo/agno-Go/pkg/hno/tools/calculator"
+    "github.com/rexleimo/agno-Go/pkg/hno/tools/http"
 )
 
 ag, _ := agent.New(agent.Config{
@@ -102,7 +102,7 @@ output, _ := ag.Run(ctx, "Calculate 15 * 23 and fetch https://api.github.com")
 ### カスタムメモリ
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/agno/memory"
+import "github.com/rexleimo/agno-Go/pkg/hno/memory"
 
 // カスタム制限でメモリを作成
 mem := memory.NewInMemory(50) // 最新50メッセージを保持
@@ -118,7 +118,7 @@ ag, _ := agent.New(agent.Config{
 フックで入力と出力を検証:
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/agno/guardrails"
+import "github.com/rexleimo/agno-Go/pkg/hno/guardrails"
 
 // 組み込みのプロンプトインジェクションガード
 promptGuard := guardrails.NewPromptInjectionGuardrail()

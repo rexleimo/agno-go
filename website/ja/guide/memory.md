@@ -30,8 +30,8 @@ import (
     "context"
     "fmt"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 )
 
 func main() {
@@ -63,7 +63,7 @@ func main() {
 保存する最大メッセージ数を設定:
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/memory"
+import "github.com/rexleimo/agno-go/pkg/hno/memory"
 
 customMemory := memory.New(memory.Config{
     MaxMessages: 50,  // 最大50メッセージを保存
@@ -118,7 +118,7 @@ for _, msg := range messages {
 手動でメモリにメッセージを追加:
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/types"
+import "github.com/rexleimo/agno-go/pkg/hno/types"
 
 // システムメッセージを追加
 agent.Memory.AddMessage(types.Message{

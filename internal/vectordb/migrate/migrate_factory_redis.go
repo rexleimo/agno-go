@@ -5,9 +5,9 @@ package migrate
 import (
 	"fmt"
 
-	"github.com/rexleimo/agno-go/pkg/agno/vectordb"
-	"github.com/rexleimo/agno-go/pkg/agno/vectordb/chromadb"
-	"github.com/rexleimo/agno-go/pkg/agno/vectordb/redisdb"
+	"github.com/rexleimo/agno-go/pkg/hno/vectordb"
+	"github.com/rexleimo/agno-go/pkg/hno/vectordb/chromadb"
+	"github.com/rexleimo/agno-go/pkg/hno/vectordb/redisdb"
 )
 
 // defaultFactory compiled with redis tag supports both chroma and redis providers.

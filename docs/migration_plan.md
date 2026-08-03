@@ -5,15 +5,15 @@
 - 任务：新增统一 CI 工作流（测试 + 静态检查），对接缓存策略，保持与 Python 仓库一致的约束。
 
 ## 异步数据库接口
-- 复用：`pkg/agno/session/storage.go` 定义的存储接口、`pkg/agno/db/batch` 现有批量写入结构。
+- 复用：`pkg/hno/session/storage.go` 定义的存储接口、`pkg/hno/session/db/batch` 现有批量写入结构。
 - 任务：抽象统一的数据库接口层，补充上下文超时与批量节流配置，保证与内存/批量实现兼容。
 
 ## 异步 Postgres 驱动
-- 复用：`pkg/agno/db/batch/postgres.go` 的 COPY + 临时表策略、参数化配置。
+- 复用：`pkg/hno/session/db/batch/postgres.go` 的 COPY + 临时表策略、参数化配置。
 - 任务：拆分连接管理与批量调度，增加 goroutine 安全的连接池封装与重试逻辑，补充回归测试。
 
 ## SurrealDB 引擎
-- 复用：`pkg/agno/session`、`pkg/agno/memory` 公共模型，`pkg/agno/db/batch` 的接口约束。
+- 复用：`pkg/hno/session`、`pkg/hno/memory` 公共模型，`pkg/hno/session/db/batch` 的接口约束。
 - 任务：引入 `surrealdb` Go 客户端，实现 CRUD、批量 upsert、指标统计，并保持 KISS 接口。
 
 ## Surreal Demo
@@ -21,7 +21,7 @@
 - 任务：新增 `cmd/examples/surreal_demo`，覆盖环境配置、建表脚本、README 场景说明。
 
 ## 迁移负载防护
-- 复用：`pkg/agno/db/batch.Config`、`PostgresBatchWriter` 超时与重试参数。
+- 复用：`pkg/hno/session/db/batch.Config`、`PostgresBatchWriter` 超时与重试参数。
 - 任务：增加批量节流（批次间 Sleep）、动态批量尺寸调节，以及清理 goroutine 的资源回收。
 
 ## 元数据保留
@@ -41,7 +41,7 @@
 - 任务：保证媒体数据挂载在顶层 `GET /runs` 响应，修正结果变量初始化，补测 MySQL/Memory 场景。
 
 ## 推理适配器扩展
-- 复用：`pkg/agno/reasoning` 现有适配层、`pkg/agno/models` 中多模型实现。
+- 复用：`pkg/hno/reasoning` 现有适配层、`pkg/hno/models` 中多模型实现。
 - 任务：补全 Gemini / Anthropic / VertexAI 推理管道的配置项、错误处理与单测矩阵。
 
 ## 可观测性刷新

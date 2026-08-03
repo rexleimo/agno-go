@@ -1,7 +1,7 @@
 # EvoLink 媒体智能体（Media Agents）
 
 ## 概览
-本文演示如何在 Agno-Go 中使用 EvoLink Provider，通过 `pkg/agno/models/evolink/*` 生成文本、图片与视频。
+本文演示如何在 Agno-Go 中使用 EvoLink Provider，通过 `pkg/hno/models/evolink/*` 生成文本、图片与视频。
 
 ## 环境准备
 - 设置环境变量：
@@ -53,9 +53,9 @@ import (
   "fmt"
   "os"
 
-  evoText "github.com/rexleimo/agno-go/pkg/agno/models/evolink/text"
-  "github.com/rexleimo/agno-go/pkg/agno/models"
-  "github.com/rexleimo/agno-go/pkg/agno/types"
+  evoText "github.com/rexleimo/agno-go/pkg/hno/models/evolink/text"
+  "github.com/rexleimo/agno-go/pkg/hno/models"
+  "github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
 func main() {
@@ -76,9 +76,9 @@ import (
   "fmt"
   "os"
 
-  evoImg "github.com/rexleimo/agno-go/pkg/agno/models/evolink/image"
-  "github.com/rexleimo/agno-go/pkg/agno/models"
-  "github.com/rexleimo/agno-go/pkg/agno/types"
+  evoImg "github.com/rexleimo/agno-go/pkg/hno/models/evolink/image"
+  "github.com/rexleimo/agno-go/pkg/hno/models"
+  "github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
 func main() {
@@ -99,9 +99,9 @@ import (
   "fmt"
   "os"
 
-  evoVid "github.com/rexleimo/agno-go/pkg/agno/models/evolink/video"
-  "github.com/rexleimo/agno-go/pkg/agno/models"
-  "github.com/rexleimo/agno-go/pkg/agno/types"
+  evoVid "github.com/rexleimo/agno-go/pkg/hno/models/evolink/video"
+  "github.com/rexleimo/agno-go/pkg/hno/models"
+  "github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
 func main() {

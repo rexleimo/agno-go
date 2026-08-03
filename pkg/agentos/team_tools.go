@@ -1,9 +1,9 @@
 package agentos
 
 import (
-	"github.com/rexleimo/agno-go/pkg/agno/models"
-	"github.com/rexleimo/agno-go/pkg/agno/team"
-	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+	"github.com/rexleimo/agno-go/pkg/hno/models"
+	"github.com/rexleimo/agno-go/pkg/hno/team"
+	"github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 )
 
 // TeamToolDefinitions returns the effective tool definitions available to a team.

@@ -28,8 +28,8 @@ import (
     "syscall"
     "time"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
     "github.com/rexleimo/agno-go/pkg/agentos"
 )
 
@@ -296,8 +296,8 @@ server.RegisterAgent("technical-support", techSupportAgent)
 
 ```go
 import (
-    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
-    "github.com/rexleimo/agno-go/pkg/agno/tools/http"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/http"
 )
 
 // Create agent with tools
@@ -317,7 +317,7 @@ server.RegisterAgent("tool-agent", ag)
 ### With Custom Session Storage
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/session"
+import "github.com/rexleimo/agno-go/pkg/hno/session"
 
 // Use custom storage (e.g., PostgreSQL, Redis)
 storage := session.NewPostgresStorage(connString)

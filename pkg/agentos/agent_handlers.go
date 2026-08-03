@@ -11,11 +11,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/rexleimo/agno-go/pkg/agno/agent"
-	"github.com/rexleimo/agno-go/pkg/agno/media"
-	"github.com/rexleimo/agno-go/pkg/agno/run"
-	"github.com/rexleimo/agno-go/pkg/agno/session"
-	"github.com/rexleimo/agno-go/pkg/agno/types"
+	"github.com/rexleimo/agno-go/pkg/hno/agent"
+	"github.com/rexleimo/agno-go/pkg/hno/media"
+	"github.com/rexleimo/agno-go/pkg/hno/run"
+	"github.com/rexleimo/agno-go/pkg/hno/session"
+	"github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
 // AgentRunRequest represents a request to run an agent
@@ -180,7 +180,7 @@ func (s *Server) handleAgentRun(c *gin.Context) {
 		s.logger.Error("agent run failed", "error", err, "agent_id", agentID)
 		status := http.StatusInternalServerError
 		errorCode := "EXECUTION_ERROR"
-		if agnoErr, ok := err.(*types.AgnoError); ok && agnoErr.Code == types.ErrCodeCancelled {
+		if agnoErr, ok := err.(*types.HnoError); ok && agnoErr.Code == types.ErrCodeCancelled {
 			status = http.StatusRequestTimeout
 			errorCode = string(types.ErrCodeCancelled)
 		}
@@ -321,7 +321,7 @@ func (s *Server) streamAgentRun(
 	result, err := ag.RunStream(ctx, req.Input)
 	if err != nil {
 		code := "AGENT_ERROR"
-		if agnoErr, ok := err.(*types.AgnoError); ok {
+		if agnoErr, ok := err.(*types.HnoError); ok {
 			code = string(agnoErr.Code)
 		}
 		errorEvent := NewEvent(EventError, ErrorData{
@@ -404,7 +404,7 @@ func (s *Server) streamAgentRun(
 
 			if err != nil {
 				code := "AGENT_ERROR"
-				if agnoErr, ok := err.(*types.AgnoError); ok {
+				if agnoErr, ok := err.(*types.HnoError); ok {
 					code = string(agnoErr.Code)
 				}
 				errorEvent := NewEvent(EventError, ErrorData{

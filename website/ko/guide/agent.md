@@ -5,7 +5,7 @@
 ## 개요
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/agno/agent"
+import "github.com/rexleimo/agno-Go/pkg/hno/agent"
 
 agent, err := agent.New(agent.Config{
     Name:         "My Agent",
@@ -56,8 +56,8 @@ package main
 import (
     "context"
     "fmt"
-    "github.com/rexleimo/agno-Go/pkg/agno/agent"
-    "github.com/rexleimo/agno-Go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-Go/pkg/hno/agent"
+    "github.com/rexleimo/agno-Go/pkg/hno/models/openai"
 )
 
 func main() {
@@ -80,8 +80,8 @@ func main() {
 
 ```go
 import (
-    "github.com/rexleimo/agno-Go/pkg/agno/tools/calculator"
-    "github.com/rexleimo/agno-Go/pkg/agno/tools/http"
+    "github.com/rexleimo/agno-Go/pkg/hno/tools/calculator"
+    "github.com/rexleimo/agno-Go/pkg/hno/tools/http"
 )
 
 ag, _ := agent.New(agent.Config{
@@ -102,7 +102,7 @@ output, _ := ag.Run(ctx, "Calculate 15 * 23 and fetch https://api.github.com")
 ### 커스텀 메모리
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/agno/memory"
+import "github.com/rexleimo/agno-Go/pkg/hno/memory"
 
 // 커스텀 제한이 있는 메모리 생성
 mem := memory.NewInMemory(50) // 최근 50개 메시지 유지
@@ -118,7 +118,7 @@ ag, _ := agent.New(agent.Config{
 훅으로 입력 및 출력 검증:
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/agno/guardrails"
+import "github.com/rexleimo/agno-Go/pkg/hno/guardrails"
 
 // 내장 프롬프트 인젝션 가드
 promptGuard := guardrails.NewPromptInjectionGuardrail()

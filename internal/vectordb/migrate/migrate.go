@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/rexleimo/agno-go/pkg/agno/vectordb"
+	"github.com/rexleimo/agno-go/pkg/hno/vectordb"
 )
 
 // Options controls migration behavior for a VectorDB provider

@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/rexleimo/agno-go/pkg/agno/models"
+	"github.com/rexleimo/agno-go/pkg/hno/models"
 )
 
 // TeamToolsResponse is the API payload for listing team tools.

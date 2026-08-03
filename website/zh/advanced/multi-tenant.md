@@ -80,9 +80,9 @@ import (
     "context"
     "fmt"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/memory"
-    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/memory"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 )
 
 func main() {
@@ -138,7 +138,7 @@ import (
     "net/http"
 
     "github.com/gin-gonic/gin"
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
 )
 
 var sharedAgent *agent.Agent
@@ -223,7 +223,7 @@ curl -X POST http://localhost:8080/chat \
 Memory 接口支持可选的 `userID` 参数：
 
 ```go
-// pkg/agno/memory/memory.go
+// pkg/hno/memory/memory.go
 
 type Memory interface {
     // 添加消息（支持可选的 userID）
@@ -355,7 +355,7 @@ type Config struct {
 ### Run 方法实现
 
 ```go
-// pkg/agno/agent/agent.go
+// pkg/hno/agent/agent.go
 
 func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
     // ...
@@ -689,10 +689,10 @@ execCtx := workflow.NewExecutionContextWithSession(
 
 运行测试：
 ```bash
-cd pkg/agno/memory
+cd pkg/hno/memory
 go test -v -run TestInMemory
 
-cd pkg/agno/agent
+cd pkg/hno/agent
 go test -v -run TestAgent_MultiTenant
 ```
 

@@ -36,7 +36,7 @@ package main
 import (
     "github.com/gin-gonic/gin"
     "github.com/rexleimo/agno-go/pkg/agentos/a2a"
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
 )
 
 func main() {
@@ -275,8 +275,8 @@ import (
 
     "github.com/gin-gonic/gin"
     "github.com/rexleimo/agno-go/pkg/agentos/a2a"
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 )
 
 func main() {

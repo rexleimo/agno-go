@@ -6,9 +6,9 @@ import (
 	"log"
 	"os"
 
-	"github.com/rexleimo/agno-go/pkg/agno/agent"
-	"github.com/rexleimo/agno-go/pkg/agno/models/openai"
-	"github.com/rexleimo/agno-go/pkg/agno/workflow"
+	"github.com/rexleimo/agno-go/pkg/hno/agent"
+	"github.com/rexleimo/agno-go/pkg/hno/models/openai"
+	"github.com/rexleimo/agno-go/pkg/hno/workflow"
 )
 
 // main 演示 Workflow History 功能的真实使用场景

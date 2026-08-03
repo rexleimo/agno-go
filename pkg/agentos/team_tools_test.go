@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rexleimo/agno-go/pkg/agno/agent"
-	"github.com/rexleimo/agno-go/pkg/agno/models"
-	"github.com/rexleimo/agno-go/pkg/agno/team"
-	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
-	"github.com/rexleimo/agno-go/pkg/agno/types"
+	"github.com/rexleimo/agno-go/pkg/hno/agent"
+	"github.com/rexleimo/agno-go/pkg/hno/models"
+	"github.com/rexleimo/agno-go/pkg/hno/team"
+	"github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
+	"github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
 // mockModel is a lightweight Model implementation for testing tool aggregation.

@@ -39,7 +39,7 @@
 - **学习成本**：用户面对 115 个开关，且大量开关互相作用（如 `add_history_to_context` × `num_history_runs` × `num_history_messages`），文档无法覆盖全部组合。
 - **组合爆炸与兼容负担**：每加一个能力（culture、learning、followups……）就在构造函数加 3–5 个参数，向后兼容压力全堆在签名上。
 - **测试与内聚**：`Agent` 的单元测试必须构造 100+ 参数的实例；记忆/知识/会话等子系统无法独立测试。
-- **对 Go 版是直接警示**：agno-go 的 `pkg/agno/agent/agent.go`（1087 行，`type Agent struct` L38 + `type Config struct` L65 + `Run` L215 + `RunStream` L461）目前是同一形状的缩小版——现在不拆，等字段过百再拆成本翻倍。
+- **对 Go 版是直接警示**：agno-go 的 `pkg/hno/agent/agent.go`（1087 行，`type Agent struct` L38 + `type Config struct` L65 + `Run` L215 + `RunStream` L461）目前是同一形状的缩小版——现在不拆，等字段过百再拆成本翻倍。
 
 ### 对 Go 版的规避建议
 1. **构造器禁止超过 ~10 个参数**：核心参数（model、tools、instructions）走 `New(...)`，扩展能力走 Options 函数式配置或独立组件注入。
@@ -275,7 +275,7 @@ agno 有 Session（会话）、Memory（记忆）、Knowledge（知识库）三�
 
 ## 3.3 agno-go 现状对照与落地路线
 
-当前 `pkg/agno/agent/agent.go`（1087 行）：`Agent` struct（L38）+ `Config`（L65）+ `New(config Config)`（L96）+ `Run`（L215）+ `RunStream`（L461）+ `executeToolCalls`（L770）+ `ClearMemory`（L832）——**与 agno 同构的缩小版 God Object**。建议按以下顺序重构（每步保持可编译可测试）：
+当前 `pkg/hno/agent/agent.go`（1087 行）：`Agent` struct（L38）+ `Config`（L65）+ `New(config Config)`（L96）+ `Run`（L215）+ `RunStream`（L461）+ `executeToolCalls`（L770）+ `ClearMemory`（L832）——**与 agno 同构的缩小版 God Object**。建议按以下顺序重构（每步保持可编译可测试）：
 
 1. **第 1 步：拆 Run 内核**（收益最大）：把 `Run/RunStream` 中的消息构建、工具循环、缓存逻辑（`tryCacheGet/tryCacheSet` L387–443）抽到 `runner` 包；`Agent` 只留配置与状态入口。循环改为显式状态机，`executeToolCalls` 成为纯函数。
 2. **第 2 步：引入 `RunContext` + 泛型**：`RunContext[D]`（deps、messages、usage、retries、runID），`Agent[D, O]`；工具注册表支持结构体参数 + 反射 schema 生成。

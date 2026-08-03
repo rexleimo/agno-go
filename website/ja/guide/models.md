@@ -49,7 +49,7 @@ Agno-Goは統一されたインターフェースで複数のLLMプロバイダ�
 ### セットアップ
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+import "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 
 model, err := openai.New("gpt-4o-mini", openai.Config{
     APIKey:      os.Getenv("OPENAI_API_KEY"),
@@ -89,8 +89,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 )
 
 func main() {
@@ -119,7 +119,7 @@ func main() {
 ### セットアップ
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+import "github.com/rexleimo/agno-go/pkg/hno/models/anthropic"
 
 model, err := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
     APIKey:    os.Getenv("ANTHROPIC_API_KEY"),
@@ -157,8 +157,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/anthropic"
 )
 
 func main() {
@@ -188,7 +188,7 @@ func main() {
 ### セットアップ
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/glm"
+import "github.com/rexleimo/agno-go/pkg/hno/models/glm"
 
 model, err := glm.New("glm-4", glm.Config{
     APIKey:      os.Getenv("ZHIPUAI_API_KEY"),  // 形式: {key_id}.{key_secret}
@@ -239,10 +239,10 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/glm"
-    "github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
-    "github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/glm"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 )
 
 func main() {
@@ -290,7 +290,7 @@ GLMはJWT（JSON Web Token）認証を使用します：
 3. Agno-Goで使用:
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/ollama"
+import "github.com/rexleimo/agno-go/pkg/hno/models/ollama"
 
 model, err := ollama.New("llama2", ollama.Config{
     BaseURL: "http://localhost:11434",  // Ollamaサーバー
@@ -324,8 +324,8 @@ import (
     "fmt"
     "log"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/ollama"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/ollama"
 )
 
 func main() {
@@ -447,7 +447,7 @@ agent, _ := agent.New(agent.Config{
 #### OpenAI
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/openai"
+import "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 
 model, err := openai.New("gpt-4", openai.Config{
     APIKey:  os.Getenv("OPENAI_API_KEY"),
@@ -458,7 +458,7 @@ model, err := openai.New("gpt-4", openai.Config{
 #### Anthropic Claude
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+import "github.com/rexleimo/agno-go/pkg/hno/models/anthropic"
 
 model, err := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
     APIKey:  os.Getenv("ANTHROPIC_API_KEY"),
@@ -610,7 +610,7 @@ Agno-Go v1.2.1 は高度なモデルに推論サポートを追加しました:
 ### 使用方法
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/reasoning"
+import "github.com/rexleimo/agno-go/pkg/hno/reasoning"
 
 // 推論をサポートするモデルの推論を有効にする
 model, _ := anthropic.New("claude-3-5-sonnet-20241022", anthropic.Config{
@@ -637,8 +637,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    "github.com/rexleimo/agno-go/pkg/agno/models/anthropic"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/anthropic"
 )
 
 func main() {

@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/rexleimo/agno-go/pkg/agno/db/surreal"
-	"github.com/rexleimo/agno-go/pkg/agno/session"
+	"github.com/rexleimo/agno-go/pkg/hno/session/db/surreal"
+	"github.com/rexleimo/agno-go/pkg/hno/session"
 )
 
 func main() {

@@ -72,10 +72,10 @@
 make benchmark
 
 # 运行特定基准测试
-go test -bench=BenchmarkAgentCreation -benchmem ./pkg/agno/agent/
+go test -bench=BenchmarkAgentCreation -benchmem ./pkg/hno/agent/
 
 # 生成 CPU profile
-go test -bench=. -cpuprofile=cpu.out ./pkg/agno/agent/
+go test -bench=. -cpuprofile=cpu.out ./pkg/hno/agent/
 ```
 
 [查看详细性能指标 →](/zh/advanced/performance)

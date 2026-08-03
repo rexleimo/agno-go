@@ -219,7 +219,7 @@ Runner.run(agent, input, context, max_turns=10):
 2. **run 结果含 stepsHistory**：每次模型调用成为『步』记录，天然形成审计/评估数据，Go 版可做成 `Steps []StepRecord`。
 3. **Workflow 的 commitStep 动态图**：运行时动态注册步骤，比纯静态声明图灵活；对应 Go 可设计为 builder + executor 两阶段。
 4. **工具 schema 用 zod 强类型**：Go 应对应为：工具参数用结构体 tag 生成 JSON Schema，杜绝 `map[string]interface{}`。
-5. **MCP 客户端内建**：Go 版 `pkg/agno/mcp` 已存在，建议作为一等工具来源（与 Mastra 一致）。
+5. **MCP 客户端内建**：Go 版 `pkg/hno/mcp` 已存在，建议作为一等工具来源（与 Mastra 一致）。
 
 ---
 
@@ -240,10 +240,10 @@ Runner.run(agent, input, context, max_turns=10):
 
 ## 6. 对 Go 框架（agno-go）重构的启示
 
-### 6.1 抽象层划分建议（映射到现有 `pkg/agno`）
+### 6.1 抽象层划分建议（映射到现有 `pkg/hno`）
 
 ```
-pkg/agno/
+pkg/hno/
   types/      # Message/ModelResponse/RunOutput/Event（已有，需扩展 tool_executions、stepsHistory）
   models/     # 接口收窄：Invoke/InvokeStream/结构化输出/Token计数/GetToolSchema —— 去掉循环与缓存
   runtime/    # 【新增】工具循环执行器（从 agent.go 抽出）：单轮调用→工具→结果→停止条件判定

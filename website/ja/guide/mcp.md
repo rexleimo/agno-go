@@ -20,7 +20,7 @@
 ## アーキテクチャ | Architecture
 
 ```
-pkg/agno/mcp/
+pkg/hno/mcp/
 ├── protocol/       # JSON-RPC 2.0 と MCP メッセージタイプ
 ├── client/         # MCP クライアントコアとトランスポート
 ├── security/       # コマンド検証とセキュリティ
@@ -49,9 +49,9 @@ uvx mcp install @modelcontextprotocol/server-calculator
 
 ```go
 import (
-    "github.com/rexleimo/agno-go/pkg/agno/mcp/client"
-    "github.com/rexleimo/agno-go/pkg/agno/mcp/security"
-    mcptoolkit "github.com/rexleimo/agno-go/pkg/agno/mcp/toolkit"
+    "github.com/rexleimo/agno-go/pkg/hno/mcp/client"
+    "github.com/rexleimo/agno-go/pkg/hno/mcp/security"
+    mcptoolkit "github.com/rexleimo/agno-go/pkg/hno/mcp/toolkit"
 )
 
 // セキュリティバリデーターを作成
@@ -145,12 +145,12 @@ toolkit, err := mcptoolkit.New(ctx, mcptoolkit.Config{
 2. **適切にツールをフィルタリング** - エージェントに必要なツールのみを公開
 3. **エラーを適切に処理** - MCP サーバーは失敗またはタイムアウトする可能性がある
 4. **接続を閉じる** - リソースをクリーンアップするため常に `defer toolkit.Close()`
-5. **モックサーバーでテスト** - `pkg/agno/mcp/client/testing.go` のテストユーティリティを使用
+5. **モックサーバーでテスト** - `pkg/hno/mcp/client/testing.go` のテストユーティリティを使用
 
 ## 次のステップ | Next Steps
 
 - [MCP デモ](../examples/mcp-demo.md)を試す
-- [MCP 実装ガイド](../../pkg/agno/mcp/IMPLEMENTATION.md)を読む
+- [MCP 実装ガイド](../../pkg/hno/mcp/IMPLEMENTATION.md)を読む
 - [MCP プロトコル仕様](https://spec.modelcontextprotocol.io/)を探索
 - [GitHub](https://github.com/rexleimo/agno-Go/discussions)でディスカッションに参加
 

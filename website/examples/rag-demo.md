@@ -48,13 +48,13 @@ import (
 	"log"
 	"os"
 
-	"github.com/rexleimo/agno-go/pkg/agno/agent"
-	openaiembed "github.com/rexleimo/agno-go/pkg/agno/embeddings/openai"
-	"github.com/rexleimo/agno-go/pkg/agno/knowledge"
-	openaimodel "github.com/rexleimo/agno-go/pkg/agno/models/openai"
-	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
-	"github.com/rexleimo/agno-go/pkg/agno/vectordb"
-	"github.com/rexleimo/agno-go/pkg/agno/vectordb/chromadb"
+	"github.com/rexleimo/agno-go/pkg/hno/agent"
+	openaiembed "github.com/rexleimo/agno-go/pkg/hno/embeddings/openai"
+	"github.com/rexleimo/agno-go/pkg/hno/knowledge"
+	openaimodel "github.com/rexleimo/agno-go/pkg/hno/models/openai"
+	"github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
+	"github.com/rexleimo/agno-go/pkg/hno/vectordb"
+	"github.com/rexleimo/agno-go/pkg/hno/vectordb/chromadb"
 )
 
 // RAGToolkit provides knowledge retrieval tools for the agent

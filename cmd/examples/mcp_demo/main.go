@@ -6,9 +6,9 @@ import (
 	"log"
 	"time"
 
-	"github.com/rexleimo/agno-go/pkg/agno/mcp/client"
-	"github.com/rexleimo/agno-go/pkg/agno/mcp/security"
-	mcptoolkit "github.com/rexleimo/agno-go/pkg/agno/mcp/toolkit"
+	"github.com/rexleimo/agno-go/pkg/hno/mcp/client"
+	"github.com/rexleimo/agno-go/pkg/hno/mcp/security"
+	mcptoolkit "github.com/rexleimo/agno-go/pkg/hno/mcp/toolkit"
 )
 
 func main() {
@@ -16,9 +16,9 @@ func main() {
 	fmt.Println()
 
 	// This example demonstrates how to connect to an MCP server
-	// and use its tools through the agno-Go MCP client.
+	// and use its tools through the HNO MCP client.
 	// 此示例演示如何连接到 MCP 服务器
-	// 并通过 agno-Go MCP 客户端使用其工具。
+	// 并通过 HNO MCP 客户端使用其工具。
 
 	// NOTE: To run this example, you need an actual MCP server running
 	// For example, you could use the Python MCP calculator server:
@@ -150,11 +150,11 @@ func main() {
 	fmt.Printf("  Result: %v\n", result.Content)
 	fmt.Println()
 
-	// The toolkit can now be used with agno agents!
-	// 工具包现在可以与 agno agents 一起使用！
+	// The toolkit can now be used with HNO agents!
+	// 工具包现在可以与 HNO agents 一起使用！
 	fmt.Println("=== Demo Complete ===")
 	fmt.Println()
-	fmt.Println("The MCP toolkit can now be passed to an agno Agent:")
+	fmt.Println("The MCP toolkit can now be passed to an HNO Agent:")
 	fmt.Println("  agent, _ := agent.New(&agent.Config{")
 	fmt.Println("    Model: yourModel,")
 	fmt.Println("    Toolkits: []toolkit.Toolkit{toolkit},")

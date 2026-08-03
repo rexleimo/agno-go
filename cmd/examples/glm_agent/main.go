@@ -6,10 +6,10 @@ import (
 	"log"
 	"os"
 
-	"github.com/rexleimo/agno-go/pkg/agno/agent"
-	"github.com/rexleimo/agno-go/pkg/agno/models/glm"
-	"github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
-	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+	"github.com/rexleimo/agno-go/pkg/hno/agent"
+	"github.com/rexleimo/agno-go/pkg/hno/models/glm"
+	"github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
+	"github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 )
 
 func main() {

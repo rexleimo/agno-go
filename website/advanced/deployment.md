@@ -312,7 +312,7 @@ Use reverse proxy or API gateway for rate limiting.
 Use built-in guardrails:
 
 ```go
-import "github.com/rexleimo/agno-Go/pkg/agno/guardrails"
+import "github.com/rexleimo/agno-Go/pkg/hno/guardrails"
 
 promptGuard := guardrails.NewPromptInjectionGuardrail()
 agent.PreHooks = []hooks.Hook{promptGuard}

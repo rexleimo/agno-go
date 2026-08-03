@@ -7,12 +7,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/rexleimo/agno-go/pkg/agno/agent"
-	"github.com/rexleimo/agno-go/pkg/agno/guardrails"
-	"github.com/rexleimo/agno-go/pkg/agno/hooks"
-	"github.com/rexleimo/agno-go/pkg/agno/models/openai"
-	"github.com/rexleimo/agno-go/pkg/agno/tools/calculator"
-	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+	"github.com/rexleimo/agno-go/pkg/hno/agent"
+	"github.com/rexleimo/agno-go/pkg/hno/guardrails"
+	"github.com/rexleimo/agno-go/pkg/hno/hooks"
+	"github.com/rexleimo/agno-go/pkg/hno/models/openai"
+	"github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
+	"github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 )
 
 // CustomPreHook is an example of a custom pre-hook function

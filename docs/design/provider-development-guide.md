@@ -4,7 +4,7 @@
 
 ## 一、抽象层总览（你复用什么）
 
-所有公共组件位于 `pkg/agno/models/`：
+所有公共组件位于 `pkg/hno/models/`：
 
 | 组件 | 位置 | 作用 |
 |------|------|------|
@@ -21,7 +21,7 @@
 ## 二、文件结构（新 provider 目录约定）
 
 ```
-pkg/agno/models/<provider>/
+pkg/hno/models/<provider>/
 ├── <provider>.go    # 核心：struct + Config + New + Invoke + InvokeStream + ValidateConfig
 ├── request.go       # 请求构建：buildXxxRequest（InvokeRequest → 线上格式）
 ├── response.go      # 响应解析：convertResponse / convertToChunk（线上格式 → ModelResponse）
@@ -45,8 +45,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/rexleimo/agno-go/pkg/agno/models"
-	"github.com/rexleimo/agno-go/pkg/agno/types"
+	"github.com/rexleimo/agno-go/pkg/hno/models"
+	"github.com/rexleimo/agno-go/pkg/hno/types"
 	"github.com/sashabaranov/go-openai"
 )
 
@@ -169,7 +169,7 @@ modelResp.ToolCalls = append(modelResp.ToolCalls, models.NewToolCall(
 
 ## 四、新增 provider 的步骤（Checklist）
 
-1. **建目录**：`pkg/agno/models/<provider>/`，按上述文件结构拆分
+1. **建目录**：`pkg/hno/models/<provider>/`，按上述文件结构拆分
 2. **写 Config + New**：校验 APIKey、设置默认 BaseURL/Timeout；嵌入 `models.BaseModel`（Provider 字段填 provider 名）
 3. **写 buildXxxRequest**：InvokeRequest.Messages/Tools/Temperature/MaxTokens → 线上格式
 4. **写 Invoke**：选模式 1（SDK）或模式 2（PostJSON）
@@ -177,7 +177,7 @@ modelResp.ToolCalls = append(modelResp.ToolCalls, models.NewToolCall(
 6. **写 convertResponse / convertToChunk**：文本、工具调用（NewToolCall）、usage、reasoning 提取
 7. **能力接口（可选）**：实现 StructuredOutputModel/MultimodalModel/ReasoningModel
 8. **测试**：表驱动测试 + httptest mock；有真实 API 的写集成测试（无 key 自动跳过）
-9. **验证**：`go build ./pkg/agno/models/<provider>/` + `go test ./pkg/agno/models/<provider>/` + `go vet`
+9. **验证**：`go build ./pkg/hno/models/<provider>/` + `go test ./pkg/hno/models/<provider>/` + `go vet`
 10. **注册**：在 `models/README.md` 的 provider 列表中加入新条目
 
 ## 五、验收标准

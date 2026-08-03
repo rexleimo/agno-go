@@ -24,7 +24,7 @@ Agno-Go's MCP implementation consists of several key components:
 Agno-Go 的 MCP 实现由几个关键组件组成:
 
 ```
-pkg/agno/mcp/
+pkg/hno/mcp/
 ├── protocol/       # JSON-RPC 2.0 and MCP message types | JSON-RPC 2.0 和 MCP 消息类型
 ├── client/         # MCP client core and transports | MCP 客户端核心和传输
 ├── security/       # Command validation and security | 命令验证和安全
@@ -57,7 +57,7 @@ uvx mcp install @modelcontextprotocol/server-calculator
 #### 1. Create Security Validator | 创建安全验证器
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/mcp/security"
+import "github.com/rexleimo/agno-go/pkg/hno/mcp/security"
 
 // Create validator with default safe commands
 // 使用默认安全命令创建验证器
@@ -73,7 +73,7 @@ if err := validator.Validate("python", []string{"-m", "mcp_server"}); err != nil
 #### 2. Setup Transport | 设置传输
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/mcp/client"
+import "github.com/rexleimo/agno-go/pkg/hno/mcp/client"
 
 // Create stdio transport for subprocess communication
 // 创建 stdio 传输以进行子进程通信
@@ -115,8 +115,8 @@ fmt.Printf("Connected to: %s v%s\n", serverInfo.Name, serverInfo.Version)
 
 ```go
 import (
-    "github.com/rexleimo/agno-go/pkg/agno/agent"
-    mcptoolkit "github.com/rexleimo/agno-go/pkg/agno/mcp/toolkit"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    mcptoolkit "github.com/rexleimo/agno-go/pkg/hno/mcp/toolkit"
 )
 
 // Create toolkit from MCP client
@@ -216,7 +216,7 @@ MCP supports different content types:
 MCP 支持不同的内容类型:
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/agno/mcp/content"
+import "github.com/rexleimo/agno-go/pkg/hno/mcp/content"
 
 handler := content.New()
 
@@ -293,13 +293,13 @@ Current implementation status:
 4. **Close connections** - Always defer `toolkit.Close()` to clean up resources
    - **关闭连接** - 始终 defer `toolkit.Close()` 以清理资源
 
-5. **Test with mock servers** - Use the testing utilities in `pkg/agno/mcp/client/testing.go`
-   - **使用模拟服务器测试** - 使用 `pkg/agno/mcp/client/testing.go` 中的测试工具
+5. **Test with mock servers** - Use the testing utilities in `pkg/hno/mcp/client/testing.go`
+   - **使用模拟服务器测试** - 使用 `pkg/hno/mcp/client/testing.go` 中的测试工具
 
 ## Next Steps | 下一步
 
 - Try the [MCP Demo Example](../examples/mcp-demo.md) | 尝试 [MCP 演示示例](../examples/mcp-demo.md)
-- Read the [MCP Implementation Guide](../../pkg/agno/mcp/IMPLEMENTATION.md) | 阅读 [MCP 实现指南](../../pkg/agno/mcp/IMPLEMENTATION.md)
+- Read the [MCP Implementation Guide](../../pkg/hno/mcp/IMPLEMENTATION.md) | 阅读 [MCP 实现指南](../../pkg/hno/mcp/IMPLEMENTATION.md)
 - Explore the [MCP Protocol Specification](https://spec.modelcontextprotocol.io/) | 探索 [MCP 协议规范](https://spec.modelcontextprotocol.io/)
 - Join discussions on [GitHub](https://github.com/rexleimo/agno-Go/discussions)
 

@@ -9,12 +9,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/rexleimo/agno-go/pkg/agno/agent"
-	"github.com/rexleimo/agno-go/pkg/agno/embeddings/openai"
-	"github.com/rexleimo/agno-go/pkg/agno/session"
-	"github.com/rexleimo/agno-go/pkg/agno/team"
-	"github.com/rexleimo/agno-go/pkg/agno/vectordb"
-	"github.com/rexleimo/agno-go/pkg/agno/vectordb/chromadb"
+	"github.com/rexleimo/agno-go/pkg/hno/agent"
+	"github.com/rexleimo/agno-go/pkg/hno/embeddings/openai"
+	"github.com/rexleimo/agno-go/pkg/hno/session"
+	"github.com/rexleimo/agno-go/pkg/hno/team"
+	"github.com/rexleimo/agno-go/pkg/hno/vectordb"
+	"github.com/rexleimo/agno-go/pkg/hno/vectordb/chromadb"
 )
 
 // Server represents the AgentOS HTTP server

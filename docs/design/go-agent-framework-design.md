@@ -50,7 +50,7 @@
 ## 2. 目标包结构
 
 ```
-pkg/agno/
+pkg/hno/
 ├── agent/            # Agent 编排层（薄：~400 LOC，配置壳）
 │   ├── agent.go      #   Agent[D, O] 泛型结构体：组合 Runner + tools + memory + skills + hooks
 │   ├── config.go     #   Config + AgentOption 函数式选项（≤10 核心参数 + Options）

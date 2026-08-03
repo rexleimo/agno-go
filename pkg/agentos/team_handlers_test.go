@@ -7,10 +7,10 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/rexleimo/agno-go/pkg/agno/agent"
-	"github.com/rexleimo/agno-go/pkg/agno/models"
-	"github.com/rexleimo/agno-go/pkg/agno/team"
-	"github.com/rexleimo/agno-go/pkg/agno/tools/toolkit"
+	"github.com/rexleimo/agno-go/pkg/hno/agent"
+	"github.com/rexleimo/agno-go/pkg/hno/models"
+	"github.com/rexleimo/agno-go/pkg/hno/team"
+	"github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 )
 
 func TestHandleTeamTools_ReturnsAggregatedTools(t *testing.T) {
