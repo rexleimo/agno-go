@@ -51,6 +51,11 @@ type Agent struct {
 	// 临时 instructions 支持,用于工作流历史注入
 	tempInstructions string       // Temporary instructions (single execution only) / 临时指令（仅单次执行）
 	instructionsMu   sync.RWMutex // Protects instructions modification / 保护指令修改
+
+	// functionIndex is a lazily built merged map of all toolkit functions
+	// for O(1) tool dispatch.
+	// functionIndex 是懒构建的合并函数索引，用于 O(1) 工具分发。
+	functionIndex map[string]*toolkit.Function
 }
 
 // Config contains agent configuration

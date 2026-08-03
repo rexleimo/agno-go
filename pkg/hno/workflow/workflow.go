@@ -217,19 +217,22 @@ func (w *Workflow) Run(ctx context.Context, input string, sessionID string, opts
 		}
 	}
 
-	var lastStepID string
+	// Execute the steps via the shared executor kernel.
+	// 通过共享执行器内核执行步骤。
+	res := executeSteps(ctx, w.Steps, startIdx, execCtx)
+	execCtx = res.execCtx
+	lastStepID := res.lastStepID
 
-	for idx := startIdx; idx < len(w.Steps); idx++ {
-		step := w.Steps[idx]
-
-		select {
-		case <-ctx.Done():
-			if workflowRun != nil {
+	if res.err != nil {
+		w.logger.Error("workflow execution failed", "error", res.err)
+		if workflowRun != nil {
+			workflowRun.LastStepID = lastStepID
+			if ctx.Err() != nil {
+				// Context cancelled: persist cancellation record.
+				// 上下文取消：持久化取消记录。
 				reason := ctx.Err()
 				snapshot := execCtx.ExportSessionState()
 				workflowRun.ApplyCancellation(reason.Error(), lastStepID, snapshot)
-				// Create a new context with timeout for persistence operations
-				// as the original context is cancelled
 				persistCtx, persistCancel := context.WithTimeout(context.Background(), 5*time.Second)
 				metrics.Stop()
 				w.saveRun(persistCtx, sessionID, workflowRun, metrics)
@@ -241,51 +244,22 @@ func (w *Workflow) Run(ctx context.Context, input string, sessionID string, opts
 					OccurredAt: time.Now(),
 				})
 				persistCancel()
-			}
-			return nil, ctx.Err()
-		default:
-		}
-
-		sequence := idx - startIdx + 1
-		currentStepID := step.GetID()
-		lastStepID = currentStepID
-		if workflowRun != nil {
-			workflowRun.LastStepID = currentStepID
-		}
-
-		w.logger.Info("executing step",
-			"step_id", currentStepID,
-			"step_type", step.GetType(),
-			"sequence", sequence)
-
-		result, err := step.Execute(ctx, execCtx)
-		if err != nil {
-			w.logger.Error("step execution failed",
-				"step_id", currentStepID,
-				"error", err)
-
-			if workflowRun != nil {
-				workflowRun.LastStepID = currentStepID
-				workflowRun.MarkFailed(err)
+			} else {
+				workflowRun.MarkFailed(res.err)
 				metrics.Stop()
 				w.saveRun(ctx, sessionID, workflowRun, metrics)
 			}
-
-			return nil, types.NewError(types.ErrCodeUnknown, fmt.Sprintf("step %s failed", currentStepID), err)
 		}
-
-		execCtx = result
-		if workflowRun != nil {
-			if events := extractStepEvents(execCtx, currentStepID); len(events) > 0 {
-				workflowRun.AddEvents(events)
-			}
-		}
+		return nil, res.err
 	}
 
 	if workflowRun != nil {
 		workflowRun.MarkCompleted(execCtx.Output)
 		workflowRun.LastStepID = lastStepID
 		workflowRun.Messages = extractMessages(execCtx)
+		for _, stepEvents := range res.events {
+			workflowRun.AddEvents(stepEvents)
+		}
 		metrics.Stop()
 		w.saveRun(ctx, sessionID, workflowRun, metrics)
 	}
@@ -369,91 +343,6 @@ func (w *Workflow) loadHistory(ctx context.Context, execCtx *ExecutionContext) e
 
 // saveRun 保存运行记录到存储
 // saveRun saves run record to storage
-func (w *Workflow) saveRun(ctx context.Context, sessionID string, run *WorkflowRun, metrics *WorkflowMetrics) error {
-	if w.historyStore == nil {
-		return nil
-	}
-
-	// 获取 session
-	// Get session
-	session, err := w.historyStore.GetSession(ctx, sessionID)
-	if err != nil {
-		return fmt.Errorf("failed to get session: %w", err)
-	}
-	if metrics != nil {
-		attachWorkflowMetrics(run, metrics)
-	}
-
-	// 添加运行记录
-	// Add run record
-	session.AddRun(run)
-
-	// 更新 session
-	// Update session
-	if err := w.historyStore.UpdateSession(ctx, session); err != nil {
-		return fmt.Errorf("failed to update session: %w", err)
-	}
-
-	w.logger.Debug("saved run",
-		"session_id", sessionID,
-		"run_id", run.RunID,
-		"status", run.Status)
-
-	return nil
-}
-
-func attachWorkflowMetrics(run *WorkflowRun, metrics *WorkflowMetrics) {
-	if run == nil || metrics == nil {
-		return
-	}
-	if run.Metadata == nil {
-		run.Metadata = make(map[string]interface{})
-	}
-	snapshot := metrics.Snapshot()
-	if len(snapshot) == 0 {
-		return
-	}
-	run.Metadata["metrics"] = snapshot
-}
-
-func recordWorkflowMetrics(execCtx *ExecutionContext, metrics *WorkflowMetrics) {
-	if execCtx == nil || metrics == nil {
-		return
-	}
-	snapshot := metrics.Snapshot()
-	if len(snapshot) == 0 {
-		return
-	}
-	if execCtx.Metadata == nil {
-		execCtx.Metadata = make(map[string]interface{})
-	}
-	execCtx.Metadata["workflow_metrics"] = snapshot
-}
-
-func (w *Workflow) saveCancellation(ctx context.Context, sessionID string, record *CancellationRecord) error {
-	if w.historyStore == nil || record == nil {
-		return nil
-	}
-
-	session, err := w.historyStore.GetSession(ctx, sessionID)
-	if err != nil {
-		return fmt.Errorf("failed to get session for cancellation: %w", err)
-	}
-
-	session.AddCancellation(record)
-	if err := w.historyStore.UpdateSession(ctx, session); err != nil {
-		return fmt.Errorf("failed to update session cancellation: %w", err)
-	}
-
-	w.logger.Debug("saved cancellation",
-		"session_id", sessionID,
-		"run_id", record.RunID,
-		"step_id", record.StepID)
-	return nil
-}
-
-// extractMessages 从执行上下文提取消息
-// extractMessages extracts messages from execution context
 func extractMessages(execCtx *ExecutionContext) []*types.Message {
 	// 从 session state 中提取消息历史
 	// Extract message history from session state

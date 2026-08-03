@@ -11,6 +11,7 @@ import (
 type MemoryStorage struct {
 	mu       sync.RWMutex
 	sessions map[string]*WorkflowSession // sessionID -> session
+	order    []string                    // insertion order for deterministic FIFO eviction / 插入顺序，保证确定性 FIFO 淘汰
 	maxSize  int                         // Maximum number of sessions to store (0 = unlimited)
 }
 
@@ -57,17 +58,13 @@ func (m *MemoryStorage) CreateSession(ctx context.Context, sessionID, workflowID
 	// Check size limit
 	// 检查大小限制
 	if m.maxSize > 0 && len(m.sessions) >= m.maxSize {
-		// Remove oldest session (simple FIFO eviction)
-		// 删除最旧的会话（简单的 FIFO 驱逐）
-		var oldestID string
-		var oldestTime time.Time
-		for id, session := range m.sessions {
-			if oldestTime.IsZero() || session.CreatedAt.Before(oldestTime) {
-				oldestID = id
-				oldestTime = session.CreatedAt
-			}
-		}
-		if oldestID != "" {
+		// Evict the oldest session (deterministic FIFO by insertion order;
+		// CreatedAt timestamps can collide within the same nanosecond).
+		// 淘汰最旧的会话（按插入顺序的确定性 FIFO；
+		// CreatedAt 时间戳在同一纳秒内可能相同）。
+		if len(m.order) > 0 {
+			oldestID := m.order[0]
+			m.order = m.order[1:]
 			delete(m.sessions, oldestID)
 		}
 	}
@@ -76,6 +73,7 @@ func (m *MemoryStorage) CreateSession(ctx context.Context, sessionID, workflowID
 	// 创建新会话
 	session := NewWorkflowSession(sessionID, workflowID, userID)
 	m.sessions[sessionID] = session
+	m.order = append(m.order, sessionID)
 
 	return session, nil
 }

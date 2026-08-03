@@ -73,16 +73,24 @@ func (t *BaseToolkit) Execute(ctx context.Context, fnName string, args map[strin
 		return nil, fmt.Errorf("function %s not found in toolkit %s", fnName, t.name)
 	}
 
-	// Validate required parameters
-	for paramName, param := range fn.Parameters {
-		if param.Required {
-			if _, exists := args[paramName]; !exists {
-				return nil, fmt.Errorf("required parameter %s missing", paramName)
-			}
-		}
+	if err := ValidateArgs(fn, args); err != nil {
+		return nil, err
 	}
 
 	return fn.Handler(ctx, args)
+}
+
+// ValidateArgs checks that all required parameters are present.
+// ValidateArgs 检查所有必填参数是否存在。
+func ValidateArgs(fn *Function, args map[string]interface{}) error {
+	for paramName, param := range fn.Parameters {
+		if param.Required {
+			if _, exists := args[paramName]; !exists {
+				return fmt.Errorf("required parameter %s missing", paramName)
+			}
+		}
+	}
+	return nil
 }
 
 // ToModelToolDefinitions converts toolkit functions to model tool definitions

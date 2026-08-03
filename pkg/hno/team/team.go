@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 
 	"github.com/rexleimo/agno-go/pkg/hno/agent"
@@ -247,18 +248,17 @@ func (t *Team) Run(ctx context.Context, input string) (*RunOutput, error) {
 	var output *RunOutput
 	var err error
 
-	switch t.Mode {
-	case ModeSequential:
-		output, err = t.runSequential(ctx, input)
-	case ModeParallel:
-		output, err = t.runParallel(ctx, input)
-	case ModeLeaderFollower:
-		output, err = t.runLeaderFollower(ctx, input)
-	case ModeConsensus:
-		output, err = t.runConsensus(ctx, input)
-	default:
+	// Delegate the collaboration strategy to the mode's scheduler. The team
+	// owns the run loop: it asks the scheduler for the next agent, executes
+	// it via the shared kernel, and stops when the scheduler returns nil.
+	// 将协作策略委托给模式对应的 scheduler。team 拥有运行循环：
+	// 向 scheduler 请求下一个 agent，用共享内核执行，scheduler 返回
+	// nil 时结束。
+	scheduler := schedulerFor(t.Mode)
+	if scheduler == nil {
 		return nil, types.NewInvalidConfigError(fmt.Sprintf("unknown team mode: %s", t.Mode), nil)
 	}
+	output, err = t.runWithScheduler(ctx, scheduler, input)
 
 	if err != nil {
 		t.logger.Error("team run failed", "error", err)
@@ -283,289 +283,112 @@ func (t *Team) Run(ctx context.Context, input string) (*RunOutput, error) {
 	return output, nil
 }
 
-// runSequential executes agents one after another, passing output as input to next
-func (t *Team) runSequential(ctx context.Context, input string) (*RunOutput, error) {
-	currentInput := input
-	agentOutputs := make([]*AgentOutput, 0, len(t.Agents))
+// runWithScheduler is the shared execution kernel: it drives the run loop by
+// asking the scheduler for the next agent until completion, then builds the
+// final RunOutput. Mode-specific behaviour (ordering, input chaining,
+// convergence) lives entirely in the scheduler.
+//
+// runWithScheduler 是共享执行内核：通过向 scheduler 请求下一个 agent
+// 驱动运行循环直至完成，然后构建最终 RunOutput。模式专属行为
+// （顺序、输入串联、收敛）完全由 scheduler 承担。
+func (t *Team) runWithScheduler(ctx context.Context, s Scheduler, input string) (*RunOutput, error) {
+	// Adapt the team to the shared run.Loop kernel: the scheduler's Next
+	// decides the next agent, InputFor derives its input, and each agent
+	// invocation is a Unit.
+	// 将团队适配到共享 run.Loop 内核：scheduler 的 Next 决定下一个
+	// agent，InputFor 推导输入，每次 agent 调用是一个 Unit。
+	loop := &run.Loop{
+		Next: func(history []run.UnitOutput) (run.Unit, string, error) {
+			// Translate run.UnitOutput history into AgentOutput history.
+			// 将 run.UnitOutput 历史转换为 AgentOutput 历史。
+			agentHistory := make([]AgentOutput, len(history))
+			for i, h := range history {
+				agentHistory[i] = AgentOutput{AgentID: h.UnitID, Content: h.Output}
+			}
 
-	for i, ag := range t.Agents {
-		t.logger.Info("running agent", "agent_id", ag.ID, "sequence", i+1)
-
-		result, err := t.invokeAgent(ctx, ag, currentInput)
-		if err != nil {
-			return nil, types.NewError(types.ErrCodeUnknown, fmt.Sprintf("agent %s failed", ag.ID), err)
-		}
-
-		agentOutputs = append(agentOutputs, &AgentOutput{
-			AgentID: ag.ID,
-			Content: result.Content,
-		})
-
-		// Pass output to next agent
-		currentInput = result.Content
-	}
-
-	// Last agent's output is the final result
-	finalContent := ""
-	if len(agentOutputs) > 0 {
-		finalContent = agentOutputs[len(agentOutputs)-1].Content
-	}
-
-	metadata := map[string]interface{}{
-		"mode":        string(ModeSequential),
-		"agent_count": len(t.Agents),
-	}
-	t.appendInheritanceMetadata(metadata)
-
-	return &RunOutput{
-		Content:      finalContent,
-		AgentOutputs: agentOutputs,
-		Metadata:     metadata,
-	}, nil
-}
-
-// runParallel executes all agents simultaneously
-func (t *Team) runParallel(ctx context.Context, input string) (*RunOutput, error) {
-	var wg sync.WaitGroup
-	results := make(chan *AgentOutput, len(t.Agents))
-	errors := make(chan error, len(t.Agents))
-
-	for _, ag := range t.Agents {
-		wg.Add(1)
-		go func(a *agent.Agent) {
-			defer wg.Done()
-
-			t.logger.Info("running agent in parallel", "agent_id", a.ID)
-
-			result, err := t.invokeAgent(ctx, a, input)
+			ag, err := s.Next(ctx, t, agentHistory)
 			if err != nil {
-				errors <- types.NewError(types.ErrCodeUnknown, fmt.Sprintf("agent %s failed", a.ID), err)
-				return
+				return nil, "", err
+			}
+			if ag == nil {
+				return nil, "", nil
 			}
 
-			results <- &AgentOutput{
-				AgentID: a.ID,
-				Content: result.Content,
-			}
-		}(ag)
-	}
+			agentInput := s.InputFor(input, agentHistory)
 
-	wg.Wait()
-	close(results)
-	close(errors)
-
-	// Check for errors
-	if len(errors) > 0 {
-		return nil, <-errors
-	}
-
-	// Collect all results
-	agentOutputs := make([]*AgentOutput, 0, len(t.Agents))
-	for output := range results {
-		agentOutputs = append(agentOutputs, output)
-	}
-
-	// Combine outputs (simple concatenation for now)
-	combinedContent := ""
-	for i, output := range agentOutputs {
-		if i > 0 {
-			combinedContent += "\n\n"
-		}
-		combinedContent += fmt.Sprintf("[%s]: %s", output.AgentID, output.Content)
-	}
-
-	metadata := map[string]interface{}{
-		"mode":        string(ModeParallel),
-		"agent_count": len(t.Agents),
-	}
-	t.appendInheritanceMetadata(metadata)
-
-	return &RunOutput{
-		Content:      combinedContent,
-		AgentOutputs: agentOutputs,
-		Metadata:     metadata,
-	}, nil
-}
-
-// runLeaderFollower uses leader to delegate tasks and synthesize results
-func (t *Team) runLeaderFollower(ctx context.Context, input string) (*RunOutput, error) {
-	// Step 1: Leader plans and delegates
-	t.logger.Info("leader planning", "leader_id", t.Leader.ID)
-
-	planPrompt := fmt.Sprintf(`You are a team leader. Break down this task into subtasks for your team members:
+			// Leader planning stage needs its own prompt for leader-follower.
+			// leader-follower 的规划阶段需要专属提示词。
+			if _, ok := s.(*LeaderFollowerScheduler); ok && len(agentHistory) == 0 {
+				agentInput = fmt.Sprintf(
+					`You are a team leader. Break down this task into subtasks for your team members:
 Task: %s
 
 Respond with a JSON array of subtasks, one for each team member.
 Example: ["subtask1", "subtask2", "subtask3"]`, input)
-
-	planResult, err := t.invokeAgent(ctx, t.Leader, planPrompt)
-	if err != nil {
-		return nil, types.NewError(types.ErrCodeUnknown, "leader planning failed", err)
-	}
-
-	// For simplicity, assign the same task to all followers
-	// In a real implementation, parse planResult.Content to extract subtasks
-	var wg sync.WaitGroup
-	results := make(chan *AgentOutput, len(t.Agents))
-	errors := make(chan error, len(t.Agents))
-
-	// Step 2: Followers execute
-	for _, ag := range t.Agents {
-		wg.Add(1)
-		go func(a *agent.Agent) {
-			defer wg.Done()
-
-			t.logger.Info("follower executing", "agent_id", a.ID)
-
-			result, err := t.invokeAgent(ctx, a, input) // Use original input for now
-			if err != nil {
-				errors <- types.NewError(types.ErrCodeUnknown, fmt.Sprintf("agent %s failed", a.ID), err)
-				return
 			}
 
-			results <- &AgentOutput{
-				AgentID: a.ID,
-				Content: result.Content,
-			}
-		}(ag)
+			unit := run.NewUnitFunc(ag.ID, func(ctx context.Context, in string) (string, run.Events, error) {
+				result, err := t.invokeAgent(ctx, ag, in)
+				if err != nil {
+					return "", nil, err
+				}
+				return result.Content, nil, nil
+			})
+			return unit, agentInput, nil
+		},
 	}
 
-	wg.Wait()
-	close(results)
-	close(errors)
-
-	if len(errors) > 0 {
-		return nil, <-errors
-	}
-
-	// Collect follower outputs
-	followerOutputs := make([]*AgentOutput, 0, len(t.Agents))
-	combinedResults := ""
-	for output := range results {
-		followerOutputs = append(followerOutputs, output)
-		combinedResults += fmt.Sprintf("\n[%s]: %s", output.AgentID, output.Content)
-	}
-
-	// Step 3: Leader synthesizes results
-	synthesisPrompt := fmt.Sprintf(`You are a team leader. Synthesize these team member outputs into a final answer:
-
-Original Task: %s
-
-Team Outputs:%s
-
-Provide a comprehensive final answer.`, input, combinedResults)
-
-	finalResult, err := t.invokeAgent(ctx, t.Leader, synthesisPrompt)
+	history, err := loop.Run(ctx)
 	if err != nil {
-		return nil, types.NewError(types.ErrCodeUnknown, "leader synthesis failed", err)
+		return nil, types.NewError(types.ErrCodeUnknown, "team run failed", err)
 	}
 
-	// Include leader outputs
-	allOutputs := append([]*AgentOutput{{
-		AgentID: t.Leader.ID + "_plan",
-		Content: planResult.Content,
-	}}, followerOutputs...)
-	allOutputs = append(allOutputs, &AgentOutput{
-		AgentID: t.Leader.ID + "_final",
-		Content: finalResult.Content,
-	})
-
-	metadata := map[string]interface{}{
-		"mode":        string(ModeLeaderFollower),
-		"leader_id":   t.Leader.ID,
-		"agent_count": len(t.Agents),
+	// Translate back to AgentOutput for output assembly.
+	// 转换回 AgentOutput 用于输出组装。
+	agentOutputs := make([]AgentOutput, len(history))
+	for i, h := range history {
+		agentOutputs[i] = AgentOutput{AgentID: h.UnitID, Content: h.Output}
 	}
-	t.appendInheritanceMetadata(metadata)
-
-	return &RunOutput{
-		Content:      finalResult.Content,
-		AgentOutputs: allOutputs,
-		Metadata:     metadata,
-	}, nil
+	return t.buildRunOutput(input, agentOutputs)
 }
 
-// runConsensus runs multiple rounds until agents reach consensus
-func (t *Team) runConsensus(ctx context.Context, input string) (*RunOutput, error) {
-	allOutputs := make([]*AgentOutput, 0)
-	previousOutputs := ""
-
-	for round := 1; round <= t.MaxRounds; round++ {
-		t.logger.Info("consensus round", "round", round, "max_rounds", t.MaxRounds)
-
-		roundPrompt := input
-		if round > 1 {
-			roundPrompt = fmt.Sprintf(`Original task: %s
-
-Previous round outputs:
-%s
-
-Consider the previous outputs and provide your refined answer. If you agree with a previous answer, state so clearly.`, input, previousOutputs)
-		}
-
-		// Run all agents in parallel
-		var wg sync.WaitGroup
-		results := make(chan *AgentOutput, len(t.Agents))
-		errors := make(chan error, len(t.Agents))
-
-		for _, ag := range t.Agents {
-			wg.Add(1)
-			go func(a *agent.Agent) {
-				defer wg.Done()
-
-				result, err := t.invokeAgent(ctx, a, roundPrompt)
-				if err != nil {
-					errors <- err
-					return
-				}
-
-				results <- &AgentOutput{
-					AgentID: fmt.Sprintf("%s_round%d", a.ID, round),
-					Content: result.Content,
-				}
-			}(ag)
-		}
-
-		wg.Wait()
-		close(results)
-		close(errors)
-
-		if len(errors) > 0 {
-			return nil, <-errors
-		}
-
-		// Collect round outputs
-		roundOutputs := make([]*AgentOutput, 0, len(t.Agents))
-		previousOutputs = ""
-		for output := range results {
-			roundOutputs = append(roundOutputs, output)
-			allOutputs = append(allOutputs, output)
-			previousOutputs += fmt.Sprintf("\n[%s]: %s", output.AgentID, output.Content)
-		}
-
-		// Simple consensus check: if all outputs are similar length (placeholder logic)
-		// In real implementation, use semantic similarity or voting
-		if round >= 2 {
-			// Consider consensus reached if we've done at least 2 rounds
-			break
-		}
+// buildRunOutput assembles the final RunOutput from the execution history.
+// The last agent's output is the team's answer (or the leader's synthesis
+// for leader-follower mode).
+//
+// buildRunOutput 从执行历史组装最终 RunOutput。最后一个 agent 的
+// 输出即团队答案（leader-follower 模式为 leader 的合成）。
+func (t *Team) buildRunOutput(input string, history []AgentOutput) (*RunOutput, error) {
+	if len(history) == 0 {
+		return nil, types.NewError(types.ErrCodeUnknown, "no agents executed", nil)
 	}
 
-	// Use last round's first agent output as final
-	finalContent := ""
-	if len(allOutputs) > 0 {
-		finalContent = allOutputs[len(allOutputs)-1].Content
+	finalContent := history[len(history)-1].Content
+	// Parallel and consensus modes combine all outputs into the final answer.
+	// 并行与共识模式将所有输出合并为最终答案。
+	if t.Mode == ModeParallel || t.Mode == ModeConsensus {
+		var sb strings.Builder
+		for _, out := range history {
+			sb.WriteString(fmt.Sprintf("\n[%s]: %s", out.AgentID, out.Content))
+		}
+		finalContent = strings.TrimSpace(sb.String())
 	}
-
 	metadata := map[string]interface{}{
-		"mode":        string(ModeConsensus),
-		"rounds":      t.MaxRounds,
+		"mode":        string(t.Mode),
 		"agent_count": len(t.Agents),
+	}
+	if t.Mode == ModeLeaderFollower && t.Leader != nil {
+		metadata["leader_id"] = t.Leader.ID
 	}
 	t.appendInheritanceMetadata(metadata)
 
+	outputs := make([]*AgentOutput, len(history))
+	for i := range history {
+		outputs[i] = &history[i]
+	}
 	return &RunOutput{
 		Content:      finalContent,
-		AgentOutputs: allOutputs,
+		AgentOutputs: outputs,
 		Metadata:     metadata,
 	}, nil
 }
@@ -599,137 +422,4 @@ func (t *Team) GetAgents() []*agent.Agent {
 	agents := make([]*agent.Agent, len(t.Agents))
 	copy(agents, t.Agents)
 	return agents
-}
-
-type inheritanceRecord struct {
-	ModelID string
-	Source  string
-}
-
-type modelScope struct {
-	restore func()
-	record  *inheritanceRecord
-}
-
-func (t *Team) invokeAgent(ctx context.Context, ag *agent.Agent, input string) (*agent.RunOutput, error) {
-	scope := t.prepareAgentModel(ag)
-	output, err := ag.Run(ctx, input)
-	if scope.restore != nil {
-		scope.restore()
-	}
-	if scope.record != nil {
-		t.recordInheritance(ag.ID, scope.record)
-	}
-	if output != nil && len(output.Events) > 0 {
-		annotateEventsWithTeam(t.ID, output.Events)
-	}
-	return output, err
-}
-
-func annotateEventsWithTeam(teamID string, events run.Events) {
-	if teamID == "" {
-		return
-	}
-	for _, evt := range events {
-		switch e := evt.(type) {
-		case *run.RunContentEvent:
-			if e.TeamID == "" {
-				e.TeamID = teamID
-			}
-		case *run.RunCompletedEvent:
-			if e.TeamID == "" {
-				e.TeamID = teamID
-			}
-		}
-	}
-}
-
-func (t *Team) prepareAgentModel(ag *agent.Agent) modelScope {
-	scope := modelScope{
-		restore: func() {},
-	}
-	if ag == nil {
-		return scope
-	}
-
-	original := ag.Model
-	scope.restore = func() {
-		ag.Model = original
-	}
-
-	if override, ok := t.modelOverrides[ag.ID]; ok && override != nil {
-		ag.Model = override
-		scope.record = &inheritanceRecord{
-			ModelID: override.GetID(),
-			Source:  "override",
-		}
-		return scope
-	}
-
-	if !t.inheritModel || t.sharedModel == nil {
-		return scope
-	}
-
-	if _, skip := t.skipInheritance[ag.ID]; skip {
-		return scope
-	}
-
-	ag.Model = t.sharedModel
-	scope.record = &inheritanceRecord{
-		ModelID: t.sharedModel.GetID(),
-		Source:  "team",
-	}
-	return scope
-}
-
-func (t *Team) recordInheritance(agentID string, record *inheritanceRecord) {
-	if agentID == "" || record == nil {
-		return
-	}
-	t.inheritanceMu.Lock()
-	defer t.inheritanceMu.Unlock()
-
-	if t.inheritanceTrace == nil {
-		t.inheritanceTrace = make(map[string]inheritanceRecord)
-	}
-	t.inheritanceTrace[agentID] = *record
-}
-
-func (t *Team) snapshotInheritance() map[string]map[string]string {
-	t.inheritanceMu.Lock()
-	defer t.inheritanceMu.Unlock()
-
-	if len(t.inheritanceTrace) == 0 {
-		return nil
-	}
-
-	result := make(map[string]map[string]string, len(t.inheritanceTrace))
-	for agentID, record := range t.inheritanceTrace {
-		result[agentID] = map[string]string{
-			"model_id": record.ModelID,
-			"source":   record.Source,
-		}
-	}
-	return result
-}
-
-func (t *Team) appendInheritanceMetadata(metadata map[string]interface{}) {
-	if metadata == nil {
-		return
-	}
-	if trace := t.snapshotInheritance(); len(trace) > 0 {
-		metadata["model_inheritance"] = trace
-	}
-}
-
-func (t *Team) resetInheritance() {
-	t.inheritanceMu.Lock()
-	defer t.inheritanceMu.Unlock()
-	if t.inheritanceTrace == nil {
-		t.inheritanceTrace = make(map[string]inheritanceRecord)
-		return
-	}
-	for k := range t.inheritanceTrace {
-		delete(t.inheritanceTrace, k)
-	}
 }
