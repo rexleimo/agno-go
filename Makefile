@@ -15,11 +15,7 @@ coverage: test ## Show test coverage
 
 lint: ## Run incremental linters (set LINT_BASE in CI)
 	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not installed. Run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; exit 1; }
-	@if [ -n "$(LINT_BASE)" ] && git rev-parse --verify "$(LINT_BASE)" >/dev/null 2>&1; then \
-		golangci-lint run --new-from-rev="$(LINT_BASE)" ./...; \
-	else \
-		golangci-lint run ./...; \
-	fi
+	@if [ -n "$(LINT_BASE)" ] && git rev-parse --verify "$(LINT_BASE)" >/dev/null 2>&1; then golangci-lint run --new-from-rev="$(LINT_BASE)" ./...; else golangci-lint run ./...; fi
 
 lint-full: ## Run the full linter against the whole repository
 	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not installed. Run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; exit 1; }

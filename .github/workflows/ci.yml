@@ -62,7 +62,12 @@ jobs:
       - name: Run lint
         env:
           LINT_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
-        run: make lint LINT_BASE="$LINT_BASE"
+        run: |
+          if [ -n "$LINT_BASE" ] && git rev-parse --verify "$LINT_BASE" >/dev/null 2>&1; then
+            golangci-lint run --new-from-rev="$LINT_BASE" ./...
+          else
+            golangci-lint run ./...
+          fi
 
       - name: Run tests
         run: make test
