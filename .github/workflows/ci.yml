@@ -41,7 +41,18 @@ jobs:
             ${{ runner.os }}-gomod-
 
       - name: Download dependencies
-        run: go mod download
+        env:
+          GOPROXY: https://proxy.golang.org,direct
+          GOSUMDB: sum.golang.org
+        run: |
+          for attempt in 1 2 3; do
+            if go mod download; then
+              exit 0
+            fi
+            echo "go mod download failed (attempt ${attempt}/3); retrying..."
+            sleep $((attempt * 10))
+          done
+          exit 1
 
       - name: Install tooling
         run: make install-tools
