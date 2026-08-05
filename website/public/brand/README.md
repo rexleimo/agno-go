@@ -22,4 +22,4 @@ The current HNO identity (generated with GPT Image 2, August 2026) uses:
 - `hno-favicon.png`: browser favicon (64px).
 - `website/public/logo.png`: 512px copy of the production mark for compatibility integrations.
 
-The PNG files are the production source of truth (AI-generated, no hand-authored SVG equivalents). The legacy `*-halo-node-v3.svg` / `hno-logo-header*.svg` / `hno-favicon.svg` files in this directory are archived designs from the previous "three-node + friendly face" identity — kept for history only, not referenced by the site. Regenerate or derive variants (e.g. new sizes, taglines) with image-to-image from the mark/lockup PNGs above.
+The PNG files are the production source of truth (AI-generated, no hand-authored SVG equivalents). The legacy "three-node + friendly face" identity (including its `*-halo-node-v3.svg` sources) was removed from the site; regenerate or derive variants (e.g. new sizes, taglines) with image-to-image from the mark/lockup PNGs above.
