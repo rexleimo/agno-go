@@ -23,6 +23,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -58,7 +60,9 @@ jobs:
         run: make install-tools
 
       - name: Run lint
-        run: make lint
+        env:
+          LINT_BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: make lint LINT_BASE="$LINT_BASE"
 
       - name: Run tests
         run: make test

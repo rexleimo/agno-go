@@ -1,4 +1,4 @@
-.PHONY: help test lint build coverage clean fmt vet contract-test
+.PHONY: help test lint lint-full build coverage clean fmt vet contract-test
 
 help: ## Show this help message
 	@echo 'Usage: make [target]'
@@ -13,7 +13,15 @@ coverage: test ## Show test coverage
 	go tool cover -html=coverage.txt -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 
-lint: ## Run linters
+lint: ## Run incremental linters (set LINT_BASE in CI)
+	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not installed. Run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; exit 1; }
+	@if [ -n "$(LINT_BASE)" ] && git rev-parse --verify "$(LINT_BASE)" >/dev/null 2>&1; then \
+		golangci-lint run --new-from-rev="$(LINT_BASE)" ./...; \
+	else \
+		golangci-lint run ./...; \
+	fi
+
+lint-full: ## Run the full linter against the whole repository
 	@command -v golangci-lint >/dev/null 2>&1 || { echo "golangci-lint not installed. Run: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; exit 1; }
 	golangci-lint run ./...
 
