@@ -11,6 +11,7 @@ func TestSandbox_FailClosedByDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() { _ = sb.Close() }()
 	if _, err := sb.ResolveRead(filepath.Join(t.TempDir(), "a.txt")); err == nil {
 		t.Fatal("expected error for sandbox without read roots")
 	}
@@ -25,12 +26,16 @@ func TestSandbox_ResolveRead_InsideRoot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() { _ = sb.Close() }()
 	got, err := sb.ResolveRead(filepath.Join(root, "sub", "a.txt"))
 	if err != nil {
 		t.Fatalf("ResolveRead inside root: %v", err)
 	}
-	want := filepath.Join(root, "sub", "a.txt")
-	if got != filepath.Clean(want) {
+	want, err := canonicalPath(filepath.Join(root, "sub", "a.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != want {
 		t.Errorf("got %q want %q", got, want)
 	}
 }
@@ -41,6 +46,7 @@ func TestSandbox_ResolveRead_TraversalRejected(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() { _ = sb.Close() }()
 	cases := []string{
 		filepath.Join(root, "..", "secret.txt"),
 		filepath.Join(root, "..", "..", "etc", "passwd"),
@@ -68,6 +74,7 @@ func TestSandbox_ResolveRead_SymlinkEscapeRejected(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() { _ = sb.Close() }()
 	if _, err := sb.ResolveRead(link); err == nil {
 		t.Fatal("expected symlink escape to be rejected")
 	}
@@ -83,6 +90,7 @@ func TestSandbox_ResolveWrite_DirSymlinkEscapeRejected(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer func() { _ = sb.Close() }()
 	if _, err := sb.ResolveWrite(filepath.Join(root, "out", "new.txt")); err == nil {
 		t.Fatal("expected dir symlink escape to be rejected")
 	}
