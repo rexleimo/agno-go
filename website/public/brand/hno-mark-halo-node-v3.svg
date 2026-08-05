@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">HNO Halo Node mark v3</title>
+  <desc id="desc">Friendly HNO agent hub with three connected outer nodes.</desc>
+  <rect width="512" height="512" rx="144" fill="#0d0d0d"/>
+  <circle cx="256" cy="256" r="178" fill="none" stroke="#00ADD8" stroke-width="26"/>
+  <path d="M256 78 L256 125 M99 335 L143 309 M413 335 L369 309" stroke="#00ADD8" stroke-width="14" stroke-linecap="round" opacity="0.82"/>
+  <circle cx="256" cy="76" r="24" fill="#ffcf5c"/>
+  <circle cx="98" cy="336" r="24" fill="#00ADD8"/>
+  <circle cx="414" cy="336" r="24" fill="#00ADD8"/>
+  <circle cx="256" cy="256" r="130" fill="#f7f9fa"/>
+  <circle cx="202" cy="240" r="17" fill="#0d0d0d"/>
+  <circle cx="310" cy="240" r="17" fill="#0d0d0d"/>
+  <path d="M210 310 C234 336 278 336 302 310" fill="none" stroke="#0d0d0d" stroke-width="13" stroke-linecap="round"/>
+</svg>

@@ -9,14 +9,13 @@ export default defineConfig({
   sitemap: { hostname: 'https://hno.rexai.top/' },
 
   head: [
-    // Use existing logo as favicon to avoid 404s
-    ['link', { rel: 'icon', type: 'image/png', href: '/logo.png' }],
-    ['link', { rel: 'shortcut icon', href: '/logo.png' }],
-    ['link', { rel: 'apple-touch-icon', href: '/logo.png' }],
-    ['meta', { name: 'theme-color', content: '#3eaf7c' }],
+    ['link', { rel: 'icon', type: 'image/png', href: '/brand/hno-favicon.png' }],
+    ['link', { rel: 'shortcut icon', type: 'image/png', href: '/brand/hno-favicon.png' }],
+    ['link', { rel: 'apple-touch-icon', href: '/brand/hno-mark-halo-node-v3.png' }],
+    ['meta', { name: 'theme-color', content: '#00ADD8' }],
     ['meta', { name: 'og:type', content: 'website' }],
     ['meta', { name: 'og:site_name', content: 'HNO' }],
-    ['meta', { name: 'og:image', content: '/logo.png' }],
+    ['meta', { name: 'og:image', content: '/brand/hno-logo-halo-node-v3.png' }],
     ['meta', { name: 'og:url', content: 'https://hno.rexai.top/' }],
     ['meta', { name: 'robots', content: 'index,follow' }],
     ['link', { rel: 'alternate', type: 'application/rss+xml', href: '/rss.xml', title: 'HNO Blog RSS' }],
@@ -468,7 +467,12 @@ export default defineConfig({
   },
 
   themeConfig: {
-    logo: '/logo.png',
+    siteTitle: false,
+    logo: {
+      light: '/brand/hno-logo-header.png',
+      dark: '/brand/hno-logo-header-dark.png',
+      alt: 'HNO'
+    },
 
     nav: [
       { text: 'Guide', link: '/guide/' },
