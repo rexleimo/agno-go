@@ -42,7 +42,7 @@ jobs:
 
       - name: Download dependencies
         env:
-          GOPROXY: https://proxy.golang.org,direct
+          GOPROXY: https://goproxy.cn,https://proxy.golang.org,direct
           GOSUMDB: sum.golang.org
         run: |
           for attempt in 1 2 3; do
