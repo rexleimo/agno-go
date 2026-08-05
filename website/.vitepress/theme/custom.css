@@ -37,6 +37,12 @@
   font-weight: 600;
   letter-spacing: -0.02em;
 }
+/* 导航 logo：透明底 lockup，32px 高、垂直居中（VitePress 默认 24px 偏小） */
+.VPNavBarTitle .VPImage {
+  height: 32px;
+  width: auto;
+  display: block;
+}
 
 /* 正文窄栏：阅读优先 ~720px */
 .VPDoc .content-container {

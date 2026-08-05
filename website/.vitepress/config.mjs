@@ -469,8 +469,8 @@ export default defineConfig({
   themeConfig: {
     siteTitle: false,
     logo: {
-      light: '/brand/hno-logo-header.png',
-      dark: '/brand/hno-logo-header-dark.png',
+      light: '/brand/hno-logo-nav-light.png',
+      dark: '/brand/hno-logo-nav-dark.png',
       alt: 'HNO'
     },
 
