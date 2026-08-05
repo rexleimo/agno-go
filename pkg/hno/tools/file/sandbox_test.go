@@ -1,98 +1,142 @@
 package file
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
 func TestSandbox_FailClosedByDefault(t *testing.T) {
-	sb, err := NewSandbox()
+	sandbox, err := NewSandbox()
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = sb.Close() }()
-	if _, err := sb.ResolveRead(filepath.Join(t.TempDir(), "a.txt")); err == nil {
-		t.Fatal("expected error for sandbox without read roots")
+	defer func() { _ = sandbox.Close() }()
+
+	if _, err := sandbox.ReadFile("a.txt"); err == nil {
+		t.Fatal("expected read to be denied without a read root")
 	}
-	if _, err := sb.ResolveWrite(filepath.Join(t.TempDir(), "a.txt")); err == nil {
-		t.Fatal("expected error for sandbox without write root")
+	if _, err := sandbox.ReadDir("."); err == nil {
+		t.Fatal("expected list to be denied without a read root")
+	}
+	if _, err := sandbox.Stat("a.txt"); err == nil {
+		t.Fatal("expected stat to be denied without a read root")
+	}
+	if err := sandbox.WriteFile("a.txt", []byte("content"), 0644); err == nil {
+		t.Fatal("expected write to be denied without a write root")
+	}
+	if err := sandbox.DeleteFile("a.txt"); err == nil {
+		t.Fatal("expected delete to be denied without a write root")
+	}
+	if err := sandbox.MkdirAll("nested", 0755); err == nil {
+		t.Fatal("expected mkdir to be denied without a write root")
 	}
 }
 
-func TestSandbox_ResolveRead_InsideRoot(t *testing.T) {
-	root := t.TempDir()
-	sb, err := NewSandbox(WithReadRoots(root))
+func TestSandbox_SeparatesReadAndWriteRoots(t *testing.T) {
+	readRoot := t.TempDir()
+	writeRoot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(readRoot, ".env"), []byte("safe=true"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	readOnly, err := NewSandbox(WithReadRoots(readRoot))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = sb.Close() }()
-	got, err := sb.ResolveRead(filepath.Join(root, "sub", "a.txt"))
+	defer func() { _ = readOnly.Close() }()
+	content, err := readOnly.ReadFile(".env")
 	if err != nil {
-		t.Fatalf("ResolveRead inside root: %v", err)
+		t.Fatalf("read .env: %v", err)
 	}
-	want, err := canonicalPath(filepath.Join(root, "sub", "a.txt"))
+	if string(content) != "safe=true" {
+		t.Errorf("content = %q, want %q", content, "safe=true")
+	}
+	if err := readOnly.WriteFile("created.txt", []byte("no"), 0644); err == nil {
+		t.Fatal("read root must not grant write access")
+	}
+
+	writeOnly, err := NewSandbox(WithWriteRoot(writeRoot))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got != want {
-		t.Errorf("got %q want %q", got, want)
+	defer func() { _ = writeOnly.Close() }()
+	if err := writeOnly.WriteFile("created.txt", []byte("yes"), 0644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	if _, err := writeOnly.ReadFile("created.txt"); err == nil {
+		t.Fatal("write root must not implicitly grant read access")
+	}
+	if _, err := writeOnly.Stat("created.txt"); err == nil {
+		t.Fatal("write root must not implicitly grant metadata access")
 	}
 }
 
-func TestSandbox_ResolveRead_TraversalRejected(t *testing.T) {
+func TestSandbox_RejectsTraversalAndAbsolutePaths(t *testing.T) {
 	root := t.TempDir()
-	sb, err := NewSandbox(WithReadRoots(root))
+	sandbox, err := NewSandbox(WithReadRoots(root), WithWriteRoot(root))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = sb.Close() }()
-	cases := []string{
-		filepath.Join(root, "..", "secret.txt"),
-		filepath.Join(root, "..", "..", "etc", "passwd"),
-		filepath.Join(root, "a", "..", "..", "x"),
-	}
-	for _, p := range cases {
-		if _, err := sb.ResolveRead(p); err == nil {
-			t.Errorf("expected rejection for %q", p)
+	defer func() { _ = sandbox.Close() }()
+
+	for _, path := range []string{"../secret.txt", filepath.Join("a", "..", "..", "secret.txt"), ""} {
+		if _, err := sandbox.ReadFile(path); err == nil {
+			t.Errorf("expected read rejection for %q", path)
+		}
+		if err := sandbox.WriteFile(path, []byte("blocked"), 0644); err == nil {
+			t.Errorf("expected write rejection for %q", path)
 		}
 	}
+	if err := sandbox.WriteFile(filepath.Join(root, "inside.txt"), []byte("blocked"), 0644); err == nil {
+		t.Fatal("expected absolute path to be rejected")
+	}
 }
 
-func TestSandbox_ResolveRead_SymlinkEscapeRejected(t *testing.T) {
+func TestSandbox_ReadFile_SymlinkEscapeRejected(t *testing.T) {
 	root := t.TempDir()
 	outside := t.TempDir()
 	secret := filepath.Join(outside, "secret.txt")
 	if err := os.WriteFile(secret, []byte("s3cr3t"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	link := filepath.Join(root, "link.txt")
-	if err := os.Symlink(secret, link); err != nil {
+	if err := os.Symlink(secret, filepath.Join(root, "link.txt")); err != nil {
 		t.Skipf("symlink unsupported: %v", err)
 	}
-	sb, err := NewSandbox(WithReadRoots(root))
+
+	sandbox, err := NewSandbox(WithReadRoots(root))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = sb.Close() }()
-	if _, err := sb.ResolveRead(link); err == nil {
-		t.Fatal("expected symlink escape to be rejected")
+	defer func() { _ = sandbox.Close() }()
+
+	content, err := sandbox.ReadFile("link.txt")
+	if err == nil {
+		t.Fatalf("expected symlink escape to fail, got %q", content)
 	}
 }
 
-func TestSandbox_ResolveWrite_DirSymlinkEscapeRejected(t *testing.T) {
+func TestSandbox_WriteFile_DirectorySymlinkEscapeRejected(t *testing.T) {
 	root := t.TempDir()
 	outside := t.TempDir()
 	if err := os.Symlink(outside, filepath.Join(root, "out")); err != nil {
 		t.Skipf("symlink unsupported: %v", err)
 	}
-	sb, err := NewSandbox(WithWriteRoot(root))
+
+	sandbox, err := NewSandbox(WithWriteRoot(root))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = sb.Close() }()
-	if _, err := sb.ResolveWrite(filepath.Join(root, "out", "new.txt")); err == nil {
-		t.Fatal("expected dir symlink escape to be rejected")
+	defer func() { _ = sandbox.Close() }()
+
+	if err := sandbox.WriteFile(filepath.Join("out", "new.txt"), []byte("blocked"), 0644); err == nil {
+		t.Fatal("expected directory symlink escape to fail")
+	}
+	if _, err := os.Stat(filepath.Join(outside, "new.txt")); !errors.Is(err, fs.ErrNotExist) {
+		t.Fatalf("outside file was created or could not be checked: %v", err)
 	}
 }
 
@@ -103,13 +147,13 @@ func TestSandbox_WriteFile_OverwriteRejectedByDefault(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sb, err := NewSandbox(WithWriteRoot(root))
+	sandbox, err := NewSandbox(WithWriteRoot(root))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = sb.Close() }()
+	defer func() { _ = sandbox.Close() }()
 
-	if err := sb.WriteFile(target, []byte("new"), 0644); err == nil {
+	if err := sandbox.WriteFile("existing.txt", []byte("new"), 0644); err == nil {
 		t.Fatal("expected overwrite to be rejected by default")
 	}
 }
@@ -121,13 +165,13 @@ func TestSandbox_WriteFile_OverwriteAllowed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	sb, err := NewSandbox(WithWriteRoot(root), WithAllowOverwrite(true))
+	sandbox, err := NewSandbox(WithWriteRoot(root), WithAllowOverwrite(true))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = sb.Close() }()
+	defer func() { _ = sandbox.Close() }()
 
-	if err := sb.WriteFile(target, []byte("new"), 0644); err != nil {
+	if err := sandbox.WriteFile("existing.txt", []byte("new"), 0644); err != nil {
 		t.Fatalf("WriteFile with allow overwrite: %v", err)
 	}
 	got, err := os.ReadFile(target)
@@ -141,44 +185,43 @@ func TestSandbox_WriteFile_OverwriteAllowed(t *testing.T) {
 
 func TestSandbox_WriteFile_SizeLimit(t *testing.T) {
 	root := t.TempDir()
-	sb, err := NewSandbox(WithWriteRoot(root), WithMaxWriteBytes(4))
+	sandbox, err := NewSandbox(WithWriteRoot(root), WithMaxWriteBytes(4))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = sb.Close() }()
+	defer func() { _ = sandbox.Close() }()
 
-	if err := sb.WriteFile(filepath.Join(root, "big.txt"), []byte("12345"), 0644); err == nil {
+	if err := sandbox.WriteFile("big.txt", []byte("12345"), 0644); err == nil {
 		t.Fatal("expected write over max write bytes to be rejected")
 	}
 }
 
 func TestSandbox_ReadFile_SizeLimit(t *testing.T) {
 	root := t.TempDir()
-	big := filepath.Join(root, "big.bin")
-	if err := os.WriteFile(big, make([]byte, 1024), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "big.bin"), make([]byte, 1024), 0644); err != nil {
 		t.Fatal(err)
 	}
 
-	sb, err := NewSandbox(WithReadRoots(root), WithMaxReadBytes(512))
+	sandbox, err := NewSandbox(WithReadRoots(root), WithMaxReadBytes(512))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = sb.Close() }()
+	defer func() { _ = sandbox.Close() }()
 
-	if _, err := sb.ReadFile(big); err == nil {
+	if _, err := sandbox.ReadFile("big.bin"); err == nil {
 		t.Fatal("expected read over max read bytes to be rejected")
 	}
 }
 
 func TestSandbox_WriteFile_CreatesParentDirectory(t *testing.T) {
 	root := t.TempDir()
-	sb, err := NewSandbox(WithWriteRoot(root))
+	sandbox, err := NewSandbox(WithWriteRoot(root))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = sb.Close() }()
+	defer func() { _ = sandbox.Close() }()
 
-	if err := sb.WriteFile(filepath.Join("nested", "file.txt"), []byte("content"), 0644); err != nil {
+	if err := sandbox.WriteFile(filepath.Join("nested", "file.txt"), []byte("content"), 0644); err != nil {
 		t.Fatalf("WriteFile: %v", err)
 	}
 	got, err := os.ReadFile(filepath.Join(root, "nested", "file.txt"))
@@ -196,18 +239,17 @@ func TestSandbox_WriteFile_FinalSymlinkRejected(t *testing.T) {
 	if err := os.WriteFile(target, []byte("old"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	link := filepath.Join(root, "link.txt")
-	if err := os.Symlink(target, link); err != nil {
+	if err := os.Symlink(target, filepath.Join(root, "link.txt")); err != nil {
 		t.Skipf("symlink unsupported: %v", err)
 	}
 
-	sb, err := NewSandbox(WithWriteRoot(root), WithAllowOverwrite(true))
+	sandbox, err := NewSandbox(WithWriteRoot(root), WithAllowOverwrite(true))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = sb.Close() }()
+	defer func() { _ = sandbox.Close() }()
 
-	if err := sb.WriteFile(link, []byte("new"), 0644); err == nil {
+	if err := sandbox.WriteFile("link.txt", []byte("new"), 0644); err == nil {
 		t.Fatal("expected final symlink to be rejected")
 	}
 	got, err := os.ReadFile(target)
@@ -216,5 +258,57 @@ func TestSandbox_WriteFile_FinalSymlinkRejected(t *testing.T) {
 	}
 	if string(got) != "old" {
 		t.Errorf("target was modified through symlink: %q", got)
+	}
+}
+
+func TestSandbox_AuditEntries(t *testing.T) {
+	root := t.TempDir()
+	var entries []AuditEntry
+	sandbox, err := NewSandbox(
+		WithWriteRoot(root),
+		WithAudit(func(entry AuditEntry) { entries = append(entries, entry) }),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = sandbox.Close() }()
+
+	if err := sandbox.WriteFile("a.txt", []byte("hi"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("audit entries = %d, want 1", len(entries))
+	}
+	if entries[0].Operation != "write_file" || entries[0].Path != "a.txt" || entries[0].Size != 2 || entries[0].At.IsZero() {
+		t.Fatalf("unexpected audit entry: %+v", entries[0])
+	}
+}
+
+func TestSandbox_RejectsWindowsSpecialPaths(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows-specific path validation")
+	}
+
+	root := t.TempDir()
+	sandbox, err := NewSandbox(WithReadRoots(root), WithWriteRoot(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = sandbox.Close() }()
+
+	for _, path := range []string{
+		`C:foo`,
+		`C:\Windows\win.ini`,
+		`\Windows\win.ini`,
+		`\\server\share\file.txt`,
+		`\\?\C:\Windows\file.txt`,
+		`file.txt:stream`,
+		"NUL",
+		"CON.txt",
+		"COM1",
+	} {
+		if err := sandbox.WriteFile(path, []byte("blocked"), 0644); err == nil {
+			t.Errorf("expected Windows special path %q to be rejected", path)
+		}
 	}
 }

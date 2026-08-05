@@ -240,43 +240,59 @@ func createTestPPTX(path string, slides []string) error {
 	return nil
 }
 
-func TestValidatePath(t *testing.T) {
-	tmpDir := t.TempDir()
-	ft := NewWithBaseDir(tmpDir)
+func TestNewWithBaseDir_ConfinesOperations(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	tools := NewWithBaseDir(root)
+	defer func() { _ = tools.Close() }()
 
-	tests := []struct {
-		name    string
-		path    string
-		wantErr bool
-	}{
-		{
-			name:    "valid path inside base dir",
-			path:    filepath.Join(tmpDir, "test.txt"),
-			wantErr: false,
-		},
-		{
-			name:    "valid relative path",
-			path:    filepath.Join(tmpDir, "subdir", "test.txt"),
-			wantErr: false,
-		},
-		{
-			name:    "invalid path outside base dir",
-			path:    "/tmp/test.txt",
-			wantErr: true,
-		},
-		{
-			name:    "invalid path with parent directory",
-			path:    filepath.Join(tmpDir, "..", "test.txt"),
-			wantErr: true,
-		},
+	target := filepath.Join(root, ".env")
+	result, err := tools.writeFile(context.Background(), map[string]interface{}{
+		"path":    target,
+		"content": "safe=true",
+	})
+	if err != nil {
+		t.Fatalf("write inside base directory: %v", err)
+	}
+	if result.(map[string]interface{})["path"] != target {
+		t.Fatal("caller-facing result path changed")
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			err := ft.validatePath(tt.path)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("validatePath() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
+	readResult, err := tools.readFile(context.Background(), map[string]interface{}{"path": target})
+	if err != nil {
+		t.Fatalf("read .env inside base directory: %v", err)
+	}
+	if readResult.(map[string]interface{})["content"] != "safe=true" {
+		t.Fatal("unexpected .env content")
+	}
+
+	if _, err := tools.writeFile(context.Background(), map[string]interface{}{
+		"path":    filepath.Join(outside, "blocked.txt"),
+		"content": "blocked",
+	}); err == nil {
+		t.Fatal("expected write outside base directory to fail")
+	}
+}
+
+func TestNewWithSandbox_RequiresRootRelativePaths(t *testing.T) {
+	root := t.TempDir()
+	sandbox, err := NewSandbox(WithWriteRoot(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	tools := NewWithSandbox(sandbox)
+	defer func() { _ = tools.Close() }()
+
+	if _, err := tools.writeFile(context.Background(), map[string]interface{}{
+		"path":    filepath.Join(root, "absolute.txt"),
+		"content": "blocked",
+	}); err == nil {
+		t.Fatal("expected absolute sandbox path to fail")
+	}
+	if _, err := tools.writeFile(context.Background(), map[string]interface{}{
+		"path":    "relative.txt",
+		"content": "allowed",
+	}); err != nil {
+		t.Fatalf("write root-relative path: %v", err)
 	}
 }
