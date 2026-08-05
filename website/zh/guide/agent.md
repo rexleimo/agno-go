@@ -278,9 +278,10 @@ ag, _ := agent.New(agent.Config{
 
 ## 性能考虑
 
-- **Agent 创建**: 平均约 180ns
-- **内存占用**: 每个 Agent 约 1.2KB
-- **并发 Agent**: 完全线程安全,可自由使用 goroutine
+Agent 创建数据依赖环境。请查看[性能页面](/zh/advanced/performance)中的
+benchmark 命令、机器信息、分配范围以及测量边界。benchmark 使用本地
+`MockModel`，不是 LLM 延迟或生产容量测量。并发上限应根据部署环境的工作负载
+和资源设置，而不是套用固定数字。
 
 ```go
 // Concurrent agents

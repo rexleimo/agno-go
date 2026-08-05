@@ -4,85 +4,84 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 )
 
-// HackerNewsToolkit provides Hacker News API capabilities
-// This implementation uses the official Hacker News API
+const (
+	defaultBaseURL       = "https://hacker-news.firebaseio.com/v0"
+	defaultSearchBaseURL = "https://hn.algolia.com/api/v1"
+)
 
-// HackerNewsToolkit provides Hacker News capabilities
+// HackerNewsToolkit provides Hacker News Firebase and Algolia Search API access.
 type HackerNewsToolkit struct {
 	*toolkit.BaseToolkit
-	client *http.Client
-	baseURL string
+	client        *http.Client
+	baseURL       string
+	searchBaseURL string
 }
 
-// New creates a new HackerNews toolkit
+// New creates a toolkit using the official Hacker News APIs.
 func New() *HackerNewsToolkit {
+	return NewWithBases(defaultBaseURL, defaultSearchBaseURL)
+}
+
+// NewWithBase creates a toolkit against a custom base. The same base is used
+// for both Firebase endpoints and /search, which is convenient for tests and
+// API-compatible proxies.
+func NewWithBase(baseURL string) *HackerNewsToolkit {
+	return NewWithBases(baseURL, baseURL)
+}
+
+// NewWithBases creates a toolkit with separate Firebase and Algolia endpoints.
+func NewWithBases(baseURL, searchBaseURL string) *HackerNewsToolkit {
+	if strings.TrimSpace(baseURL) == "" {
+		baseURL = defaultBaseURL
+	}
+	if strings.TrimSpace(searchBaseURL) == "" {
+		searchBaseURL = defaultSearchBaseURL
+	}
 	t := &HackerNewsToolkit{
-		BaseToolkit: toolkit.NewBaseToolkit("hacker_news"),
-		client: &http.Client{
-			Timeout: 30 * time.Second,
-		},
-		baseURL: "https://hacker-news.firebaseio.com/v0",
+		BaseToolkit:   toolkit.NewBaseToolkit("hacker_news"),
+		client:        &http.Client{Timeout: 30 * time.Second},
+		baseURL:       strings.TrimRight(baseURL, "/"),
+		searchBaseURL: strings.TrimRight(searchBaseURL, "/"),
 	}
 
-	// Register top stories function
 	t.RegisterFunction(&toolkit.Function{
 		Name:        "get_top_stories",
 		Description: "Get the top stories from Hacker News",
 		Parameters: map[string]toolkit.Parameter{
-			"limit": {
-				Type:        "integer",
-				Description: "Number of top stories to return (default: 10)",
-				Required:    false,
-				Default:     10,
-			},
+			"limit": {Type: "integer", Description: "Number of top stories to return (default: 10)", Required: false, Default: 10},
 		},
 		Handler: t.getTopStories,
 	})
-
-	// Register story details function
 	t.RegisterFunction(&toolkit.Function{
 		Name:        "get_story_details",
 		Description: "Get detailed information about a specific Hacker News story",
 		Parameters: map[string]toolkit.Parameter{
-			"story_id": {
-				Type:        "integer",
-				Description: "The Hacker News story ID",
-				Required:    true,
-			},
+			"story_id": {Type: "integer", Description: "The Hacker News story ID", Required: true},
 		},
 		Handler: t.getStoryDetails,
 	})
-
-	// Register search function
 	t.RegisterFunction(&toolkit.Function{
 		Name:        "search_stories",
-		Description: "Search for Hacker News stories by keyword",
+		Description: "Search Hacker News stories through the Algolia HN Search API",
 		Parameters: map[string]toolkit.Parameter{
-			"query": {
-				Type:        "string",
-				Description: "The search query",
-				Required:    true,
-			},
-			"limit": {
-				Type:        "integer",
-				Description: "Number of results to return (default: 10)",
-				Required:    false,
-				Default:     10,
-			},
+			"query": {Type: "string", Description: "The search query", Required: true},
+			"limit": {Type: "integer", Description: "Number of results to return (default: 10)", Required: false, Default: 10},
 		},
 		Handler: t.searchStories,
 	})
-
 	return t
 }
 
-// HNItem represents a Hacker News item
 type HNItem struct {
 	ID          int    `json:"id"`
 	Title       string `json:"title,omitempty"`
@@ -95,131 +94,161 @@ type HNItem struct {
 	Descendants int    `json:"descendants,omitempty"`
 }
 
-// getTopStories gets the top stories from Hacker News
-func (h *HackerNewsToolkit) getTopStories(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-	limit := 10
-	if limitArg, ok := args["limit"].(float64); ok {
-		limit = int(limitArg)
-	}
+type algoliaSearchHit struct {
+	ObjectID    string `json:"objectID"`
+	Title       string `json:"title"`
+	URL         string `json:"url"`
+	StoryText   string `json:"story_text"`
+	Author      string `json:"author"`
+	Points      int    `json:"points"`
+	CreatedAtI  int64  `json:"created_at_i"`
+	NumComments int    `json:"num_comments"`
+}
 
-	// Get top story IDs
-	var storyIDs []int
-	resp, err := h.client.Get(h.baseURL + "/topstories.json")
+type algoliaSearchResponse struct {
+	Hits   []algoliaSearchHit `json:"hits"`
+	NbHits int                `json:"nbHits"`
+}
+
+func hnLimit(args map[string]interface{}, defaultValue, max int) (int, error) {
+	limit := defaultValue
+	if value, ok := args["limit"]; ok {
+		switch number := value.(type) {
+		case int:
+			limit = number
+		case int64:
+			limit = int(number)
+		case float64:
+			limit = int(number)
+		case float32:
+			limit = int(number)
+		default:
+			return 0, fmt.Errorf("limit must be an integer")
+		}
+	}
+	if limit < 1 || limit > max {
+		return 0, fmt.Errorf("limit must be between 1 and %d", max)
+	}
+	return limit, nil
+}
+
+func (h *HackerNewsToolkit) getTopStories(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	limit, err := hnLimit(args, 10, 100)
 	if err != nil {
+		return nil, err
+	}
+	var storyIDs []int
+	if err := h.getJSON(ctx, h.baseURL+"/topstories.json", &storyIDs); err != nil {
 		return nil, fmt.Errorf("failed to fetch top stories: %w", err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch top stories: HTTP %d", resp.StatusCode)
-	}
-
-	if err := json.NewDecoder(resp.Body).Decode(&storyIDs); err != nil {
-		return nil, fmt.Errorf("failed to decode top stories: %w", err)
-	}
-
-	// Limit the number of stories
 	if len(storyIDs) > limit {
 		storyIDs = storyIDs[:limit]
 	}
 
-	// Get details for each story
-	var stories []map[string]interface{}
+	stories := make([]map[string]interface{}, 0, len(storyIDs))
 	for _, id := range storyIDs {
-		story, err := h.getItemDetails(id)
+		story, err := h.getItemDetails(ctx, id)
 		if err != nil {
-			continue // Skip failed stories
+			continue
 		}
 		stories = append(stories, story)
 	}
-
 	return map[string]interface{}{
 		"stories": stories,
 		"count":   len(stories),
 	}, nil
 }
 
-// getStoryDetails gets detailed information about a specific story
 func (h *HackerNewsToolkit) getStoryDetails(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-	storyID, ok := args["story_id"].(float64)
+	value, ok := args["story_id"]
 	if !ok {
+		return nil, fmt.Errorf("story_id is required")
+	}
+	var storyID int
+	switch number := value.(type) {
+	case int:
+		storyID = number
+	case int64:
+		storyID = int(number)
+	case float64:
+		storyID = int(number)
+	case float32:
+		storyID = int(number)
+	default:
 		return nil, fmt.Errorf("story_id must be a number")
 	}
-
-	story, err := h.getItemDetails(int(storyID))
+	if storyID <= 0 {
+		return nil, fmt.Errorf("story_id must be positive")
+	}
+	story, err := h.getItemDetails(ctx, storyID)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get story details: %w", err)
 	}
-
 	return story, nil
 }
 
-// searchStories searches for Hacker News stories
-// Note: Hacker News doesn't have a built-in search API, so this is a placeholder
-// In a real implementation, you might use Algolia's HN search API
 func (h *HackerNewsToolkit) searchStories(ctx context.Context, args map[string]interface{}) (interface{}, error) {
 	query, ok := args["query"].(string)
-	if !ok {
-		return nil, fmt.Errorf("query must be a string")
+	if !ok || strings.TrimSpace(query) == "" {
+		return nil, fmt.Errorf("query must be a non-empty string")
+	}
+	query = strings.TrimSpace(query)
+	limit, err := hnLimit(args, 10, 100)
+	if err != nil {
+		return nil, err
 	}
 
-	limit := 10
-	if limitArg, ok := args["limit"].(float64); ok {
-		limit = int(limitArg)
+	endpoint, err := url.Parse(h.searchBaseURL + "/search")
+	if err != nil {
+		return nil, fmt.Errorf("invalid Hacker News search URL: %w", err)
 	}
+	params := endpoint.Query()
+	params.Set("query", query)
+	params.Set("tags", "story")
+	params.Set("hitsPerPage", strconv.Itoa(limit))
+	endpoint.RawQuery = params.Encode()
 
-	// For now, return a mock response since Hacker News doesn't have a built-in search API
-	// In a real implementation, this would use Algolia's HN search API
-	mockResults := []map[string]interface{}{
-		{
-			"id":    123456,
-			"title": fmt.Sprintf("Article about %s", query),
-			"url":   "https://example.com/article",
-			"score": 256,
-			"by":    "user123",
-			"time":  time.Now().Unix(),
-		},
-		{
-			"id":    123457,
-			"title": fmt.Sprintf("Tutorial: %s", query),
-			"url":   "https://example.com/tutorial",
-			"score": 128,
-			"by":    "user456",
-			"time":  time.Now().Unix() - 86400, // 1 day ago
-		},
+	var payload algoliaSearchResponse
+	if err := h.getJSON(ctx, endpoint.String(), &payload); err != nil {
+		return nil, fmt.Errorf("failed to search Hacker News: %w", err)
 	}
-
-	// Limit results
-	if len(mockResults) > limit {
-		mockResults = mockResults[:limit]
+	results := make([]map[string]interface{}, 0, len(payload.Hits))
+	for _, hit := range payload.Hits {
+		id, _ := strconv.Atoi(hit.ObjectID)
+		result := map[string]interface{}{
+			"id":          id,
+			"object_id":   hit.ObjectID,
+			"title":       hit.Title,
+			"url":         hit.URL,
+			"text":        hit.StoryText,
+			"score":       hit.Points,
+			"by":          hit.Author,
+			"time":        hit.CreatedAtI,
+			"type":        "story",
+			"descendants": hit.NumComments,
+		}
+		if hit.CreatedAtI > 0 {
+			result["time_string"] = time.Unix(hit.CreatedAtI, 0).Format("2006-01-02 15:04:05")
+		}
+		results = append(results, result)
 	}
-
 	return map[string]interface{}{
-		"query":   query,
-		"results": mockResults,
-		"count":   len(mockResults),
-		"note":    "This is a placeholder implementation. For real search, integrate with Algolia's Hacker News search API.",
+		"query":      query,
+		"results":    results,
+		"count":      len(results),
+		"total_hits": payload.NbHits,
 	}, nil
 }
 
-// getItemDetails fetches details for a specific item ID
-func (h *HackerNewsToolkit) getItemDetails(id int) (map[string]interface{}, error) {
-	resp, err := h.client.Get(fmt.Sprintf("%s/item/%d.json", h.baseURL, id))
-	if err != nil {
+func (h *HackerNewsToolkit) getItemDetails(ctx context.Context, id int) (map[string]interface{}, error) {
+	var item *HNItem
+	endpoint := fmt.Sprintf("%s/item/%d.json", h.baseURL, id)
+	if err := h.getJSON(ctx, endpoint, &item); err != nil {
 		return nil, fmt.Errorf("failed to fetch item %d: %w", id, err)
 	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("failed to fetch item %d: HTTP %d", id, resp.StatusCode)
+	if item == nil {
+		return nil, fmt.Errorf("item %d was not found", id)
 	}
-
-	var item HNItem
-	if err := json.NewDecoder(resp.Body).Decode(&item); err != nil {
-		return nil, fmt.Errorf("failed to decode item %d: %w", id, err)
-	}
-
-	// Convert to map for easier use
 	result := map[string]interface{}{
 		"id":          item.ID,
 		"title":       item.Title,
@@ -230,8 +259,34 @@ func (h *HackerNewsToolkit) getItemDetails(id int) (map[string]interface{}, erro
 		"time":        item.Time,
 		"type":        item.Type,
 		"descendants": item.Descendants,
-		"time_string": time.Unix(item.Time, 0).Format("2006-01-02 15:04:05"),
 	}
-
+	if item.Time > 0 {
+		result["time_string"] = time.Unix(item.Time, 0).Format("2006-01-02 15:04:05")
+	}
 	return result, nil
+}
+
+func (h *HackerNewsToolkit) getJSON(ctx context.Context, endpoint string, target interface{}) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Accept", "application/json")
+	resp, err := h.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))
+		message := strings.TrimSpace(string(body))
+		if message == "" {
+			return fmt.Errorf("HTTP %d", resp.StatusCode)
+		}
+		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, message)
+	}
+	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
+		return err
+	}
+	return nil
 }

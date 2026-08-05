@@ -83,8 +83,11 @@ func (o *OpenAI) buildChatRequest(req *models.InvokeRequest) openai.ChatCompleti
 	// 设置温度
 	if req.Temperature > 0 {
 		chatReq.Temperature = float32(req.Temperature)
-	} else if o.config.Temperature > 0 {
+	} else if o.config.Temperature > 0 || o.config.TemperatureSet {
 		chatReq.Temperature = float32(o.config.Temperature)
+	}
+	if o.config.Seed != nil {
+		chatReq.Seed = o.config.Seed
 	}
 
 	// Set max tokens

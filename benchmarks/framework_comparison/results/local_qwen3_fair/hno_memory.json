@@ -1,0 +1,110 @@
+{
+  "framework": "hno",
+  "scenario": "memory",
+  "endpoint": "http://127.0.0.1:8081",
+  "model": "D:\\Program Files\\llmam.cpp\\llama-b10107-bin-win-cuda-13.3-x64\\models\\Qwen3-4B-Q8_0.gguf",
+  "warmup": 3,
+  "runs": 20,
+  "samples": [
+    {
+      "duration_ns": 185991400,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 174779300,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 181760500,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 184897800,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 181870600,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 188769100,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 185492700,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 184009500,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 177645000,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 183024000,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 182962500,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 190031000,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 210451100,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 180916200,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 180755900,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 180843400,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 177291800,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 181795000,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 182032300,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 182815500,
+      "content": "BLUE-42",
+      "success": true
+    }
+  ]
+}

@@ -18,7 +18,7 @@ HNO v1.0の完全なAPIリファレンスです。
 ### Agent
 
 ```go
-import "github.com/rexleimo/HNO/pkg/hno/agent"
+import "github.com/rexleimo/agno-go/pkg/hno/agent"
 
 agent.New(config) (*Agent, error)
 agent.Run(ctx, input) (*RunOutput, error)
@@ -30,7 +30,7 @@ agent.ClearMemory()
 ### Team
 
 ```go
-import "github.com/rexleimo/HNO/pkg/hno/team"
+import "github.com/rexleimo/agno-go/pkg/hno/team"
 
 team.New(config) (*Team, error)
 team.Run(ctx, input) (*RunOutput, error)
@@ -43,7 +43,7 @@ team.Run(ctx, input) (*RunOutput, error)
 ### Workflow
 
 ```go
-import "github.com/rexleimo/HNO/pkg/hno/workflow"
+import "github.com/rexleimo/agno-go/pkg/hno/workflow"
 
 workflow.New(config) (*Workflow, error)
 workflow.Run(ctx, input) (*RunOutput, error)
@@ -57,9 +57,9 @@ workflow.Run(ctx, input) (*RunOutput, error)
 
 ```go
 import (
-    "github.com/rexleimo/HNO/pkg/hno/models/openai"
-    "github.com/rexleimo/HNO/pkg/hno/models/anthropic"
-    "github.com/rexleimo/HNO/pkg/hno/models/ollama"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/models/anthropic"
+    "github.com/rexleimo/agno-go/pkg/hno/models/ollama"
 )
 
 openai.New(modelID, config) (*OpenAI, error)
@@ -73,9 +73,9 @@ ollama.New(modelID, config) (*Ollama, error)
 
 ```go
 import (
-    "github.com/rexleimo/HNO/pkg/hno/tools/calculator"
-    "github.com/rexleimo/HNO/pkg/hno/tools/http"
-    "github.com/rexleimo/HNO/pkg/hno/tools/file"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/http"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/file"
 )
 
 calculator.New() *Calculator
@@ -90,7 +90,7 @@ file.New(config) *File
 ### エラーハンドリング
 
 ```go
-import "github.com/rexleimo/HNO/pkg/hno/types"
+import "github.com/rexleimo/agno-go/pkg/hno/types"
 
 output, err := agent.Run(ctx, input)
 if err != nil {
@@ -208,20 +208,20 @@ GET /api/v1/sessions/{session_id}/history
 
 完全なOpenAPI 3.0仕様が利用可能です:
 
-- [OpenAPI YAML](https://github.com/rexleimo/HNO/blob/main/pkg/agentos/openapi.yaml)
-- [Swagger UI](https://github.com/rexleimo/HNO/tree/main/pkg/agentos#api-documentation)
+- [OpenAPI YAML](https://github.com/rexleimo/agno-go/blob/main/pkg/agentos/openapi.yaml)
+- [Swagger UI](https://github.com/rexleimo/agno-go/tree/main/pkg/agentos#api-documentation)
 
 ## サンプル
 
 リポジトリ内の動作サンプル:
 
-- [Simple Agent](https://github.com/rexleimo/HNO/tree/main/cmd/examples/simple_agent)
-- [Team Demo](https://github.com/rexleimo/HNO/tree/main/cmd/examples/team_demo)
-- [Workflow Demo](https://github.com/rexleimo/HNO/tree/main/cmd/examples/workflow_demo)
-- [RAG Demo](https://github.com/rexleimo/HNO/tree/main/cmd/examples/rag_demo)
+- [Simple Agent](https://github.com/rexleimo/agno-go/tree/main/cmd/examples/simple_agent)
+- [Team Demo](https://github.com/rexleimo/agno-go/tree/main/cmd/examples/team_demo)
+- [Workflow Demo](https://github.com/rexleimo/agno-go/tree/main/cmd/examples/workflow_demo)
+- [RAG Demo](https://github.com/rexleimo/agno-go/tree/main/cmd/examples/rag_demo)
 
 ## パッケージドキュメント
 
 完全なGoパッケージドキュメントはpkg.go.devで確認できます:
 
-[pkg.go.dev/github.com/rexleimo/HNO](https://pkg.go.dev/github.com/rexleimo/HNO)
+[pkg.go.dev/github.com/rexleimo/agno-go](https://pkg.go.dev/github.com/rexleimo/agno-go)

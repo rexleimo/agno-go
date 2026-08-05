@@ -4,7 +4,8 @@
   "description": "Documentation for Agno-Go - High-performance multi-agent framework in Go",
   "scripts": {
     "docs:dev": "vitepress dev website",
-    "docs:build": "vitepress build website",
+    "docs:feed": "node scripts/generate-blog-rss.mjs",
+    "docs:build": "node scripts/generate-blog-rss.mjs && vitepress build website",
     "docs:preview": "vitepress preview website"
   },
   "devDependencies": {

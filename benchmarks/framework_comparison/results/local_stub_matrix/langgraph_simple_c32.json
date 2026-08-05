@@ -1,0 +1,532 @@
+{
+  "endpoint": "http://127.0.0.1:18092",
+  "model": "stub-model",
+  "scenario": "simple",
+  "framework": "langgraph",
+  "lifecycle": "fresh operation",
+  "warmup": 5,
+  "runs": 100,
+  "concurrency": 32,
+  "frameworks": {
+    "langgraph": {
+      "warmup": 5,
+      "runs": 100,
+      "concurrency": 32,
+      "measured_elapsed_ns": 413791800,
+      "samples": [
+        {
+          "duration_ns": 23585700,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 23489300,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 25146800,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 24734700,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 18794000,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 46375400,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 44755700,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 37551400,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 37885600,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 31265100,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 39862900,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 35952900,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 32666300,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 46897100,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 42797200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 46750100,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 54163300,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 43977800,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 39763800,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 52422200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 62195200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 51571900,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 61350100,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 67793400,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 43536400,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 67740900,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 82952000,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 56634800,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 64649900,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 61309300,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 70317100,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 63567700,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 67546200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 73421900,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 63805200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 66562400,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 70280900,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 74573700,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 68005900,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 51523100,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 71584100,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 85165800,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 114257400,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 113580800,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 49772200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 72170900,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 44900800,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 72918000,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 107319200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 128906800,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 116793600,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 78834200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 183356400,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 105125800,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 110158900,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 76972500,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 90966600,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 57452600,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 168048300,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 113810900,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 93049800,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 90284400,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 103863400,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 94012200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 65428200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 88353000,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 149274400,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 126401700,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 85464200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 75155000,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 93607800,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 91435000,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 144952300,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 77874600,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 121131200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 143135200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 80104200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 101532900,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 103679100,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 82032900,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 103071400,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 121322100,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 108094300,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 106130500,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 108461800,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 105529500,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 90544600,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 99568100,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 99120000,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 102025300,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 80804800,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 89124800,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 88130500,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 89512200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 92313500,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 73145000,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 89497900,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 59104200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 64112100,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 56337600,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        }
+      ],
+      "mean_ns": 78369928.0,
+      "median_ns": 74864350.0,
+      "p95_ns": 129618220.0,
+      "min_ns": 18794000,
+      "max_ns": 183356400,
+      "success_count": 100
+    }
+  },
+  "limits": [
+    "All requests use the same OpenAI-compatible endpoint and model.",
+    "Measurements are client wall-clock time and include framework request preparation.",
+    "The model may be local or remote; provider and network latency are included.",
+    "Server-side model load, CPU, and RSS are not attributed to an individual framework."
+  ]
+}

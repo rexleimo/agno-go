@@ -1,0 +1,110 @@
+{
+  "framework": "hno",
+  "scenario": "simple",
+  "endpoint": "https://api.deepseek.com",
+  "model": "deepseek-v4-flash",
+  "warmup": 3,
+  "runs": 20,
+  "samples": [
+    {
+      "duration_ns": 505374500,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 873754300,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 836785300,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 593902600,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 740960600,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 959493900,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 802971600,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 893047700,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 759559200,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 913814800,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 680203800,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 631641800,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 781074300,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 1777277600,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 552431800,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 977752400,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 727028200,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 1005365100,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 715979300,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 832992800,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    }
+  ]
+}

@@ -1,0 +1,110 @@
+{
+  "framework": "hno",
+  "scenario": "tool",
+  "endpoint": "http://127.0.0.1:8081",
+  "model": "D:\\Program Files\\llmam.cpp\\llama-b10107-bin-cuda-13.3-x64\\models\\Qwen3-4B-Q8_0.gguf",
+  "warmup": 3,
+  "runs": 20,
+  "samples": [
+    {
+      "duration_ns": 779690700,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 723988400,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 724224400,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 751180500,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 765480500,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 780402700,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 742804900,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 753814400,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 799286300,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 741498700,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 729058800,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 731051200,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 722411300,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 768804300,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 721485800,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 718925000,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 726249600,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 719375700,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 728856300,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 746605200,
+      "content": "RESULT_42",
+      "success": true
+    }
+  ]
+}

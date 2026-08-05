@@ -13,15 +13,15 @@
 HNO를 Go 모듈 의존성으로 설치:
 
 ```bash
-go get github.com/rexleimo/HNO
+go get github.com/rexleimo/agno-go
 ```
 
 그런 다음 코드에서 임포트:
 
 ```go
 import (
-    "github.com/rexleimo/HNO/pkg/hno/agent"
-    "github.com/rexleimo/HNO/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 )
 ```
 
@@ -31,7 +31,7 @@ import (
 
 ```bash
 # 리포지토리 복제
-git clone https://github.com/rexleimo/HNO.git
+git clone https://github.com/rexleimo/agno-go.git
 cd HNO
 
 # 의존성 다운로드
@@ -127,8 +127,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/HNO/pkg/hno/agent"
-    "github.com/rexleimo/HNO/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 )
 
 func main() {
@@ -318,8 +318,8 @@ AGENTOS_ADDRESS=:9090
 
 문제가 발생하면:
 
-1. [GitHub Issues](https://github.com/rexleimo/HNO/issues) 확인
-2. [Discussions](https://github.com/rexleimo/HNO/discussions)에서 질문
+1. [GitHub Issues](https://github.com/rexleimo/agno-go/issues) 확인
+2. [Discussions](https://github.com/rexleimo/agno-go/discussions)에서 질문
 3. [문서](/guide/) 검토
 
 ## 다음 단계

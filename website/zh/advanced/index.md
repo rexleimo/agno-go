@@ -7,7 +7,7 @@
 本节涵盖了面向开发者的进阶主题:
 
 - 🏗️ **理解架构** - 学习核心设计原则和模式
-- ⚡ **优化性能** - 实现亚微秒级 Agent 实例化
+- ⚡ **测量性能** - 在目标环境复现仓库中的 Go benchmark
 - 🚀 **部署到生产环境** - 生产部署最佳实践
 - 🧪 **有效测试** - 全面的测试策略和工具
 
@@ -27,15 +27,14 @@
 
 ### [性能](/zh/advanced/performance)
 
-理解性能特征和优化技术:
+理解已测量的性能特征和 benchmark 方法:
 
-- Agent 实例化 (~180ns 平均)
-- 内存占用 (~1.2KB 每个 agent)
+- 带环境信息的可复现 Agent 创建 benchmark
 - 并发和并行
 - 基准测试工具和方法
-- 与其他框架的性能对比
+- 明确列出尚未测量的内容
 
-**关键指标**: 吞吐量、延迟、内存效率、可扩展性
+**关键指标**: `ns/op`、`B/op`、分配次数以及特定工作负载下的吞吐量
 
 ### [部署](/zh/advanced/deployment)
 
@@ -68,11 +67,8 @@
 ### 性能基准
 
 ```bash
-# 运行所有基准测试
-make benchmark
-
-# 运行特定基准测试
-go test -bench=BenchmarkAgentCreation -benchmem ./pkg/hno/agent/
+# 运行可复现的 Agent 创建快照
+go test -run='^$' -bench='BenchmarkAgentCreation' -benchmem -count=10 ./pkg/hno/agent/
 
 # 生成 CPU profile
 go test -bench=. -cpuprofile=cpu.out ./pkg/hno/agent/
@@ -166,7 +162,7 @@ Go 的并发模型使得:
 ### 文档
 
 - [Go 包文档](https://pkg.go.dev/github.com/rexleimo/HNO)
-- [Python Agno 框架](https://github.com/agno-agi/agno) (灵感来源)
+- [Python HNO 框架](https://github.com/agno-agi/agno) (灵感来源)
 - [VitePress 文档源码](https://github.com/rexleimo/HNO/tree/main/website)
 
 ### 社区

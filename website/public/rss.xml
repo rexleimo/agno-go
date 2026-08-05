@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
+  <channel>
+    <title>HNO Blog</title>
+    <link>https://hno.rexai.top/</link>
+    <description>Original engineering notes and timely analysis for Go-native AI agent systems.</description>
+    <language>en</language>
+    <atom:link href="https://hno.rexai.top/rss.xml" rel="self" type="application/rss+xml" />
+  <item>
+    <title>AI Agent 框架性能怎么测：为什么运行时开销比模型延迟更重要</title>
+    <link>https://hno.rexai.top/zh/blog/ai-agent-runtime-benchmark</link>
+    <guid isPermaLink="true">https://hno.rexai.top/zh/blog/ai-agent-runtime-benchmark</guid>
+    <pubDate>Wed, 05 Aug 2026 00:00:00 GMT</pubDate>
+    <dc:language>zh-CN</dc:language>
+    <description>使用相同的本地 Stub，对 HNO、Agno 和 LangGraph 进行 100 次、并发度 1/8/32 的可复现对比。</description>
+    <category>性能基准</category>
+    <category>AI Agent</category>
+    <category>Agent 框架</category>
+    <category>Go</category>
+    <category>Python</category>
+    <category>LangGraph</category>
+    <category>Agno</category>
+  </item>
+  <item>
+    <title>AI Agent Framework Benchmarks: Why Runtime Overhead Matters More Than Model Latency</title>
+    <link>https://hno.rexai.top/blog/ai-agent-runtime-benchmark</link>
+    <guid isPermaLink="true">https://hno.rexai.top/blog/ai-agent-runtime-benchmark</guid>
+    <pubDate>Wed, 05 Aug 2026 00:00:00 GMT</pubDate>
+    <dc:language>en</dc:language>
+    <description>A reproducible local-stub benchmark comparing HNO, Agno, and LangGraph at 100 requests and concurrency 1, 8, and 32.</description>
+    <category>Benchmarks</category>
+    <category>AI agents</category>
+    <category>agent frameworks</category>
+    <category>benchmark</category>
+    <category>Go</category>
+    <category>Python</category>
+    <category>LangGraph</category>
+    <category>Agno</category>
+  </item>
+  </channel>
+</rss>

@@ -8,6 +8,18 @@ Build complex, controlled multi-step processes with 5 powerful primitives.
 
 A **Workflow** provides deterministic, step-based orchestration for building controlled AI agent processes. Unlike Teams (autonomous), Workflows give you full control over execution flow.
 
+```mermaid
+flowchart LR
+    S[Start] --> ST1[Step 1]
+    ST1 --> C{Condition}
+    C -->|yes| ST2[Step 2]
+    C -->|no| RT[Router]
+    ST2 --> L{Loop}
+    L -->|iterate| ST2
+    L -->|done| P[Parallel]
+    P --> E[End]
+```
+
 ### Key Features
 
 - **5 Primitives**: Step, Condition, Loop, Parallel, Router

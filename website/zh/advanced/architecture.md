@@ -139,7 +139,7 @@ LLM 提供商实现:
 
 **目录 / Directory**: `pkg/agentos/`
 
-生产就绪的 HTTP 服务器,功能包括:
+HTTP 服务器能力包括:
 
 - RESTful API 端点
 - 会话管理

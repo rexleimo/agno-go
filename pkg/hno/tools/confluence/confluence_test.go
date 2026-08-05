@@ -2,217 +2,144 @@ package confluence
 
 import (
 	"context"
+	"encoding/base64"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
-func TestConfluenceToolkit_ListSpaces(t *testing.T) {
-	toolkit := New()
+func newConfluenceTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		expectedAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte("testuser@example.com:test-token"))
+		if r.Header.Get("Authorization") != expectedAuth {
+			http.Error(w, `{"message":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/wiki/api/v2/spaces":
+			_, _ = w.Write([]byte(`{"results":[{"id":"1","key":"DOC","name":"Documentation","type":"global"}]}`))
+		case "/wiki/rest/api/content/search":
+			cql := r.URL.Query().Get("cql")
+			if !strings.Contains(cql, `text~"documentation"`) {
+				http.Error(w, `{"message":"missing CQL"}`, http.StatusBadRequest)
+				return
+			}
+			_, _ = w.Write([]byte(`{"results":[{"id":"123","title":"Getting Started","space":{"key":"DOC"},"version":{"number":2}}]}`))
+		case "/wiki/rest/api/content/123":
+			_, _ = w.Write([]byte(`{"id":"123","title":"Getting Started","body":{"storage":{"value":"<p>Real page content</p>","representation":"storage"}},"version":{"number":2}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+}
 
-	// Test with valid parameters
-	result, err := toolkit.listSpaces(context.Background(), map[string]interface{}{
-		"base_url":  "https://example.atlassian.net/wiki",
+func confluenceArgs() map[string]interface{} {
+	return map[string]interface{}{
+		"base_url":  "http://unused.example/wiki",
 		"username":  "testuser@example.com",
 		"api_token": "test-token",
-	})
+	}
+}
 
+func TestConfluenceToolkit_ListSpaces(t *testing.T) {
+	server := newConfluenceTestServer(t)
+	defer server.Close()
+	args := confluenceArgs()
+	args["base_url"] = server.URL + "/wiki"
+
+	result, err := New().Execute(context.Background(), "list_spaces", args)
 	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
+		t.Fatalf("list_spaces failed: %v", err)
 	}
-
-	resultMap, ok := result.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected map result, got: %T", result)
-	}
-
-	// Check that spaces are returned
-	spaces, ok := resultMap["spaces"].([]map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected spaces array, got: %T", resultMap["spaces"])
-	}
-
-	if len(spaces) == 0 {
-		t.Error("Expected at least one space")
-	}
-
-	// Check count field
-	count, ok := resultMap["count"].(int)
-	if !ok {
-		t.Fatalf("Expected count integer, got: %T", resultMap["count"])
-	}
-
-	if count != len(spaces) {
-		t.Errorf("Count mismatch: expected %d, got %d", len(spaces), count)
+	spaces := result.(map[string]interface{})["spaces"].([]map[string]interface{})
+	if len(spaces) != 1 || spaces[0]["key"] != "DOC" {
+		t.Fatalf("unexpected spaces: %#v", spaces)
 	}
 }
 
 func TestConfluenceToolkit_SearchPages(t *testing.T) {
-	toolkit := New()
+	server := newConfluenceTestServer(t)
+	defer server.Close()
+	args := confluenceArgs()
+	args["base_url"] = server.URL + "/wiki"
+	args["query"] = "documentation"
 
-	// Test with valid parameters
-	result, err := toolkit.searchPages(context.Background(), map[string]interface{}{
-		"base_url":  "https://example.atlassian.net/wiki",
-		"username":  "testuser@example.com",
-		"api_token": "test-token",
-		"query":     "documentation",
-	})
-
+	result, err := New().Execute(context.Background(), "search_pages", args)
 	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
+		t.Fatalf("search_pages failed: %v", err)
 	}
-
-	resultMap, ok := result.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected map result, got: %T", result)
-	}
-
-	// Check that pages are returned
-	pages, ok := resultMap["pages"].([]map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected pages array, got: %T", resultMap["pages"])
-	}
-
-	if len(pages) == 0 {
-		t.Error("Expected at least one page")
-	}
-
-	// Check query field
-	query, ok := resultMap["query"].(string)
-	if !ok {
-		t.Fatalf("Expected query string, got: %T", resultMap["query"])
-	}
-
-	if query != "documentation" {
-		t.Errorf("Expected query 'documentation', got '%s'", query)
+	resultMap := result.(map[string]interface{})
+	pages := resultMap["pages"].([]map[string]interface{})
+	if len(pages) != 1 || pages[0]["title"] != "Getting Started" {
+		t.Fatalf("unexpected pages: %#v", pages)
 	}
 }
 
-func TestConfluenceToolkit_SearchPages_WithSpaceKey(t *testing.T) {
-	toolkit := New()
+func TestConfluenceToolkit_SearchPagesWithSpaceKey(t *testing.T) {
+	server := newConfluenceTestServer(t)
+	defer server.Close()
+	args := confluenceArgs()
+	args["base_url"] = server.URL + "/wiki"
+	args["query"] = "documentation"
+	args["space_key"] = "DOC"
 
-	// Test with space key parameter
-	result, err := toolkit.searchPages(context.Background(), map[string]interface{}{
-		"base_url":  "https://example.atlassian.net/wiki",
-		"username":  "testuser@example.com",
-		"api_token": "test-token",
-		"query":     "documentation",
-		"space_key": "DS",
-	})
-
+	result, err := New().Execute(context.Background(), "search_pages", args)
 	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
+		t.Fatalf("search_pages with space key failed: %v", err)
 	}
-
-	resultMap, ok := result.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected map result, got: %T", result)
-	}
-
-	// Check space_key field
-	spaceKey, ok := resultMap["space_key"].(string)
-	if !ok {
-		t.Fatalf("Expected space_key string, got: %T", resultMap["space_key"])
-	}
-
-	if spaceKey != "DS" {
-		t.Errorf("Expected space_key 'DS', got '%s'", spaceKey)
+	if result.(map[string]interface{})["space_key"] != "DOC" {
+		t.Fatalf("unexpected space key: %#v", result)
 	}
 }
 
 func TestConfluenceToolkit_GetPageContent(t *testing.T) {
-	toolkit := New()
+	server := newConfluenceTestServer(t)
+	defer server.Close()
+	args := confluenceArgs()
+	args["base_url"] = server.URL + "/wiki"
+	args["page_id"] = "123"
 
-	// Test with valid parameters
-	result, err := toolkit.getPageContent(context.Background(), map[string]interface{}{
-		"base_url":  "https://example.atlassian.net/wiki",
-		"username":  "testuser@example.com",
-		"api_token": "test-token",
-		"page_id":   "123456",
-	})
-
+	result, err := New().Execute(context.Background(), "get_page_content", args)
 	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
+		t.Fatalf("get_page_content failed: %v", err)
 	}
-
-	resultMap, ok := result.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected map result, got: %T", result)
-	}
-
-	// Check that page content is returned
-	page, ok := resultMap["page"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected page map, got: %T", resultMap["page"])
-	}
-
-	// Check page ID
-	pageID, ok := page["id"].(string)
-	if !ok {
-		t.Fatalf("Expected page id string, got: %T", page["id"])
-	}
-
-	if pageID != "123456" {
-		t.Errorf("Expected page id '123456', got '%s'", pageID)
+	page := result.(map[string]interface{})["page"].(map[string]interface{})
+	if page["id"] != "123" || page["title"] != "Getting Started" {
+		t.Fatalf("unexpected page: %#v", page)
 	}
 }
 
-func TestConfluenceToolkit_ListSpaces_MissingParameters(t *testing.T) {
-	toolkit := New()
-
-	// Test missing base_url
-	_, err := toolkit.listSpaces(context.Background(), map[string]interface{}{
-		"username":  "testuser@example.com",
-		"api_token": "test-token",
-	})
-
-	if err == nil {
-		t.Error("Expected error for missing base_url")
+func TestConfluenceToolkit_MissingParameters(t *testing.T) {
+	if _, err := New().Execute(context.Background(), "list_spaces", map[string]interface{}{
+		"username": "testuser", "api_token": "token",
+	}); err == nil {
+		t.Error("expected missing base_url error")
 	}
-
-	// Test missing username
-	_, err = toolkit.listSpaces(context.Background(), map[string]interface{}{
-		"base_url":  "https://example.atlassian.net/wiki",
-		"api_token": "test-token",
-	})
-
-	if err == nil {
-		t.Error("Expected error for missing username")
+	if _, err := New().Execute(context.Background(), "search_pages", map[string]interface{}{
+		"base_url": "https://example.test/wiki", "username": "testuser", "api_token": "token",
+	}); err == nil {
+		t.Error("expected missing query error")
 	}
+}
 
-	// Test missing api_token
-	_, err = toolkit.listSpaces(context.Background(), map[string]interface{}{
-		"base_url": "https://example.atlassian.net/wiki",
-		"username": "testuser@example.com",
-	})
-
-	if err == nil {
-		t.Error("Expected error for missing api_token")
+func TestConfluenceToolkit_APIError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"message":"server error"}`, http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	args := confluenceArgs()
+	args["base_url"] = server.URL
+	if _, err := New().Execute(context.Background(), "list_spaces", args); err == nil {
+		t.Fatal("expected API error")
 	}
 }
 
 func TestConfluenceToolkit_New(t *testing.T) {
-	toolkit := New()
-
-	if toolkit == nil {
-		t.Fatal("Expected toolkit to be created")
-	}
-
-	// Check that functions are registered
-	functions := toolkit.Functions()
-	if len(functions) != 3 {
-		t.Errorf("Expected 3 functions, got %d", len(functions))
-	}
-
-	expectedFunctions := []string{"list_spaces", "search_pages", "get_page_content"}
-	for _, expected := range expectedFunctions {
-		found := false
-		for _, function := range functions {
-			if function.Name == expected {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("Expected function '%s' not found", expected)
-		}
+	tk := New()
+	if tk == nil || len(tk.Functions()) != 3 {
+		t.Fatalf("expected three registered functions")
 	}
 }

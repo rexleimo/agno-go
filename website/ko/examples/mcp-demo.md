@@ -2,14 +2,14 @@
 
 ## 개요
 
-이 예제는 MCP (Model Context Protocol) 서버에 연결하고 HNO MCP 클라이언트를 통해 해당 도구를 사용하는 방법을 보여줍니다. 보안 검증 설정, 전송 생성, MCP 서버 연결, MCP 도구와 Agno 에이전트 통합 방법을 배우게 됩니다.
+이 예제는 MCP (Model Context Protocol) 서버에 연결하고 HNO MCP 클라이언트를 통해 해당 도구를 사용하는 방법을 보여줍니다. 보안 검증 설정, 전송 생성, MCP 서버 연결, MCP 도구와 HNO 에이전트 통합 방법을 배우게 됩니다.
 
 ## 학습 내용
 
 - MCP 명령에 대한 보안 검증 생성 및 구성 방법
 - 하위 프로세스 통신을 위한 stdio 전송 설정 방법
 - MCP 서버 연결 및 사용 가능한 도구 발견 방법
-- Agno 에이전트에서 사용할 MCP 툴킷 생성 방법
+- HNO 에이전트에서 사용할 MCP 툴킷 생성 방법
 - MCP 도구를 직접 호출하는 방법
 
 ## 전제 조건
@@ -155,7 +155,7 @@ func main() {
 	fmt.Printf("  Result: %v\n", result.Content)
 
 	fmt.Println("\n=== Demo Complete ===")
-	fmt.Println("The MCP toolkit can now be passed to an agno Agent!")
+	fmt.Println("The MCP toolkit can now be passed to an HNO Agent!")
 }
 ```
 
@@ -223,7 +223,7 @@ toolkit, err := mcptoolkit.New(ctx, mcptoolkit.Config{
 defer toolkit.Close()
 ```
 
-- MCP 도구를 Agno 툴킷 함수로 변환
+- MCP 도구를 HNO 툴킷 함수로 변환
 - MCP 스키마에서 함수 시그니처 자동 생성
 - `agent.Config.Toolkits`와 호환
 
@@ -276,12 +276,12 @@ Step 7: Calling a tool...
   Result: 8
 
 === Demo Complete ===
-The MCP toolkit can now be passed to an agno Agent!
+The MCP toolkit can now be passed to an HNO Agent!
 ```
 
-## Agno 에이전트와 함께 사용
+## HNO 에이전트와 함께 사용
 
-MCP 툴킷을 얻으면 모든 Agno 에이전트와 함께 사용할 수 있습니다:
+MCP 툴킷을 얻으면 모든 HNO 에이전트와 함께 사용할 수 있습니다:
 
 ```go
 import (
@@ -329,4 +329,4 @@ fmt.Println(output.Content)
 - [MCP 통합 가이드](../guide/mcp.md) 읽기
 - 다른 MCP 서버 (filesystem, git, sqlite) 연결 시도
 - 사용 사례에 맞는 사용자 정의 MCP 서버 구축
-- MCP 도구와 내장 Agno 도구 결합
+- MCP 도구와 내장 HNO 도구 결합

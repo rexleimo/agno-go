@@ -1,0 +1,253 @@
+{
+  "report_type": "local_fixed_model_overhead_matrix",
+  "captured_at_utc": "2026-08-05T02:09:34.855179+00:00",
+  "status": "complete",
+  "protocol": {
+    "frameworks": [
+      "hno",
+      "agno",
+      "langgraph"
+    ],
+    "model": "stub-model",
+    "stub_response": "LOCAL_MODEL_OK",
+    "stub_delay_ms": 1.0,
+    "warmup": 5,
+    "runs": 100,
+    "concurrencies": [
+      1,
+      8,
+      32
+    ],
+    "measurement": "per-request client wall-clock samples plus process RSS and CPU telemetry",
+    "lifecycle": "fresh operation: client/model/Agent/Graph setup is included per operation"
+  },
+  "environment": {
+    "system": "Windows",
+    "release": "11",
+    "machine": "AMD64",
+    "processor": "Intel64 Family 6 Model 151 Stepping 5, GenuineIntel",
+    "python": "3.14.5",
+    "go": "go version go1.26.4 windows/amd64"
+  },
+  "matrix": {
+    "1": {
+      "hno": {
+        "summary": {
+          "count": 100,
+          "mean_ms": 1.583016,
+          "median_ms": 1.52785,
+          "p95_ms": 1.6754749999999996,
+          "min_ms": 1.5052,
+          "max_ms": 2.354,
+          "success_count": 100,
+          "success_rate": 1.0,
+          "measured_elapsed_ms": 158.3016,
+          "measured_rps": 631.7055544605993
+        },
+        "resources": {
+          "exit_code": 0,
+          "wall_time_s": 0.21971240000857506,
+          "peak_rss_mb": 12.21484375,
+          "cpu_time_s": 0.046875,
+          "average_cpu_percent": 21.33470846350526
+        }
+      },
+      "agno": {
+        "summary": {
+          "count": 100,
+          "mean_ms": 41.631562,
+          "median_ms": 36.81335,
+          "p95_ms": 61.86302499999999,
+          "min_ms": 32.9021,
+          "max_ms": 66.7755,
+          "success_count": 100,
+          "success_rate": 1.0,
+          "measured_elapsed_ms": 4165.6736,
+          "measured_rps": 24.005721427622174
+        },
+        "resources": {
+          "exit_code": 0,
+          "wall_time_s": 6.904575099993963,
+          "peak_rss_mb": 204.5078125,
+          "cpu_time_s": 5.90625,
+          "average_cpu_percent": 85.54110737393768
+        }
+      },
+      "langgraph": {
+        "summary": {
+          "count": 100,
+          "mean_ms": 7.686675,
+          "median_ms": 7.520849999999999,
+          "p95_ms": 9.082265,
+          "min_ms": 6.2799,
+          "max_ms": 12.3178,
+          "success_count": 100,
+          "success_rate": 1.0,
+          "measured_elapsed_ms": 771.1534,
+          "measured_rps": 129.67588549826792
+        },
+        "resources": {
+          "exit_code": 0,
+          "wall_time_s": 3.2400328000076115,
+          "peak_rss_mb": 156.28125,
+          "cpu_time_s": 2.84375,
+          "average_cpu_percent": 87.76917320075647
+        }
+      }
+    },
+    "8": {
+      "hno": {
+        "summary": {
+          "count": 100,
+          "mean_ms": 1.859361,
+          "median_ms": 1.59575,
+          "p95_ms": 2.655119999999999,
+          "min_ms": 1.5328,
+          "max_ms": 3.663,
+          "success_count": 100,
+          "success_rate": 1.0,
+          "measured_elapsed_ms": 23.8887,
+          "measured_rps": 4186.07961086204
+        },
+        "resources": {
+          "exit_code": 0,
+          "wall_time_s": 0.06577159999869764,
+          "peak_rss_mb": 12.33984375,
+          "cpu_time_s": 0.109375,
+          "average_cpu_percent": 166.29517907754374
+        }
+      },
+      "agno": {
+        "summary": {
+          "count": 100,
+          "mean_ms": 61.765786,
+          "median_ms": 59.82015,
+          "p95_ms": 83.47258,
+          "min_ms": 42.5135,
+          "max_ms": 102.5626,
+          "success_count": 100,
+          "success_rate": 1.0,
+          "measured_elapsed_ms": 795.829,
+          "measured_rps": 125.65513445727663
+        },
+        "resources": {
+          "exit_code": 0,
+          "wall_time_s": 3.4447918999940157,
+          "peak_rss_mb": 284.953125,
+          "cpu_time_s": 6.921875,
+          "average_cpu_percent": 200.93739189331075
+        }
+      },
+      "langgraph": {
+        "summary": {
+          "count": 100,
+          "mean_ms": 30.117316000000002,
+          "median_ms": 30.088549999999998,
+          "p95_ms": 37.63825,
+          "min_ms": 13.6523,
+          "max_ms": 46.6828,
+          "success_count": 100,
+          "success_rate": 1.0,
+          "measured_elapsed_ms": 396.9069,
+          "measured_rps": 251.94825285224317
+        },
+        "resources": {
+          "exit_code": 0,
+          "wall_time_s": 2.786759399998118,
+          "peak_rss_mb": 157.9375,
+          "cpu_time_s": 2.671875,
+          "average_cpu_percent": 95.8774912538845
+        }
+      }
+    },
+    "32": {
+      "hno": {
+        "summary": {
+          "count": 100,
+          "mean_ms": 6.702788000000001,
+          "median_ms": 3.09085,
+          "p95_ms": 18.636944999999997,
+          "min_ms": 1.5385,
+          "max_ms": 20.0609,
+          "success_count": 100,
+          "success_rate": 1.0,
+          "measured_elapsed_ms": 27.5683,
+          "measured_rps": 3627.3546065589826
+        },
+        "resources": {
+          "exit_code": 0,
+          "wall_time_s": 0.10473469999851659,
+          "peak_rss_mb": 16.703125,
+          "cpu_time_s": 0.09375,
+          "average_cpu_percent": 89.51188097290375
+        }
+      },
+      "agno": {
+        "summary": {
+          "count": 100,
+          "mean_ms": 138.677675,
+          "median_ms": 129.3451,
+          "p95_ms": 241.74420999999998,
+          "min_ms": 62.2318,
+          "max_ms": 273.8485,
+          "success_count": 100,
+          "success_rate": 1.0,
+          "measured_elapsed_ms": 587.635,
+          "measured_rps": 170.17366222229785
+        },
+        "resources": {
+          "exit_code": 0,
+          "wall_time_s": 3.3833334000082687,
+          "peak_rss_mb": 373.7734375,
+          "cpu_time_s": 7.46875,
+          "average_cpu_percent": 220.7512271767762
+        }
+      },
+      "langgraph": {
+        "summary": {
+          "count": 100,
+          "mean_ms": 78.369928,
+          "median_ms": 74.86435,
+          "p95_ms": 129.61821999999995,
+          "min_ms": 18.794,
+          "max_ms": 183.3564,
+          "success_count": 100,
+          "success_rate": 1.0,
+          "measured_elapsed_ms": 413.7918,
+          "measured_rps": 241.6674279190646
+        },
+        "resources": {
+          "exit_code": 0,
+          "wall_time_s": 2.80663099999947,
+          "peak_rss_mb": 161.0703125,
+          "cpu_time_s": 2.765625,
+          "average_cpu_percent": 98.53896005568677
+        }
+      }
+    }
+  },
+  "raw_files": {
+    "1": {
+      "hno": "benchmarks\\framework_comparison\\results\\local_stub_matrix\\hno_simple_c1.json",
+      "agno": "benchmarks\\framework_comparison\\results\\local_stub_matrix\\agno_simple_c1.json",
+      "langgraph": "benchmarks\\framework_comparison\\results\\local_stub_matrix\\langgraph_simple_c1.json"
+    },
+    "8": {
+      "hno": "benchmarks\\framework_comparison\\results\\local_stub_matrix\\hno_simple_c8.json",
+      "agno": "benchmarks\\framework_comparison\\results\\local_stub_matrix\\agno_simple_c8.json",
+      "langgraph": "benchmarks\\framework_comparison\\results\\local_stub_matrix\\langgraph_simple_c8.json"
+    },
+    "32": {
+      "hno": "benchmarks\\framework_comparison\\results\\local_stub_matrix\\hno_simple_c32.json",
+      "agno": "benchmarks\\framework_comparison\\results\\local_stub_matrix\\agno_simple_c32.json",
+      "langgraph": "benchmarks\\framework_comparison\\results\\local_stub_matrix\\langgraph_simple_c32.json"
+    }
+  },
+  "limits": [
+    "The local stub removes remote provider variance but is not a model-quality or provider benchmark.",
+    "The same HTTP endpoint and fixed response are used by every framework.",
+    "Peak RSS includes runtime and import overhead; it is not an allocation-per-request measurement.",
+    "Agno and LangGraph are run in separate processes so their RSS and CPU values are not combined.",
+    "This measures the simple one-request scenario; tool loops, memory, streaming, and teams need separate rows."
+  ]
+}

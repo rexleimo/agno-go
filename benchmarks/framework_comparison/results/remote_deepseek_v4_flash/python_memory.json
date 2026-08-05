@@ -1,0 +1,239 @@
+{
+  "endpoint": "https://api.deepseek.com",
+  "model": "deepseek-v4-flash",
+  "scenario": "memory",
+  "warmup": 3,
+  "runs": 20,
+  "frameworks": {
+    "agno": {
+      "warmup": 3,
+      "runs": 20,
+      "samples": [
+        {
+          "duration_ns": 2114107300,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2032024000,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 1959888900,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2656679500,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 77246034800,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2306046400,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2506561100,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2105828600,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 3290286600,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2570120800,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2261685100,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2312600300,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2303500700,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 5058831600,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 1944894600,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2070196200,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2528425100,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2556717200,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2160051100,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2281161000,
+          "content": "BLUE-42",
+          "success": true
+        }
+      ],
+      "mean_ns": 6213282045.0,
+      "median_ns": 2304773550.0,
+      "p95_ns": 8668191760.0,
+      "min_ns": 1944894600,
+      "max_ns": 77246034800,
+      "success_count": 20
+    },
+    "langgraph": {
+      "warmup": 3,
+      "runs": 20,
+      "samples": [
+        {
+          "duration_ns": 2391401400,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 9329913700,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2674876700,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 3438026900,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2869962200,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 6278295600,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 8314940200,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2329246500,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2886661400,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2110583200,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 3594121600,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2390519100,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2433141800,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 3007468600,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2932621700,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 3033666600,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2552350700,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2415664300,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 2721011300,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 9388791800,
+          "content": "BLUE-42",
+          "success": true
+        }
+      ],
+      "mean_ns": 3854663265.0,
+      "median_ns": 2878311800.0,
+      "p95_ns": 9332857605.0,
+      "min_ns": 2110583200,
+      "max_ns": 9388791800,
+      "success_count": 20
+    }
+  },
+  "limits": [
+    "All requests use the same local llama.cpp endpoint and model.",
+    "Measurements are client wall-clock time and include framework request preparation.",
+    "The model is local; no cloud LLM or network service is involved.",
+    "Server-side model load, CPU, and RSS are not attributed to an individual framework."
+  ]
+}

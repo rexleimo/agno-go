@@ -310,7 +310,7 @@ BenchmarkWorkflowHistory_NoHistory-8
 ### Performance Targets
 
 - ✅ History Load: <5ms per operation (actual ~0.177ms)
-- ✅ Memory Overhead: <2MB (actual ~1.2MB)
+- ✅ Memory Overhead: <2MB (actual ~0.57MB)
 - ✅ Performance Impact: <5% degradation (actual ~1.7%)
 
 ### Performance Optimization Tips

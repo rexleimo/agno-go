@@ -6,24 +6,12 @@ HNO開発のための包括的なテストガイド。
 
 ## 概要
 
-HNOは、コードベース全体で**80.8%のテストカバレッジ**を持つ包括的なテストを通じて高品質を維持しています。このガイドでは、テスト基準、パターン、ベストプラクティスをカバーします。
+このガイドでは、テスト基準、パターン、ベストプラクティスを扱います。カバレッジは
+Revision、build tag、対象パッケージ、OS により変わるため、固定値として公開しません。
 
-### テストカバレッジの状況
+### テストカバレッジ
 
-| パッケージ | カバレッジ | ステータス |
-|---------|----------|--------|
-| types | 100.0% | ✅ 優秀 |
-| memory | 93.1% | ✅ 優秀 |
-| team | 92.3% | ✅ 優秀 |
-| toolkit | 91.7% | ✅ 優秀 |
-| http | 88.9% | ✅ 良好 |
-| workflow | 80.4% | ✅ 良好 |
-| file | 76.2% | ✅ 良好 |
-| calculator | 75.6% | ✅ 良好 |
-| agent | 74.7% | ✅ 良好 |
-| anthropic | 50.9% | 🟡 改善が必要 |
-| openai | 44.6% | 🟡 改善が必要 |
-| ollama | 43.8% | 🟡 改善が必要 |
+現在の checkout の値は次のコマンドで生成してください。
 
 ---
 
@@ -33,10 +21,10 @@ HNOは、コードベース全体で**80.8%のテストカバレッジ**を持�
 
 ```bash
 # カバレッジ付きですべてのテストを実行
-make test
+go test -race -coverprofile=coverage.out -covermode=atomic ./...
 
-# 同等のコマンド:
-go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+# 現在のレポートを集計
+go tool cover -func=coverage.out
 ```
 
 ### 特定のパッケージ
@@ -556,7 +544,7 @@ go test -timeout 30s ./...
 - 設計パターンについては[アーキテクチャ](/advanced/architecture)を確認
 - ベンチマークについては[パフォーマンス](/advanced/performance)を確認
 - プロダクションセットアップについては[デプロイメント](/advanced/deployment)を確認
-- [コントリビューティングガイド](https://github.com/rexleimo/HNO/blob/main/CONTRIBUTING.md)を探索
+- [コントリビューティングガイド](https://github.com/rexleimo/agno-go/blob/main/CONTRIBUTING.md)を探索
 
 ---
 

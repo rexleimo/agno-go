@@ -4,6 +4,20 @@ An **Agent** is an autonomous AI entity that can use tools, maintain conversatio
 
 ## Overview
 
+```mermaid
+flowchart LR
+    A[User Input] --> B[Build Request]
+    B --> C{Model Response}
+    C -->|has tool_calls| D[Execute Tools<br/>concurrently]
+    D --> B
+    C -->|final answer| E[Output]
+```
+
+The agent loop lives in a dedicated runner: each turn builds the request from
+memory and instructions, invokes the model, and — when the model requests
+tools — executes them concurrently and feeds the results back. The loop stops
+on a final answer or when turn limits are reached.
+
 ```go
 import "github.com/rexleimo/HNO/pkg/hno/agent"
 
@@ -292,9 +306,11 @@ ag, _ := agent.New(agent.Config{
 
 ## Performance Considerations
 
-- **Agent Creation**: ~180ns average
-- **Memory Footprint**: ~1.2KB per agent
-- **Concurrent Agents**: Fully thread-safe, use goroutines freely
+Agent construction measurements are environment-dependent. See [Performance](/advanced/performance)
+for the checked-in benchmark command, machine details, allocation ranges, and
+what the benchmark does not measure. It uses a local `MockModel`; it is not an
+LLM latency or production-capacity measurement. Add concurrency limits based
+on the workload and resources of the deployment rather than a fixed claim.
 
 ```go
 // Concurrent agents

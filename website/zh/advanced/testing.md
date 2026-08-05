@@ -6,24 +6,12 @@ HNO 开发的综合测试指南。
 
 ## 概述 / Overview
 
-HNO 通过全面的测试保持高质量,整个代码库的**测试覆盖率达 80.8%**。本指南涵盖测试标准、模式和最佳实践。
+本指南涵盖测试标准、模式和最佳实践。覆盖率会随着代码版本、构建标签、目标包
+和平台变化，不是一个固定的项目属性。请针对当前代码生成新的报告。
 
-### 测试覆盖率状态 / Test Coverage Status
+### 测试覆盖率
 
-| 包 / Package | 覆盖率 / Coverage | 状态 / Status |
-|---------|----------|--------|
-| types | 100.0% | ✅ 优秀 / Excellent |
-| memory | 93.1% | ✅ 优秀 / Excellent |
-| team | 92.3% | ✅ 优秀 / Excellent |
-| toolkit | 91.7% | ✅ 优秀 / Excellent |
-| http | 88.9% | ✅ 良好 / Good |
-| workflow | 80.4% | ✅ 良好 / Good |
-| file | 76.2% | ✅ 良好 / Good |
-| calculator | 75.6% | ✅ 良好 / Good |
-| agent | 74.7% | ✅ 良好 / Good |
-| anthropic | 50.9% | 🟡 需要改进 / Needs improvement |
-| openai | 44.6% | 🟡 需要改进 / Needs improvement |
-| ollama | 43.8% | 🟡 需要改进 / Needs improvement |
+这里不放过期的覆盖率快照。请运行下面的命令，获得当前 checkout 的真实结果。
 
 ---
 
@@ -32,11 +20,11 @@ HNO 通过全面的测试保持高质量,整个代码库的**测试覆盖率达 
 ### 所有测试 / All Tests
 
 ```bash
-# 运行所有测试(带覆盖率) / Run all tests with coverage
-make test
+# 运行所有测试并生成覆盖率
+go test -race -coverprofile=coverage.out -covermode=atomic ./...
 
-# 等效于 / Equivalent to:
-go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+# 汇总当前报告
+go tool cover -func=coverage.out
 ```
 
 ### 特定包 / Specific Package

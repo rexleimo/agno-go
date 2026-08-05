@@ -4,113 +4,61 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 )
 
-// ConfluenceToolkit provides Confluence API integration capabilities
-// This is a basic implementation that can be extended with specific Confluence API endpoints
-
-// ConfluenceToolkit provides Confluence API integration
+// ConfluenceToolkit provides Confluence Cloud REST API integration.
 type ConfluenceToolkit struct {
 	*toolkit.BaseToolkit
 	client *http.Client
 }
 
-// New creates a new Confluence toolkit
+// New creates a Confluence toolkit. The base URL and credentials are supplied
+// per tool call because installations and identities may differ.
 func New() *ConfluenceToolkit {
 	t := &ConfluenceToolkit{
 		BaseToolkit: toolkit.NewBaseToolkit("confluence"),
-		client: &http.Client{
-			Timeout: 30 * time.Second,
-		},
+		client:      &http.Client{Timeout: 30 * time.Second},
 	}
 
-	// Register Confluence space list function
 	t.RegisterFunction(&toolkit.Function{
 		Name:        "list_spaces",
 		Description: "List Confluence spaces accessible with the provided credentials",
 		Parameters: map[string]toolkit.Parameter{
-			"base_url": {
-				Type:        "string",
-				Description: "Confluence base URL (e.g., https://your-domain.atlassian.net/wiki)",
-				Required:    true,
-			},
-			"username": {
-				Type:        "string",
-				Description: "Confluence username or email",
-				Required:    true,
-			},
-			"api_token": {
-				Type:        "string",
-				Description: "Confluence API token",
-				Required:    true,
-			},
+			"base_url":  {Type: "string", Description: "Confluence base URL, for example https://example.atlassian.net/wiki", Required: true},
+			"username":  {Type: "string", Description: "Confluence username or email", Required: true},
+			"api_token": {Type: "string", Description: "Confluence API token", Required: true},
 		},
 		Handler: t.listSpaces,
 	})
 
-	// Register Confluence page search function
 	t.RegisterFunction(&toolkit.Function{
 		Name:        "search_pages",
-		Description: "Search for pages in Confluence",
+		Description: "Search for pages in Confluence using CQL",
 		Parameters: map[string]toolkit.Parameter{
-			"base_url": {
-				Type:        "string",
-				Description: "Confluence base URL",
-				Required:    true,
-			},
-			"username": {
-				Type:        "string",
-				Description: "Confluence username or email",
-				Required:    true,
-			},
-			"api_token": {
-				Type:        "string",
-				Description: "Confluence API token",
-				Required:    true,
-			},
-			"query": {
-				Type:        "string",
-				Description: "Search query",
-				Required:    true,
-			},
-			"space_key": {
-				Type:        "string",
-				Description: "Space key to search in (optional)",
-				Required:    false,
-			},
+			"base_url":  {Type: "string", Description: "Confluence base URL", Required: true},
+			"username":  {Type: "string", Description: "Confluence username or email", Required: true},
+			"api_token": {Type: "string", Description: "Confluence API token", Required: true},
+			"query":     {Type: "string", Description: "Full-text search query", Required: true},
+			"space_key": {Type: "string", Description: "Optional space key", Required: false},
 		},
 		Handler: t.searchPages,
 	})
 
-	// Register Confluence page content function
 	t.RegisterFunction(&toolkit.Function{
 		Name:        "get_page_content",
-		Description: "Get the content of a specific Confluence page",
+		Description: "Get the storage-format content of a Confluence page",
 		Parameters: map[string]toolkit.Parameter{
-			"base_url": {
-				Type:        "string",
-				Description: "Confluence base URL",
-				Required:    true,
-			},
-			"username": {
-				Type:        "string",
-				Description: "Confluence username or email",
-				Required:    true,
-			},
-			"api_token": {
-				Type:        "string",
-				Description: "Confluence API token",
-				Required:    true,
-			},
-			"page_id": {
-				Type:        "string",
-				Description: "Page ID",
-				Required:    true,
-			},
+			"base_url":  {Type: "string", Description: "Confluence base URL", Required: true},
+			"username":  {Type: "string", Description: "Confluence username or email", Required: true},
+			"api_token": {Type: "string", Description: "Confluence API token", Required: true},
+			"page_id":   {Type: "string", Description: "Page ID", Required: true},
 		},
 		Handler: t.getPageContent,
 	})
@@ -118,205 +66,190 @@ func New() *ConfluenceToolkit {
 	return t
 }
 
-// listSpaces lists accessible Confluence spaces
-func (c *ConfluenceToolkit) listSpaces(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-	_, ok := args["base_url"].(string)
-	if !ok {
-		return nil, fmt.Errorf("base_url must be a string")
-	}
-
-	_, ok = args["username"].(string)
-	if !ok {
-		return nil, fmt.Errorf("username must be a string")
-	}
-
-	_, ok = args["api_token"].(string)
-	if !ok {
-		return nil, fmt.Errorf("api_token must be a string")
-	}
-
-	// For now, return a mock response since we need actual Confluence API integration
-	// In a real implementation, this would call the Confluence API
-	mockSpaces := []map[string]interface{}{
-		{
-			"id":    "12345",
-			"key":   "DS",
-			"name":  "Documentation Space",
-			"type":  "global",
-			"_links": map[string]interface{}{
-				"webui": "/spaces/DS",
-			},
-		},
-		{
-			"id":    "67890",
-			"key":   "DEV",
-			"name":  "Development Space",
-			"type":  "global",
-			"_links": map[string]interface{}{
-				"webui": "/spaces/DEV",
-			},
-		},
-	}
-
-	return map[string]interface{}{
-		"spaces": mockSpaces,
-		"count":  len(mockSpaces),
-		"note":   "This is a placeholder implementation. Integrate with Confluence API for real space data.",
-	}, nil
+type confluencePageResponse struct {
+	Results []map[string]interface{} `json:"results"`
 }
 
-// searchPages searches for pages in Confluence
-func (c *ConfluenceToolkit) searchPages(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-	_, ok := args["base_url"].(string)
-	if !ok {
-		return nil, fmt.Errorf("base_url must be a string")
+func confluenceString(args map[string]interface{}, name string) (string, error) {
+	value, ok := args[name].(string)
+	if !ok || strings.TrimSpace(value) == "" {
+		return "", fmt.Errorf("%s must be a non-empty string", name)
 	}
-
-	_, ok = args["username"].(string)
-	if !ok {
-		return nil, fmt.Errorf("username must be a string")
-	}
-
-	_, ok = args["api_token"].(string)
-	if !ok {
-		return nil, fmt.Errorf("api_token must be a string")
-	}
-
-	query, ok := args["query"].(string)
-	if !ok {
-		return nil, fmt.Errorf("query must be a string")
-	}
-
-	spaceKey := ""
-	if spaceKeyArg, ok := args["space_key"].(string); ok {
-		spaceKey = spaceKeyArg
-	}
-
-	// For now, return a mock response
-	mockPages := []map[string]interface{}{
-		{
-			"id":      "123456",
-			"title":   "Getting Started Guide",
-			"space": map[string]interface{}{
-				"key":  "DS",
-				"name": "Documentation Space",
-			},
-			"version": map[string]interface{}{
-				"number": 3,
-			},
-			"_links": map[string]interface{}{
-				"webui": "/spaces/DS/pages/123456/Getting+Started+Guide",
-			},
-		},
-		{
-			"id":      "789012",
-			"title":   "API Documentation",
-			"space": map[string]interface{}{
-				"key":  "DEV",
-				"name": "Development Space",
-			},
-			"version": map[string]interface{}{
-				"number": 5,
-			},
-			"_links": map[string]interface{}{
-				"webui": "/spaces/DEV/pages/789012/API+Documentation",
-			},
-		},
-	}
-
-	result := map[string]interface{}{
-		"query":     query,
-		"pages":     mockPages,
-		"count":     len(mockPages),
-		"space_key": spaceKey,
-		"note":      "This is a placeholder implementation. Integrate with Confluence API for real search results.",
-	}
-
-	return result, nil
+	return strings.TrimSpace(value), nil
 }
 
-// getPageContent gets the content of a specific Confluence page
-func (c *ConfluenceToolkit) getPageContent(ctx context.Context, args map[string]interface{}) (interface{}, error) {
-	_, ok := args["base_url"].(string)
-	if !ok {
-		return nil, fmt.Errorf("base_url must be a string")
-	}
-
-	_, ok = args["username"].(string)
-	if !ok {
-		return nil, fmt.Errorf("username must be a string")
-	}
-
-	_, ok = args["api_token"].(string)
-	if !ok {
-		return nil, fmt.Errorf("api_token must be a string")
-	}
-
-	pageID, ok := args["page_id"].(string)
-	if !ok {
-		return nil, fmt.Errorf("page_id must be a string")
-	}
-
-	// For now, return a mock response
-	mockContent := map[string]interface{}{
-		"id":    pageID,
-		"title": "Example Page Title",
-		"space": map[string]interface{}{
-			"key":  "DS",
-			"name": "Documentation Space",
-		},
-		"body": map[string]interface{}{
-			"storage": map[string]interface{}{
-				"value": "<p>This is example page content for page " + pageID + ".</p><p>In a real implementation, this would contain the actual Confluence page content.</p>",
-				"representation": "storage",
-			},
-		},
-		"version": map[string]interface{}{
-			"number":    2,
-			"message":   "Updated documentation",
-			"minorEdit": false,
-		},
-		"_links": map[string]interface{}{
-			"webui": "/spaces/DS/pages/" + pageID + "/Example+Page+Title",
-		},
-	}
-
-	return map[string]interface{}{
-		"page": mockContent,
-		"note": "This is a placeholder implementation. Integrate with Confluence API for real page content.",
-	}, nil
-}
-
-// Helper function to make authenticated Confluence API requests
-func (c *ConfluenceToolkit) makeConfluenceRequest(ctx context.Context, url, username, apiToken string) (*http.Response, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+func confluenceEndpoint(baseURL, path string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(baseURL))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create request: %w", err)
+		return "", fmt.Errorf("invalid Confluence base_url: %w", err)
+	}
+	if (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return "", fmt.Errorf("base_url must be an absolute http or https URL")
+	}
+	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/" + strings.TrimLeft(path, "/")
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+	return parsed.String(), nil
+}
+
+func escapeCQL(value string) string {
+	value = strings.ReplaceAll(value, `\`, `\\`)
+	return strings.ReplaceAll(value, `"`, `\"`)
+}
+
+func (c *ConfluenceToolkit) listSpaces(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	baseURL, err := confluenceString(args, "base_url")
+	if err != nil {
+		return nil, err
+	}
+	username, err := confluenceString(args, "username")
+	if err != nil {
+		return nil, err
+	}
+	token, err := confluenceString(args, "api_token")
+	if err != nil {
+		return nil, err
+	}
+	endpoint, err := confluenceEndpoint(baseURL, "/api/v2/spaces")
+	if err != nil {
+		return nil, err
 	}
 
-	// Set basic auth for Confluence API
+	resp, err := c.makeConfluenceRequest(ctx, endpoint, username, token)
+	if err != nil {
+		return nil, err
+	}
+	var payload confluencePageResponse
+	if err := c.parseConfluenceResponse(resp, &payload); err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{
+		"spaces": payload.Results,
+		"count":  len(payload.Results),
+	}, nil
+}
+
+func (c *ConfluenceToolkit) searchPages(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	baseURL, err := confluenceString(args, "base_url")
+	if err != nil {
+		return nil, err
+	}
+	username, err := confluenceString(args, "username")
+	if err != nil {
+		return nil, err
+	}
+	token, err := confluenceString(args, "api_token")
+	if err != nil {
+		return nil, err
+	}
+	query, err := confluenceString(args, "query")
+	if err != nil {
+		return nil, err
+	}
+	spaceKey, _ := args["space_key"].(string)
+	spaceKey = strings.TrimSpace(spaceKey)
+
+	endpoint, err := confluenceEndpoint(baseURL, "/rest/api/content/search")
+	if err != nil {
+		return nil, err
+	}
+	parsed, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	cql := `type=page AND text~"` + escapeCQL(query) + `"`
+	if spaceKey != "" {
+		cql += ` AND space="` + escapeCQL(spaceKey) + `"`
+	}
+	params := parsed.Query()
+	params.Set("cql", cql)
+	params.Set("expand", "space,version")
+	params.Set("limit", "25")
+	parsed.RawQuery = params.Encode()
+
+	resp, err := c.makeConfluenceRequest(ctx, parsed.String(), username, token)
+	if err != nil {
+		return nil, err
+	}
+	var payload confluencePageResponse
+	if err := c.parseConfluenceResponse(resp, &payload); err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{
+		"query":     query,
+		"pages":     payload.Results,
+		"count":     len(payload.Results),
+		"space_key": spaceKey,
+	}, nil
+}
+
+func (c *ConfluenceToolkit) getPageContent(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+	baseURL, err := confluenceString(args, "base_url")
+	if err != nil {
+		return nil, err
+	}
+	username, err := confluenceString(args, "username")
+	if err != nil {
+		return nil, err
+	}
+	token, err := confluenceString(args, "api_token")
+	if err != nil {
+		return nil, err
+	}
+	pageID, err := confluenceString(args, "page_id")
+	if err != nil {
+		return nil, err
+	}
+	endpoint, err := confluenceEndpoint(baseURL, "/rest/api/content/"+url.PathEscape(pageID))
+	if err != nil {
+		return nil, err
+	}
+	parsed, err := url.Parse(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	params := parsed.Query()
+	params.Set("expand", "body.storage,space,version")
+	parsed.RawQuery = params.Encode()
+
+	resp, err := c.makeConfluenceRequest(ctx, parsed.String(), username, token)
+	if err != nil {
+		return nil, err
+	}
+	var page map[string]interface{}
+	if err := c.parseConfluenceResponse(resp, &page); err != nil {
+		return nil, err
+	}
+	return map[string]interface{}{"page": page}, nil
+}
+
+func (c *ConfluenceToolkit) makeConfluenceRequest(ctx context.Context, endpoint, username, apiToken string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create Confluence request: %w", err)
+	}
 	req.SetBasicAuth(username, apiToken)
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("request failed: %w", err)
+		return nil, fmt.Errorf("Confluence request failed: %w", err)
 	}
-
 	return resp, nil
 }
 
-// Helper function to parse Confluence API response
 func (c *ConfluenceToolkit) parseConfluenceResponse(resp *http.Response, target interface{}) error {
 	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("Confluence API request failed with status: %d", resp.StatusCode)
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 8<<10))
+		message := strings.TrimSpace(string(body))
+		if message == "" {
+			return fmt.Errorf("Confluence API request failed with status: %d", resp.StatusCode)
+		}
+		return fmt.Errorf("Confluence API request failed with status: %d: %s", resp.StatusCode, message)
 	}
-
 	if err := json.NewDecoder(resp.Body).Decode(target); err != nil {
 		return fmt.Errorf("failed to decode Confluence API response: %w", err)
 	}
-
 	return nil
 }

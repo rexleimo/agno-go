@@ -2,14 +2,14 @@
 
 ## Overview
 
-This example demonstrates how to connect to an MCP (Model Context Protocol) server and use its tools through the HNO MCP client. You'll learn how to set up security validation, create transports, connect to MCP servers, and integrate MCP tools with your Agno agents.
+This example demonstrates how to connect to an MCP (Model Context Protocol) server and use its tools through the HNO MCP client. You'll learn how to set up security validation, create transports, connect to MCP servers, and integrate MCP tools with your HNO agents.
 
 ## You Will Learn
 
 - How to create and configure security validation for MCP commands
 - How to set up stdio transport for subprocess communication
 - How to connect to an MCP server and discover available tools
-- How to create an MCP toolkit for use with Agno agents
+- How to create an MCP toolkit for use with HNO agents
 - How to call MCP tools directly
 
 ## Prerequisites
@@ -155,7 +155,7 @@ func main() {
 	fmt.Printf("  Result: %v\n", result.Content)
 
 	fmt.Println("\n=== Demo Complete ===")
-	fmt.Println("The MCP toolkit can now be passed to an agno Agent!")
+	fmt.Println("The MCP toolkit can now be passed to an HNO Agent!")
 }
 ```
 
@@ -223,7 +223,7 @@ toolkit, err := mcptoolkit.New(ctx, mcptoolkit.Config{
 defer toolkit.Close()
 ```
 
-- Converts MCP tools into Agno toolkit functions
+- Converts MCP tools into HNO toolkit functions
 - Automatically generates function signatures from MCP schemas
 - Compatible with `agent.Config.Toolkits`
 
@@ -276,12 +276,12 @@ Step 7: Calling a tool...
   Result: 8
 
 === Demo Complete ===
-The MCP toolkit can now be passed to an agno Agent!
+The MCP toolkit can now be passed to an HNO Agent!
 ```
 
-## Using with Agno Agents
+## Using with HNO Agents
 
-Once you have the MCP toolkit, you can use it with any Agno agent:
+Once you have the MCP toolkit, you can use it with any HNO agent:
 
 ```go
 import (
@@ -329,4 +329,4 @@ fmt.Println(output.Content)
 - Read the [MCP Integration Guide](../guide/mcp.md)
 - Try connecting to other MCP servers (filesystem, git, sqlite)
 - Build a custom MCP server for your use case
-- Combine MCP tools with built-in Agno tools
+- Combine MCP tools with built-in HNO tools

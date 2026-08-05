@@ -7,7 +7,7 @@ HNO의 고급 개념, 성능 최적화, 배포 전략 및 테스트 모범 사�
 이 섹션에서는 개발자를 위한 고급 주제를 다룹니다:
 
 - 🏗️ **아키텍처 이해하기** - 핵심 설계 원칙과 패턴 학습
-- ⚡ **성능 최적화하기** - 마이크로초 이하 에이전트 인스턴스화 달성
+- ⚡ **성능 측정** - 대상 환경에서 저장소의 Go benchmark 재현
 - 🚀 **프로덕션에 배포하기** - 프로덕션 배포 모범 사례
 - 🧪 **효과적으로 테스트하기** - 포괄적인 테스트 전략과 도구
 
@@ -27,15 +27,14 @@ HNO의 모듈식 아키텍처와 설계 철학에 대해 알아보기:
 
 ### [성능](/ko/advanced/performance)
 
-성능 특성과 최적화 기법 이해하기:
+측정된 성능 특성과 benchmark 방법 이해하기:
 
-- 에이전트 인스턴스화 (평균 ~180ns)
-- 메모리 사용량 (에이전트당 ~1.2KB)
+- 환경 정보가 포함된 재현 가능한 Agent 생성 benchmark
 - 동시성과 병렬성
 - 벤치마킹 도구와 방법론
-- 다른 프레임워크와의 성능 비교
+- 아직 측정하지 않은 항목의 명시
 
-**핵심 지표**: 처리량, 지연 시간, 메모리 효율성, 확장성
+**주요 지표**: `ns/op`, `B/op`, 할당 횟수와 부하별 처리량
 
 ### [배포](/ko/advanced/deployment)
 
@@ -68,11 +67,8 @@ HNO의 모듈식 아키텍처와 설계 철학에 대해 알아보기:
 ### 성능 벤치마크
 
 ```bash
-# 모든 벤치마크 실행
-make benchmark
-
-# 특정 벤치마크 실행
-go test -bench=BenchmarkAgentCreation -benchmem ./pkg/hno/agent/
+# 재현 가능한 Agent 생성 스냅샷 실행
+go test -run='^$' -bench='BenchmarkAgentCreation' -benchmem -count=10 ./pkg/hno/agent/
 
 # CPU 프로파일 생성
 go test -bench=. -cpuprofile=cpu.out ./pkg/hno/agent/
@@ -158,21 +154,21 @@ HNO에 기여하고 싶으신가요? 확인해보세요:
 
 - [아키텍처 문서](/ko/advanced/architecture) - 코드베이스 이해하기
 - [테스트 가이드](/ko/advanced/testing) - 테스트 표준 배우기
-- [GitHub 저장소](https://github.com/rexleimo/HNO) - PR 제출하기
-- [개발 가이드](https://github.com/rexleimo/HNO/blob/main/CLAUDE.md) - 개발 환경 설정
+- [GitHub 저장소](https://github.com/rexleimo/agno-go) - PR 제출하기
+- [개발 가이드](https://github.com/rexleimo/agno-go/blob/main/CLAUDE.md) - 개발 환경 설정
 
 ## 추가 리소스
 
 ### 문서
 
-- [Go 패키지 문서](https://pkg.go.dev/github.com/rexleimo/HNO)
-- [Python Agno 프레임워크](https://github.com/agno-agi/agno) (영감의 원천)
-- [VitePress 문서 소스](https://github.com/rexleimo/HNO/tree/main/website)
+- [Go 패키지 문서](https://pkg.go.dev/github.com/rexleimo/agno-go)
+- [Python HNO 프레임워크](https://github.com/agno-agi/agno) (영감의 원천)
+- [VitePress 문서 소스](https://github.com/rexleimo/agno-go/tree/main/website)
 
 ### 커뮤니티
 
-- [GitHub Issues](https://github.com/rexleimo/HNO/issues)
-- [GitHub Discussions](https://github.com/rexleimo/HNO/discussions)
+- [GitHub Issues](https://github.com/rexleimo/agno-go/issues)
+- [GitHub Discussions](https://github.com/rexleimo/agno-go/discussions)
 - [릴리스 노트](/ko/release-notes)
 
 ## 다음 단계

@@ -1,307 +1,162 @@
-# Performance
+# DeepSeek 100-run concurrent real-model performance report
 
-HNO is designed for extreme performance, achieving 16x faster agent instantiation compared to Python Agno.
+<div class="benchmark-page-marker" aria-hidden="true"></div>
 
-## Executive Summary
+<div class="benchmark-status benchmark-status--ready">
+  <div class="benchmark-status__eyebrow">Publication status</div>
+  <div class="benchmark-status__title">DeepSeek fixed-answer comparison: 100 concurrent runs complete</div>
+  <div class="benchmark-status__badges">
+    <span class="benchmark-badge benchmark-badge--ready">Real DeepSeek</span>
+    <span class="benchmark-badge">100 runs per path</span>
+    <span class="benchmark-badge">Concurrency 8</span>
+    <span class="benchmark-badge">Provider prefix cache</span>
+  </div>
+  <p><strong>Result:</strong> in this DeepSeek <code>deepseek-v4-flash</code> fixed-answer workload, HNO had the lowest mean client latency. Relative to Direct API, the mean ratios were <strong>1.60x</strong> for HNO, <strong>1.33x</strong> for Agno, and <strong>1.54x</strong> for LangGraph.</p>
+  <p><strong>Boundary:</strong> this is a same-provider, same-model, same-prompt latency snapshot with eight requests in flight. It is not a universal claim about Go, Python, throughput, or production capacity.</p>
+</div>
 
-✅ **Performance Goals Achieved**:
-- ✅ Agent instantiation: **~180ns** (<1μs target)
-- ✅ Memory footprint: **~1.2KB/agent** (<3KB target)
-- ✅ Concurrency: Linear scaling with no contention
+## Local system-overhead summary
 
-## Benchmark Results
+The primary framework comparison is a fresh-operation matrix against the same local OpenAI-compatible stub. Each row uses 100 measured operations, 5 warmups, a 1 ms fixed response delay, and the listed concurrency. RSS is process-tree working set; measured RPS is the completed measured batch throughput.
 
-### Agent Creation Performance
+| Concurrency | Framework | Mean | P95 | Measured RPS | Success | Peak RSS |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| 8 | HNO | **1.859 ms** | **2.655 ms** | **4,186.08** | 100/100 | **12.3 MB** |
+| 8 | Agno | 61.766 ms | 83.473 ms | 125.66 | 100/100 | 285.0 MB |
+| 8 | LangGraph | 30.117 ms | 37.638 ms | 251.95 | 100/100 | 157.9 MB |
+| 32 | HNO | **6.703 ms** | **18.637 ms** | **3,627.35** | 100/100 | **16.7 MB** |
+| 32 | Agno | 138.678 ms | 241.744 ms | 170.17 | 100/100 | 373.8 MB |
+| 32 | LangGraph | 78.370 ms | 129.618 ms | 241.67 | 100/100 | 161.1 MB |
 
-| Benchmark | Time/op | Memory/op | Allocs/op |
-|-----------|---------|-----------|-----------|
-| **Simple Agent** | 184.5 ns | 1,272 B (1.2 KB) | 8 |
-| **With Tools** | 193.0 ns | 1,288 B (1.3 KB) | 9 |
-| **With Memory** | 111.9 ns | 312 B (0.3 KB) | 6 |
+At concurrency 8, HNO measured 16.6x LangGraph's batch RPS and 33.3x Agno's in this local protocol. At concurrency 32, the ratios were 15.0x and 21.3x. This is framework/runtime overhead evidence, not remote model speed.
 
-**Key Findings**:
-- ⚡ Agent creation: **<200 nanoseconds** (5x better than 1μs target!)
-- 💾 Memory usage: **1.2-1.3KB** (60% better than 3KB target)
-- 🎯 Adding tools costs only 8.5ns overhead
-- 🎯 Memory is lightweight (only 312B)
+See the [full local system-overhead matrix](/advanced/system-overhead) for raw files, resource definitions, lifecycle scope, and reproduction.
 
-### Execution Performance
+## Final results
 
-| Benchmark | Throughput |
-|-----------|------------|
-| **Simple Run** | ~6M ops/sec |
-| **With Tool Calls** | ~0.5M ops/sec |
-| **Memory Operations** | ~1M ops/sec |
+Recorded: `2026-08-04T15:33:06Z`. Each path used 3 serial warmups and 100 measured samples with bounded concurrency 8.
 
-**Note**: Real performance is bounded by LLM API latency (100-1000ms). Above results use mock models.
+| Path | Mean | Median P50 | P95 | Min-max | Success | Relative to Direct |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Direct API | 2,094.52 ms | 1,707.51 ms | 4,225.19 ms | 905.05-4,592.62 ms | 100/100 | 1.00x |
+| HNO | **1,312.71 ms** | **1,288.57 ms** | **1,563.62 ms** | 922.35-1,847.16 ms | 100/100 | **1.60x** |
+| Agno | 1,571.34 ms | 1,513.03 ms | 1,988.19 ms | 1,150.89-2,646.64 ms | 100/100 | 1.33x |
+| LangGraph | 1,362.09 ms | 1,332.45 ms | 1,753.45 ms | 983.37-1,927.02 ms | 100/100 | 1.54x |
 
-### Concurrent Performance
+### What the relative mean means
 
-| Benchmark | Time/op | Memory/op | Scaling |
-|-----------|---------|-----------|---------|
-| **Parallel Creation** | 191.0 ns | 1,272 B | ✅ Linear |
-| **Parallel Run** | Similar | Similar | ✅ Linear |
+The multiplier is defined as:
 
-**Key Findings**:
-- ✅ Concurrent and single-threaded performance are identical
-- ✅ No lock contention or race conditions
-- ✅ Perfect for high-concurrency scenarios
-
-## Performance Comparison
-
-### vs Python Agno
-
-| Metric | Go | Python | Improvement |
-|--------|-----|--------|-------------|
-| **Instantiation** | ~180ns | ~3μs | **16x faster** |
-| **Memory/Agent** | ~1.2KB | ~6.5KB | **5x less** |
-| **Concurrency** | Native goroutines | GIL limited | **Superior** |
-
-## Real-World Scenarios
-
-### Scenario 1: Batch Agent Creation
-
-Creating 1,000 agents:
-- **Time**: 1,000 × 180ns = **0.18ms**
-- **Memory**: 1,000 × 1.2KB = **1.2MB**
-
-### Scenario 2: High-Concurrency API Service
-
-Handling 10,000 req/s:
-- **Per request**: 1 agent instance
-- **Memory overhead**: 10,000 × 1.2KB = **12MB**
-- **Latency**: <1ms (excluding LLM API calls)
-
-### Scenario 3: Multi-Agent Workflow
-
-100 agents collaborating:
-- **Total memory**: 100 × 1.2KB = **120KB**
-- **Startup time**: 100 × 180ns = **18μs**
-
-## Optimization Techniques
-
-### 1. Low Allocation Count
-
-- Only 8-9 heap allocations per agent
-- No unnecessary interface conversions
-- Pre-allocated slice capacities
-
-### 2. Efficient Memory Layout
-
-```go
-type Agent struct {
-    ID           string        // 16B
-    Name         string        // 16B
-    Model        Model         // 16B (interface)
-    Tools        []Toolkit     // 24B (slice header)
-    Memory       Memory        // 16B (interface)
-    Instructions string        // 16B
-    MaxLoops     int           // 8B
-    // Total: ~112B struct + heap allocations
-}
+```text
+Direct API mean duration / path mean duration
 ```
 
-### 3. Zero-Copy Operations
+For HNO:
 
-- String references (no copying)
-- Interface pointers (no copying)
-- Slice views (no copying)
-
-## Bottleneck Analysis
-
-### Current Bottlenecks
-
-1. **LLM API Latency** (100-1000ms)
-   - Solution: Streaming, caching, batch requests
-
-2. **Tool Execution Time** (varies)
-   - Solution: Parallel execution, timeout controls
-
-3. **Not yet benchmarked**:
-   - Team coordination overhead
-   - Workflow execution overhead
-   - Vector DB queries
-
-## Production Recommendations
-
-### 1. Agent Pooling
-
-Reuse agent instances to reduce GC pressure:
-
-```go
-type AgentPool struct {
-    agents chan *Agent
-}
-
-func NewAgentPool(size int, config agent.Config) *AgentPool {
-    pool := &AgentPool{
-        agents: make(chan *Agent, size),
-    }
-    for i := 0; i < size; i++ {
-        ag, _ := agent.New(config)
-        pool.agents <- ag
-    }
-    return pool
-}
-
-func (p *AgentPool) Get() *Agent {
-    return <-p.agents
-}
-
-func (p *AgentPool) Put(ag *Agent) {
-    ag.ClearMemory()
-    p.agents <- ag
-}
+```text
+2094.52 / 1312.71 = 1.60x
 ```
 
-### 2. Goroutine Limits
+HNO's mean client latency was about 37.3% lower than the Direct API mean in this snapshot. This is an end-to-end client measurement, not a division of Go runtime time by Python runtime time. It includes:
 
-Limit concurrency to avoid resource exhaustion:
-
-```go
-semaphore := make(chan struct{}, 100) // Max 100 concurrent
-
-for _, task := range tasks {
-    semaphore <- struct{}{}
-    go func(t Task) {
-        defer func() { <-semaphore }()
-
-        ag, _ := agent.New(config)
-        ag.Run(ctx, t.Input)
-    }(task)
-}
+```text
+client request preparation + provider network + provider queueing + model generation + response parsing
 ```
 
-### 3. Response Caching
+The concurrent protocol changes the interpretation from the earlier serial 1000-run snapshot. The result shows observed latency for eight in-flight requests; it is not a request-per-second benchmark and should not be presented as a pure framework speedup.
 
-Cache LLM responses to reduce API calls:
+## Prompt-cache evidence
 
-```go
-type CachedModel struct {
-    model models.Model
-    cache map[string]*types.ModelResponse
-    mu    sync.RWMutex
-}
+DeepSeek prompt caching is provider-managed. There is no client-side `cache=true` switch to force it. The four paths used the same stable long prefix and the same fixed-answer prompt.
 
-func (m *CachedModel) Invoke(ctx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error) {
-    key := hashRequest(req)
+The Direct API path reported:
 
-    m.mu.RLock()
-    if cached, ok := m.cache[key]; ok {
-        m.mu.RUnlock()
-        return cached, nil
-    }
-    m.mu.RUnlock()
-
-    resp, err := m.model.Invoke(ctx, req)
-    if err != nil {
-        return nil, err
-    }
-
-    m.mu.Lock()
-    m.cache[key] = resp
-    m.mu.Unlock()
-
-    return resp, nil
-}
+```text
+99/100 measured requests: prompt_cache_hit_tokens = 1920, prompt_cache_miss_tokens = 13
+1/100 measured requests:  prompt_cache_hit_tokens = 0,    prompt_cache_miss_tokens = 1933
 ```
 
-### 4. Monitoring
+The first measured request was a cache miss in this run; later requests observed the cached prefix. Framework SDK results do not expose the same provider usage fields in their current result structures, so the direct path is retained as provider-level cache evidence rather than treated as a framework-specific metric.
 
-Monitor key metrics in production:
+## Test protocol
 
-```go
-import "github.com/prometheus/client_golang/prometheus"
+| Condition | Value |
+| --- | --- |
+| Provider | DeepSeek |
+| Model | `deepseek-v4-flash` |
+| API | OpenAI-compatible |
+| Endpoint | `https://api.deepseek.com/v1` |
+| Prompt | Fixed answer, return `REMOTE_MODEL_OK` |
+| Temperature | 0 |
+| Seed | 42 |
+| Max output tokens | 128 |
+| Warmup | 3 serial requests per path |
+| Measured runs | 100 per path |
+| Concurrency | 8 measured requests in flight |
+| Prompt cache | Provider-managed prefix cache |
+| Key | Read locally and never stored in results |
 
-var (
-    agentCreations = prometheus.NewCounter(prometheus.CounterOpts{
-        Name: "agno_agent_creations_total",
-    })
+## Result boundaries
 
-    agentLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
-        Name: "agno_agent_run_duration_seconds",
-    })
-)
+The supported statement is:
+
+> Under the DeepSeek `deepseek-v4-flash`, fixed-answer, stable-prefix, 100-run protocol with concurrency 8, temperature 0, and seed 42, HNO's observed mean client latency was 1.60x relative to Direct API, Agno was 1.33x, and LangGraph was 1.54x.
+
+This does not prove:
+
+- that every Go program is faster than Python;
+- that HNO will be 1.60x faster for every model, provider, prompt, tool, or concurrency level;
+- that 1.60x is a pure Go runtime improvement;
+- that this is production throughput or capacity;
+- that this is TTFT or TPS;
+- that the result remains stable under rate limits, retries, failures, or a different time window.
+
+The P95 and maximum values show provider/network tail behavior. Production work still needs separate tests for throughput, rate limits, retries, TTFT, TPS, token usage, resource consumption, and cost.
+
+## Raw results
+
+The checked-in concurrent snapshot is:
+
+```text
+benchmarks/framework_comparison/results/remote_deepseek_v4_flash/latest_100_concurrent.json
+benchmarks/framework_comparison/results/remote_deepseek_v4_flash/latest_100_concurrent.md
 ```
 
-## Running Benchmarks
+Raw samples:
 
-### Run All Benchmarks
+```text
+benchmarks/framework_comparison/results/remote_deepseek_v4_flash/direct_simple_100_concurrent.json
+benchmarks/framework_comparison/results/remote_deepseek_v4_flash/hno_simple_100_concurrent.json
+benchmarks/framework_comparison/results/remote_deepseek_v4_flash/python_simple_100_concurrent.json
+```
+
+The earlier serial 1000-run files remain in the results directory for historical comparison; they are not used as the conclusion on this page.
+
+## Local framework overhead matrix
+
+For a provider-independent comparison of HNO, Agno, and LangGraph using the same local fixed-response endpoint, see the [local framework and system overhead matrix](/advanced/system-overhead). It reports 100 samples at concurrency 1, 8, and 32, with request latency, measured batch RPS, peak process-tree RSS, and CPU telemetry.
+
+## Reproduce
 
 ```bash
-make bench
-# or
-go test -bench=. -benchmem ./...
+python benchmarks/framework_comparison/remote_fixed_baseline.py \
+  --config benchmarks/framework_comparison/remote_model.local.env \
+  --warmup 3 --runs 100 --concurrency 8 \
+  --output benchmarks/framework_comparison/results/remote_deepseek_v4_flash/direct_simple_100_concurrent.json
+
+go run ./benchmarks/framework_comparison/hno_local_runner \
+  -config benchmarks/framework_comparison/remote_model.local.env \
+  -warmup 3 -runs 100 -concurrency 8 \
+  > benchmarks/framework_comparison/results/remote_deepseek_v4_flash/hno_simple_100_concurrent.json
+
+uv run --with 'agno==2.8.6' --with 'langgraph==1.2.10' \
+  --with 'langchain-openai' --with 'langchain-core' \
+  python benchmarks/framework_comparison/real_local.py \
+  --config benchmarks/framework_comparison/remote_model.local.env \
+  --scenario simple --warmup 3 --runs 100 --concurrency 8 \
+  --output benchmarks/framework_comparison/results/remote_deepseek_v4_flash/python_simple_100_concurrent.json
+
+python benchmarks/framework_comparison/summarize_remote.py
 ```
 
-### Run Specific Benchmark
-
-```bash
-go test -bench=BenchmarkAgentCreation -benchmem ./pkg/hno/agent/
-```
-
-### Generate CPU Profile
-
-```bash
-go test -bench=. -cpuprofile=cpu.prof ./pkg/hno/agent/
-go tool pprof cpu.prof
-```
-
-### Generate Memory Profile
-
-```bash
-go test -bench=. -memprofile=mem.prof ./pkg/hno/agent/
-go tool pprof mem.prof
-```
-
-## Profiling Tips
-
-### 1. CPU Profiling
-
-```bash
-go test -cpuprofile=cpu.prof -bench=.
-go tool pprof -http=:8080 cpu.prof
-```
-
-### 2. Memory Profiling
-
-```bash
-go test -memprofile=mem.prof -bench=.
-go tool pprof -http=:8080 mem.prof
-```
-
-### 3. Race Detection
-
-```bash
-go test -race ./...
-```
-
-## Future Optimizations
-
-### Planned Improvements
-
-- [ ] String interning for repeated values
-- [ ] sync.Pool for agent reuse
-- [ ] Batch tool execution
-- [ ] HTTP/2 connection pooling for LLM APIs
-- [ ] gRPC support for lower latency
-
-## Conclusion
-
-HNO **exceeds performance targets**:
-
-- ✅ 5x faster than target (180ns vs 1μs)
-- ✅ 60% less memory than target (1.2KB vs 3KB)
-- ✅ 16x faster than Python, 5x less memory
-- ✅ Perfect concurrency scaling
-
-**Supports**:
-- Thousands of concurrent agents
-- 10K+ requests/second
-- Low-latency real-time applications
-
-## References
-
-- [Architecture](/advanced/architecture)
-- [Deployment](/advanced/deployment)
-- [Benchmark Code](https://github.com/rexleimo/HNO/tree/main/pkg/hno/agent/agent_bench_test.go)
+The local config file is intentionally ignored by Git. Do not paste the API key into source files, reports, logs, or documentation.

@@ -27,7 +27,7 @@ go run -tags logfire cmd/examples/logfire_observability/main.go
 
 자세한 단계별 가이드는 GitHub 문서를 참고하세요:
 
-- https://github.com/rexleimo/HNO/blob/main/docs/release/logfire_observability.md
+- https://github.com/rexleimo/agno-go/blob/main/docs/release/logfire_observability.md
 
 다음 단계:
 - SSE 이벤트를 원하는 관측/모니터링 백엔드로 전달

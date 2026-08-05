@@ -30,7 +30,7 @@ go run -tags logfire cmd/examples/logfire_observability/main.go
 
 詳細な手順は GitHub のドキュメントをご参照ください：
 
-- https://github.com/rexleimo/HNO/blob/main/docs/release/logfire_observability.md
+- https://github.com/rexleimo/agno-go/blob/main/docs/release/logfire_observability.md
 
 次のステップ:
 - SSE を任意の APM/監視基盤へ転送

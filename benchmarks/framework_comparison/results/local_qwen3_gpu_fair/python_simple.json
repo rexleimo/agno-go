@@ -1,0 +1,239 @@
+{
+  "endpoint": "http://127.0.0.1:8081",
+  "model": "D:\\Program Files\\llmam.cpp\\llama-b10107-bin-win-cuda-13.3-x64\\models\\Qwen3-4B-Q8_0.gguf",
+  "scenario": "simple",
+  "warmup": 3,
+  "runs": 20,
+  "frameworks": {
+    "agno": {
+      "warmup": 3,
+      "runs": 20,
+      "samples": [
+        {
+          "duration_ns": 131797400,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 197505700,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 134323900,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 148456500,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 126413000,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 128850000,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 151059400,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 133230200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 137490600,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 150605100,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 177823700,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 144002600,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 126010100,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 132875800,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 129373600,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 130796100,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 206756900,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 133831900,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 138421300,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 251338800,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        }
+      ],
+      "mean_ns": 150548130.0,
+      "median_ns": 135907250.0,
+      "p95_ns": 208985995.0,
+      "min_ns": 126010100,
+      "max_ns": 251338800,
+      "success_count": 20
+    },
+    "langgraph": {
+      "warmup": 3,
+      "runs": 20,
+      "samples": [
+        {
+          "duration_ns": 131503600,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 154802300,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 100404600,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 100619400,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 107447500,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 106027300,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 107005000,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 105614600,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 103884300,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 115162200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 105860600,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 107462000,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 102957700,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 105341400,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 100112400,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 104635500,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 110723200,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 100913700,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 98953800,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 104343300,
+          "content": "LOCAL_MODEL_OK",
+          "success": true
+        }
+      ],
+      "mean_ns": 108688720.0,
+      "median_ns": 105478000.0,
+      "p95_ns": 132668535.0,
+      "min_ns": 98953800,
+      "max_ns": 154802300,
+      "success_count": 20
+    }
+  },
+  "limits": [
+    "All requests use the same local llama.cpp endpoint and model.",
+    "Measurements are client wall-clock time and include framework request preparation.",
+    "The model is local; no cloud LLM or network service is involved.",
+    "Server-side model load, CPU, and RSS are not attributed to an individual framework."
+  ]
+}

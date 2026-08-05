@@ -389,4 +389,4 @@ KISS 원칙을 따르세요 - 과도한 엔지니어링 지양.
 - [성능 벤치마크](/advanced/performance)
 - [배포 가이드](/advanced/deployment)
 - [API 참조](/api/)
-- [소스 코드](https://github.com/rexleimo/HNO)
+- [소스 코드](https://github.com/rexleimo/agno-go)

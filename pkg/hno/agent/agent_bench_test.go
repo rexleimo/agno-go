@@ -2,6 +2,8 @@ package agent
 
 import (
 	"context"
+	"io"
+	"log/slog"
 	"testing"
 
 	"github.com/rexleimo/agno-go/pkg/hno/memory"
@@ -67,6 +69,35 @@ func BenchmarkAgentCreationWithMemory(b *testing.B) {
 			Memory: mem,
 		})
 		if err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
+// BenchmarkAgentFreshRunLocalDummy measures a fresh agent plus one local model run.
+// No network, provider, or token generation is involved.
+func BenchmarkAgentFreshRunLocalDummy(b *testing.B) {
+	model := &MockModel{
+		BaseModel: models.BaseModel{ID: "local-dummy", Provider: "benchmark"},
+		InvokeFunc: func(ctx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error) {
+			return &types.ModelResponse{Content: "ok"}, nil
+		},
+	}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	b.ResetTimer()
+	b.ReportAllocs()
+
+	for i := 0; i < b.N; i++ {
+		agent, err := New(Config{
+			Name:   "benchmark-agent",
+			Model:  model,
+			Logger: logger,
+		})
+		if err != nil {
+			b.Fatal(err)
+		}
+		if _, err := agent.Run(context.Background(), "ping"); err != nil {
 			b.Fatal(err)
 		}
 	}

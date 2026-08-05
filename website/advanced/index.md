@@ -7,7 +7,7 @@ Deep dive into advanced concepts, performance optimization, deployment strategie
 This section covers advanced topics for developers who want to:
 
 - 🏗️ **Understand the architecture** - Learn the core design principles and patterns
-- ⚡ **Optimize performance** - Achieve sub-microsecond agent instantiation
+- ⚡ **Measure performance** - Reproduce the checked-in Go benchmarks on your target environment
 - 🚀 **Deploy to production** - Best practices for production deployments
 - 🧪 **Test effectively** - Comprehensive testing strategies and tools
 
@@ -27,15 +27,14 @@ Learn about HNO's modular architecture and design philosophy:
 
 ### [Performance](/advanced/performance)
 
-Understand performance characteristics and optimization techniques:
+Understand measured performance characteristics and benchmark methodology:
 
-- Agent instantiation (~180ns average)
-- Memory footprint (~1.2KB per agent)
+- Reproducible agent-construction benchmarks with environment details
 - Concurrency and parallelism
 - Benchmarking tools and methodologies
-- Performance comparison with other frameworks
+- Explicit limits on what is not yet benchmarked
 
-**Key metrics**: Throughput, latency, memory efficiency, scalability
+**Key metrics**: `ns/op`, `B/op`, allocations, and workload-specific throughput
 
 ### [Deployment](/advanced/deployment)
 
@@ -82,17 +81,16 @@ go run -tags redis ./cmd/vectordb_migrate --action up --provider redis \
 ### Performance Benchmarks
 
 ```bash
-# Run all benchmarks
-make benchmark
-
-# Run specific benchmark
-go test -bench=BenchmarkAgentCreation -benchmem ./pkg/hno/agent/
+# Run the reproducible agent-construction snapshot
+go test -run='^$' -bench='BenchmarkAgentCreation' -benchmem -count=10 ./pkg/hno/agent/
 
 # Generate CPU profile
 go test -bench=. -cpuprofile=cpu.out ./pkg/hno/agent/
 ```
 
 [See detailed performance metrics →](/advanced/performance)
+
+[See local framework and system overhead matrix →](/advanced/system-overhead)
 
 ### Production Deployment
 
@@ -166,7 +164,7 @@ Interested in contributing to HNO? Check out:
 ### Documentation
 
 - [Go package documentation](https://pkg.go.dev/github.com/rexleimo/HNO)
-- [Python Agno framework](https://github.com/agno-agi/agno) (inspiration)
+- [Python HNO framework](https://github.com/agno-agi/agno) (inspiration)
 - [VitePress documentation source](https://github.com/rexleimo/HNO/tree/main/website)
 
 ### Community

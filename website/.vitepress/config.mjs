@@ -3,21 +3,23 @@ import { defineConfig } from 'vitepress'
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
   title: "HNO",
-  description: "High-performance multi-agent system framework built with Go",
-  base: '/HNO/',
+  description: "Multi-agent system framework built with Go",
+  base: '/',
   ignoreDeadLinks: true,
-  sitemap: { hostname: 'https://rexleimo.github.io/HNO/' },
+  sitemap: { hostname: 'https://hno.rexai.top/' },
 
   head: [
     // Use existing logo as favicon to avoid 404s
-    ['link', { rel: 'icon', type: 'image/png', href: '/HNO/logo.png' }],
-    ['link', { rel: 'shortcut icon', href: '/HNO/logo.png' }],
-    ['link', { rel: 'apple-touch-icon', href: '/HNO/logo.png' }],
+    ['link', { rel: 'icon', type: 'image/png', href: '/logo.png' }],
+    ['link', { rel: 'shortcut icon', href: '/logo.png' }],
+    ['link', { rel: 'apple-touch-icon', href: '/logo.png' }],
     ['meta', { name: 'theme-color', content: '#3eaf7c' }],
     ['meta', { name: 'og:type', content: 'website' }],
     ['meta', { name: 'og:site_name', content: 'HNO' }],
-    ['meta', { name: 'og:image', content: '/HNO/logo.png' }],
-    ['meta', { name: 'og:url', content: 'https://rexleimo.github.io/HNO/' }],
+    ['meta', { name: 'og:image', content: '/logo.png' }],
+    ['meta', { name: 'og:url', content: 'https://hno.rexai.top/' }],
+    ['meta', { name: 'robots', content: 'index,follow' }],
+    ['link', { rel: 'alternate', type: 'application/rss+xml', href: '/rss.xml', title: 'HNO Blog RSS' }],
   ],
 
   locales: {
@@ -25,15 +27,16 @@ export default defineConfig({
       label: 'English',
       lang: 'en',
       title: 'HNO',
-      description: 'High-performance multi-agent system framework built with Go',
+      description: 'Multi-agent system framework built with Go',
       themeConfig: {
         nav: [
           { text: 'Guide', link: '/guide/' },
           { text: 'API Reference', link: '/api/' },
           { text: 'Advanced', link: '/advanced/' },
           { text: 'Examples', link: '/examples/' },
+          { text: 'Blog', link: '/blog/' },
           {
-            text: 'v1.2.9',
+            text: 'v2.0.0',
             items: [
               { text: 'Changelog', link: 'https://github.com/rexleimo/HNO/blob/main/CHANGELOG.md' },
               { text: 'Release Notes', link: '/release-notes' }
@@ -91,6 +94,7 @@ export default defineConfig({
               items: [
                 { text: 'Architecture', link: '/advanced/architecture' },
                 { text: 'Performance', link: '/advanced/performance' },
+                { text: 'System Overhead Matrix', link: '/advanced/system-overhead' },
                 { text: 'Deployment', link: '/advanced/deployment' },
                 { text: 'Testing', link: '/advanced/testing' },
                 { text: 'Run Context', link: '/advanced/run-context' },
@@ -115,6 +119,15 @@ export default defineConfig({
                 { text: 'Logfire Observability', link: '/examples/logfire-observability' }
               ]
             }
+          ],
+          '/blog/': [
+            {
+              text: 'Blog',
+              items: [
+                { text: 'Latest article', link: '/blog/' },
+                { text: 'AI Agent runtime benchmark', link: '/blog/ai-agent-runtime-benchmark' }
+              ]
+            }
           ]
         },
         editLink: {
@@ -130,15 +143,16 @@ export default defineConfig({
       label: '简体中文',
       lang: 'zh-CN',
       title: 'HNO',
-      description: '基于 Go 构建的高性能多智能体系统框架',
+      description: '基于 Go 构建的多智能体系统框架',
       themeConfig: {
         nav: [
           { text: '指南', link: '/zh/guide/' },
           { text: 'API 参考', link: '/zh/api/' },
           { text: '进阶', link: '/zh/advanced/' },
           { text: '示例', link: '/zh/examples/' },
+          { text: '博客', link: '/zh/blog/' },
           {
-            text: 'v1.2.9',
+            text: 'v2.0.0',
             items: [
               { text: '更新日志', link: 'https://github.com/rexleimo/HNO/blob/main/CHANGELOG.md' },
               { text: '发布说明', link: '/zh/release-notes' }
@@ -196,6 +210,7 @@ export default defineConfig({
               items: [
                 { text: '架构', link: '/zh/advanced/architecture' },
                 { text: '性能', link: '/zh/advanced/performance' },
+                { text: '系统开销矩阵', link: '/zh/advanced/system-overhead' },
                 { text: '部署', link: '/zh/advanced/deployment' },
                 { text: '测试', link: '/zh/advanced/testing' },
                 { text: '运行上下文', link: '/zh/advanced/run-context' },
@@ -220,6 +235,15 @@ export default defineConfig({
                 { text: 'Logfire 可观测性', link: '/zh/examples/logfire-observability' }
               ]
             }
+          ],
+          '/zh/blog/': [
+            {
+              text: '博客',
+              items: [
+                { text: '最新文章', link: '/zh/blog/' },
+                { text: 'AI Agent 框架性能基准', link: '/zh/blog/ai-agent-runtime-benchmark' }
+              ]
+            }
           ]
         },
         editLink: {
@@ -235,7 +259,7 @@ export default defineConfig({
       label: '日本語',
       lang: 'ja',
       title: 'HNO',
-      description: 'Go で構築された高性能マルチエージェントシステムフレームワーク',
+      description: 'Go で構築されたマルチエージェントシステムフレームワーク',
       themeConfig: {
         nav: [
           { text: 'ガイド', link: '/ja/guide/' },
@@ -243,7 +267,7 @@ export default defineConfig({
           { text: '高度な内容', link: '/ja/advanced/' },
           { text: 'サンプル', link: '/ja/examples/' },
           {
-            text: 'v1.2.9',
+            text: 'v2.0.0',
             items: [
               { text: '変更履歴', link: 'https://github.com/rexleimo/HNO/blob/main/CHANGELOG.md' },
               { text: 'リリースノート', link: '/ja/release-notes' }
@@ -348,7 +372,7 @@ export default defineConfig({
           { text: '고급', link: '/ko/advanced/' },
           { text: '예제', link: '/ko/examples/' },
           {
-            text: 'v1.2.9',
+            text: 'v2.0.0',
             items: [
               { text: '변경 로그', link: 'https://github.com/rexleimo/HNO/blob/main/CHANGELOG.md' },
               { text: '릴리스 노트', link: '/ko/release-notes' }
@@ -451,8 +475,9 @@ export default defineConfig({
       { text: 'API Reference', link: '/api/' },
       { text: 'Advanced', link: '/advanced/' },
       { text: 'Examples', link: '/examples/' },
+      { text: 'Blog', link: '/blog/' },
       {
-        text: 'v1.2.9',
+        text: 'v2.0.0',
         items: [
           { text: 'Changelog', link: 'https://github.com/rexleimo/HNO/blob/main/CHANGELOG.md' },
           { text: 'Release Notes', link: '/release-notes' }
@@ -530,6 +555,15 @@ export default defineConfig({
             { text: 'Workflow Demo', link: '/examples/workflow-demo' },
             { text: 'RAG Demo', link: '/examples/rag-demo' },
             { text: 'MCP Demo', link: '/examples/mcp-demo' }
+          ]
+        }
+      ],
+      '/blog/': [
+        {
+          text: 'Blog',
+          items: [
+            { text: 'Latest article', link: '/blog/' },
+            { text: 'AI Agent runtime benchmark', link: '/blog/ai-agent-runtime-benchmark' }
           ]
         }
       ]

@@ -72,7 +72,7 @@ website/
 Edit `.vitepress/config.mjs` (or `.vitepress/config.ts` if using TypeScript) to modify:
 
 - Site title and description
-- Base URL (set to `/HNO/` for GitHub Pages)
+- Base URL (set to `/` for the custom domain `hno.rexai.top`)
 - Navigation menu
 - Sidebar structure
 - Theme options
@@ -80,11 +80,11 @@ Edit `.vitepress/config.mjs` (or `.vitepress/config.ts` if using TypeScript) to 
 
 ### Important: Base URL
 
-The `base` option is set to `/HNO/` to match the GitHub repository name. If deploying elsewhere, update this value in `.vitepress/config.mjs`:
+The custom domain is served from the site root, so `base` is `/` in `.vitepress/config.mjs`:
 
 ```ts
 export default defineConfig({
-  base: '/HNO/', // Change this for different deployments
+  base: '/',
   // ...
 })
 ```
@@ -97,9 +97,21 @@ The site automatically deploys to GitHub Pages when changes are pushed to `main`
 
 1. Push changes to `main`
 2. GitHub Actions builds the site
-3. Deployed to `https://rexleimo.github.io/HNO/`
+3. Deployed to `https://hno.rexai.top/`
 
 **Workflow**: `.github/workflows/deploy-docs.yml`
+
+### Custom Domain
+
+The repository includes `website/public/CNAME`, so the generated Pages artifact
+contains `hno.rexai.top`. GitHub and DNS still need to be configured:
+
+1. In **Settings → Pages**, set the custom domain to `hno.rexai.top` and enable HTTPS after DNS validation.
+2. At the DNS provider, create `CNAME hno -> rexleimo.github.io`.
+3. Push the site changes to `main` and wait for the Pages deployment to finish.
+
+The deployed site should then be available at `https://hno.rexai.top/` with a root
+base path, not under `/HNO/`.
 
 ### Manual Deployment
 

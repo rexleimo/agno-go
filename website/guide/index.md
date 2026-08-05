@@ -1,18 +1,19 @@
 # What is HNO?
 
-**HNO** is a high-performance multi-agent system framework built with Go. Inheriting the design philosophy from the Python Agno framework, it leverages Go's concurrency model and performance advantages to build efficient, scalable AI agent systems.
+**HNO** is a multi-agent system framework built with Go. It uses Go's concurrency model, static typing, deployment model, and standard tooling; workload-specific performance claims are documented only when a reproducible benchmark is available.
 
 ## Key Features
 
-### 🚀 Extreme Performance
+### 🚀 Measured Performance
 
-- **Agent Instantiation**: ~180ns average (16x faster than Python version)
-- **Memory Footprint**: ~1.2KB per agent (5.4x less than Python)
-- **Native Concurrency**: Full goroutine support without GIL limitations
+- Agent-construction benchmark results and the exact environment are recorded in [Performance](/advanced/performance).
+- The benchmark uses a local `MockModel` and measures framework allocation, not LLM latency or service throughput.
+- No Go-vs-Python speedup or memory ratio is published without an apples-to-apples benchmark.
+- **Native Concurrency**: Go goroutines are available for application-level concurrency.
 
-### 🤖 Production-Ready
+### 🤖 AgentOS HTTP Server
 
-HNO includes **AgentOS**, a production HTTP server with:
+HNO includes **AgentOS**, an HTTP server with:
 
 - RESTful API with OpenAPI 3.0 specification
 - Session management for multi-turn conversations
@@ -32,7 +33,7 @@ Three core abstractions for different use cases:
 
 ### 🔌 Multi-Model Support
 
-Built-in support for 6 major LLM providers:
+Built-in support for multiple LLM providers:
 
 - **OpenAI** - GPT-4, GPT-3.5 Turbo, etc.
 - **Anthropic** - Claude 3.5 Sonnet, Claude 3 Opus/Sonnet/Haiku
@@ -45,10 +46,10 @@ Built-in support for 6 major LLM providers:
 
 Following the KISS principle, we provide essential tools with high quality:
 
-- **Calculator** - Basic math operations (75.6% test coverage)
-- **HTTP** - Make HTTP GET/POST requests (88.9% coverage)
-- **File Operations** - Read, write, list, delete with security controls (76.2% coverage)
-- **Search** - DuckDuckGo web search (92.1% coverage)
+- **Calculator** - Basic math operations
+- **HTTP** - Make HTTP GET/POST requests
+- **File Operations** - Read, write, list, delete with security controls
+- **Search** - DuckDuckGo web search
 
 Easy to create custom tools - see [Tools Guide](/guide/tools).
 
@@ -68,14 +69,14 @@ See [RAG Demo](/examples/rag-demo) for a complete example.
 
 **Keep It Simple, Stupid** - Focus on quality over quantity:
 
-- **3 core LLM providers** (not 45+)
-- **Essential tools** (not 115+)
-- **1 vector database** (not 15+)
+- A small, inspectable core
+- Essential tools
+- Pluggable storage integrations
 
-This focused approach ensures:
+This focused approach aims for:
 - Better code quality
 - Easier maintenance
-- Production-ready features
+- Deployable server features; production suitability depends on the workload
 
 ### Go Advantages
 
@@ -93,16 +94,16 @@ HNO is perfect for:
 
 - **Production AI Applications** - Deploy with AgentOS HTTP server
 - **Multi-Agent Systems** - Coordinate multiple AI agents
-- **High-Performance Workflows** - Process thousands of requests
+- **Application Workflows** - Compose multi-step agent tasks
 - **Local AI Development** - Use Ollama for privacy-focused applications
 - **RAG Applications** - Build knowledge-based AI assistants
 
 ## Quality Metrics
 
-- **Test Coverage**: 80.8% average across core packages
-- **Test Cases**: 85+ tests with 100% pass rate
-- **Documentation**: Complete guides, API reference, examples
-- **Production-Ready**: Docker, K8s manifests, deployment guides
+- **Test status**: Run `go test ./...` for the current result
+- **Benchmark status**: See the reproducible snapshot in [Performance](/advanced/performance)
+- **Documentation**: Guides, API reference, and examples are built with VitePress
+- **Deployment**: Docker and deployment material are provided; production suitability depends on the deployment workload
 
 ## Next Steps
 
@@ -127,4 +128,4 @@ Ready to get started?
 
 HNO is released under the [MIT License](https://github.com/rexleimo/HNO/blob/main/LICENSE).
 
-Inspired by [Agno (Python)](https://github.com/agno-agi/agno) framework.
+Inspired by the [Agno Python](https://github.com/agno-agi/agno) project. HNO is the current name of this Go project; the repository does not define an official expansion of the name.

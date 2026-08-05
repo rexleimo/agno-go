@@ -103,8 +103,8 @@ type Model interface {
    - Testing strategy and dependencies
 
 2. **Performance.md** (性能)
-   - Benchmark results: ~180ns agent creation, ~1.2KB memory
-   - 16x faster than Python implementation
+   - Benchmark methodology and reproducible local results
+   - Cross-language performance claims are intentionally omitted without an apples-to-apples run
    - Production recommendations and monitoring
    - Profiling tips and optimization techniques
 
@@ -115,7 +115,7 @@ type Model interface {
    - Monitoring, logging, and troubleshooting
 
 4. **Testing.md** (测试)
-   - 80.8% overall test coverage
+   - Test and coverage commands documented without a stale percentage snapshot
    - Unit testing, integration testing, benchmarks
    - Mocking strategies and test helpers
    - CI/CD with GitHub Actions

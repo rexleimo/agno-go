@@ -1,0 +1,110 @@
+{
+  "framework": "hno",
+  "scenario": "simple",
+  "endpoint": "http://127.0.0.1:8081",
+  "model": "D:\\Program Files\\llmam.cpp\\llama-b10107-bin-win-cuda-13.3-x64\\models\\Qwen3-4B-Q8_0.gguf",
+  "warmup": 3,
+  "runs": 20,
+  "samples": [
+    {
+      "duration_ns": 101233700,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 102510100,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 100110100,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 106158100,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 98566600,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 98288400,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 101953000,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 99766600,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 98425500,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 96206400,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 100408000,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 99887900,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 97216200,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 97567000,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 101488900,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 101263500,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 99132700,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 99058000,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 94998300,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    },
+    {
+      "duration_ns": 94779300,
+      "content": "LOCAL_MODEL_OK",
+      "success": true
+    }
+  ]
+}

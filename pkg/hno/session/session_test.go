@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/rexleimo/agno-go/pkg/hno/agent"
+	"github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
 func TestNewSession(t *testing.T) {
@@ -124,10 +125,19 @@ func TestSession_GetLastRun(t *testing.T) {
 func TestSession_CalculateTotalTokens(t *testing.T) {
 	session := NewSession("sess-1", "agent-1")
 
-	// Currently returns 0 (placeholder)
+	session.AddRun(&agent.RunOutput{Metadata: map[string]interface{}{
+		"usage": types.Usage{PromptTokens: 10, CompletionTokens: 6},
+	}})
+	session.AddRun(&agent.RunOutput{Metadata: map[string]interface{}{
+		"usage": map[string]interface{}{"total_tokens": float64(9)},
+	}})
+	session.AddRun(&agent.RunOutput{Metadata: map[string]interface{}{
+		"usage": &types.Usage{TotalTokens: 4},
+	}})
+
 	tokens := session.CalculateTotalTokens()
-	if tokens != 0 {
-		t.Errorf("Total tokens = %d, want 0 (placeholder)", tokens)
+	if tokens != 29 {
+		t.Errorf("Total tokens = %d, want 29", tokens)
 	}
 }
 

@@ -56,7 +56,11 @@ func setupTestStore(t *testing.T) (*Store, func()) {
 	}
 
 	connStr, err := container.ConnectionString(ctx, "sslmode=disable")
-	require.NoError(t, err)
+	if err != nil {
+		container.Terminate(ctx) //nolint:errcheck
+		cancel()
+		t.Fatalf("failed to get postgres connection string: %v", err)
+	}
 
 	st, err := New(ctx, Config{DSN: connStr})
 	if err != nil {
@@ -65,7 +69,12 @@ func setupTestStore(t *testing.T) (*Store, func()) {
 		t.Fatalf("failed to create store: %v", err)
 	}
 
-	require.NoError(t, bootstrapSessionTable(ctx, st.pool))
+	if err := bootstrapSessionTable(ctx, st.pool); err != nil {
+		st.Close()
+		container.Terminate(ctx) //nolint:errcheck
+		cancel()
+		t.Fatalf("failed to bootstrap postgres session table: %v", err)
+	}
 
 	cleanup := func() {
 		st.Close()
@@ -93,6 +102,10 @@ func startPostgresContainer(ctx context.Context) (container *postgres.PostgresCo
 		postgres.WithDatabase("agno"),
 		postgres.WithUsername("agno"),
 		postgres.WithPassword("agno"),
+		// BasicWaitStrategies waits for both PostgreSQL's second ready log and
+		// Docker Desktop's host-side port proxy. The latter is required on
+		// Windows; a log-only wait can still yield EOF from pgx.
+		postgres.BasicWaitStrategies(),
 	)
 	if err != nil && isDockerUnavailable(err) {
 		err = fmt.Errorf("%w: %v", errDockerUnavailable, err)

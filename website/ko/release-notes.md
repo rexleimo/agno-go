@@ -142,7 +142,7 @@ outline: deep
 - 최소 지식 적재 엔드포인트
   - `POST /api/v1/knowledge/content` 는 `text/plain` 및 `application/json` 지원
 
-엔터프라이즈 검수 절차: [`docs/ENTERPRISE_MIGRATION_PLAN.md`](https://github.com/rexleimo/HNO/blob/main/docs/ENTERPRISE_MIGRATION_PLAN.md) 참고.
+엔터프라이즈 검수 절차: [`docs/ENTERPRISE_MIGRATION_PLAN.md`](https://github.com/rexleimo/agno-go/blob/main/docs/ENTERPRISE_MIGRATION_PLAN.md) 참고.
 
 ## 버전 1.1.0 (2025-10-08)
 
@@ -167,7 +167,7 @@ JSON-RPC 2.0 기반의 에이전트 간 상호작용을 위한 표준화된 통�
 - RESTful API 엔드포인트 (`/a2a/message/send`, `/a2a/message/stream`)
 - 멀티미디어 지원 (텍스트, 이미지, 파일, JSON 데이터)
 - 스트리밍을 위한 Server-Sent Events (SSE)
-- Python Agno A2A 구현과 호환
+- Python HNO A2A 구현과 호환
 
 **빠른 예제:**
 ```go
@@ -197,7 +197,7 @@ a2a.RegisterRoutes(router)
 - `sync.RWMutex`를 사용한 스레드 안전성
 - 병렬 브랜치 격리를 위한 딥 카피
 - 데이터 손실을 방지하는 스마트 병합 전략
-- Python Agno v2.1.2의 경쟁 조건 수정
+- Python HNO v2.1.2의 경쟁 조건 수정
 
 **빠른 예제:**
 ```go
@@ -282,7 +282,7 @@ claude, _ := anthropic.New("claude-3-opus", anthropic.Config{
 ### 🐛 버그 수정
 
 - **워크플로우 경쟁 조건** - 병렬 단계 실행 데이터 경쟁 수정
-  - Python Agno v2.1.2에는 공유 `session_state` dict로 인한 덮어쓰기 문제가 있었습니다
+  - Python HNO v2.1.2에는 공유 `session_state` dict로 인한 덮어쓰기 문제가 있었습니다
   - Go 구현은 브랜치당 독립적인 SessionState 복제본을 사용합니다
   - 스마트 병합 전략으로 동시 실행에서 데이터 손실 방지
 
@@ -318,10 +318,9 @@ claude, _ := anthropic.New("claude-3-opus", anthropic.Config{
 
 ### 📊 성능
 
-**성능 저하 없음** - 모든 벤치마크가 일관됩니다:
-- Agent 인스턴스화: ~180ns/op (Python보다 16배 빠름)
-- 메모리 사용량: ~1.2KB/에이전트
-- 스레드 안전 동시 작업
+**성능 설명** - 재현 가능한 benchmark, 환경과 한계는
+[Performance](/ko/advanced/performance)에서 확인하세요. 과거 버전의 재현되지 않은
+수치는 성능 보장으로 취급하지 않으며, 스레드 안전성과 동시성은 실제 부하에서 검증해야 합니다.
 
 ---
 
@@ -388,7 +387,7 @@ go get github.com/rexleimo/agno-go@v1.1.0
 ### 🧪 개선
 
 - **JSON 직렬화 테스트 강화** - utils/serialize 패키지에서 100% 테스트 커버리지 달성
-- **성능 벤치마크** - Python Agno 성능 테스트 패턴과 정렬
+- **성능 벤치마크** - Python HNO 성능 테스트 패턴과 정렬
 - **포괄적인 문서** - 이중 언어 패키지 문서 추가
 
 ---
@@ -411,7 +410,7 @@ go get github.com/rexleimo/agno-go@v1.1.0
 
 ### 🎉 초기 릴리스
 
-HNO v1.0은 Agno 멀티 에이전트 프레임워크의 고성능 Go 구현입니다.
+HNO v1.0은 HNO 멀티 에이전트 프레임워크의 고성능 Go 구현입니다.
 
 #### 핵심 기능
 - **Agent** - 도구 지원이 있는 단일 자율 에이전트

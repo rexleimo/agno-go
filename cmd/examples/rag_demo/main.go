@@ -5,10 +5,13 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
+	defaultef "github.com/amikos-tech/chroma-go/pkg/embeddings/default_ef"
 	"github.com/rexleimo/agno-go/pkg/hno/agent"
 	openaiembed "github.com/rexleimo/agno-go/pkg/hno/embeddings/openai"
 	"github.com/rexleimo/agno-go/pkg/hno/knowledge"
+	"github.com/rexleimo/agno-go/pkg/hno/models"
 	openaimodel "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 	"github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 	"github.com/rexleimo/agno-go/pkg/hno/vectordb"
@@ -19,6 +22,33 @@ import (
 type RAGToolkit struct {
 	*toolkit.BaseToolkit
 	vectorDB vectordb.VectorDB
+}
+
+// localEmbedder adapts the pure-Go MiniLM embedding function to the
+// vectordb.EmbeddingFunction interface.
+// localEmbedder 将纯 Go MiniLM embedding 函数适配到 vectordb.EmbeddingFunction 接口。
+type localEmbedder struct {
+	ef *defaultef.DefaultEmbeddingFunction
+}
+
+func (l *localEmbedder) Embed(ctx context.Context, texts []string) ([][]float32, error) {
+	embs, err := l.ef.EmbedDocuments(ctx, texts)
+	if err != nil {
+		return nil, err
+	}
+	out := make([][]float32, len(embs))
+	for i, e := range embs {
+		out[i] = e.ContentAsFloat32()
+	}
+	return out, nil
+}
+
+func (l *localEmbedder) EmbedSingle(ctx context.Context, text string) ([]float32, error) {
+	emb, err := l.ef.EmbedQuery(ctx, text)
+	if err != nil {
+		return nil, err
+	}
+	return emb.ContentAsFloat32(), nil
 }
 
 // NewRAGToolkit creates a new RAG toolkit
@@ -85,30 +115,54 @@ func main() {
 	fmt.Println("This example demonstrates:")
 	fmt.Println("1. Loading documents from files")
 	fmt.Println("2. Chunking text into smaller pieces")
-	fmt.Println("3. Generating embeddings with OpenAI")
+	fmt.Println("3. Generating embeddings (OpenAI or local MiniLM via HNO_EMBED=local)")
 	fmt.Println("4. Storing in ChromaDB vector database")
 	fmt.Println("5. Using RAG with an Agent to answer questions")
 	fmt.Println()
-
-	// Check environment variables
-	openaiKey := os.Getenv("OPENAI_API_KEY")
-	if openaiKey == "" {
-		log.Fatal("OPENAI_API_KEY environment variable is required")
-	}
+	fmt.Println("Local mode: HNO_EMBED=local + HNO_MODEL_URL=http://127.0.0.1:18080/v1 (llama.cpp)")
+	fmt.Println()
 
 	ctx := context.Background()
 
-	// Step 1: Create embedding function
-	fmt.Println("📊 Step 1: Creating OpenAI embedding function...")
-	embedFunc, err := openaiembed.New(openaiembed.Config{
-		APIKey: openaiKey,
-		Model:  "text-embedding-3-small",
-	})
-	if err != nil {
-		log.Fatalf("Failed to create embedding function: %v", err)
+	// Local mode: pure-Go MiniLM embeddings + local llama.cpp model.
+	// No API key required.
+	// 本地模式：纯 Go MiniLM embedding + 本地 llama.cpp 模型，无需 API key。
+	localMode := os.Getenv("HNO_EMBED") == "local"
+	if !localMode {
+		openaiKey := os.Getenv("OPENAI_API_KEY")
+		if openaiKey == "" {
+			log.Fatal("OPENAI_API_KEY environment variable is required (or set HNO_EMBED=local for the local mode)")
+		}
 	}
-	fmt.Printf("   ✅ Created embedding function (model: %s, dimensions: %d)\n\n",
-		embedFunc.GetModel(), embedFunc.GetDimensions())
+
+	// Step 1: Create embedding function
+	var (
+		embedFunc vectordb.EmbeddingFunction
+		err       error
+	)
+	if localMode {
+		fmt.Println("📊 Step 1: Creating local embedding function (pure-Go MiniLM)...")
+		localEF, cleanup, err := defaultef.NewDefaultEmbeddingFunction()
+		if err != nil {
+			log.Fatalf("Failed to create local embedding function: %v", err)
+		}
+		defer cleanup()
+		embedFunc = &localEmbedder{ef: localEF}
+		fmt.Println("   ✅ Created local embedding function (MiniLM, 384 dims)")
+	} else {
+		fmt.Println("📊 Step 1: Creating OpenAI embedding function...")
+		embedFunc, err = openaiembed.New(openaiembed.Config{
+			APIKey: os.Getenv("OPENAI_API_KEY"),
+			Model:  "text-embedding-3-small",
+		})
+		if err != nil {
+			log.Fatalf("Failed to create embedding function: %v", err)
+		}
+		fmt.Printf("   ✅ Created embedding function (model: %s, dimensions: %d)\n",
+			embedFunc.(*openaiembed.OpenAIEmbedding).GetModel(),
+			embedFunc.(*openaiembed.OpenAIEmbedding).GetDimensions())
+	}
+	fmt.Println()
 
 	// Step 2: Create ChromaDB vector database
 	fmt.Println("💾 Step 2: Connecting to ChromaDB...")
@@ -231,12 +285,27 @@ func main() {
 	// Step 6: Create RAG-powered Agent
 	fmt.Println("🤖 Step 6: Creating RAG-powered Agent...")
 
-	// Create OpenAI model
-	model, err := openaimodel.New("gpt-4o-mini", openaimodel.Config{
-		APIKey:      openaiKey,
-		Temperature: 0.7,
-		MaxTokens:   500,
-	})
+	// Create model: local llama.cpp in local mode, OpenAI otherwise.
+	// 创建模型：本地模式用 llama.cpp，否则用 OpenAI。
+	var model models.Model
+	if localMode {
+		baseURL := os.Getenv("HNO_MODEL_URL")
+		if baseURL == "" {
+			baseURL = "http://127.0.0.1:18080/v1"
+		}
+		model, err = openaimodel.New("qwen3-4b", openaimodel.Config{
+			BaseURL:     baseURL,
+			APIKey:      "local",
+			Temperature: 0.7,
+			MaxTokens:   500,
+		})
+	} else {
+		model, err = openaimodel.New("gpt-4o-mini", openaimodel.Config{
+			APIKey:      os.Getenv("OPENAI_API_KEY"),
+			Temperature: 0.7,
+			MaxTokens:   500,
+		})
+	}
 	if err != nil {
 		log.Fatalf("Failed to create model: %v", err)
 	}
@@ -266,7 +335,7 @@ Always be helpful, accurate, and concise.`,
 
 	// Step 7: Interactive Q&A
 	fmt.Println("💬 Step 7: Interactive Q&A (RAG in action)")
-	fmt.Println("=" + string(make([]byte, 60)) + "=")
+	fmt.Println(strings.Repeat("=", 60))
 
 	questions := []string{
 		"What is artificial intelligence?",
@@ -287,7 +356,7 @@ Always be helpful, accurate, and concise.`,
 		fmt.Printf("Assistant: %s\n", output.Content)
 	}
 
-	fmt.Println("\n" + string(make([]byte, 60)) + "=")
+	fmt.Println("\n" + strings.Repeat("=", 60))
 	fmt.Println("\n✅ RAG Demo completed successfully!")
 	fmt.Println("\nKey Takeaways:")
 	fmt.Println("• Documents are chunked and embedded automatically")

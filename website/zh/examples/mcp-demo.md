@@ -2,14 +2,14 @@
 
 ## 概述
 
-本示例演示如何连接到 MCP (模型上下文协议) 服务器并通过 HNO MCP 客户端使用其工具。您将学习如何设置安全验证、创建传输、连接到 MCP 服务器以及将 MCP 工具与您的 Agno agents 集成。
+本示例演示如何连接到 MCP (模型上下文协议) 服务器并通过 HNO MCP 客户端使用其工具。您将学习如何设置安全验证、创建传输、连接到 MCP 服务器以及将 MCP 工具与您的 HNO agents 集成。
 
 ## 你将学到
 
 - 如何为 MCP 命令创建和配置安全验证
 - 如何设置用于子进程通信的 stdio 传输
 - 如何连接到 MCP 服务器并发现可用工具
-- 如何创建用于 Agno agents 的 MCP 工具包
+- 如何创建用于 HNO agents 的 MCP 工具包
 - 如何直接调用 MCP 工具
 
 ## 前置要求
@@ -155,7 +155,7 @@ func main() {
 	fmt.Printf("  Result: %v\n", result.Content)
 
 	fmt.Println("\n=== Demo Complete ===")
-	fmt.Println("The MCP toolkit can now be passed to an agno Agent!")
+	fmt.Println("The MCP toolkit can now be passed to an HNO Agent!")
 }
 ```
 
@@ -223,7 +223,7 @@ toolkit, err := mcptoolkit.New(ctx, mcptoolkit.Config{
 defer toolkit.Close()
 ```
 
-- 将 MCP 工具转换为 Agno 工具包函数
+- 将 MCP 工具转换为 HNO 工具包函数
 - 从 MCP schema 自动生成函数签名
 - 与 `agent.Config.Toolkits` 兼容
 
@@ -276,12 +276,12 @@ Step 7: Calling a tool...
   Result: 8
 
 === Demo Complete ===
-The MCP toolkit can now be passed to an agno Agent!
+The MCP toolkit can now be passed to an HNO Agent!
 ```
 
-## 与 Agno Agents 一起使用
+## 与 HNO Agents 一起使用
 
-一旦您有了 MCP 工具包,您可以将其与任何 Agno agent 一起使用:
+一旦您有了 MCP 工具包,您可以将其与任何 HNO agent 一起使用:
 
 ```go
 import (
@@ -329,4 +329,4 @@ fmt.Println(output.Content)
 - 阅读 [MCP 集成指南](../guide/mcp.md)
 - 尝试连接到其他 MCP 服务器 (filesystem, git, sqlite)
 - 为您的用例构建自定义 MCP 服务器
-- 将 MCP 工具与内置的 Agno 工具结合使用
+- 将 MCP 工具与内置的 HNO 工具结合使用

@@ -1,0 +1,2 @@
+agno==2.8.6
+langgraph==1.2.10

@@ -21,7 +21,7 @@ export OPENAI_API_KEY=sk-your-key
 go run cmd/examples/simple_agent/main.go
 ```
 
-[ソースを表示](https://github.com/rexleimo/HNO/tree/main/cmd/examples/simple_agent)
+[ソースを表示](https://github.com/rexleimo/agno-go/tree/main/cmd/examples/simple_agent)
 
 ---
 
@@ -42,7 +42,7 @@ export ANTHROPIC_API_KEY=sk-ant-your-key
 go run cmd/examples/claude_agent/main.go
 ```
 
-[ソースを表示](https://github.com/rexleimo/HNO/tree/main/cmd/examples/claude_agent)
+[ソースを表示](https://github.com/rexleimo/agno-go/tree/main/cmd/examples/claude_agent)
 
 ---
 
@@ -69,7 +69,7 @@ ollama pull llama3
 go run cmd/examples/ollama_agent/main.go
 ```
 
-[ソースを表示](https://github.com/rexleimo/HNO/tree/main/cmd/examples/ollama_agent)
+[ソースを表示](https://github.com/rexleimo/agno-go/tree/main/cmd/examples/ollama_agent)
 
 ---
 
@@ -90,7 +90,7 @@ export OPENAI_API_KEY=sk-your-key
 go run cmd/examples/team_demo/main.go
 ```
 
-[ソースを表示](https://github.com/rexleimo/HNO/tree/main/cmd/examples/team_demo)
+[ソースを表示](https://github.com/rexleimo/agno-go/tree/main/cmd/examples/team_demo)
 
 ---
 
@@ -111,7 +111,7 @@ export OPENAI_API_KEY=sk-your-key
 go run cmd/examples/workflow_demo/main.go
 ```
 
-[ソースを表示](https://github.com/rexleimo/HNO/tree/main/cmd/examples/workflow_demo)
+[ソースを表示](https://github.com/rexleimo/agno-go/tree/main/cmd/examples/workflow_demo)
 
 ---
 
@@ -139,7 +139,7 @@ export OPENAI_API_KEY=sk-your-key
 go run cmd/examples/rag_demo/main.go
 ```
 
-[ソースを表示](https://github.com/rexleimo/HNO/tree/main/cmd/examples/rag_demo)
+[ソースを表示](https://github.com/rexleimo/agno-go/tree/main/cmd/examples/rag_demo)
 
 ---
 
@@ -155,11 +155,11 @@ import (
     "fmt"
     "os"
 
-    "github.com/rexleimo/HNO/pkg/hno/agent"
-    "github.com/rexleimo/HNO/pkg/hno/models/openai"
-    "github.com/rexleimo/HNO/pkg/hno/tools/calculator"
-    "github.com/rexleimo/HNO/pkg/hno/tools/http"
-    "github.com/rexleimo/HNO/pkg/hno/tools/toolkit"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/http"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 )
 
 func main() {
@@ -193,9 +193,9 @@ import (
     "fmt"
     "os"
 
-    "github.com/rexleimo/HNO/pkg/hno/agent"
-    "github.com/rexleimo/HNO/pkg/hno/models/openai"
-    "github.com/rexleimo/HNO/pkg/hno/team"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/team"
 )
 
 func main() {
@@ -238,9 +238,9 @@ import (
     "os"
     "strings"
 
-    "github.com/rexleimo/HNO/pkg/hno/agent"
-    "github.com/rexleimo/HNO/pkg/hno/models/openai"
-    "github.com/rexleimo/HNO/pkg/hno/workflow"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/workflow"
 )
 
 func main() {
@@ -303,4 +303,4 @@ func main() {
 3. 説明と使用方法を含むREADME.mdを追加
 4. プルリクエストを提出
 
-[コントリビューションガイドライン](https://github.com/rexleimo/HNO/blob/main/CONTRIBUTING.md)
+[コントリビューションガイドライン](https://github.com/rexleimo/agno-go/blob/main/CONTRIBUTING.md)

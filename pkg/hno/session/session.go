@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/rexleimo/agno-go/pkg/hno/agent"
+	"github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
 // Session represents a conversation session with an agent
@@ -89,12 +90,77 @@ func (s *Session) GetLastRun() *agent.RunOutput {
 	return s.Runs[len(s.Runs)-1]
 }
 
-// CalculateTotalTokens calculates total tokens used across all runs
-// Note: Currently RunOutput doesn't track metrics, so this returns 0
-// This is a placeholder for future enhancements
+// CalculateTotalTokens calculates total tokens used across all runs.
+// RunOutput stores provider usage in Metadata so the session package does not
+// need to couple its public model to a particular provider response type.
 func (s *Session) CalculateTotalTokens() int {
-	// TODO: When RunOutput gains Metrics field, calculate actual tokens
-	return 0
+	total := 0
+	for _, run := range s.Runs {
+		if run == nil || run.Metadata == nil {
+			continue
+		}
+		total += usageTotalTokens(run.Metadata["usage"])
+	}
+	return total
+}
+
+func usageTotalTokens(value interface{}) int {
+	switch usage := value.(type) {
+	case types.Usage:
+		if usage.TotalTokens > 0 {
+			return usage.TotalTokens
+		}
+		return usage.PromptTokens + usage.CompletionTokens
+	case *types.Usage:
+		if usage == nil {
+			return 0
+		}
+		return usageTotalTokens(*usage)
+	case map[string]interface{}:
+		if total, ok := numberFromMap(usage, "total_tokens"); ok && total > 0 {
+			return total
+		}
+		prompt, _ := numberFromMap(usage, "prompt_tokens")
+		completion, _ := numberFromMap(usage, "completion_tokens")
+		return prompt + completion
+	default:
+		return 0
+	}
+}
+
+func numberFromMap(values map[string]interface{}, key string) (int, bool) {
+	value, ok := values[key]
+	if !ok {
+		return 0, false
+	}
+	switch number := value.(type) {
+	case int:
+		return number, true
+	case int8:
+		return int(number), true
+	case int16:
+		return int(number), true
+	case int32:
+		return int(number), true
+	case int64:
+		return int(number), true
+	case uint:
+		return int(number), true
+	case uint8:
+		return int(number), true
+	case uint16:
+		return int(number), true
+	case uint32:
+		return int(number), true
+	case uint64:
+		return int(number), true
+	case float32:
+		return int(number), true
+	case float64:
+		return int(number), true
+	default:
+		return 0, false
+	}
 }
 
 // GenerateSummary creates a summary of the session

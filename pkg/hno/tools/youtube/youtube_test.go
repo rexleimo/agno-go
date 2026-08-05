@@ -2,209 +2,130 @@ package youtube
 
 import (
 	"context"
+	"net/http"
+	"net/http/httptest"
+	"strconv"
 	"testing"
 )
 
+func newYouTubeTestToolkit(t *testing.T) *YouTubeToolkit {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("key") != "test-key" {
+			http.Error(w, `{"error":{"message":"bad key"}}`, http.StatusForbidden)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/search":
+			if r.URL.Query().Get("q") == "" {
+				http.Error(w, `{"error":"missing query"}`, http.StatusBadRequest)
+				return
+			}
+			if r.URL.Query().Get("maxResults") == "" {
+				http.Error(w, `{"error":"missing maxResults"}`, http.StatusBadRequest)
+				return
+			}
+			_, _ = w.Write([]byte(`{"items":[{"id":{"videoId":"video-1"},"snippet":{"publishedAt":"2024-01-01T00:00:00Z","channelId":"channel-1","title":"Real video","description":"A real API result","channelTitle":"Real Channel"}}]}`))
+		case "/videos":
+			if r.URL.Query().Get("id") != "dQw4w9WgXcQ" {
+				http.Error(w, `{"error":"unexpected id"}`, http.StatusBadRequest)
+				return
+			}
+			_, _ = w.Write([]byte(`{"items":[{"id":"dQw4w9WgXcQ","snippet":{"publishedAt":"2024-01-01T00:00:00Z","channelId":"channel-1","title":"Real video","description":"Real description","channelTitle":"Real Channel","categoryId":"27","tags":["go","api"]},"contentDetails":{"duration":"PT10M30S"},"statistics":{"viewCount":"2500","likeCount":"150","commentCount":"20"}}]}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	return NewWithConfig(Config{APIKey: "test-key", BaseURL: server.URL})
+}
+
 func TestYouTubeToolkit_New(t *testing.T) {
-	toolkit := New()
-
-	if toolkit == nil {
-		t.Fatal("Expected toolkit to be created, got nil")
-	}
-
-	if toolkit.Name() != "youtube" {
-		t.Errorf("Expected toolkit name 'youtube', got '%s'", toolkit.Name())
-	}
-
-	functions := toolkit.Functions()
-	if len(functions) != 2 {
-		t.Errorf("Expected 2 functions, got %d", len(functions))
-	}
-
-	if _, exists := functions["search_youtube"]; !exists {
-		t.Error("Expected 'search_youtube' function to exist")
-	}
-
-	if _, exists := functions["get_video_info"]; !exists {
-		t.Error("Expected 'get_video_info' function to exist")
+	tk := New()
+	if tk == nil || tk.Name() != "youtube" || len(tk.Functions()) != 2 {
+		t.Fatalf("unexpected toolkit initialization")
 	}
 }
 
 func TestYouTubeToolkit_SearchYouTube(t *testing.T) {
-	toolkit := New()
-	ctx := context.Background()
-
-	// Test basic search
-	result, err := toolkit.Execute(ctx, "search_youtube", map[string]interface{}{
+	tk := newYouTubeTestToolkit(t)
+	result, err := tk.Execute(context.Background(), "search_youtube", map[string]interface{}{
 		"query": "machine learning tutorial",
 	})
-
 	if err != nil {
-		t.Fatalf("YouTube search failed: %v", err)
+		t.Fatalf("search_youtube failed: %v", err)
 	}
-
-	resultMap, ok := result.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected map result, got %T", result)
-	}
-
+	resultMap := result.(map[string]interface{})
 	if resultMap["query"] != "machine learning tutorial" {
-		t.Errorf("Expected query 'machine learning tutorial', got '%v'", resultMap["query"])
+		t.Fatalf("unexpected query: %#v", resultMap["query"])
 	}
-
-	results, ok := resultMap["results"].([]map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected results slice, got %T", resultMap["results"])
-	}
-
-	if len(results) == 0 {
-		t.Error("Expected at least one mock result")
-	}
-
-	// Check first result structure
-	firstResult := results[0]
-	if firstResult["title"] == "" {
-		t.Error("Expected title in result")
-	}
-	if firstResult["video_id"] == "" {
-		t.Error("Expected video_id in result")
-	}
-	if firstResult["url"] == "" {
-		t.Error("Expected url in result")
+	results := resultMap["results"].([]map[string]interface{})
+	if len(results) != 1 || results[0]["video_id"] != "video-1" || results[0]["title"] != "Real video" {
+		t.Fatalf("unexpected API results: %#v", results)
 	}
 }
 
 func TestYouTubeToolkit_SearchYouTubeWithMaxResults(t *testing.T) {
-	toolkit := New()
-	ctx := context.Background()
-
-	// Test search with max_results
-	result, err := toolkit.Execute(ctx, "search_youtube", map[string]interface{}{
-		"query":       "test query",
-		"max_results": 1.0, // JSON numbers come as float64
+	tk := newYouTubeTestToolkit(t)
+	result, err := tk.Execute(context.Background(), "search_youtube", map[string]interface{}{
+		"query": "test query", "max_results": 1.0,
 	})
-
 	if err != nil {
-		t.Fatalf("YouTube search failed: %v", err)
+		t.Fatalf("search_youtube failed: %v", err)
 	}
-
-	resultMap, ok := result.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected map result, got %T", result)
-	}
-
-	count, ok := resultMap["count"].(int)
-	if !ok {
-		t.Fatalf("Expected count to be int, got %T", resultMap["count"])
-	}
-
-	if count > 1 {
-		t.Errorf("Expected max 1 result, got %d", count)
-	}
-}
-
-func TestYouTubeToolkit_SearchYouTubeMissingQuery(t *testing.T) {
-	toolkit := New()
-	ctx := context.Background()
-
-	// Test missing required parameter
-	_, err := toolkit.Execute(ctx, "search_youtube", map[string]interface{}{})
-
-	if err == nil {
-		t.Error("Expected error for missing query parameter")
+	if result.(map[string]interface{})["count"] != 1 {
+		t.Fatalf("unexpected count: %#v", result)
 	}
 }
 
 func TestYouTubeToolkit_GetVideoInfo(t *testing.T) {
-	toolkit := New()
-	ctx := context.Background()
-
-	// Test getting video info
-	result, err := toolkit.Execute(ctx, "get_video_info", map[string]interface{}{
+	tk := newYouTubeTestToolkit(t)
+	result, err := tk.Execute(context.Background(), "get_video_info", map[string]interface{}{
 		"video_url": "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
 	})
-
 	if err != nil {
-		t.Fatalf("Get video info failed: %v", err)
+		t.Fatalf("get_video_info failed: %v", err)
 	}
-
-	resultMap, ok := result.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected map result, got %T", result)
+	info := result.(map[string]interface{})
+	if info["video_id"] != "dQw4w9WgXcQ" || info["title"] != "Real video" || info["views"] != "2500" {
+		t.Fatalf("unexpected video info: %#v", info)
 	}
-
-	if resultMap["video_id"] != "dQw4w9WgXcQ" {
-		t.Errorf("Expected video_id 'dQw4w9WgXcQ', got '%v'", resultMap["video_id"])
-	}
-
-	if resultMap["url"] != "https://www.youtube.com/watch?v=dQw4w9WgXcQ" {
-		t.Errorf("Expected URL 'https://www.youtube.com/watch?v=dQw4w9WgXcQ', got '%v'", resultMap["url"])
-	}
-
-	if resultMap["title"] == "" {
-		t.Error("Expected title in video info")
+	if info["duration_seconds"] != int64(630) {
+		t.Fatalf("unexpected duration: %#v", info["duration_seconds"])
 	}
 }
 
 func TestYouTubeToolkit_GetVideoInfoShortURL(t *testing.T) {
-	toolkit := New()
-	ctx := context.Background()
-
-	// Test getting video info with short URL
-	result, err := toolkit.Execute(ctx, "get_video_info", map[string]interface{}{
+	tk := newYouTubeTestToolkit(t)
+	result, err := tk.Execute(context.Background(), "get_video_info", map[string]interface{}{
 		"video_url": "https://youtu.be/dQw4w9WgXcQ",
 	})
-
 	if err != nil {
-		t.Fatalf("Get video info failed: %v", err)
+		t.Fatalf("get_video_info short URL failed: %v", err)
 	}
-
-	resultMap, ok := result.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected map result, got %T", result)
-	}
-
-	if resultMap["video_id"] != "dQw4w9WgXcQ" {
-		t.Errorf("Expected video_id 'dQw4w9WgXcQ', got '%v'", resultMap["video_id"])
+	if result.(map[string]interface{})["video_id"] != "dQw4w9WgXcQ" {
+		t.Fatalf("unexpected video id: %#v", result)
 	}
 }
 
-func TestYouTubeToolkit_GetVideoInfoInvalidURL(t *testing.T) {
-	toolkit := New()
-	ctx := context.Background()
-
-	// Test invalid URL
-	_, err := toolkit.Execute(ctx, "get_video_info", map[string]interface{}{
-		"video_url": "not-a-valid-url",
-	})
-
-	if err == nil {
-		t.Error("Expected error for invalid URL")
+func TestYouTubeToolkit_Validation(t *testing.T) {
+	tk := NewWithConfig(Config{APIKey: "test-key", BaseURL: "http://127.0.0.1:" + strconv.Itoa(1)})
+	if _, err := tk.Execute(context.Background(), "search_youtube", map[string]interface{}{}); err == nil {
+		t.Error("expected missing query error")
+	}
+	if _, err := tk.Execute(context.Background(), "get_video_info", map[string]interface{}{"video_url": "https://example.com/video"}); err == nil {
+		t.Error("expected non-YouTube URL error")
+	}
+	if _, err := tk.Execute(context.Background(), "get_video_info", map[string]interface{}{"video_url": "not-a-valid-url"}); err == nil {
+		t.Error("expected invalid URL error")
 	}
 }
 
-func TestYouTubeToolkit_GetVideoInfoNonYouTubeURL(t *testing.T) {
-	toolkit := New()
-	ctx := context.Background()
-
-	// Test non-YouTube URL
-	_, err := toolkit.Execute(ctx, "get_video_info", map[string]interface{}{
-		"video_url": "https://example.com/video",
-	})
-
+func TestYouTubeToolkit_MissingAPIKey(t *testing.T) {
+	tk := NewWithConfig(Config{BaseURL: "https://example.test"})
+	_, err := tk.Execute(context.Background(), "search_youtube", map[string]interface{}{"query": "test"})
 	if err == nil {
-		t.Error("Expected error for non-YouTube URL")
-	}
-}
-
-func TestYouTubeToolkit_GetVideoInfoMissingURL(t *testing.T) {
-	toolkit := New()
-	ctx := context.Background()
-
-	// Test missing required parameter
-	_, err := toolkit.Execute(ctx, "get_video_info", map[string]interface{}{})
-
-	if err == nil {
-		t.Error("Expected error for missing video_url parameter")
+		t.Fatal("expected missing API key error")
 	}
 }

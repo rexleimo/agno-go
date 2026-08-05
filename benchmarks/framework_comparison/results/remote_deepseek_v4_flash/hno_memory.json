@@ -1,0 +1,107 @@
+{
+  "framework": "hno",
+  "scenario": "memory",
+  "endpoint": "https://api.deepseek.com",
+  "model": "deepseek-v4-flash",
+  "warmup": 3,
+  "runs": 20,
+  "samples": [
+    {
+      "duration_ns": 2188606600,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 2157780800,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 2226372700,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 2131578300,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 2622311800,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 3386166100,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 2294926400,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 18221075700,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 1987722200,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 1895304300,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 2409508800,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 7920709400,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 3761095000,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 2148884100,
+      "success": false
+    },
+    {
+      "duration_ns": 3252398100,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 3232717200,
+      "success": false
+    },
+    {
+      "duration_ns": 2679521800,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 5485467000,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 4156370400,
+      "content": "BLUE-42",
+      "success": true
+    },
+    {
+      "duration_ns": 2570601600,
+      "success": false
+    }
+  ]
+}

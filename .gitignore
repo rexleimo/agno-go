@@ -36,6 +36,7 @@ Thumbs.db
 # Environment
 .env
 .env.local
+benchmarks/framework_comparison/remote_model.local.env
 
 # VitePress
 node_modules/

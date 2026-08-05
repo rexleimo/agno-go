@@ -1,0 +1,263 @@
+{
+  "recorded_at_utc": "2026-08-04T04:32:17.955276+00:00",
+  "git_revision": "60778ef0690cbf4883c8f1fa557556cc982a2cc2",
+  "worktree_dirty": true,
+  "worktree_status": "M README.md\n M cmd/examples/rag_demo/main.go\n M internal/session/contract/contract_test.go\n M internal/session/store/postgres/store_test.go\n M pkg/hno/agent/agent_bench_test.go\n M pkg/hno/session/session.go\n M pkg/hno/session/session_test.go\n M pkg/hno/tools/airflow/airflow.go\n M pkg/hno/tools/airflow/airflow_test.go\n M pkg/hno/tools/bitbucket/bitbucket.go\n M pkg/hno/tools/bitbucket/bitbucket_test.go\n M pkg/hno/tools/confluence/confluence.go\n M pkg/hno/tools/confluence/confluence_test.go\n M pkg/hno/tools/hackernews/hackernews.go\n M pkg/hno/tools/hackernews/hackernews_test.go\n M pkg/hno/tools/http/http_test.go\n M pkg/hno/tools/websearch/websearch.go\n M pkg/hno/tools/websearch/websearch_test.go\n M pkg/hno/tools/youtube/youtube.go\n M pkg/hno/tools/youtube/youtube_test.go\n M pkg/hno/vectordb/chromadb/chromadb.go\n M website/.vitepress/config.mjs\n M website/TRANSLATION_SUMMARY.md\n M website/advanced/architecture.md\n M website/advanced/index.md\n M website/advanced/performance.md\n M website/advanced/testing.md\n M website/examples/mcp-demo.md\n M website/guide/agent.md\n M website/guide/index.md\n M website/guide/mcp.md\n M website/guide/team.md\n M website/guide/tools.md\n M website/guide/workflow-history.md\n M website/guide/workflow.md\n M website/index.md\n M website/ja/advanced/architecture.md\n M website/ja/advanced/deployment.md\n M website/ja/advanced/index.md\n M website/ja/advanced/observability.md\n M website/ja/advanced/performance.md\n M website/ja/advanced/testing.md\n M website/ja/api/index.md\n M website/ja/examples/index.md\n M website/ja/examples/logfire-observability.md\n M website/ja/examples/mcp-demo.md\n M website/ja/guide/agent.md\n M website/ja/guide/index.md\n M website/ja/guide/installation.md\n M website/ja/guide/mcp.md\n M website/ja/guide/quick-start.md\n M website/ja/guide/workflow-history.md\n M website/ja/index.md\n M website/ja/release-notes.md\n M website/ko/advanced/architecture.md\n M website/ko/advanced/deployment.md\n M website/ko/advanced/index.md\n M website/ko/advanced/observability.md\n M website/ko/advanced/performance.md\n M website/ko/advanced/testing.md\n M website/ko/api/index.md\n M website/ko/examples/index.md\n M website/ko/examples/logfire-observability.md\n M website/ko/examples/mcp-demo.md\n M website/ko/guide/agent.md\n M website/ko/guide/index.md\n M website/ko/guide/installation.md\n M website/ko/guide/mcp.md\n M website/ko/guide/quick-start.md\n M website/ko/guide/workflow-history.md\n M website/ko/index.md\n M website/ko/release-notes.md\n M website/release-notes.md\n M website/zh/advanced/architecture.md\n M website/zh/advanced/index.md\n M website/zh/advanced/performance.md\n M website/zh/advanced/testing.md\n M website/zh/examples/mcp-demo.md\n M website/zh/guide/agent.md\n M website/zh/guide/index.md\n M website/zh/guide/mcp.md\n M website/zh/guide/workflow-history.md\n M website/zh/index.md\n M website/zh/release-notes.md\n?? .aios/\n?? .contextdb-enable\n?? benchmarks/\n?? cmd/efprobe/\n?? pkg/hno/vectordb/chromadb/metadata_test.go",
+  "benchmark_source_sha256": {
+    "pkg\\hno\\agent\\agent_bench_test.go": "2edb6a182b341af8eb0c9099bcbb6c1ca23a5f5c5b7e741a9e378701c3a90666",
+    "benchmarks\\framework_comparison\\compare.py": "a6e5ccd8af6b77ca11b0562b56a736931fe62bb16eb1415db691bbf33412dcb7",
+    "benchmarks\\framework_comparison\\requirements.txt": "a78298a8ac777cd22e18e2a5aee5e4c1f1a131a5163af9120c08e1de2cb6c5e1"
+  },
+  "platform": {
+    "system": "Windows",
+    "release": "10",
+    "machine": "AMD64",
+    "processor": "12th Gen Intel(R) Core(TM) i5-12400F"
+  },
+  "go_version": "go version go1.26.4 windows/amd64",
+  "python": "3.11.15",
+  "packages": {
+    "agno": "2.8.6",
+    "langgraph": "1.2.10"
+  },
+  "python_repeat": 20,
+  "python_number": 1000,
+  "hno": {
+    "command": [
+      "go",
+      "test",
+      "-run=^$",
+      "-bench=BenchmarkAgentCreation|BenchmarkAgentFreshRunLocalDummy",
+      "-benchmem",
+      "-count=10",
+      "./pkg/hno/agent/"
+    ],
+    "cpu": "12th Gen Intel(R) Core(TM) i5-12400F",
+    "benchmarks": {
+      "BenchmarkAgentCreation": {
+        "bytes_per_op": 568,
+        "allocs_per_op": 8,
+        "ns_op": {
+          "samples": [
+            275.0,
+            264.0,
+            247.7,
+            251.9,
+            248.4,
+            258.4,
+            251.2,
+            256.2,
+            256.4,
+            269.0
+          ],
+          "min": 247.7,
+          "median": 256.29999999999995,
+          "max": 275.0,
+          "mean": 257.82
+        }
+      },
+      "BenchmarkAgentCreationWithTools": {
+        "bytes_per_op": 584,
+        "allocs_per_op": 9,
+        "ns_op": {
+          "samples": [
+            286.3,
+            287.7,
+            285.5,
+            277.8,
+            293.6,
+            284.6,
+            310.7,
+            305.7,
+            287.4,
+            295.2
+          ],
+          "min": 277.8,
+          "median": 287.54999999999995,
+          "max": 310.7,
+          "mean": 291.45
+        }
+      },
+      "BenchmarkAgentCreationWithMemory": {
+        "bytes_per_op": 472,
+        "allocs_per_op": 6,
+        "ns_op": {
+          "samples": [
+            213.6,
+            206.7,
+            227.4,
+            224.9,
+            215.5,
+            223.6,
+            213.4,
+            220.9,
+            203.4,
+            223.5
+          ],
+          "min": 203.4,
+          "median": 218.2,
+          "max": 227.4,
+          "mean": 217.29000000000002
+        }
+      },
+      "BenchmarkAgentFreshRunLocalDummy": {
+        "bytes_per_op": 5184,
+        "allocs_per_op": 53,
+        "ns_op": {
+          "samples": [
+            5984.0,
+            5738.0,
+            6144.0,
+            7046.0,
+            5985.0,
+            6418.0,
+            5549.0,
+            7232.0,
+            7810.0,
+            6116.0
+          ],
+          "min": 5549.0,
+          "median": 6130.0,
+          "max": 7810.0,
+          "mean": 6402.2
+        }
+      }
+    }
+  },
+  "python_frameworks": {
+    "agno_agent": {
+      "number_per_sample": 1000,
+      "gc_disabled_by_timeit": true,
+      "ns_op": {
+        "samples": [
+          6951.19999909366,
+          5569.899998590699,
+          5488.099999638507,
+          5895.599999348633,
+          5523.199999515782,
+          5560.499999774038,
+          5886.099999770522,
+          5446.099999971921,
+          5669.000000125379,
+          5770.4000009835,
+          5556.100000831066,
+          5670.099999406375,
+          5559.699999139411,
+          5251.599999610335,
+          5363.100000977283,
+          6001.799998557544,
+          5772.700000306941,
+          5561.399999351124,
+          6165.200000395998,
+          5590.099999608356
+        ],
+        "min": 5251.599999610335,
+        "median": 5579.9999990995275,
+        "max": 6951.19999909366,
+        "mean": 5712.594999749854
+      }
+    },
+    "agno_agent_with_tool": {
+      "number_per_sample": 1000,
+      "gc_disabled_by_timeit": true,
+      "ns_op": {
+        "samples": [
+          5469.100000482285,
+          5794.400000013411,
+          6455.400000049849,
+          5635.999999867636,
+          6391.000000803615,
+          5605.399999694782,
+          5878.100000700215,
+          5998.000000545289,
+          5599.899999651825,
+          6098.400001064874,
+          5859.000000782544,
+          5466.800001158845,
+          5967.900000541704,
+          5562.999998801388,
+          5511.200000910321,
+          6957.199999305885,
+          6383.599999026046,
+          6092.1000003872905,
+          7661.300000108895,
+          5474.300000059884
+        ],
+        "min": 5466.800001158845,
+        "median": 5868.550000741379,
+        "max": 7661.300000108895,
+        "mean": 5993.105000197829
+      }
+    },
+    "agno_fresh_run_local_dummy": {
+      "number_per_sample": 100,
+      "gc_disabled_by_timeit": true,
+      "ns_op": {
+        "samples": [
+          164920.99999595666,
+          180839.00000419817,
+          179047.99999087118,
+          174320.0000055367,
+          171864.00000355206,
+          168336.99999551754,
+          163066.00000461913,
+          160366.9999894919,
+          186859.0000049153,
+          205856.00001140847,
+          197645.9999968938,
+          186613.9999947336,
+          190957.00001344085,
+          201667.00000118,
+          168636.9999879389,
+          193297.00000525918,
+          209911.000001739,
+          159055.9999931429,
+          166235.99998638383,
+          164172.00000432786
+        ],
+        "min": 159055.9999931429,
+        "median": 176683.99999820394,
+        "max": 209911.000001739,
+        "mean": 179683.49999955535
+      }
+    },
+    "langgraph_minimal_compile": {
+      "number_per_sample": 100,
+      "gc_disabled_by_timeit": true,
+      "ns_op": {
+        "samples": [
+          302730.0000030664,
+          312377.9999987164,
+          313036.9999962568,
+          320300.99999246886,
+          344207.00001646765,
+          329423.99999228655,
+          385255.0000010524,
+          323300.99998944206,
+          319995.9999983548,
+          314592.99998459755,
+          311029.000004055,
+          317329.00000861264,
+          339987.0000066585,
+          377415.0000026566,
+          342741.0000040254,
+          318521.9999977562,
+          304464.9999901594,
+          325486.0000015469,
+          331602.00000565965,
+          333141.9999994978
+        ],
+        "min": 302730.0000030664,
+        "median": 321800.99999095546,
+        "max": 385255.0000010524,
+        "mean": 328346.9999996669
+      }
+    }
+  },
+  "limits": [
+    "All frameworks use local dummy objects; no LLM, network, database, or token generation is measured.",
+    "HNO agent creation is compared only with Agno Agent creation.",
+    "LangGraph compiles a minimal StateGraph and is not presented as an Agent-construction equivalent.",
+    "Go B/op and Python timeit results are different measurement systems and are not compared as memory."
+  ]
+}

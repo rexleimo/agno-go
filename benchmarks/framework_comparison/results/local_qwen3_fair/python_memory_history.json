@@ -1,0 +1,239 @@
+{
+  "endpoint": "http://127.0.0.1:8081",
+  "model": "D:\\Program Files\\llmam.cpp\\llama-b10107-bin-cuda-13.3-x64\\models\\Qwen3-4B-Q8_0.gguf",
+  "scenario": "memory",
+  "warmup": 3,
+  "runs": 20,
+  "frameworks": {
+    "agno": {
+      "warmup": 3,
+      "runs": 20,
+      "samples": [
+        {
+          "duration_ns": 230965400,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 244521700,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 256105000,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 231539900,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 208066100,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 219885800,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 230754500,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 217555700,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 211655800,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 236390000,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 210444200,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 224726300,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 225344300,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 234305400,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 237372200,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 221939100,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 238392900,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 210552200,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 211676800,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 241000500,
+          "content": "BLUE-42",
+          "success": true
+        }
+      ],
+      "mean_ns": 227159690.0,
+      "median_ns": 228049400.0,
+      "p95_ns": 245100865.0,
+      "min_ns": 208066100,
+      "max_ns": 256105000,
+      "success_count": 20
+    },
+    "langgraph": {
+      "warmup": 3,
+      "runs": 20,
+      "samples": [
+        {
+          "duration_ns": 189591000,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 186168500,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 184238500,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 184239300,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 186548900,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 198870200,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 186943500,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 186973500,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 185236600,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 183424400,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 192413000,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 183609200,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 185201900,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 182255100,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 194506200,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 184124900,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 182323700,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 184607600,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 183088300,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 183779200,
+          "content": "BLUE-42",
+          "success": true
+        }
+      ],
+      "mean_ns": 186407175.0,
+      "median_ns": 184904750.0,
+      "p95_ns": 194724400.0,
+      "min_ns": 182255100,
+      "max_ns": 198870200,
+      "success_count": 20
+    }
+  },
+  "limits": [
+    "All requests use the same local llama.cpp endpoint and model.",
+    "Measurements are client wall-clock time and include framework request preparation.",
+    "The model is local; no cloud LLM or network service is involved.",
+    "Server-side model load, CPU, and RSS are not attributed to an individual framework."
+  ]
+}

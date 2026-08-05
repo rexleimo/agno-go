@@ -73,6 +73,29 @@ func main() {
 
 ## Coordination Modes
 
+Four collaboration strategies plug into the shared orchestration kernel as
+`Scheduler` implementations:
+
+```mermaid
+flowchart TD
+    subgraph Sequential
+        A1[Agent 1] --> A2[Agent 2] --> A3[Agent 3]
+    end
+    subgraph Parallel
+        B1[Agent 1] & B2[Agent 2] & B3[Agent 3] --> B4[Combine]
+    end
+    subgraph LeaderFollower["Leader-Follower"]
+        L[Leader plans] --> F1[Follower 1]
+        L --> F2[Follower 2]
+        F1 & F2 --> LS[Leader synthesizes]
+    end
+    subgraph Consensus
+        C1[Round 1] --> C2[Round 2] --> C3{Converged?}
+        C3 -->|no| C1
+        C3 -->|yes| CD[Done]
+    end
+```
+
 ### 1. Sequential Mode
 
 Agents execute one after another, output feeds to next agent.

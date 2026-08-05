@@ -6,24 +6,12 @@ HNO 개발을 위한 종합적인 테스트 가이드입니다.
 
 ## 개요
 
-HNO는 코드베이스 전체에서 **80.8% 테스트 커버리지**를 통해 높은 품질을 유지합니다. 이 가이드는 테스트 표준, 패턴 및 모범 사례를 다룹니다.
+이 가이드는 테스트 표준, 패턴과 모범 사례를 다룹니다. 커버리지는 Revision,
+build tag, 대상 패키지와 OS에 따라 달라지므로 고정값으로 공개하지 않습니다.
 
-### 테스트 커버리지 현황
+### 테스트 커버리지
 
-| 패키지 | 커버리지 | 상태 |
-|---------|----------|--------|
-| types | 100.0% | ✅ 우수 |
-| memory | 93.1% | ✅ 우수 |
-| team | 92.3% | ✅ 우수 |
-| toolkit | 91.7% | ✅ 우수 |
-| http | 88.9% | ✅ 양호 |
-| workflow | 80.4% | ✅ 양호 |
-| file | 76.2% | ✅ 양호 |
-| calculator | 75.6% | ✅ 양호 |
-| agent | 74.7% | ✅ 양호 |
-| anthropic | 50.9% | 🟡 개선 필요 |
-| openai | 44.6% | 🟡 개선 필요 |
-| ollama | 43.8% | 🟡 개선 필요 |
+현재 checkout의 값은 다음 명령으로 생성하세요.
 
 ---
 
@@ -33,10 +21,10 @@ HNO는 코드베이스 전체에서 **80.8% 테스트 커버리지**를 통해 �
 
 ```bash
 # 커버리지와 함께 모든 테스트 실행
-make test
+go test -race -coverprofile=coverage.out -covermode=atomic ./...
 
-# 동일:
-go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+# 현재 리포트 요약
+go tool cover -func=coverage.out
 ```
 
 ### 특정 패키지
@@ -556,7 +544,7 @@ go test -timeout 30s ./...
 - [아키텍처](/advanced/architecture) 리뷰하여 디자인 패턴 학습
 - [성능](/advanced/performance) 확인하여 벤치마크 이해
 - [배포](/advanced/deployment) 읽고 프로덕션 설정 학습
-- [기여 가이드](https://github.com/rexleimo/HNO/blob/main/CONTRIBUTING.md) 탐색
+- [기여 가이드](https://github.com/rexleimo/agno-go/blob/main/CONTRIBUTING.md) 탐색
 
 ---
 

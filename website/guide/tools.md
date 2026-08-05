@@ -184,6 +184,37 @@ output, _ := agent.Run(ctx,
 
 ---
 
+## External API Tools Use Live Data
+
+The integrations below do not fall back to sample records. They call their
+provider and return an error when credentials are missing or the provider
+rejects the request. Configure credentials outside prompts and source code:
+
+| Toolkit | Provider | Credentials |
+| --- | --- | --- |
+| `bitbucket.New()` | Bitbucket Cloud REST API | `username` + app password in the tool call |
+| `confluence.New()` | Confluence REST API | `base_url`, username, and API token in the tool call |
+| `airflow.New()` | Airflow REST API | `base_url`, username, and password in the tool call |
+| `youtube.New()` | YouTube Data API v3 | `YOUTUBE_API_KEY` |
+| `websearch.New()` | Tavily Search API | `TAVILY_API_KEY` |
+| `hackernews.New()` | Hacker News Firebase + Algolia Search API | none |
+
+For tests or API-compatible gateways, the YouTube and Tavily toolkits expose
+`NewWithConfig`, while Bitbucket and Hacker News expose `NewWithBase` (Hacker
+News also has `NewWithBases`). These constructors only change the endpoint;
+they do not reintroduce mock data.
+
+```go
+youtubeTool := youtube.NewWithConfig(youtube.Config{
+    APIKey: os.Getenv("YOUTUBE_API_KEY"),
+})
+searchTool := websearch.NewWithConfig(websearch.Config{
+    APIKey: os.Getenv("TAVILY_API_KEY"),
+})
+```
+
+---
+
 ## Creating Custom Tools
 
 Build your own tools by implementing the Toolkit interface.

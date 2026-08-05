@@ -12,8 +12,8 @@
   - **Extensibility** - Connect your agents to any MCP-compatible server
 - **🔒 安全性** - 内置命令验证和 shell 注入保护
   - **Security** - Built-in command validation and shell injection protection
-- **🚀 性能** - 快速初始化 (<100μs) 和低内存占用 (<10KB)
-  - **Performance** - Fast initialization (<100μs) and low memory footprint (<10KB)
+- **🚀 性能** - 初始化和内存取决于传输、服务器及配置，应针对目标部署测量
+  - **Performance** - Initialization and memory depend on transport, server, and configuration
 - **📦 可重用性** - 利用现有的 MCP 服务器,无需重新造轮子
   - **Reusability** - Leverage existing MCP servers without reinventing the wheel
 
@@ -29,7 +29,7 @@ pkg/hno/mcp/
 ├── client/         # MCP 客户端核心和传输 | MCP client core and transports
 ├── security/       # 命令验证和安全 | Command validation and security
 ├── content/        # 内容类型处理 | Content type handling
-└── toolkit/        # 与 agno 工具包系统集成 | Integration with agno toolkit system
+└── toolkit/        # 与 HNO 工具包系统集成 | Integration with HNO toolkit system
 ```
 
 ## 快速开始
@@ -133,8 +133,8 @@ if err != nil {
 }
 defer toolkit.Close()
 
-// 与 agno agent 一起使用
-// Use with agno agent
+// 与 HNO agent 一起使用
+// Use with HNO agent
 ag, err := agent.New(agent.Config{
     Name:     "Math Assistant",
     Model:    yourModel,
@@ -259,14 +259,9 @@ More servers available at [MCP Servers Registry](https://github.com/modelcontext
 
 ## 性能 | Performance
 
-HNO 的 MCP 实现经过高度优化:
-
-HNO's MCP implementation is highly optimized:
-
-- **MCP 客户端初始化 | MCP Client Init**: <100μs
-- **工具发现 | Tool Discovery**: 每个服务器 <50μs | <50μs per server
-- **内存 | Memory**: 每个连接 <10KB | <10KB per connection
-- **测试覆盖率 | Test Coverage**: >80%
+这里不发布固定的 MCP 延迟、内存和覆盖率数字，因为仓库没有覆盖所有传输方式
+和服务器类型的统一 benchmark。请使用生产环境中的具体 MCP 服务器和传输方式，
+自行测量初始化、工具发现、内存和吞吐量。
 
 ## 限制 | Limitations
 

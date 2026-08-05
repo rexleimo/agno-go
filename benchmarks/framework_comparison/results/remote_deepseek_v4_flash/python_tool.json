@@ -1,0 +1,239 @@
+{
+  "endpoint": "https://api.deepseek.com",
+  "model": "deepseek-v4-flash",
+  "scenario": "tool",
+  "warmup": 3,
+  "runs": 20,
+  "frameworks": {
+    "agno": {
+      "warmup": 3,
+      "runs": 20,
+      "samples": [
+        {
+          "duration_ns": 2777856000,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2273769800,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2347449700,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2199040200,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2552198500,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2126898100,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 3502253000,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 1831914500,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2592949800,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 1903636200,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2313670900,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 1611689000,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2648100200,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2415146400,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2501213500,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 1953215700,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2454122100,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2205045800,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2127038700,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2409395900,
+          "content": "RESULT_42",
+          "success": true
+        }
+      ],
+      "mean_ns": 2337330200.0,
+      "median_ns": 2330560300.0,
+      "p95_ns": 2814075850.0,
+      "min_ns": 1611689000,
+      "max_ns": 3502253000,
+      "success_count": 20
+    },
+    "langgraph": {
+      "warmup": 3,
+      "runs": 20,
+      "samples": [
+        {
+          "duration_ns": 2167467300,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2419127700,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2541652000,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2347595600,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2645488600,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2871763400,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2065640900,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2083756300,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2236713000,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2005184600,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2004973400,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2351332400,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2951963500,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2735383000,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2269980300,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2545220100,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2644282800,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 1666679800,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 2000261800,
+          "content": "RESULT_42",
+          "success": true
+        },
+        {
+          "duration_ns": 1964858500,
+          "content": "RESULT_42",
+          "success": true
+        }
+      ],
+      "mean_ns": 2325966250.0,
+      "median_ns": 2308787950.0,
+      "p95_ns": 2875773405.0,
+      "min_ns": 1666679800,
+      "max_ns": 2951963500,
+      "success_count": 20
+    }
+  },
+  "limits": [
+    "All requests use the same local llama.cpp endpoint and model.",
+    "Measurements are client wall-clock time and include framework request preparation.",
+    "The model is local; no cloud LLM or network service is involved.",
+    "Server-side model load, CPU, and RSS are not attributed to an individual framework."
+  ]
+}

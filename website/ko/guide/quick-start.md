@@ -13,13 +13,13 @@
 ### 옵션 1: Go Get 사용
 
 ```bash
-go get github.com/rexleimo/HNO
+go get github.com/rexleimo/agno-go
 ```
 
 ### 옵션 2: 리포지토리 복제
 
 ```bash
-git clone https://github.com/rexleimo/HNO.git
+git clone https://github.com/rexleimo/agno-go.git
 cd HNO
 go mod download
 ```
@@ -39,8 +39,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/HNO/pkg/hno/agent"
-    "github.com/rexleimo/HNO/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 )
 
 func main() {
@@ -104,10 +104,10 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/HNO/pkg/hno/agent"
-    "github.com/rexleimo/HNO/pkg/hno/models/openai"
-    "github.com/rexleimo/HNO/pkg/hno/tools/calculator"
-    "github.com/rexleimo/HNO/pkg/hno/tools/toolkit"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 )
 
 func main() {
@@ -167,8 +167,8 @@ import (
     "os"
     "strings"
 
-    "github.com/rexleimo/HNO/pkg/hno/agent"
-    "github.com/rexleimo/HNO/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 )
 
 func main() {
@@ -381,12 +381,12 @@ export LOG_LEVEL=debug
 
 ```go
 import (
-    "github.com/rexleimo/HNO/pkg/hno/agent"
-    "github.com/rexleimo/HNO/pkg/hno/models/openai"
-    "github.com/rexleimo/HNO/pkg/hno/tools/calculator"
-    "github.com/rexleimo/HNO/pkg/hno/team"
-    "github.com/rexleimo/HNO/pkg/hno/workflow"
-    "github.com/rexleimo/HNO/pkg/agentos"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/hno/team"
+    "github.com/rexleimo/agno-go/pkg/hno/workflow"
+    "github.com/rexleimo/agno-go/pkg/agentos"
 )
 ```
 

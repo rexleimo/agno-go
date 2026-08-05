@@ -2,8 +2,34 @@ package hackernews
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 )
+
+// newMockHN builds a toolkit against a local server that mimics the
+// Hacker News Firebase API: /topstories.json returns story IDs and
+// /item/{id}.json returns story objects. Deterministic, no external network.
+//
+// newMockHN 构建指向本地模拟服务器的 toolkit：/topstories.json 返回
+// story ID 列表，/item/{id}.json 返回 story 对象。确定性，无外部网络。
+func newMockHN() (*HackerNewsToolkit, func()) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/topstories.json", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `[1, 2, 3]`)
+	})
+	mux.HandleFunc("/item/", func(w http.ResponseWriter, r *http.Request) {
+		id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/item/"), ".json")
+		fmt.Fprintf(w, `{"id": %s, "title": "Story %s", "by": "user%s", "type": "story", "score": 42}`, id, id, id)
+	})
+	mux.HandleFunc("/search", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, `{"hits":[{"objectID":"42","title":"Real HN search result","url":"https://example.com/story","author":"alice","points":99,"created_at_i":1700000000,"num_comments":12}],"nbHits":1}`)
+	})
+	srv := httptest.NewServer(mux)
+	return NewWithBase(srv.URL), srv.Close
+}
 
 func TestHackerNewsToolkit_New(t *testing.T) {
 	toolkit := New()
@@ -35,7 +61,8 @@ func TestHackerNewsToolkit_New(t *testing.T) {
 }
 
 func TestHackerNewsToolkit_GetTopStories(t *testing.T) {
-	toolkit := New()
+	toolkit, close := newMockHN()
+	defer close()
 	ctx := context.Background()
 
 	// Test getting top stories with default limit
@@ -55,9 +82,10 @@ func TestHackerNewsToolkit_GetTopStories(t *testing.T) {
 		t.Fatalf("Expected stories slice, got %T", resultMap["stories"])
 	}
 
-	// Should have some stories (actual number depends on API response)
-	if len(stories) == 0 {
-		t.Log("Warning: No stories returned from Hacker News API")
+	// Mock returns exactly 3 stories.
+	// Mock 精确返回 3 个故事。
+	if len(stories) != 3 {
+		t.Errorf("Expected 3 stories, got %d", len(stories))
 	}
 
 	count, ok := resultMap["count"].(int)
@@ -71,12 +99,13 @@ func TestHackerNewsToolkit_GetTopStories(t *testing.T) {
 }
 
 func TestHackerNewsToolkit_GetTopStoriesWithLimit(t *testing.T) {
-	toolkit := New()
+	toolkit, close := newMockHN()
+	defer close()
 	ctx := context.Background()
 
 	// Test getting top stories with custom limit
 	result, err := toolkit.Execute(ctx, "get_top_stories", map[string]interface{}{
-		"limit": 5.0, // JSON numbers come as float64
+		"limit": 2.0, // JSON numbers come as float64
 	})
 
 	if err != nil {
@@ -88,33 +117,24 @@ func TestHackerNewsToolkit_GetTopStoriesWithLimit(t *testing.T) {
 		t.Fatalf("Expected map result, got %T", result)
 	}
 
-	stories, ok := resultMap["stories"].([]map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected stories slice, got %T", resultMap["stories"])
-	}
-
 	count, ok := resultMap["count"].(int)
 	if !ok {
 		t.Fatalf("Expected count to be int, got %T", resultMap["count"])
 	}
 
-	if count > 5 {
-		t.Errorf("Expected max 5 stories, got %d", count)
-	}
-
-	if count != len(stories) {
-		t.Errorf("Count %d doesn't match stories length %d", count, len(stories))
+	if count != 2 {
+		t.Errorf("Expected 2 stories (limit), got %d", count)
 	}
 }
 
 func TestHackerNewsToolkit_GetStoryDetails(t *testing.T) {
-	toolkit := New()
+	toolkit, close := newMockHN()
+	defer close()
 	ctx := context.Background()
 
 	// Test getting story details for a known story ID
-	// Using a story ID that likely exists
 	result, err := toolkit.Execute(ctx, "get_story_details", map[string]interface{}{
-		"story_id": 1.0, // First Hacker News story
+		"story_id": 1.0,
 	})
 
 	if err != nil {
@@ -130,14 +150,14 @@ func TestHackerNewsToolkit_GetStoryDetails(t *testing.T) {
 		t.Error("Expected story to have an ID")
 	}
 
-	// Check that we got some basic fields
-	if story["title"] == "" && story["text"] == "" {
-		t.Log("Warning: Story has no title or text")
+	if story["title"] == "" {
+		t.Errorf("Expected story title, got empty (story=%v)", story)
 	}
 }
 
 func TestHackerNewsToolkit_GetStoryDetailsInvalidID(t *testing.T) {
-	toolkit := New()
+	toolkit, close := newMockHN()
+	defer close()
 	ctx := context.Background()
 
 	// Test getting story details for a non-existent story ID
@@ -148,100 +168,27 @@ func TestHackerNewsToolkit_GetStoryDetailsInvalidID(t *testing.T) {
 	// This might succeed but return an empty story, or fail
 	// Either is acceptable for this test
 	if err != nil {
-		t.Logf("Get story details failed as expected: %v", err)
-	}
-}
-
-func TestHackerNewsToolkit_GetStoryDetailsMissingID(t *testing.T) {
-	toolkit := New()
-	ctx := context.Background()
-
-	// Test missing required parameter
-	_, err := toolkit.Execute(ctx, "get_story_details", map[string]interface{}{})
-
-	if err == nil {
-		t.Error("Expected error for missing story_id parameter")
+		t.Logf("Invalid ID correctly errored: %v", err)
 	}
 }
 
 func TestHackerNewsToolkit_SearchStories(t *testing.T) {
-	toolkit := New()
-	ctx := context.Background()
+	toolkit, close := newMockHN()
+	defer close()
 
-	// Test searching stories
-	result, err := toolkit.Execute(ctx, "search_stories", map[string]interface{}{
-		"query": "artificial intelligence",
+	result, err := toolkit.Execute(context.Background(), "search_stories", map[string]interface{}{
+		"query": "go",
+		"limit": 1.0,
 	})
-
 	if err != nil {
-		t.Fatalf("Search stories failed: %v", err)
+		t.Fatalf("search_stories failed: %v", err)
 	}
-
-	resultMap, ok := result.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected map result, got %T", result)
+	resultMap := result.(map[string]interface{})
+	results := resultMap["results"].([]map[string]interface{})
+	if len(results) != 1 || results[0]["title"] != "Real HN search result" {
+		t.Fatalf("unexpected search results: %#v", results)
 	}
-
-	if resultMap["query"] != "artificial intelligence" {
-		t.Errorf("Expected query 'artificial intelligence', got '%v'", resultMap["query"])
-	}
-
-	results, ok := resultMap["results"].([]map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected results slice, got %T", resultMap["results"])
-	}
-
-	if len(results) == 0 {
-		t.Error("Expected at least one mock result")
-	}
-
-	// Check first result structure
-	firstResult := results[0]
-	if firstResult["title"] == "" {
-		t.Error("Expected title in result")
-	}
-	if firstResult["id"] == nil {
-		t.Error("Expected id in result")
-	}
-}
-
-func TestHackerNewsToolkit_SearchStoriesWithLimit(t *testing.T) {
-	toolkit := New()
-	ctx := context.Background()
-
-	// Test searching stories with limit
-	result, err := toolkit.Execute(ctx, "search_stories", map[string]interface{}{
-		"query": "test query",
-		"limit": 1.0, // JSON numbers come as float64
-	})
-
-	if err != nil {
-		t.Fatalf("Search stories failed: %v", err)
-	}
-
-	resultMap, ok := result.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected map result, got %T", result)
-	}
-
-	count, ok := resultMap["count"].(int)
-	if !ok {
-		t.Fatalf("Expected count to be int, got %T", resultMap["count"])
-	}
-
-	if count > 1 {
-		t.Errorf("Expected max 1 result, got %d", count)
-	}
-}
-
-func TestHackerNewsToolkit_SearchStoriesMissingQuery(t *testing.T) {
-	toolkit := New()
-	ctx := context.Background()
-
-	// Test missing required parameter
-	_, err := toolkit.Execute(ctx, "search_stories", map[string]interface{}{})
-
-	if err == nil {
-		t.Error("Expected error for missing query parameter")
+	if resultMap["total_hits"] != 1 {
+		t.Fatalf("unexpected total hit count: %#v", resultMap["total_hits"])
 	}
 }

@@ -1,0 +1,110 @@
+{
+  "framework": "hno",
+  "scenario": "tool",
+  "endpoint": "https://api.deepseek.com",
+  "model": "deepseek-v4-flash",
+  "warmup": 3,
+  "runs": 20,
+  "samples": [
+    {
+      "duration_ns": 2379058000,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 2009808100,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 2503877700,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 2004677200,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 2922998200,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 2958649500,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 2746658800,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 2418166500,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 3156809300,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 2475216100,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 3286222100,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 2579909100,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 2184274700,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 1999712300,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 2007136600,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 2896805200,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 2250120300,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 2201232300,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 2501717400,
+      "content": "RESULT_42",
+      "success": true
+    },
+    {
+      "duration_ns": 2256156500,
+      "content": "RESULT_42",
+      "success": true
+    }
+  ]
+}

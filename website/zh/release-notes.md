@@ -167,7 +167,7 @@ outline: deep
 - REST API 端点（`/a2a/message/send`、`/a2a/message/stream`）
 - 多媒体支持（文本、图片、文件、JSON 数据）
 - Server-Sent Events (SSE) 流式传输
-- 与 Python Agno A2A 实现兼容
+- 与 Python HNO A2A 实现兼容
 
 **快速示例：**
 ```go
@@ -197,7 +197,7 @@ a2a.RegisterRoutes(router)
 - 使用 `sync.RWMutex` 的线程安全
 - 并行分支隔离的深拷贝
 - 智能合并策略防止数据丢失
-- 修复 Python Agno v2.1.2 的竞态条件
+- 修复 Python HNO v2.1.2 的竞态条件
 
 **快速示例：**
 ```go
@@ -282,7 +282,7 @@ claude, _ := anthropic.New("claude-3-opus", anthropic.Config{
 ### 🐛 Bug 修复
 
 - **Workflow 竞态条件** - 修复并行步骤执行的数据竞争
-  - Python Agno v2.1.2 有共享的 `session_state` 字典导致覆盖
+  - Python HNO v2.1.2 有共享的 `session_state` 字典导致覆盖
   - Go 实现为每个分支使用独立的 SessionState 克隆
   - 智能合并策略防止并发执行中的数据丢失
 
@@ -318,10 +318,7 @@ claude, _ := anthropic.New("claude-3-opus", anthropic.Config{
 
 ### 📊 性能
 
-**无性能回归** - 所有基准测试保持一致：
-- Agent 实例化：~180ns/op（比 Python 快 16 倍）
-- 内存占用：~1.2KB/agent
-- 线程安全的并发操作
+**性能说明** - 当前可复现的 benchmark 快照、环境和限制请查看[性能页面](/zh/advanced/performance)。历史版本中的未复现实测数字不再作为性能承诺；线程安全和并发能力应结合具体工作负载验证。
 
 ---
 
@@ -389,13 +386,11 @@ go get github.com/rexleimo/agno-go@v1.1.0
 
 #### 测试与质量
 - **增强 JSON 序列化测试** - utils/serialize 包达到 100% 测试覆盖率
-- **性能基准测试** - 与 Python Agno 性能测试模式对齐
+- **性能基准测试** - 与 Python HNO 性能测试模式对齐
 - **全面文档** - 添加双语包文档
 
 #### 性能
-- **ToJSON**: ~600ns/op, 760B/op, 15 allocs/op
-- **ConvertValue**: ~180ns/op, 392B/op, 5 allocs/op
-- **Agent Creation**: ~180ns/op（比 Python 快 16 倍）
+- 当前可复现的 benchmark 及其测量边界见[性能页面](/zh/advanced/performance)。本版本历史记录中的估算不作为跨语言或生产容量结论。
 
 ---
 
@@ -425,7 +420,7 @@ model, _ := glm.New("glm-4", glm.Config{
 
 ### 🎉 初始版本
 
-HNO v1.0 是 Agno 多智能体框架的高性能 Go 实现。
+HNO v1.0 是 HNO 多智能体框架的高性能 Go 实现。
 
 #### 核心功能
 - **Agent** - 带工具支持的单个自主 Agent（74.7% 覆盖率）
@@ -444,9 +439,7 @@ HNO v1.0 是 Agno 多智能体框架的高性能 Go 实现。
 - ChromaDB 向量数据库
 
 #### 性能
-- Agent 创建：~180ns/op（比 Python 快 16 倍）
-- 内存占用：~1.2KB/agent
-- 测试覆盖率：平均 80.8%
+- 当前可复现的 benchmark 及其环境记录见[性能页面](/zh/advanced/performance)。
 
 ---
 

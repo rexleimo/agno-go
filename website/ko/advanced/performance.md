@@ -1,307 +1,68 @@
 # 성능
 
-HNO는 극한의 성능을 위해 설계되어, Python Agno 대비 16배 빠른 에이전트 인스턴스화를 달성합니다.
+이 페이지는 고정된 로컬 dummy model을 사용한 framework overhead 측정만 공개합니다.
+LLM 품질, 네트워크 지연시간 또는 운영 처리량 보장이 아닙니다. 원본 데이터는
+`benchmarks/framework_comparison/results/latest.json`에 있습니다.
 
-## 요약
+## 프레임워크 간 측정
 
-✅ **성능 목표 달성**:
-- ✅ 에이전트 인스턴스화: **~180ns** (<1μs 목표)
-- ✅ 메모리 사용량: **~1.2KB/agent** (<3KB 목표)
-- ✅ 동시성: 경합 없는 선형 확장
+기록: 2026-08-04 04:19:54 UTC
 
-## 벤치마크 결과
+- Target: `windows/amd64`
+- CPU: `12th Gen Intel(R) Core(TM) i5-12400F`
+- Go: `go1.26.4`
+- Python: `3.11.15`
+- Packages: `agno==2.8.6`, `langgraph==1.2.10`
+- Python 20회, Go 10회. 외부 Provider, 네트워크, DB, Token은 사용하지 않습니다.
 
-### 에이전트 생성 성능
+### HNO와 Agno: Agent 생성
 
-| 벤치마크 | 시간/op | 메모리/op | 할당/op |
-|-----------|---------|-----------|-----------|
-| **Simple Agent** | 184.5 ns | 1,272 B (1.2 KB) | 8 |
-| **With Tools** | 193.0 ns | 1,288 B (1.3 KB) | 9 |
-| **With Memory** | 111.9 ns | 312 B (0.3 KB) | 6 |
+| Operation | Framework | Mean ns/op | Median ns/op | Range ns/op |
+| --- | --- | ---: | ---: | ---: |
+| Minimal Agent | HNO | 255.8 | 252.4 | 249.2-266.8 |
+| Minimal Agent | Agno | 7,105.5 | 6,869.1 | 5,308.8-10,042.1 |
+| Agent + 도구 1개 | HNO | 298.4 | 296.8 | 265.9-355.1 |
+| Agent + 도구 1개 | Agno | 6,603.7 | 6,394.4 | 5,812.1-8,591.5 |
 
-**주요 발견**:
-- ⚡ 에이전트 생성: **<200 나노초** (1μs 목표 대비 5배 향상!)
-- 💾 메모리 사용: **1.2-1.3KB** (3KB 목표 대비 60% 개선)
-- 🎯 도구 추가 시 오버헤드 8.5ns만 발생
-- 🎯 메모리는 경량 (312B만 사용)
+이 구성 작업에서 Agno/HNO 평균 비는 27.8배와 22.1배입니다. 이 수치는 해당
+머신, 버전, 설정과 작업에만 해당하며 운영이나 종단 간 속도 비가 아닙니다.
 
-### 실행 성능
+### HNO와 Agno: fresh local dummy run
 
-| 벤치마크 | 처리량 |
-|-----------|------------|
-| **Simple Run** | ~6M ops/sec |
-| **With Tool Calls** | ~0.5M ops/sec |
-| **Memory Operations** | ~1M ops/sec |
+새 Agent를 만들고 고정된 응답으로 `ping`을 한 번 실행합니다.
 
-**참고**: 실제 성능은 LLM API 지연시간(100-1000ms)에 제한됩니다. 위 결과는 모의 모델 사용.
+| Framework | Mean ns/op | Median ns/op | Range ns/op |
+| --- | ---: | ---: | ---: |
+| HNO | 6,431.0 | 6,528.0 | 5,360.0-7,090.0 |
+| Agno | 187,208.6 | 180,537.0 | 162,652.0-241,754.0 |
 
-### 동시 성능
+이 작업의 평균 비는 29.1배입니다. 실제 LLM, 네트워크, DB, Token 생성은 포함하지 않습니다.
 
-| 벤치마크 | 시간/op | 메모리/op | 확장성 |
-|-----------|---------|-----------|---------|
-| **Parallel Creation** | 191.0 ns | 1,272 B | ✅ 선형 |
-| **Parallel Run** | 유사 | 유사 | ✅ 선형 |
+### LangGraph: 별도 지표
 
-**주요 발견**:
-- ✅ 동시 및 단일 스레드 성능 동일
-- ✅ 락 경합 또는 경쟁 조건 없음
-- ✅ 높은 동시성 시나리오에 완벽
+LangGraph는 Agent 생성이 아니라 graph compile을 사용하므로 별도로 보고합니다. 최소
+`StateGraph`는 평균 `356,598.2 ns/op`, 중앙값 `352,408.5 ns/op`, 범위
+`332,839.0-394,720.0 ns/op`입니다. 이는 완전한 Agent 시스템의 속도 순위가 아닙니다.
 
-## 성능 비교
-
-### vs Python Agno
-
-| 지표 | Go | Python | 개선 |
-|--------|-----|--------|-------------|
-| **인스턴스화** | ~180ns | ~3μs | **16배 빠름** |
-| **메모리/Agent** | ~1.2KB | ~6.5KB | **5배 적음** |
-| **동시성** | 네이티브 고루틴 | GIL 제한 | **우수** |
-
-## 실제 시나리오
-
-### 시나리오 1: 배치 에이전트 생성
-
-1,000개 에이전트 생성:
-- **시간**: 1,000 × 180ns = **0.18ms**
-- **메모리**: 1,000 × 1.2KB = **1.2MB**
-
-### 시나리오 2: 고동시성 API 서비스
-
-10,000 req/s 처리:
-- **요청당**: 1 에이전트 인스턴스
-- **메모리 오버헤드**: 10,000 × 1.2KB = **12MB**
-- **지연시간**: <1ms (LLM API 호출 제외)
-
-### 시나리오 3: 다중 에이전트 워크플로우
-
-100개 에이전트 협업:
-- **총 메모리**: 100 × 1.2KB = **120KB**
-- **시작 시간**: 100 × 180ns = **18μs**
-
-## 최적화 기법
-
-### 1. 낮은 할당 횟수
-
-- 에이전트당 8-9회의 힙 할당만
-- 불필요한 인터페이스 변환 없음
-- 사전 할당된 슬라이스 용량
-
-### 2. 효율적인 메모리 레이아웃
-
-```go
-type Agent struct {
-    ID           string        // 16B
-    Name         string        // 16B
-    Model        Model         // 16B (interface)
-    Tools        []Toolkit     // 24B (slice header)
-    Memory       Memory        // 16B (interface)
-    Instructions string        // 16B
-    MaxLoops     int           // 8B
-    // Total: ~112B struct + heap allocations
-}
-```
-
-### 3. 제로 카피 작업
-
-- 문자열 참조 (복사 없음)
-- 인터페이스 포인터 (복사 없음)
-- 슬라이스 뷰 (복사 없음)
-
-## 병목 현상 분석
-
-### 현재 병목
-
-1. **LLM API 지연시간** (100-1000ms)
-   - 해결책: 스트리밍, 캐싱, 배치 요청
-
-2. **도구 실행 시간** (가변)
-   - 해결책: 병렬 실행, 타임아웃 제어
-
-3. **아직 벤치마크되지 않음**:
-   - 팀 조정 오버헤드
-   - 워크플로우 실행 오버헤드
-   - 벡터 DB 쿼리
-
-## 프로덕션 권장사항
-
-### 1. 에이전트 풀링
-
-GC 압력을 줄이기 위해 에이전트 인스턴스 재사용:
-
-```go
-type AgentPool struct {
-    agents chan *Agent
-}
-
-func NewAgentPool(size int, config agent.Config) *AgentPool {
-    pool := &AgentPool{
-        agents: make(chan *Agent, size),
-    }
-    for i := 0; i < size; i++ {
-        ag, _ := agent.New(config)
-        pool.agents <- ag
-    }
-    return pool
-}
-
-func (p *AgentPool) Get() *Agent {
-    return <-p.agents
-}
-
-func (p *AgentPool) Put(ag *Agent) {
-    ag.ClearMemory()
-    p.agents <- ag
-}
-```
-
-### 2. 고루틴 제한
-
-리소스 고갈을 방지하기 위한 동시성 제한:
-
-```go
-semaphore := make(chan struct{}, 100) // Max 100 concurrent
-
-for _, task := range tasks {
-    semaphore <- struct{}{}
-    go func(t Task) {
-        defer func() { <-semaphore }()
-
-        ag, _ := agent.New(config)
-        ag.Run(ctx, t.Input)
-    }(task)
-}
-```
-
-### 3. 응답 캐싱
-
-API 호출을 줄이기 위한 LLM 응답 캐싱:
-
-```go
-type CachedModel struct {
-    model models.Model
-    cache map[string]*types.ModelResponse
-    mu    sync.RWMutex
-}
-
-func (m *CachedModel) Invoke(ctx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error) {
-    key := hashRequest(req)
-
-    m.mu.RLock()
-    if cached, ok := m.cache[key]; ok {
-        m.mu.RUnlock()
-        return cached, nil
-    }
-    m.mu.RUnlock()
-
-    resp, err := m.model.Invoke(ctx, req)
-    if err != nil {
-        return nil, err
-    }
-
-    m.mu.Lock()
-    m.cache[key] = resp
-    m.mu.Unlock()
-
-    return resp, nil
-}
-```
-
-### 4. 모니터링
-
-프로덕션에서 주요 지표 모니터링:
-
-```go
-import "github.com/prometheus/client_golang/prometheus"
-
-var (
-    agentCreations = prometheus.NewCounter(prometheus.CounterOpts{
-        Name: "agno_agent_creations_total",
-    })
-
-    agentLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
-        Name: "agno_agent_run_duration_seconds",
-    })
-)
-```
-
-## 벤치마크 실행
-
-### 모든 벤치마크 실행
+## 재현
 
 ```bash
-make bench
-# 또는
-go test -bench=. -benchmem ./...
+uv run --with 'agno==2.8.6' --with 'langgraph==1.2.10' \
+  python benchmarks/framework_comparison/compare.py --repeat 20 --number 1000
 ```
 
-### 특정 벤치마크 실행
+프로토콜, raw JSON, source hash와 한계는 `benchmarks/framework_comparison/README.md`를
+참조하세요. Go `B/op`와 Python `timeit`은 다른 측정 체계이며 메모리 비교로 사용하지 않습니다.
 
-```bash
-go test -bench=BenchmarkAgentCreation -benchmem ./pkg/hno/agent/
-```
+## 아직 측정하지 않은 항목
 
-### CPU 프로파일 생성
+실제 LLM 지연, Token throughput, resident memory, Team/Workflow, 실제 서비스 Tool,
+고정 동시성 RPS, 운영 용량과 비용은 측정하지 않았습니다. 동일 Provider, model, prompt,
+Tool, output, timeout, concurrency, hardware와 version이 필요합니다.
 
-```bash
-go test -bench=. -cpuprofile=cpu.prof ./pkg/hno/agent/
-go tool pprof cpu.prof
-```
+## 왜 Go, 왜 HNO인가
 
-### 메모리 프로파일 생성
-
-```bash
-go test -bench=. -memprofile=mem.prof ./pkg/hno/agent/
-go tool pprof mem.prof
-```
-
-## 프로파일링 팁
-
-### 1. CPU 프로파일링
-
-```bash
-go test -cpuprofile=cpu.prof -bench=.
-go tool pprof -http=:8080 cpu.prof
-```
-
-### 2. 메모리 프로파일링
-
-```bash
-go test -memprofile=mem.prof -bench=.
-go tool pprof -http=:8080 mem.prof
-```
-
-### 3. 경쟁 조건 탐지
-
-```bash
-go test -race ./...
-```
-
-## 향후 최적화
-
-### 계획된 개선 사항
-
-- [ ] 반복 값에 대한 문자열 인터닝
-- [ ] 에이전트 재사용을 위한 sync.Pool
-- [ ] 배치 도구 실행
-- [ ] LLM API용 HTTP/2 연결 풀링
-- [ ] 낮은 지연시간을 위한 gRPC 지원
-
-## 결론
-
-HNO는 **성능 목표를 초과 달성**:
-
-- ✅ 목표 대비 5배 빠름 (180ns vs 1μs)
-- ✅ 목표 대비 60% 적은 메모리 (1.2KB vs 3KB)
-- ✅ Python 대비 16배 빠름, 5배 적은 메모리
-- ✅ 완벽한 동시성 확장
-
-**지원**:
-- 수천 개의 동시 에이전트
-- 10K+ 요청/초
-- 저지연 실시간 애플리케이션
-
-## 참고 자료
-
-- [아키텍처](/advanced/architecture)
-- [배포](/advanced/deployment)
-- [벤치마크 코드](https://github.com/rexleimo/HNO/tree/main/pkg/hno/agent/agent_bench_test.go)
+Go는 컴파일된 배포물, 내장 동시성, 정적 타입, HTTP/JSON 표준 라이브러리와
+테스트/profile/race 도구가 선택 이유인 구현 언어입니다. HNO는 현재 프로젝트 이름이며
+공식 약어 확장은 저장소에 정의되어 있지 않습니다. Go module path는
+`github.com/rexleimo/agno-go`로 유지됩니다.

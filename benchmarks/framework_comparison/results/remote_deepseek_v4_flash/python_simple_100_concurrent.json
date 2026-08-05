@@ -1,0 +1,1042 @@
+{
+  "endpoint": "https://api.deepseek.com",
+  "model": "deepseek-v4-flash",
+  "scenario": "simple",
+  "warmup": 3,
+  "runs": 100,
+  "concurrency": 8,
+  "frameworks": {
+    "agno": {
+      "warmup": 3,
+      "runs": 100,
+      "concurrency": 8,
+      "samples": [
+        {
+          "duration_ns": 1594957700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1509449900,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1482497700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1331913800,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1784280100,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1421828800,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1493923200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1474808400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1718941000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1947477600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1608460700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1504117400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1608133300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1736624500,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1518158400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1438729100,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1617430600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1405888600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1393902000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1361768600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1390544000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1622197800,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1737936800,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1449925200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 2058857000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 2045775200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 2032955400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1986139900,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1983491600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1455947600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1415412100,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1583201600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 2027194000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1449533000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1472752700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1592027700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1468626200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1565452200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1425326500,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1405559100,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1490299900,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1647029700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1536770800,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1378764700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1602653500,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1324574900,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1687680400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1678300100,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1637305300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1516600400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1815658400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1548012200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1288219600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1460408100,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1439669700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1564809300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1559834900,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1339448000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1477805700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1442612800,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1397908600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1659283200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1379277000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1155464700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1309809300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1964408600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1612269700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1575895700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1973772300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1716511600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1439318300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1307719700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1241416500,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1420447800,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 2646640100,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1674546000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1927779300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1268926500,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1697711300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1709847400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1412676000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1506605700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1505235600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1500603800,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1475911900,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1306416500,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1317062000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1418721900,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1574231000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1392313700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1242949300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1150891200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1765953000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1811055100,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1912403200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1678191400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1610455100,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1646522000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1475660300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1792964800,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        }
+      ],
+      "mean_ns": 1571343825.0,
+      "median_ns": 1513025150.0,
+      "p95_ns": 1988192605.0,
+      "min_ns": 1150891200,
+      "max_ns": 2646640100,
+      "success_count": 100
+    },
+    "langgraph": {
+      "warmup": 3,
+      "runs": 100,
+      "concurrency": 8,
+      "samples": [
+        {
+          "duration_ns": 1222694300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1393366000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1375105400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1780528200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1593743700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1446781700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1778936200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1551121500,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1680404400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1601639200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1348050600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1598935600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1565354900,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1568326700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1467267400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 983371000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1375043600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1336615300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1417517400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1364499800,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1287739300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1314245500,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1146658500,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1534982600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1219589900,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1287799400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1752846700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1764972300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1373774000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1726152700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1367932300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1387892800,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1398018700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1197370000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1244442400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1152679800,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1288557800,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1248757600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1307972700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1275784600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1248230600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1306586400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1293904400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1065054200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1214667700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1402503000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1263818200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1232572000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1183057300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1336944000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1148976400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1297082000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1453967300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1215691600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1158064300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1927020000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1171996300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1087974000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1218079600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1081633200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1069771300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1568692800,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1269207900,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1270552200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1329404200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1065693800,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1020011600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1240839000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1123388800,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1622140800,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1661454900,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1457517300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1424450100,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1469731900,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1582564100,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1653092500,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1151721700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1376554900,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1303567600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1489597700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1342361800,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1335504200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1826432400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1612362300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1301975500,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1389074000,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1541362200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1290968400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1367240100,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1029913600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1199632200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1205979700,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1392362100,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1266847200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1545454200,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1414528300,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1307069400,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1316290500,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1125403600,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        },
+        {
+          "duration_ns": 1213080900,
+          "content": "REMOTE_MODEL_OK",
+          "success": true
+        }
+      ],
+      "mean_ns": 1362090927.0,
+      "median_ns": 1332454200.0,
+      "p95_ns": 1753452980.0,
+      "min_ns": 983371000,
+      "max_ns": 1927020000,
+      "success_count": 100
+    }
+  },
+  "limits": [
+    "All requests use the same OpenAI-compatible endpoint and model.",
+    "Measurements are client wall-clock time and include framework request preparation.",
+    "The model may be local or remote; provider and network latency are included.",
+    "Server-side model load, CPU, and RSS are not attributed to an individual framework."
+  ]
+}

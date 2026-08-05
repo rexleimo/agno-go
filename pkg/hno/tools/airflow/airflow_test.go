@@ -2,253 +2,130 @@ package airflow
 
 import (
 	"context"
+	"encoding/base64"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
-func TestAirflowToolkit_ListDAGs(t *testing.T) {
-	toolkit := New()
+func newAirflowTestServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		expectedAuth := "Basic " + base64.StdEncoding.EncodeToString([]byte("admin:admin"))
+		if r.Header.Get("Authorization") != expectedAuth {
+			http.Error(w, `{"detail":"unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/dags":
+			_, _ = w.Write([]byte(`{"dags":[{"dag_id":"real_dag","is_paused":false}],"total_entries":1}`))
+		case r.Method == http.MethodPost && r.URL.Path == "/api/v1/dags/example_dag/dagRuns":
+			var request struct {
+				Conf map[string]interface{} `json:"conf"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil || request.Conf["param"] != "value" {
+				http.Error(w, `{"detail":"invalid conf"}`, http.StatusBadRequest)
+				return
+			}
+			_, _ = w.Write([]byte(`{"dag_id":"example_dag","dag_run_id":"manual__real","state":"queued","conf":{"param":"value"}}`))
+		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/dags/example_dag/dagRuns/manual__real":
+			_, _ = w.Write([]byte(`{"dag_id":"example_dag","dag_run_id":"manual__real","state":"success","conf":{"param":"value"}}`))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+}
 
-	// Test with valid parameters
-	result, err := toolkit.listDAGs(context.Background(), map[string]interface{}{
-		"base_url": "http://localhost:8080",
+func airflowArgs(serverURL string) map[string]interface{} {
+	return map[string]interface{}{
+		"base_url": serverURL,
 		"username": "admin",
 		"password": "admin",
-	})
+	}
+}
 
+func TestAirflowToolkit_ListDAGs(t *testing.T) {
+	server := newAirflowTestServer(t)
+	defer server.Close()
+	result, err := New().Execute(context.Background(), "list_dags", airflowArgs(server.URL))
 	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
+		t.Fatalf("list_dags failed: %v", err)
 	}
-
-	resultMap, ok := result.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected map result, got: %T", result)
+	resultMap := result.(map[string]interface{})
+	dags := resultMap["dags"].([]map[string]interface{})
+	if len(dags) != 1 || dags[0]["dag_id"] != "real_dag" || resultMap["total_entries"] != 1 {
+		t.Fatalf("unexpected DAG response: %#v", resultMap)
 	}
-
-	// Check that DAGs are returned
-	dags, ok := resultMap["dags"].([]map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected dags array, got: %T", resultMap["dags"])
-	}
-
-	if len(dags) == 0 {
-		t.Error("Expected at least one DAG")
-	}
-
-    // Check total_entries field (Airflow API schema)
-    total, ok := resultMap["total_entries"].(int)
-    if !ok {
-        t.Fatalf("Expected total_entries integer, got: %T", resultMap["total_entries"])
-    }
-
-    if total != len(dags) {
-        t.Errorf("total_entries mismatch: expected %d, got %d", len(dags), total)
-    }
 }
 
 func TestAirflowToolkit_TriggerDAGRun(t *testing.T) {
-	toolkit := New()
-
-	// Test with valid parameters
-	result, err := toolkit.triggerDAGRun(context.Background(), map[string]interface{}{
-		"base_url": "http://localhost:8080",
-		"username": "admin",
-		"password": "admin",
-		"dag_id":  "example_dag",
-	})
-
+	server := newAirflowTestServer(t)
+	defer server.Close()
+	args := airflowArgs(server.URL)
+	args["dag_id"] = "example_dag"
+	args["conf"] = map[string]interface{}{"param": "value"}
+	result, err := New().Execute(context.Background(), "trigger_dag_run", args)
 	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
+		t.Fatalf("trigger_dag_run failed: %v", err)
 	}
-
-	resultMap, ok := result.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected map result, got: %T", result)
-	}
-
-	// Check DAG ID
-	dagID, ok := resultMap["dag_id"].(string)
-	if !ok {
-		t.Fatalf("Expected dag_id string, got: %T", resultMap["dag_id"])
-	}
-
-	if dagID != "example_dag" {
-		t.Errorf("Expected dag_id 'example_dag', got '%s'", dagID)
-	}
-
-    // Check dag_run_id
-    dagRunID, ok := resultMap["dag_run_id"].(string)
-    if !ok {
-        t.Fatalf("Expected dag_run_id string, got: %T", resultMap["dag_run_id"])
-    }
-
-    if dagRunID == "" {
-        t.Error("Expected non-empty dag_run_id")
-    }
-
-	// Check state
-	state, ok := resultMap["state"].(string)
-	if !ok {
-		t.Fatalf("Expected state string, got: %T", resultMap["state"])
-	}
-
-	if state != "queued" {
-		t.Errorf("Expected state 'queued', got '%s'", state)
-	}
-}
-
-func TestAirflowToolkit_TriggerDAGRun_WithConf(t *testing.T) {
-	toolkit := New()
-
-	// Test with configuration parameters
-	conf := map[string]interface{}{
-		"param1": "value1",
-		"param2": 42,
-	}
-
-	result, err := toolkit.triggerDAGRun(context.Background(), map[string]interface{}{
-		"base_url": "http://localhost:8080",
-		"username": "admin",
-		"password": "admin",
-		"dag_id":  "example_dag",
-		"conf":    conf,
-	})
-
-	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
-	}
-
-	resultMap, ok := result.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected map result, got: %T", result)
-	}
-
-	// Check configuration
-	resultConf, ok := resultMap["conf"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected conf map, got: %T", resultMap["conf"])
-	}
-
-	if len(resultConf) != 2 {
-		t.Errorf("Expected 2 conf parameters, got %d", len(resultConf))
+	resultMap := result.(map[string]interface{})
+	if resultMap["dag_run_id"] != "manual__real" || resultMap["state"] != "queued" {
+		t.Fatalf("unexpected trigger response: %#v", resultMap)
 	}
 }
 
 func TestAirflowToolkit_GetDAGRunStatus(t *testing.T) {
-	toolkit := New()
-
-	// Test with valid parameters
-    result, err := toolkit.getDAGRunStatus(context.Background(), map[string]interface{}{
-        "base_url": "http://localhost:8080",
-        "username": "admin",
-        "password": "admin",
-        "dag_id":  "example_dag",
-        "dag_run_id":  "manual__2024-01-15T10:00:00",
-    })
-
+	server := newAirflowTestServer(t)
+	defer server.Close()
+	args := airflowArgs(server.URL)
+	args["dag_id"] = "example_dag"
+	args["dag_run_id"] = "manual__real"
+	result, err := New().Execute(context.Background(), "get_dag_run_status", args)
 	if err != nil {
-		t.Fatalf("Expected no error, got: %v", err)
+		t.Fatalf("get_dag_run_status failed: %v", err)
 	}
-
-	resultMap, ok := result.(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected map result, got: %T", result)
-	}
-
-	// Check that DAG run status is returned
-	dagRun, ok := resultMap["dag_run"].(map[string]interface{})
-	if !ok {
-		t.Fatalf("Expected dag_run map, got: %T", resultMap["dag_run"])
-	}
-
-	// Check DAG ID
-	dagID, ok := dagRun["dag_id"].(string)
-	if !ok {
-		t.Fatalf("Expected dag_id string, got: %T", dagRun["dag_id"])
-	}
-
-	if dagID != "example_dag" {
-		t.Errorf("Expected dag_id 'example_dag', got '%s'", dagID)
-	}
-
-	// Check run ID
-	runID, ok := dagRun["dag_run_id"].(string)
-	if !ok {
-		t.Fatalf("Expected dag_run_id string, got: %T", dagRun["dag_run_id"])
-	}
-
-	if runID != "manual__2024-01-15T10:00:00" {
-		t.Errorf("Expected dag_run_id 'manual__2024-01-15T10:00:00', got '%s'", runID)
-	}
-
-	// Check state
-	state, ok := dagRun["state"].(string)
-	if !ok {
-		t.Fatalf("Expected state string, got: %T", dagRun["state"])
-	}
-
-	if state != "success" {
-		t.Errorf("Expected state 'success', got '%s'", state)
+	dagRun := result.(map[string]interface{})["dag_run"].(map[string]interface{})
+	if dagRun["dag_id"] != "example_dag" || dagRun["state"] != "success" {
+		t.Fatalf("unexpected status response: %#v", dagRun)
 	}
 }
 
-func TestAirflowToolkit_ListDAGs_MissingParameters(t *testing.T) {
-	toolkit := New()
-
-	// Test missing base_url
-	_, err := toolkit.listDAGs(context.Background(), map[string]interface{}{
-		"username": "admin",
-		"password": "admin",
-	})
-
-	if err == nil {
-		t.Error("Expected error for missing base_url")
+func TestAirflowToolkit_UsesExplicitAPIVersion(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !strings.HasPrefix(r.URL.Path, "/api/v2/") {
+			t.Errorf("expected API v2 path, got %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"dags":[],"total_entries":0}`))
+	}))
+	defer server.Close()
+	args := airflowArgs(server.URL + "/api/v2")
+	if _, err := New().Execute(context.Background(), "list_dags", args); err != nil {
+		t.Fatalf("list_dags with explicit v2 base failed: %v", err)
 	}
+}
 
-	// Test missing username
-	_, err = toolkit.listDAGs(context.Background(), map[string]interface{}{
-		"base_url": "http://localhost:8080",
-		"password": "admin",
-	})
-
-	if err == nil {
-		t.Error("Expected error for missing username")
+func TestAirflowToolkit_ValidationAndAPIError(t *testing.T) {
+	if _, err := New().Execute(context.Background(), "list_dags", map[string]interface{}{
+		"username": "admin", "password": "admin",
+	}); err == nil {
+		t.Error("expected missing base_url error")
 	}
-
-	// Test missing password
-	_, err = toolkit.listDAGs(context.Background(), map[string]interface{}{
-		"base_url": "http://localhost:8080",
-		"username": "admin",
-	})
-
-	if err == nil {
-		t.Error("Expected error for missing password")
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, `{"detail":"failed"}`, http.StatusInternalServerError)
+	}))
+	defer server.Close()
+	if _, err := New().Execute(context.Background(), "list_dags", airflowArgs(server.URL)); err == nil {
+		t.Error("expected Airflow API error")
 	}
 }
 
 func TestAirflowToolkit_New(t *testing.T) {
-	toolkit := New()
-
-	if toolkit == nil {
-		t.Fatal("Expected toolkit to be created")
-	}
-
-	// Check that functions are registered
-	functions := toolkit.Functions()
-	if len(functions) != 3 {
-		t.Errorf("Expected 3 functions, got %d", len(functions))
-	}
-
-	expectedFunctions := []string{"list_dags", "trigger_dag_run", "get_dag_run_status"}
-	for _, expected := range expectedFunctions {
-		found := false
-		for _, function := range functions {
-			if function.Name == expected {
-				found = true
-				break
-			}
-		}
-		if !found {
-			t.Errorf("Expected function '%s' not found", expected)
-		}
+	tk := New()
+	if tk == nil || len(tk.Functions()) != 3 {
+		t.Fatalf("expected three registered functions")
 	}
 }

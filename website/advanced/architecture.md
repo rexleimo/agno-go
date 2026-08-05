@@ -185,7 +185,7 @@ Extensible toolkit system:
 
 **Directory**: `pkg/agentos/`
 
-Production-ready HTTP server with:
+HTTP server capabilities include:
 
 - RESTful API endpoints
 - Session management

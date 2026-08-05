@@ -180,26 +180,34 @@ func TestHTTPToolkit_Post(t *testing.T) {
 func TestHTTPToolkit_Get_ErrorHandling(t *testing.T) {
 	toolkit := New()
 
-	// Test with invalid URL
-	_, err := toolkit.httpGet(context.Background(), map[string]interface{}{
-		"url": "http://invalid-domain-that-does-not-exist-12345.com",
-	})
+	// A closed server gives a deterministic connection-refused error.
+	// 已关闭的服务器产生确定性的连接拒绝错误。
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	url := srv.URL
+	srv.Close()
 
+	_, err := toolkit.httpGet(context.Background(), map[string]interface{}{
+		"url": url,
+	})
 	if err == nil {
-		t.Error("httpGet() should return error for invalid domain")
+		t.Error("httpGet() should return error for unreachable server")
 	}
 }
 
 func TestHTTPToolkit_Post_ErrorHandling(t *testing.T) {
 	toolkit := New()
 
-	// Test with invalid URL
-	_, err := toolkit.httpPost(context.Background(), map[string]interface{}{
-		"url": "http://invalid-domain-that-does-not-exist-12345.com",
-	})
+	// A closed server gives a deterministic connection-refused error.
+	// 已关闭的服务器产生确定性的连接拒绝错误。
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	url := srv.URL
+	srv.Close()
 
+	_, err := toolkit.httpPost(context.Background(), map[string]interface{}{
+		"url": url,
+	})
 	if err == nil {
-		t.Error("httpPost() should return error for invalid domain")
+		t.Error("httpPost() should return error for unreachable server")
 	}
 }
 

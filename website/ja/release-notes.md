@@ -142,7 +142,7 @@ outline: deep
 - 最小限のナレッジ取り込みエンドポイント
   - `POST /api/v1/knowledge/content` は `text/plain` と `application/json` をサポート
 
-企業向けの検収手順は [`docs/ENTERPRISE_MIGRATION_PLAN.md`](https://github.com/rexleimo/HNO/blob/main/docs/ENTERPRISE_MIGRATION_PLAN.md) を参照してください。
+企業向けの検収手順は [`docs/ENTERPRISE_MIGRATION_PLAN.md`](https://github.com/rexleimo/agno-go/blob/main/docs/ENTERPRISE_MIGRATION_PLAN.md) を参照してください。
 
 ## バージョン 1.1.0 (2025-10-08)
 
@@ -167,7 +167,7 @@ JSON-RPC 2.0に基づくエージェント間相互作用の標準化された�
 - RESTful APIエンドポイント（`/a2a/message/send`, `/a2a/message/stream`）
 - マルチメディアサポート（テキスト、画像、ファイル、JSONデータ）
 - ストリーミング用Server-Sent Events (SSE)
-- Python Agno A2A実装と互換性あり
+- Python HNO A2A実装と互換性あり
 
 **クイック例:**
 ```go
@@ -197,7 +197,7 @@ a2a.RegisterRoutes(router)
 - `sync.RWMutex`によるスレッドセーフ
 - 並列ブランチ分離のためのディープコピー
 - データ損失を防ぐスマートマージ戦略
-- Python Agno v2.1.2の競合状態を修正
+- Python HNO v2.1.2の競合状態を修正
 
 **クイック例:**
 ```go
@@ -282,7 +282,7 @@ claude, _ := anthropic.New("claude-3-opus", anthropic.Config{
 ### 🐛 バグ修正
 
 - **ワークフロー競合状態** - 並列ステップ実行のデータ競合を修正
-  - Python Agno v2.1.2には共有`session_state` dictによる上書きの問題がありました
+  - Python HNO v2.1.2には共有`session_state` dictによる上書きの問題がありました
   - Go実装はブランチごとに独立したSessionStateクローンを使用
   - スマートマージ戦略により並行実行でのデータ損失を防止
 
@@ -318,10 +318,9 @@ claude, _ := anthropic.New("claude-3-opus", anthropic.Config{
 
 ### 📊 パフォーマンス
 
-**パフォーマンス低下なし** - すべてのベンチマークが一貫しています：
-- Agent実例化: ~180ns/op（Pythonより16倍高速）
-- メモリフットプリント: ~1.2KB/エージェント
-- スレッドセーフな並行操作
+**パフォーマンスの説明** - 再現可能な benchmark、環境、制限は
+[Performance](/ja/advanced/performance)を参照してください。過去版の未再現の
+数値は性能保証として扱わず、スレッド安全性と並行性は実際の負荷で検証します。
 
 ---
 

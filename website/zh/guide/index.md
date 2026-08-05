@@ -1,18 +1,19 @@
 # 什么是 HNO?
 
-**HNO** 是一个使用 Go 语言构建的高性能多智能体系统框架。它继承了 Python Agno 框架的设计理念,利用 Go 的并发模型和性能优势来构建高效、可扩展的 AI Agent 系统。
+**HNO** 是一个使用 Go 语言构建的多智能体系统框架。它使用 Go 的并发模型、静态类型、部署方式和标准工具；只有在存在可复现 benchmark 时，文档才发布特定工作负载的性能结论。
 
 ## 核心特性
 
-### 🚀 极致性能
+### 🚀 可复现的性能测量
 
-- **Agent 实例化**: 平均约 180ns (比 Python 版本快 16 倍)
-- **内存占用**: 每个 Agent 约 1.2KB (比 Python 少 5.4 倍)
-- **原生并发**: 完整支持 Goroutine,无 GIL 限制
+- Agent 创建 benchmark 和完整环境记录在[性能页面](/zh/advanced/performance)。
+- benchmark 使用本地 `MockModel`，测量的是框架分配，不是 LLM 延迟或服务吞吐量。
+- 没有同工作负载的公平测试，就不发布 Go 与 Python 的倍数加速或内存比例。
+- **原生并发**: 应用层可以使用 Go Goroutine。
 
-### 🤖 生产就绪
+### 🤖 AgentOS HTTP 服务器
 
-HNO 包含 **AgentOS**,一个生产级 HTTP 服务器:
+HNO 包含 **AgentOS**,一个可部署的 HTTP 服务器:
 
 - 符合 OpenAPI 3.0 规范的 RESTful API
 - 多轮对话的会话管理
@@ -32,7 +33,7 @@ HNO 包含 **AgentOS**,一个生产级 HTTP 服务器:
 
 ### 🔌 多模型支持
 
-内置支持 6 个主流 LLM 提供商:
+内置支持多个 LLM 提供商:
 
 - **OpenAI** - GPT-4、GPT-3.5 Turbo 等
 - **Anthropic** - Claude 3.5 Sonnet、Claude 3 Opus/Sonnet/Haiku
@@ -45,10 +46,10 @@ HNO 包含 **AgentOS**,一个生产级 HTTP 服务器:
 
 遵循 KISS 原则,提供高质量的基础工具:
 
-- **Calculator** - 基础数学运算 (75.6% 测试覆盖率)
-- **HTTP** - 发起 HTTP GET/POST 请求 (88.9% 覆盖率)
-- **File Operations** - 带安全控制的读、写、列表、删除 (76.2% 覆盖率)
-- **Search** - DuckDuckGo 网页搜索 (92.1% 覆盖率)
+- **Calculator** - 基础数学运算
+- **HTTP** - 发起 HTTP GET/POST 请求
+- **File Operations** - 带安全控制的读、写、列表、删除
+- **Search** - DuckDuckGo 网页搜索
 
 轻松创建自定义工具 - 查看 [Tools Guide](/guide/tools)。
 
@@ -68,14 +69,14 @@ HNO 包含 **AgentOS**,一个生产级 HTTP 服务器:
 
 **Keep It Simple, Stupid** - 专注于质量而非数量:
 
-- **3 个核心 LLM 提供商** (而非 45+)
-- **基础工具** (而非 115+)
-- **1 个向量数据库** (而非 15+)
+- 可检查的小型核心
+- 基础工具
+- 可插拔的存储集成
 
-这种聚焦的方法确保:
+这种聚焦的方法旨在实现:
 - 更好的代码质量
 - 更易于维护
-- 生产就绪的特性
+- 可部署的服务器能力；是否适合生产取决于具体工作负载
 
 ### Go 语言优势
 
@@ -93,16 +94,16 @@ HNO 非常适合:
 
 - **生产 AI 应用** - 使用 AgentOS HTTP 服务器部署
 - **多智能体系统** - 协调多个 AI Agent
-- **高性能工作流** - 处理数千个请求
+- **应用工作流** - 编排多步骤 Agent 任务
 - **本地 AI 开发** - 使用 Ollama 实现隐私优先的应用
 - **RAG 应用** - 构建基于知识库的 AI 助手
 
 ## 质量指标
 
-- **测试覆盖率**: 核心包平均 80.8%
-- **测试用例**: 85+ 个测试,100% 通过率
-- **文档**: 完整的指南、API 参考、示例
-- **生产就绪**: Docker、K8s 清单、部署指南
+- **测试状态**: 执行 `go test ./...` 查看当前结果
+- **Benchmark 状态**: 查看[性能页面](/zh/advanced/performance)中的可复现快照
+- **文档**: 使用 VitePress 构建指南、API 参考和示例
+- **部署**: 提供 Docker 和部署材料；是否适合生产取决于具体工作负载
 
 ## 下一步
 
@@ -127,4 +128,4 @@ HNO 非常适合:
 
 HNO 使用 [MIT License](https://github.com/rexleimo/HNO/blob/main/LICENSE) 发布。
 
-灵感来源于 [Agno (Python)](https://github.com/agno-agi/agno) 框架。
+灵感来源于 [Agno Python](https://github.com/agno-agi/agno) 项目。HNO 是这个 Go 项目当前使用的名称；仓库没有定义 HNO 的正式全称。

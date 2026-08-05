@@ -310,7 +310,7 @@ BenchmarkWorkflowHistory_NoHistory-8
 ### 性能目标
 
 - ✅ 历史加载: <5ms per operation (实际 ~0.177ms)
-- ✅ 内存开销: <2MB (实际 ~1.2MB)
+- ✅ 内存开销: <2MB (实际 ~0.57MB)
 - ✅ 性能影响: <5% degradation (实际 ~1.7%)
 
 ### 性能优化建议

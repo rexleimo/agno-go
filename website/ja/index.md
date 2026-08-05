@@ -3,162 +3,76 @@ layout: home
 
 hero:
   name: "HNO"
-  text: "高性能マルチエージェントフレームワーク"
-  tagline: "Python より 16 倍高速 | 180ns インスタンス化 | エージェントあたり 1.2KB メモリ"
-  image:
-    src: /logo.png
-    alt: HNO
+  text: "Go ネイティブ・マルチエージェントフレームワーク"
+  tagline: "未検証の推定ではなく、明示的で再現可能な証拠で説明する Go 実装。"
   actions:
     - theme: brand
       text: はじめる
       link: /ja/guide/quick-start
     - theme: alt
       text: GitHub で見る
-      link: https://github.com/rexleimo/HNO
+      link: https://github.com/rexleimo/agno-go
 
 features:
-  - icon: 🚀
-    title: 極限のパフォーマンス
-    details: エージェント初期化は約 180ns、エージェントあたり約 1.2KB のメモリで、Python ランタイムより 16 倍高速です。
+  - title: 推測ではなく計測
+    details: Agent 作成用の Go benchmark を同梱し、Performance ページにコマンド、環境、範囲、制限を記録しています。
 
-  - icon: 🤖
-    title: 本番対応 AgentOS
-    details: OpenAPI 3.0、セッションストレージ、ヘルスチェック、構造化ログ、CORS、タイムアウトに加え、要約・再利用・履歴フィルターのパリティエンドポイントを備えています。
+  - title: Provider アダプター
+    details: Provider 実装は Model インターフェースの背後にあります。現在のソースにはトップレベルの Provider パッケージが 17 個ありますが、互換性や遅延の保証ではありません。
 
-  - icon: 🪄
-    title: セッションパリティ
-    details: エージェントやチーム間でセッションを共有し、同期 / 非同期サマリー、キャッシュヒットやキャンセル理由を記録しつつ、Python の `stream_events` スイッチとも互換です。
+  - title: 共有オーケストレーション
+    details: Agent、Team、Workflow は Go ソースの実行コンポーネントと Tool dispatch 抽象を共有します。
 
-  - icon: 🧩
-    title: 柔軟なアーキテクチャ
-    details: エージェント、チーム（4 つの協調モード）、ワークフロー（5 つの制御プリミティブ）を組み合わせ、継承デフォルトやチェックポイント復帰で決定論的にオーケストレーションします。
+  - title: 可観測性の統合
+    details: OpenTelemetry と構造化ランタイム計測を利用できます。計測の有効化によるコストは構成に依存するため、対象サービスで測定します。
 
-  - icon: 🔌
-    title: マルチプロバイダーモデル
-    details: OpenAI o-series、Anthropic Claude、Google Gemini、DeepSeek、GLM、ModelScope、Ollama、Cohere、Groq、Together、OpenRouter、LM Studio、Vercel、Portkey、InternLM、SambaNova をサポート。
+  - title: Skills・MCP・メモリ
+    details: Agent Skills、MCP ブリッジ、プラグ可能なメモリとセッションストレージをオプション機能として提供します。
 
-  - icon: 🔧
-    title: 拡張可能なツール
-    details: 計算機、HTTP、ファイル、検索に加え、Claude Agent Skills、Tavily Reader/Search、Gmail 既読化、Jira Worklog、ElevenLabs 音声、PPTX リーダー、MCP コネクタを搭載。
+  - title: 正確なプロトコル説明
+    details: 自動テストはアダプターと request/response マッピングを対象にします。実 Provider の検証には認証情報が必要で、テスト応答を本番の証拠とは表現しません。
 
-  - icon: 💾
-    title: ナレッジとキャッシュ
-    details: ChromaDB 連携、バッチ投入ユーティリティ、インジェスト支援に加え、同一モデル呼び出しを重複排除するレスポンスキャッシュを提供します。
-
-  - icon: 🛡️
-    title: ガードレールと可観測性
-    details: プロンプトインジェクション防御、カスタム前後処理フック、メディア検証、SSE 推論ストリーム、Logfire / OpenTelemetry 連携サンプルを提供します。
-
-  - icon: 📦
-    title: シンプルなデプロイ
-    details: 単一バイナリ、Docker / Compose / Kubernetes マニフェスト、実践的なデプロイガイドですぐに導入できます。
 ---
 
-## クイック例
+## クロスフレームワーク benchmark スナップショット
 
-わずか数行のコードで、ツール付き AI エージェントを作成:
+これは制御されたローカル benchmark であり、本番や LLM の benchmark ではありません。
 
-```go
-package main
+| 操作 | HNO 平均 | Agno 平均 | HNO 中央値 | Agno 中央値 |
+| --- | ---: | ---: | ---: | ---: |
+| Agent 作成 | 255.8 ns/op | 7,105.5 ns/op | 252.4 | 6,869.1 |
+| Agent 作成（Tool 1個） | 298.4 ns/op | 6,603.7 ns/op | 296.8 | 6,394.4 |
+| 新規 Agent + local dummy run | 6,431.0 ns/op | 187,208.6 ns/op | 6,528.0 | 180,537.0 |
 
-import (
-    "context"
-    "fmt"
-    "github.com/rexleimo/agno-go/pkg/hno/agent"
-    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
-    "github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
-)
+環境は Windows amd64、12th Gen Intel Core i5-12400F、Go 1.26.4、Python 3.11.15、
+`agno==2.8.6`、`langgraph==1.2.10`。Python 20 回、Go 10 回を実行し、すべて
+固定のローカル dummy 応答を使います。構成だけの Agno/HNO 平均比は 27.8 倍と
+22.1 倍、fresh run は 29.1 倍でした。これはこの workload 限定であり、本番や
+エンドツーエンドの速度比ではありません。
 
-func main() {
-    // モデルを作成
-    model, _ := openai.New("gpt-4o-mini", openai.Config{
-        APIKey: "your-api-key",
-    })
+LangGraph は Agent オブジェクトではなくグラフのコンパイルを行うため別に報告します。
+最小 `StateGraph` の平均は `356,598.2 ns/op`、中央値は `352,408.5 ns/op`、
+範囲は `332,839.0-394,720.0 ns/op` です。
 
-    // ツール付きエージェントを作成
-    ag, _ := agent.New(agent.Config{
-        Name:     "数学アシスタント",
-        Model:    model,
-        Toolkits: []toolkit.Toolkit{calculator.New()},
-    })
-
-    // エージェントを実行
-    output, _ := ag.Run(context.Background(), "25 * 4 + 15 はいくつ?")
-    fmt.Println(output.Content) // 出力: 115
-}
-```
-
-## パフォーマンス比較
-
-| 指標 | Python Agno | HNO | 改善 |
-|--------|-------------|---------|-------------|
-| エージェント作成 | ~3μs | ~180ns | **16 倍高速** |
-| メモリ/エージェント | ~6.5KB | ~1.2KB | **5.4 倍削減** |
-| 並行性 | GIL 制限 | ネイティブ goroutine | **無制限** |
-
-## なぜ HNO?
-
-### 本番環境向けに構築
-
-HNO は単なるフレームワークではなく、完全な本番システムです。付属の **AgentOS** サーバーは以下を提供:
-
-- OpenAPI 3.0 仕様の RESTful API
-- マルチターン会話のセッション管理
-- スレッドセーフなエージェントレジストリ
-- ヘルスモニタリングと構造化ロギング
-- CORS サポートとリクエストタイムアウト処理
-
-### KISS 原則
-
-**Keep It Simple, Stupid** の哲学に従う:
-
-- **3 つのコア LLM プロバイダー**(45+ ではない) - OpenAI、Anthropic、Ollama
-- **必須ツール**(115+ ではない) - 計算機、HTTP、ファイル、検索
-- **量より質** - 本番環境対応機能に焦点
-
-### 開発者体験
-
-- **型安全**: Go の強い型付けでコンパイル時にエラーを検出
-- **高速ビルド**: Go のコンパイル速度で迅速な反復開発
-- **簡単なデプロイ**: ランタイム依存なしの単一バイナリ
-- **優れたツール**: 組み込みのテスト、プロファイリング、競合検出
-
-## 5 分でスタート
+元のサンプル、hash、バージョン、コマンドは
+[`benchmarks/framework_comparison/`](https://github.com/rexleimo/agno-go/tree/main/benchmarks/framework_comparison) にあります。
 
 ```bash
-# リポジトリをクローン
-git clone https://github.com/rexleimo/HNO.git
-cd HNO
-
-# API キーを設定
-export OPENAI_API_KEY=sk-your-key-here
-
-# サンプルを実行
-go run cmd/examples/simple_agent/main.go
-
-# または AgentOS サーバーを起動
-docker-compose up -d
-curl http://localhost:8080/health
+uv run --with 'agno==2.8.6' --with 'langgraph==1.2.10' \
+  python benchmarks/framework_comparison/compare.py --repeat 20 --number 1000
 ```
 
-## 含まれるもの
+## なぜ Go、なぜ HNO
 
-- **コアフレームワーク**: Agent、Team(4 モード)、Workflow(5 プリミティブ)
-- **モデル**: OpenAI、Anthropic Claude、Ollama、DeepSeek、Gemini、ModelScope
-- **ツール**: Calculator(75.6%)、HTTP(88.9%)、File(76.2%)、Search(92.1%)
-- **RAG**: ChromaDB 統合 + OpenAI 埋め込み
-- **AgentOS**: 本番環境向け HTTP サーバー(65.0% カバレッジ)
-- **サンプル**: すべての機能をカバーする 6 つの実用例
-- **ドキュメント**: 完全ガイド、API リファレンス、デプロイ手順
+**なぜ Go か:** コンパイル済み配布物、組み込みの並行処理、静的型、HTTP/JSON
+標準ライブラリ、標準のテストとプロファイルツールが実装上の理由です。特定の
+負荷での有利さは、その負荷で計測する必要があります。
 
-## コミュニティ
+**なぜ HNO か:** HNO は現在のプロジェクト名です。正式な略語の展開はリポジトリに
+定義されていないため、ここで創作しません。Go module path は
+`github.com/rexleimo/agno-go` のままで、HNO は標準モデルやプロトコルではなく
+プロジェクトのブランド名です。
 
-- **GitHub**: [rexleimo/HNO](https://github.com/rexleimo/HNO)
-- **Issues**: [バグ報告と機能リクエスト](https://github.com/rexleimo/HNO/issues)
-- **Discussions**: [質問とアイデア共有](https://github.com/rexleimo/HNO/discussions)
-
-## ライセンス
-
-HNO は [MIT ライセンス](https://github.com/rexleimo/HNO/blob/main/LICENSE) でリリースされています。
-
-[Agno (Python)](https://github.com/agno-agi/agno) フレームワークからインスピレーションを得ています。
+**証拠の方針:** 平均、中央値、範囲、環境、バージョン、コマンドを記録します。
+Go の割り当てバイトを Python のメモリ値として扱いません。実 LLM や本番容量の
+比較には同じ Provider と workload が必要です。

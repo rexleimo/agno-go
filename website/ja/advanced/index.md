@@ -7,7 +7,7 @@ HNO の高度な概念、パフォーマンス最適化、デプロイ戦略、�
 このセクションでは、開発者向けの高度なトピックをカバーしています:
 
 - 🏗️ **アーキテクチャを理解する** - コア設計原則とパターンを学ぶ
-- ⚡ **パフォーマンスを最適化する** - サブマイクロ秒のエージェントインスタンス化を実現
+- ⚡ **パフォーマンス計測** - 対象環境でリポジトリの Go benchmark を再現
 - 🚀 **本番環境へデプロイする** - 本番デプロイのベストプラクティス
 - 🧪 **効果的にテストする** - 包括的なテスト戦略とツール
 
@@ -27,15 +27,14 @@ HNO のモジュラーアーキテクチャと設計哲学について学ぶ:
 
 ### [パフォーマンス](/ja/advanced/performance)
 
-パフォーマンス特性と最適化テクニックを理解する:
+計測済みの性能特性と benchmark の方法を理解する:
 
-- エージェントのインスタンス化 (~180ns 平均)
-- メモリフットプリント (~1.2KB エージェントあたり)
-- 並行性と並列性
-- ベンチマークツールと方法論
-- 他のフレームワークとのパフォーマンス比較
+- 環境情報付きの再現可能な Agent 作成 benchmark
+- 並行性と並列処理
+- ベンチマークツールと方法
+- 未計測の項目を明示
 
-**重要な指標**: スループット、レイテンシ、メモリ効率、スケーラビリティ
+**主な指標**: `ns/op`、`B/op`、割り当て回数、負荷ごとのスループット
 
 ### [デプロイ](/ja/advanced/deployment)
 
@@ -68,11 +67,8 @@ HNO のモジュラーアーキテクチャと設計哲学について学ぶ:
 ### パフォーマンスベンチマーク
 
 ```bash
-# すべてのベンチマークを実行
-make benchmark
-
-# 特定のベンチマークを実行
-go test -bench=BenchmarkAgentCreation -benchmem ./pkg/hno/agent/
+# 再現可能な Agent 作成スナップショットを実行
+go test -run='^$' -bench='BenchmarkAgentCreation' -benchmem -count=10 ./pkg/hno/agent/
 
 # CPU プロファイルを生成
 go test -bench=. -cpuprofile=cpu.out ./pkg/hno/agent/
@@ -158,21 +154,21 @@ HNO への貢献に興味がありますか? チェックアウト:
 
 - [アーキテクチャドキュメント](/ja/advanced/architecture) - コードベースを理解する
 - [テストガイド](/ja/advanced/testing) - テスト標準を学ぶ
-- [GitHub リポジトリ](https://github.com/rexleimo/HNO) - PR を送信
-- [開発ガイド](https://github.com/rexleimo/HNO/blob/main/CLAUDE.md) - 開発環境のセットアップ
+- [GitHub リポジトリ](https://github.com/rexleimo/agno-go) - PR を送信
+- [開発ガイド](https://github.com/rexleimo/agno-go/blob/main/CLAUDE.md) - 開発環境のセットアップ
 
 ## その他のリソース
 
 ### ドキュメント
 
-- [Go パッケージドキュメント](https://pkg.go.dev/github.com/rexleimo/HNO)
-- [Python Agno フレームワーク](https://github.com/agno-agi/agno) (インスピレーション)
-- [VitePress ドキュメントソース](https://github.com/rexleimo/HNO/tree/main/website)
+- [Go パッケージドキュメント](https://pkg.go.dev/github.com/rexleimo/agno-go)
+- [Python HNO フレームワーク](https://github.com/agno-agi/agno) (インスピレーション)
+- [VitePress ドキュメントソース](https://github.com/rexleimo/agno-go/tree/main/website)
 
 ### コミュニティ
 
-- [GitHub Issues](https://github.com/rexleimo/HNO/issues)
-- [GitHub Discussions](https://github.com/rexleimo/HNO/discussions)
+- [GitHub Issues](https://github.com/rexleimo/agno-go/issues)
+- [GitHub Discussions](https://github.com/rexleimo/agno-go/discussions)
 - [リリースノート](/ja/release-notes)
 
 ## 次のステップ

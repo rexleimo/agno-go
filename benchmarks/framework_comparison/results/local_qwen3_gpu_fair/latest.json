@@ -1,0 +1,1101 @@
+{
+  "report_type": "real_local_model_framework_comparison",
+  "captured_at_utc": "2026-08-04T09:44:38.331681+00:00",
+  "status": "controlled_snapshot_not_universal_claim",
+  "model_service": {
+    "provider": "llama.cpp",
+    "build": "b10107",
+    "endpoint": "http://127.0.0.1:8081/v1",
+    "model_file": "Qwen3-4B-Q8_0.gguf",
+    "model_id_returned_by_server": "D:\\Program Files\\llmam.cpp\\llama-b10107-bin-cuda-13.3-x64\\models\\Qwen3-4B-Q8_0.gguf",
+    "fingerprint": "b10107-c0bc8591e",
+    "context": 8192,
+    "parallel_slots": 1,
+    "gpu_layers": 99,
+    "prompt_cache": false,
+    "reasoning": "off",
+    "api_key_value": "[REDACTED_LOCAL_ONLY]"
+  },
+  "protocol": {
+    "temperature": 0,
+    "seed": 42,
+    "warmup": 3,
+    "runs": 20,
+    "measurement": "client wall-clock duration; fresh framework object per sample"
+  },
+  "environment": {
+    "os": "Windows amd64",
+    "cpu": "12th Gen Intel(R) Core(TM) i5-12400F",
+    "go": "go version go1.26.4 windows/amd64",
+    "python": "3.11.15",
+    "agno": "2.8.6",
+    "langgraph": "1.2.10",
+    "langchain-openai": "1.4.1",
+    "openai": "2.53.0"
+  },
+  "git": {
+    "revision": "60778ef0690cbf4883c8f1fa557556cc982a2cc2",
+    "worktree_dirty": true,
+    "status": "M README.md\n M cmd/examples/rag_demo/main.go\n M internal/session/contract/contract_test.go\n M internal/session/store/postgres/store_test.go\n M pkg/hno/agent/agent_bench_test.go\n M pkg/hno/models/openai/openai.go\n M pkg/hno/models/openai/request.go\n M pkg/hno/session/session.go\n M pkg/hno/session/session_test.go\n M pkg/hno/tools/airflow/airflow.go\n M pkg/hno/tools/airflow/airflow_test.go\n M pkg/hno/tools/bitbucket/bitbucket.go\n M pkg/hno/tools/bitbucket/bitbucket_test.go\n M pkg/hno/tools/confluence/confluence.go\n M pkg/hno/tools/confluence/confluence_test.go\n M pkg/hno/tools/hackernews/hackernews.go\n M pkg/hno/tools/hackernews/hackernews_test.go\n M pkg/hno/tools/http/http_test.go\n M pkg/hno/tools/websearch/websearch.go\n M pkg/hno/tools/websearch/websearch_test.go\n M pkg/hno/tools/youtube/youtube.go\n M pkg/hno/tools/youtube/youtube_test.go\n M pkg/hno/vectordb/chromadb/chromadb.go\n M website/.vitepress/config.mjs\n M website/.vitepress/theme/custom.css\n M website/TRANSLATION_SUMMARY.md\n M website/advanced/architecture.md\n M website/advanced/index.md\n M website/advanced/performance.md\n M website/advanced/testing.md\n M website/examples/mcp-demo.md\n M website/guide/agent.md\n M website/guide/index.md\n M website/guide/mcp.md\n M website/guide/team.md\n M website/guide/tools.md\n M website/guide/workflow-history.md\n M website/guide/workflow.md\n M website/index.md\n M website/ja/advanced/architecture.md\n M website/ja/advanced/deployment.md\n M website/ja/advanced/index.md\n M website/ja/advanced/observability.md\n M website/ja/advanced/performance.md\n M website/ja/advanced/testing.md\n M website/ja/api/index.md\n M website/ja/examples/index.md\n M website/ja/examples/logfire-observability.md\n M website/ja/examples/mcp-demo.md\n M website/ja/guide/agent.md\n M website/ja/guide/index.md\n M website/ja/guide/installation.md\n M website/ja/guide/mcp.md\n M website/ja/guide/quick-start.md\n M website/ja/guide/workflow-history.md\n M website/ja/index.md\n M website/ja/release-notes.md\n M website/ko/advanced/architecture.md\n M website/ko/advanced/deployment.md\n M website/ko/advanced/index.md\n M website/ko/advanced/observability.md\n M website/ko/advanced/performance.md\n M website/ko/advanced/testing.md\n M website/ko/api/index.md\n M website/ko/examples/index.md\n M website/ko/examples/logfire-observability.md\n M website/ko/examples/mcp-demo.md\n M website/ko/guide/agent.md\n M website/ko/guide/index.md\n M website/ko/guide/installation.md\n M website/ko/guide/mcp.md\n M website/ko/guide/quick-start.md\n M website/ko/guide/workflow-history.md\n M website/ko/index.md\n M website/ko/release-notes.md\n M website/release-notes.md\n M website/zh/advanced/architecture.md\n M website/zh/advanced/index.md\n M website/zh/advanced/performance.md\n M website/zh/advanced/testing.md\n M website/zh/examples/mcp-demo.md\n M website/zh/guide/agent.md\n M website/zh/guide/index.md\n M website/zh/guide/mcp.md\n M website/zh/guide/workflow-history.md\n M website/zh/index.md\n M website/zh/release-notes.md\n?? .aios/\n?? .contextdb-enable\n?? benchmarks/\n?? cmd/efprobe/\n?? pkg/hno/vectordb/chromadb/metadata_test.go",
+    "source_sha256": {
+      "benchmarks/framework_comparison/hno_local_runner/main.go": "c545eafa1c336108da5ee2c652097e6609922296a8b76c6e0a7e49958fe4e37a",
+      "benchmarks/framework_comparison/real_local.py": "f88ad047baa6f04f1ecc5dd0553304dada64358ea7c779141cdf8d4df426fbda",
+      "pkg/hno/models/openai/openai.go": "65155153e0f98019ba496cff26e1e8c176e3399b07d0b47de10b20831080db4e",
+      "pkg/hno/models/openai/request.go": "d2c791aced4561964f1177ca43e72ac5ec0e012f102aabe8e8a04e2bd1890596"
+    }
+  },
+  "scenarios": {
+    "simple": {
+      "prompt": "/no_think\\nReply with exactly: LOCAL_MODEL_OK",
+      "frameworks": {
+        "hno": {
+          "samples": [
+            {
+              "duration_ns": 116733400,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 95962500,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 111313100,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 381002400,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 104433700,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 102930600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 112251500,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 101154600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 115382600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 94766300,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 104652100,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 150613200,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 95439600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 104114200,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 112633900,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 97340300,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 108749500,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 95906300,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 103814200,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 97255000,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            }
+          ],
+          "count": 20,
+          "mean_ns": 120322450.0,
+          "median_ns": 104273950.0,
+          "p95_ns": 162132660.0,
+          "stddev_ns": 62607148.04967729,
+          "min_ns": 94766300,
+          "max_ns": 381002400,
+          "success_count": 20,
+          "success_rate": 1.0
+        },
+        "agno": {
+          "samples": [
+            {
+              "duration_ns": 131797400,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 197505700,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 134323900,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 148456500,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 126413000,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 128850000,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 151059400,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 133230200,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 137490600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 150605100,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 177823700,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 144002600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 126010100,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 132875800,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 129373600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 130796100,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 206756900,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 133831900,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 138421300,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 251338800,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            }
+          ],
+          "count": 20,
+          "mean_ns": 150548130.0,
+          "median_ns": 135907250.0,
+          "p95_ns": 208985995.0,
+          "stddev_ns": 32953395.46370713,
+          "min_ns": 126010100,
+          "max_ns": 251338800,
+          "success_count": 20,
+          "success_rate": 1.0
+        },
+        "langgraph": {
+          "samples": [
+            {
+              "duration_ns": 131503600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 154802300,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 100404600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 100619400,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 107447500,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 106027300,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 107005000,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 105614600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 103884300,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 115162200,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 105860600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 107462000,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 102957700,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 105341400,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 100112400,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 104635500,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 110723200,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 100913700,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 98953800,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 104343300,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            }
+          ],
+          "count": 20,
+          "mean_ns": 108688720.0,
+          "median_ns": 105478000.0,
+          "p95_ns": 132668535.0,
+          "stddev_ns": 12954158.801656181,
+          "min_ns": 98953800,
+          "max_ns": 154802300,
+          "success_count": 20,
+          "success_rate": 1.0
+        }
+      },
+      "raw_files": [
+        "hno_simple.json",
+        "python_simple.json"
+      ]
+    },
+    "tool": {
+      "prompt": "/no_think\\nUse the add tool to calculate 25 + 17. After the tool returns, reply with exactly: RESULT_42",
+      "frameworks": {
+        "hno": {
+          "samples": [
+            {
+              "duration_ns": 779690700,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 723988400,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 724224400,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 751180500,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 765480500,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 780402700,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 742804900,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 753814400,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 799286300,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 741498700,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 729058800,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 731051200,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 722411300,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 768804300,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 721485800,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 718925000,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 726249600,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 719375700,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 728856300,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 746605200,
+              "content": "RESULT_42",
+              "success": true
+            }
+          ],
+          "count": 20,
+          "mean_ns": 743759735.0,
+          "median_ns": 736274950.0,
+          "p95_ns": 781346880.0,
+          "stddev_ns": 23872857.036508065,
+          "min_ns": 718925000,
+          "max_ns": 799286300,
+          "success_count": 20,
+          "success_rate": 1.0
+        },
+        "agno": {
+          "samples": [
+            {
+              "duration_ns": 751477100,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 745657600,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 743848600,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 754685100,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 835055200,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 802380600,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 786511700,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 775012800,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 823430000,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 833016000,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 840941300,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 831433500,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 821228500,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 811263800,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 804760000,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 794916300,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 749479300,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 756201000,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 789860400,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 756920200,
+              "content": "RESULT_42",
+              "success": true
+            }
+          ],
+          "count": 20,
+          "mean_ns": 790403950.0,
+          "median_ns": 792388350.0,
+          "p95_ns": 835349505.0,
+          "stddev_ns": 34083340.3170816,
+          "min_ns": 743848600,
+          "max_ns": 840941300,
+          "success_count": 20,
+          "success_rate": 1.0
+        },
+        "langgraph": {
+          "samples": [
+            {
+              "duration_ns": 756990400,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 765445900,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 762782000,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 760518100,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 760099900,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 762692400,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 773394300,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 766230600,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 762435200,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 762086800,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 764533000,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 765354900,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 763222500,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 787806600,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 810040800,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 810510000,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 808167900,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 818964300,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 789244400,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 803073800,
+              "content": "RESULT_42",
+              "success": true
+            }
+          ],
+          "count": 20,
+          "mean_ns": 777679690.0,
+          "median_ns": 765400400.0,
+          "p95_ns": 810932715.0,
+          "stddev_ns": 21059745.88830299,
+          "min_ns": 756990400,
+          "max_ns": 818964300,
+          "success_count": 20,
+          "success_rate": 1.0
+        }
+      },
+      "raw_files": [
+        "hno_tool.json",
+        "python_tool.json"
+      ]
+    },
+    "memory": {
+      "prompt": "Two-turn BLUE-42 memory exchange",
+      "frameworks": {
+        "hno": {
+          "samples": [
+            {
+              "duration_ns": 172883200,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 175890500,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 173249800,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 172997200,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 172717500,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 169359200,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 172178500,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 173233200,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 170437300,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 175474500,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 175048500,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 174784100,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 170696200,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 179406200,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 176633700,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 174498100,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 181523700,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 187502400,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 178782900,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 178132700,
+              "content": "BLUE-42",
+              "success": true
+            }
+          ],
+          "count": 20,
+          "mean_ns": 175271470.0,
+          "median_ns": 174641100.0,
+          "p95_ns": 181822635.0,
+          "stddev_ns": 4254585.912574064,
+          "min_ns": 169359200,
+          "max_ns": 187502400,
+          "success_count": 20,
+          "success_rate": 1.0
+        },
+        "agno": {
+          "samples": [
+            {
+              "duration_ns": 208224000,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 232125700,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 226829700,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 221064700,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 232725800,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 223124100,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 206028400,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 228704200,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 229701500,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 239021900,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 220757900,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 205869100,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 210453400,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 209324300,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 228253500,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 236761000,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 234599700,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 234484100,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 247226200,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 234929400,
+              "content": "BLUE-42",
+              "success": true
+            }
+          ],
+          "count": 20,
+          "mean_ns": 225510430.0,
+          "median_ns": 228478850.0,
+          "p95_ns": 239432115.0,
+          "stddev_ns": 12066317.795508724,
+          "min_ns": 205869100,
+          "max_ns": 247226200,
+          "success_count": 20,
+          "success_rate": 1.0
+        },
+        "langgraph": {
+          "samples": [
+            {
+              "duration_ns": 184196000,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 183896200,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 185075400,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 185314500,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 181338800,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 203687600,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 194441700,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 194135700,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 189747700,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 194573500,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 191719700,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 193127700,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 188519000,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 197076500,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 192243000,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 190867100,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 194676800,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 188811200,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 189437000,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 197943600,
+              "content": "BLUE-42",
+              "success": true
+            }
+          ],
+          "count": 20,
+          "mean_ns": 191041435.0,
+          "median_ns": 191293400.0,
+          "p95_ns": 198230800.0,
+          "stddev_ns": 5492258.439052382,
+          "min_ns": 181338800,
+          "max_ns": 203687600,
+          "success_count": 20,
+          "success_rate": 1.0
+        }
+      },
+      "raw_files": [
+        "hno_memory.json",
+        "python_memory.json"
+      ]
+    }
+  },
+  "limits": [
+    "This is a real local-model snapshot, not a cloud-provider or production benchmark.",
+    "All frameworks use the same llama.cpp endpoint, GGUF model, prompt intent, temperature, seed, context, and single server slot.",
+    "The server uses GPU offload -ngl 99, prompt cache disabled, and reasoning disabled.",
+    "Client wall-clock includes framework request preparation and model response time.",
+    "Model-server GPU/CPU/RSS is shared and is not attributed to one framework.",
+    "Results are valid for this machine, model quantization, llama.cpp build, and protocol; they are not universal speed ratios."
+  ]
+}

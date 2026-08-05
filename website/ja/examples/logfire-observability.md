@@ -21,5 +21,5 @@ go run -tags logfire cmd/examples/logfire_observability/main.go
 
 ## 関連ドキュメント
 
-- 深掘りガイド（GitHub）: https://github.com/rexleimo/HNO/blob/main/docs/release/logfire_observability.md
+- 深掘りガイド（GitHub）: https://github.com/rexleimo/agno-go/blob/main/docs/release/logfire_observability.md
 - 概要: `/ja/advanced/observability`

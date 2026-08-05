@@ -1,18 +1,18 @@
 # Agno-Go
 
-[![Go Version](https://img.shields.io/badge/go-1.21+-blue.svg)](https://golang.org/dl/)
+[![Go Version](https://img.shields.io/badge/go-1.24+-blue.svg)](https://golang.org/dl/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Test Coverage](https://img.shields.io/badge/coverage-80.8%25-brightgreen.svg)](docs/DEVELOPMENT.md#testing-standards)
+
 [![Release](https://img.shields.io/badge/release-v1.2.9-blue.svg)](CHANGELOG.md)
 
-**Agno-Go** is a high-performance multi-agent framework written in Go. It keeps the KISS philosophy of the Agno project while embracing Go’s strengths: lightweight goroutines, a tiny memory footprint, single static binaries, and a batteries-included toolchain.
+**Agno-Go** is a multi-agent framework written in Go. It keeps the KISS philosophy of the Agno project while using Go’s concurrency, static typing, deployment, and standard tooling strengths.
 
 ---
 
 ## Feature Highlights
 
-- **🚀 Extreme performance** – agent instantiation in ~180 ns and (~1.2 KB) memory per agent, 16× faster than the Python version.
-- **🤖 Production ready** – AgentOS REST server (OpenAPI 3.0), session storage, health checks, structured logging, CORS, request timeouts, and parity endpoints for summaries, reuse, and history filters.
+- **🚀 Measured performance** – checked-in Go benchmarks report allocation ranges for agent construction; see the [performance report](website/advanced/performance.md) for the exact environment and limitations.
+- **🤖 AgentOS HTTP server** – REST server (OpenAPI 3.0), session storage, health checks, structured logging, CORS, request timeouts, and parity endpoints for summaries, reuse, and history filters.
 - **🪄 Session parity** – shared sessions across agents/teams, async + sync summaries, run metadata with cache hits and cancellation reasons, and `stream_events` flags matching the Python runtime.
 - **🧩 Flexible architecture** – build with Agents, Teams (4 coordination modes), or Workflows (5 primitives) and mix freely; teams inherit/default models and workflows resume from snapshots.
 - **🔌 Multi-provider models** – OpenAI (incl. o-series reasoning), Anthropic Claude, Google Gemini, DeepSeek, GLM, ModelScope, Ollama, Cohere, Groq, Together, OpenRouter, LM Studio, Vercel, Portkey, InternLM, SambaNova.
@@ -20,6 +20,12 @@
 - **💾 Knowledge & RAG** – ChromaDB integration, batching utilities, response caching helpers, and ingestion helpers.
 - **🛡️ Guardrails & hooks** – prompt-injection guard, custom pre/post hooks, media validation, graceful degradation.
 - **📊 Observability** – rich SSE event stream with reasoning snapshots, Logfire / OpenTelemetry sample included.
+
+External service toolkits use live provider APIs and never return built-in sample
+records. Set `YOUTUBE_API_KEY` for YouTube Data API and `TAVILY_API_KEY` for
+Tavily web search. Bitbucket, Confluence, and Airflow require their endpoint
+and credentials in the tool call; Hacker News uses its public Firebase and
+Algolia APIs. Missing credentials or provider failures are returned as errors.
 
 ---
 

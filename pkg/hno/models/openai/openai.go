@@ -26,8 +26,12 @@ type Config struct {
 	APIKey      string
 	BaseURL     string
 	Temperature float64
-	MaxTokens   int
-	Timeout     time.Duration // Request timeout / 请求超时时间
+	// TemperatureSet forces an explicit temperature value, including zero.
+	TemperatureSet bool
+	// Seed makes compatible local providers reproducible when supported.
+	Seed      *int
+	MaxTokens int
+	Timeout   time.Duration // Request timeout / 请求超时时间
 }
 
 // New creates a new OpenAI model instance

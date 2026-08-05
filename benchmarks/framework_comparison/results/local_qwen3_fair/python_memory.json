@@ -1,0 +1,239 @@
+{
+  "endpoint": "http://127.0.0.1:8081",
+  "model": "D:\\Program Files\\llmam.cpp\\llama-b10107-bin-win-cuda-13.3-x64\\models\\Qwen3-4B-Q8_0.gguf",
+  "scenario": "memory",
+  "warmup": 3,
+  "runs": 20,
+  "frameworks": {
+    "agno": {
+      "warmup": 3,
+      "runs": 20,
+      "samples": [
+        {
+          "duration_ns": 773612500,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 794505700,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 779760600,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 770811400,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 783231200,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 779214000,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 804593000,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 776873500,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 795398400,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 804732500,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 788290600,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 789771600,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 806932400,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 816293800,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 856655100,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 854403100,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 810905700,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 805336800,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 816799300,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        },
+        {
+          "duration_ns": 828727100,
+          "content": "I don't have the ability to remember or retrieve previous conversations or codes. Please provide the code you need help with, and I'll be happy to assist you.",
+          "success": false
+        }
+      ],
+      "mean_ns": 801842415.0,
+      "median_ns": 799995700.0,
+      "p95_ns": 854515700.0,
+      "min_ns": 770811400,
+      "max_ns": 856655100,
+      "success_count": 0
+    },
+    "langgraph": {
+      "warmup": 3,
+      "runs": 20,
+      "samples": [
+        {
+          "duration_ns": 187801300,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 191138800,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 190351400,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 187117000,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 188064700,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 198099700,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 190075700,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 193466900,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 205735800,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 188623600,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 187849500,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 201781800,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 191708300,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 189875700,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 190708000,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 192388700,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 195310800,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 193846000,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 188764000,
+          "content": "BLUE-42",
+          "success": true
+        },
+        {
+          "duration_ns": 194893900,
+          "content": "BLUE-42",
+          "success": true
+        }
+      ],
+      "mean_ns": 192380080.0,
+      "median_ns": 190923400.0,
+      "p95_ns": 201979500.0,
+      "min_ns": 187117000,
+      "max_ns": 205735800,
+      "success_count": 20
+    }
+  },
+  "limits": [
+    "All requests use the same local llama.cpp endpoint and model.",
+    "Measurements are client wall-clock time and include framework request preparation.",
+    "The model is local; no cloud LLM or network service is involved.",
+    "Server-side model load, CPU, and RSS are not attributed to an individual framework."
+  ]
+}

@@ -389,4 +389,4 @@ KISS原則に従う - 過度な設計を避ける。
 - [パフォーマンスベンチマーク](/advanced/performance)
 - [デプロイメントガイド](/advanced/deployment)
 - [APIリファレンス](/api/)
-- [ソースコード](https://github.com/rexleimo/HNO)
+- [ソースコード](https://github.com/rexleimo/agno-go)

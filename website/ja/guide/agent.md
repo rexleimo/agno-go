@@ -5,7 +5,7 @@
 ## 概要
 
 ```go
-import "github.com/rexleimo/HNO/pkg/hno/agent"
+import "github.com/rexleimo/agno-go/pkg/hno/agent"
 
 agent, err := agent.New(agent.Config{
     Name:         "My Agent",
@@ -56,8 +56,8 @@ package main
 import (
     "context"
     "fmt"
-    "github.com/rexleimo/HNO/pkg/hno/agent"
-    "github.com/rexleimo/HNO/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 )
 
 func main() {
@@ -80,8 +80,8 @@ func main() {
 
 ```go
 import (
-    "github.com/rexleimo/HNO/pkg/hno/tools/calculator"
-    "github.com/rexleimo/HNO/pkg/hno/tools/http"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/http"
 )
 
 ag, _ := agent.New(agent.Config{
@@ -102,7 +102,7 @@ output, _ := ag.Run(ctx, "Calculate 15 * 23 and fetch https://api.github.com")
 ### カスタムメモリ
 
 ```go
-import "github.com/rexleimo/HNO/pkg/hno/memory"
+import "github.com/rexleimo/agno-go/pkg/hno/memory"
 
 // カスタム制限でメモリを作成
 mem := memory.NewInMemory(50) // 最新50メッセージを保持
@@ -118,7 +118,7 @@ ag, _ := agent.New(agent.Config{
 フックで入力と出力を検証:
 
 ```go
-import "github.com/rexleimo/HNO/pkg/hno/guardrails"
+import "github.com/rexleimo/agno-go/pkg/hno/guardrails"
 
 // 組み込みのプロンプトインジェクションガード
 promptGuard := guardrails.NewPromptInjectionGuardrail()
@@ -278,9 +278,9 @@ ag, _ := agent.New(agent.Config{
 
 ## パフォーマンスに関する考慮事項
 
-- **Agent作成**: 平均約180ns
-- **メモリフットプリント**: Agent1つあたり約1.2KB
-- **並行Agent**: 完全にスレッドセーフ、自由にgoroutineを使用可能
+- **Agent作成**: 環境依存。測定コマンド、環境、割り当て範囲は[Performance](/ja/advanced/performance)を参照
+- **メモリ**: `B/op` は Agent 全体の常駐メモリではなく、benchmark の割り当て統計
+- **同時実行Agent**: 上限は固定値ではなく、対象デプロイの負荷とリソースで決める
 
 ```go
 // 並行Agent
@@ -297,10 +297,10 @@ for i := 0; i < 100; i++ {
 
 実際の例を参照:
 
-- [Simple Agent](https://github.com/rexleimo/HNO/tree/main/cmd/examples/simple_agent)
-- [Claude Agent](https://github.com/rexleimo/HNO/tree/main/cmd/examples/claude_agent)
-- [Ollama Agent](https://github.com/rexleimo/HNO/tree/main/cmd/examples/ollama_agent)
-- [Agent with Guardrails](https://github.com/rexleimo/HNO/tree/main/cmd/examples/agent_with_guardrails)
+- [Simple Agent](https://github.com/rexleimo/agno-go/tree/main/cmd/examples/simple_agent)
+- [Claude Agent](https://github.com/rexleimo/agno-go/tree/main/cmd/examples/claude_agent)
+- [Ollama Agent](https://github.com/rexleimo/agno-go/tree/main/cmd/examples/ollama_agent)
+- [Agent with Guardrails](https://github.com/rexleimo/agno-go/tree/main/cmd/examples/agent_with_guardrails)
 
 ## APIリファレンス
 

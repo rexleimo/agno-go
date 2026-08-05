@@ -3,167 +3,98 @@ layout: home
 
 hero:
   name: "HNO"
-  text: "高性能多智能体框架"
-  tagline: "比 Python 快 16 倍 | 180ns 实例化 | 每个智能体仅 1.2KB 内存"
-  image:
-    src: /logo.png
-    alt: HNO
+  text: "Go 原生多智能体框架"
+  tagline: "以明确、可复现的证据描述 Go 实现，不把未经验证的性能估算当成事实。"
   actions:
     - theme: brand
       text: 快速开始
       link: /zh/guide/quick-start
     - theme: alt
       text: 在 GitHub 上查看
-      link: https://github.com/rexleimo/HNO
+      link: https://github.com/rexleimo/agno-go
 
 features:
-  - icon: 🚀
-    title: 极致性能
-    details: 智能体实例化仅需 ~180ns, 每个智能体约 1.2KB 内存, 相比 Python 运行时快 16 倍。
+  - title: 用测量代替猜测
+    details: 仓库包含 Agent 创建 benchmark。性能页记录了命令、环境、结果范围和限制条件。
 
-  - icon: 🤖
-    title: 生产级 AgentOS
-    details: 内置 OpenAPI 3.0、会话存储、健康检查、结构化日志、CORS、请求超时, 并补齐摘要、复用与历史筛选等对等端点。
+  - title: Provider 适配器
+    details: Provider 实现通过 Model 接口提供。当前源码包含 17 个顶层 Provider 包；这是代码清单，不是兼容性或延迟保证。
 
-  - icon: 🪄
-    title: 会话对齐
-    details: 会话可在 Agent / Team 间共享, 支持同步/异步摘要, 记录缓存命中与取消原因, 并复用 Python 上的 `stream_events` 开关。
+  - title: 共享编排组件
+    details: Agent、Team、Workflow 在 Go 源码中共享执行组件和工具分发抽象。
 
-  - icon: 🧩
-    title: 灵活架构
-    details: 自由组合 Agent、Team（4 种协作模式）与 Workflow（5 种控制原语）, 继承默认配置并支持检点恢复与确定性编排。
+  - title: 可观测性集成
+    details: 提供 OpenTelemetry 和结构化运行时埋点。启用埋点后的开销取决于部署配置，必须针对目标服务测量。
 
-  - icon: 🔌
-    title: 多模型供应商
-    details: 开箱支持 OpenAI o-series、Anthropic Claude、Google Gemini、DeepSeek、GLM、ModelScope、Ollama、Cohere、Groq、Together、OpenRouter、LM Studio、Vercel、Portkey、InternLM、SambaNova。
+  - title: Skills、MCP 与记忆
+    details: Agent Skills、MCP 桥接、可插拔记忆和会话存储作为可选框架能力提供。
 
-  - icon: 🔧
-    title: 可扩展工具
-    details: 内置计算器、HTTP、文件、搜索, 并新增 Claude Agent Skills、Tavily Reader/Search、Gmail 标记已读、Jira 工时、ElevenLabs 语音、PPTX 阅读器及 MCP 连接器。
+  - title: 诚实的协议覆盖说明
+    details: 自动化测试覆盖适配器和请求/响应映射。真机 Provider 验证需要凭据；测试响应不会被描述成线上证据。
 
-  - icon: 💾
-    title: 知识与缓存
-    details: 集成 ChromaDB、批量导入工具与摄取助手, 提供响应缓存以去重相同的模型调用。
-
-  - icon: 🛡️
-    title: 防护与可观测性
-    details: 提供提示注入防护、自定义前后置钩子、媒体校验、SSE 推理流以及 Logfire / OpenTelemetry 链路追踪示例。
-
-  - icon: 📦
-    title: 易于部署
-    details: 提供单一二进制、Docker、Compose 与 Kubernetes 清单, 配套上线指南可快速落地。
 ---
 
-## 快速示例
+## 本地系统开销矩阵
 
-仅需几行代码即可创建带工具的 AI 智能体:
+主框架对比使用同一个确定性的本地 OpenAI-compatible Stub，比较 HNO、Agno
+和 LangGraph。每行使用 100 次正式操作、5 次预热、fresh operation 生命周期
+以及相同的 1 ms Stub 响应延迟。RSS 是进程树工作集；RPS 是正式测量批次的
+吞吐，不是生产容量承诺。
 
-```go
-package main
+| 并发度 | Framework | 平均 | P95 | 测得 RPS | 成功率 | 峰值 RSS |
+| ---: | --- | ---: | ---: | ---: | ---: | ---: |
+| 8 | HNO | **1.859 ms** | **2.655 ms** | **4,186.08** | 100/100 | **12.3 MB** |
+| 8 | Agno | 61.766 ms | 83.473 ms | 125.66 | 100/100 | 285.0 MB |
+| 8 | LangGraph | 30.117 ms | 37.638 ms | 251.95 | 100/100 | 157.9 MB |
+| 32 | HNO | **6.703 ms** | **18.637 ms** | **3,627.35** | 100/100 | **16.7 MB** |
+| 32 | Agno | 138.678 ms | 241.744 ms | 170.17 | 100/100 | 373.8 MB |
+| 32 | LangGraph | 78.370 ms | 129.618 ms | 241.67 | 100/100 | 161.1 MB |
 
-import (
-    "context"
-    "fmt"
-    "github.com/rexleimo/agno-go/pkg/hno/agent"
-    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
-    "github.com/rexleimo/agno-go/pkg/hno/tools/calculator"
-)
+在并发度 8 下，HNO 在这个固定本地协议中的测得批次 RPS 约为 LangGraph
+的 16.6 倍、Agno 的 33.3 倍；并发度 32 下约为 15.0 倍和 21.3 倍。这些
+是本地编排和运行时观测，不是远程模型加速。
 
-func main() {
-    // 创建模型
-    model, _ := openai.New("gpt-4o-mini", openai.Config{
-        APIKey: "your-api-key",
-    })
+完整的[本地系统开销矩阵](/zh/advanced/system-overhead)包含原始 JSON、
+资源指标定义和复现命令。
 
-    // 创建带工具的智能体
-    ag, _ := agent.New(agent.Config{
-        Name:     "数学助手",
-        Model:    model,
-        Toolkits: []toolkit.Toolkit{calculator.New()},
-    })
+## 远程模型附录
 
-    // 运行智能体
-    output, _ := ag.Run(context.Background(), "25 * 4 + 15 等于多少?")
-    fmt.Println(output.Content) // 输出: 115
-}
-```
+远程 DeepSeek 测试是独立的端到端快照：每条路径 100 次正式请求，并发度 8。
+它包含网络、Provider 排队和模型生成时间，因此不是纯框架 benchmark。
 
-## 性能对比
+| 路径 | 平均 | P95 | 成功率 | 相对平均值 |
+| --- | ---: | ---: | ---: | ---: |
+| Direct API | 2,094.52 ms | 4,225.19 ms | 100/100 | 1.00x |
+| HNO | **1,312.71 ms** | **1,563.62 ms** | 100/100 | **1.60x** |
+| Agno | 1,571.34 ms | 1,988.19 ms | 100/100 | 1.33x |
+| LangGraph | 1,362.09 ms | 1,753.45 ms | 100/100 | 1.54x |
 
-| 指标 | Python Agno | HNO | 改进 |
-|--------|-------------|---------|-------------|
-| 智能体创建 | ~3μs | ~180ns | **快 16 倍** |
-| 内存/智能体 | ~6.5KB | ~1.2KB | **减少 5.4 倍** |
-| 并发性 | GIL 限制 | 原生 goroutine | **无限制** |
+相对倍率定义为 `Direct API 平均耗时 / 路径平均耗时`。这组数据只能说明
+本次快照中端到端延迟接近且 HNO 略有优势，不能作为远程生产性能的普遍结论。
+详见[远程性能报告](/zh/advanced/performance)。
 
-## 为什么选择 HNO?
-### v1.2.9 有哪些更新 / What's New in v1.2.9
+## HNO 博客最新文章
 
-- **EvoLink 媒体智能体** – 在 `pkg/hno/providers/evolink` 与 `pkg/hno/models/evolink/*` 下提供文本、图片、视频模型, 并在 EvoLink 媒体示例页中给出端到端工作流。 / First-class EvoLink provider for text, image, and video with end-to-end examples in the EvoLink Media Agents docs.
-- **知识上传分块** – `POST /api/v1/knowledge/content` 支持 `chunk_size`、`chunk_overlap`(JSON、`text/plain` query 参数与 multipart 表单), 并在分块 metadata 中记录这两个值以及 `chunker_type`, 与 Python AgentOS 对齐。 / `POST /api/v1/knowledge/content` now supports `chunk_size` and `chunk_overlap` across JSON, `text/plain` query params, and multipart uploads, and records these values plus `chunker_type` in chunk metadata.
-- **AgentOS HTTP 提示** – 文档新增如何自定义健康检查路径、使用 `/openapi.yaml` 与 `/docs`, 以及在变更路由后调用 `server.Resync()` 的最佳实践。 / Docs now explain how to customize health endpoints, rely on `/openapi.yaml` and `/docs`, and when to call `server.Resync()` after router changes.
+### AI Agent 框架性能怎么测：为什么运行时开销比模型延迟更重要
 
-### 为生产而生
+[阅读完整文章](/zh/blog/ai-agent-runtime-benchmark)
 
-HNO 不仅是一个框架——它是一个完整的生产系统。包含的 **AgentOS** 服务器提供:
+当一个模型或 Agent 框架成为热点时，先把模型延迟和框架开销分开，再讨论性能
+结论。本文使用同一个本地 OpenAI-compatible Stub、5 次预热、100 次正式操作，
+测试并发度 1、8、32。
 
-- 带 OpenAPI 3.0 规范的 RESTful API
-- 多轮对话的会话管理
-- 线程安全的智能体注册表
-- 健康监控和结构化日志
-- CORS 支持和请求超时处理
+更多内容见 [HNO 博客](/zh/blog/)，也可以订阅 [RSS](/rss.xml)。
 
-### KISS 原则
+## 为什么是 Go，为什么是 HNO
 
-遵循 **Keep It Simple, Stupid** 哲学:
+**为什么使用 Go？** Go 是实现选择，工程原因包括编译后的部署产物、内置
+并发模型、静态类型、标准 HTTP/JSON 库，以及一流的测试和性能分析工具。
+这些是设计理由，不代表任何工作负载都固定快多少。
 
-- **3 个核心 LLM 提供商**(而非 45+) - OpenAI、Anthropic、Ollama
-- **基础工具**(而非 115+) - 计算器、HTTP、文件、搜索
-- **质量优于数量** - 专注于生产就绪的功能
+**为什么叫 HNO？** HNO 是当前项目名称。仓库没有定义这个名称的正式全称，
+所以本站不擅自编造。Go module 路径仍然是 `github.com/rexleimo/agno-go`；
+HNO 是项目身份，不是标准化模型、协议或性能指标。
 
-### 开发者体验
-
-- **类型安全**: Go 的强类型在编译时捕获错误
-- **快速构建**: Go 的编译速度支持快速迭代
-- **易于部署**: 单一二进制文件,无运行时依赖
-- **优秀工具**: 内置测试、性能分析和竞态检测
-
-## 5 分钟快速开始
-
-```bash
-# 克隆仓库
-git clone https://github.com/rexleimo/HNO.git
-cd HNO
-
-# 设置 API 密钥
-export OPENAI_API_KEY=sk-your-key-here
-
-# 运行示例
-go run cmd/examples/simple_agent/main.go
-
-# 或启动 AgentOS 服务器
-docker-compose up -d
-curl http://localhost:8080/health
-```
-
-## 包含内容
-
-- **核心框架**: Agent、Team(4 种模式)、Workflow(5 种原语)
-- **模型**: OpenAI、Anthropic Claude、Ollama、DeepSeek、Gemini、ModelScope
-- **工具**: Calculator(75.6%)、HTTP(88.9%)、File(76.2%)、Search(92.1%)
-- **RAG**: ChromaDB 集成 + OpenAI 嵌入
-- **AgentOS**: 生产级 HTTP 服务器(65.0% 覆盖率)
-- **示例**: 6 个涵盖所有功能的实际示例
-- **文档**: 完整指南、API 参考、部署说明
-
-## 社区
-
-- **GitHub**: [rexleimo/HNO](https://github.com/rexleimo/HNO)
-- **Issues**: [报告问题和请求功能](https://github.com/rexleimo/HNO/issues)
-- **Discussions**: [提问和分享想法](https://github.com/rexleimo/HNO/discussions)
-
-## 许可证
-
-HNO 基于 [MIT 许可证](https://github.com/rexleimo/HNO/blob/main/LICENSE) 发布。
-
-灵感来自 [Agno (Python)](https://github.com/agno-agi/agno) 框架。
+**证据规则：** 实测结果附命令、版本、环境、平均值、中位数和范围。Go 的分配
+字节不能当作 Python 内存。真实 LLM、生产容量和跨框架结论需要相同 Provider、
+相同工作负载的独立实验。

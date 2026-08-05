@@ -115,3 +115,116 @@
 .VPFooter {
   border-top: 1px solid var(--hno-border);
 }
+
+/* 性能报告状态卡：先说明能否发布，再展示实验细节。 */
+.benchmark-status {
+  margin: 28px 0 36px;
+  padding: 24px 28px;
+  border: 1px solid var(--hno-border);
+  border-left: 5px solid var(--hno-accent);
+  border-radius: 16px;
+  background: #f7fcfd;
+}
+.benchmark-status--pending {
+  border-left-color: #b7791f;
+  background: #fffaf0;
+}
+.benchmark-status--ready {
+  border-left-color: var(--hno-accent-deep);
+  background: #f7fcfd;
+}
+.benchmark-status__eyebrow,
+.benchmark-kpi__label {
+  color: var(--hno-muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.benchmark-status__title {
+  margin: 6px 0 8px;
+  color: var(--hno-ink);
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.benchmark-status p {
+  margin: 0;
+  color: var(--hno-muted);
+  line-height: 1.75;
+}
+.benchmark-status p + p {
+  margin-top: 8px;
+}
+.benchmark-status__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0 14px;
+}
+.benchmark-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 3px 10px;
+  border: 1px solid var(--hno-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--hno-muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+.benchmark-badge--pending {
+  border-color: rgba(183, 121, 31, 0.28);
+  background: #fff4d6;
+  color: #805b12;
+}
+.benchmark-badge--ready {
+  border-color: rgba(0, 123, 158, 0.24);
+  background: #eaf9fc;
+  color: var(--hno-accent-deep);
+}
+
+.benchmark-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin: 24px 0 36px;
+}
+.benchmark-kpi {
+  min-height: 118px;
+  padding: 20px;
+  border: 1px solid var(--hno-border);
+  border-radius: 16px;
+  background: #fff;
+}
+.benchmark-kpi__value {
+  margin-top: 12px;
+  color: var(--hno-ink);
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+.benchmark-kpi__note {
+  margin-top: 6px;
+  color: var(--hno-muted);
+  font-size: 13px;
+}
+
+/* The report uses wider data tables than prose, while keeping paragraphs readable. */
+.VPDoc:has(.benchmark-page-marker) .content-container {
+  max-width: 860px;
+}
+.VPDoc:has(.benchmark-page-marker) .vp-doc table {
+  display: table;
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .benchmark-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+  .benchmark-status {
+    padding: 20px;
+  }
+}

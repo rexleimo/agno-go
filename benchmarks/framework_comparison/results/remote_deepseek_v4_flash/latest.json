@@ -1,0 +1,1073 @@
+{
+  "report_type": "real_remote_model_framework_comparison",
+  "captured_at_utc": "2026-08-04T12:08:58.973090+00:00",
+  "status": "provider_snapshot_with_hno_memory_failures",
+  "provider": "DeepSeek",
+  "model_service": {
+    "provider": "DeepSeek",
+    "endpoint": "https://api.deepseek.com/v1",
+    "model": "deepseek-v4-flash",
+    "api_key_env": "AGNES_API_KEY",
+    "protocol": "OpenAI-compatible"
+  },
+  "protocol": {
+    "temperature": 0,
+    "seed": 42,
+    "max_tokens": 128,
+    "warmup": 3,
+    "runs": 20,
+    "concurrency": 1,
+    "measurement": "client wall-clock duration including network, provider queue, and model response"
+  },
+  "scenarios": {
+    "simple": {
+      "prompt": "Reply with exactly: REMOTE_MODEL_OK",
+      "frameworks": {
+        "hno": {
+          "samples": [
+            {
+              "duration_ns": 505374500,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 873754300,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 836785300,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 593902600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 740960600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 959493900,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 802971600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 893047700,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 759559200,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 913814800,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 680203800,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 631641800,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 781074300,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 1777277600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 552431800,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 977752400,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 727028200,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 1005365100,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 715979300,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 832992800,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            }
+          ],
+          "count": 20,
+          "mean_ns": 828070580.0,
+          "median_ns": 792022950.0,
+          "p95_ns": 1043960725.0,
+          "stddev_ns": 263494022.59279072,
+          "min_ns": 505374500,
+          "max_ns": 1777277600,
+          "success_count": 20,
+          "success_rate": 1.0
+        },
+        "agno": {
+          "samples": [
+            {
+              "duration_ns": 23823886500,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 1100149400,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 1837873700,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 1020863500,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 988432100,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 913356600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 1120247300,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 1416988600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 19743011500,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 995481400,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 1769355800,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 3824393900,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 1007600200,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 769761600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 846608500,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 1256559500,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 8436645400,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 937557100,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 890766400,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 839749300,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            }
+          ],
+          "count": 20,
+          "mean_ns": 3676964415.0,
+          "median_ns": 1060506450.0,
+          "p95_ns": 19947055250.0,
+          "stddev_ns": 6463959752.121797,
+          "min_ns": 769761600,
+          "max_ns": 23823886500,
+          "success_count": 20,
+          "success_rate": 1.0
+        },
+        "langgraph": {
+          "samples": [
+            {
+              "duration_ns": 1050657200,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 2784957100,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 1121739600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 1525729500,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 935134400,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 7777142900,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 788107600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 1042947900,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 1093928100,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 856098200,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 869935100,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 1000114500,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 20149459600,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 637343500,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 872650300,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 1042804400,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 4280207900,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 21557152000,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 823655500,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            },
+            {
+              "duration_ns": 39424952900,
+              "content": "LOCAL_MODEL_OK",
+              "success": true
+            }
+          ],
+          "count": 20,
+          "mean_ns": 5481735910.0,
+          "median_ns": 1046802550.0,
+          "p95_ns": 22450542045.0,
+          "stddev_ns": 10064276364.266073,
+          "min_ns": 637343500,
+          "max_ns": 39424952900,
+          "success_count": 20,
+          "success_rate": 1.0
+        }
+      },
+      "raw_files": [
+        "hno_simple.json",
+        "python_simple.json"
+      ]
+    },
+    "tool": {
+      "prompt": "Use the add tool to calculate 25 + 17. After the tool returns, reply with exactly: RESULT_42",
+      "frameworks": {
+        "hno": {
+          "samples": [
+            {
+              "duration_ns": 2379058000,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2009808100,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2503877700,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2004677200,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2922998200,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2958649500,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2746658800,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2418166500,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 3156809300,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2475216100,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 3286222100,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2579909100,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2184274700,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 1999712300,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2007136600,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2896805200,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2250120300,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2201232300,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2501717400,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2256156500,
+              "content": "RESULT_42",
+              "success": true
+            }
+          ],
+          "count": 20,
+          "mean_ns": 2486960295.0,
+          "median_ns": 2446691300.0,
+          "p95_ns": 3163279940.0,
+          "stddev_ns": 395484055.8962935,
+          "min_ns": 1999712300,
+          "max_ns": 3286222100,
+          "success_count": 20,
+          "success_rate": 1.0
+        },
+        "agno": {
+          "samples": [
+            {
+              "duration_ns": 2777856000,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2273769800,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2347449700,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2199040200,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2552198500,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2126898100,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 3502253000,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 1831914500,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2592949800,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 1903636200,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2313670900,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 1611689000,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2648100200,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2415146400,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2501213500,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 1953215700,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2454122100,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2205045800,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2127038700,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2409395900,
+              "content": "RESULT_42",
+              "success": true
+            }
+          ],
+          "count": 20,
+          "mean_ns": 2337330200.0,
+          "median_ns": 2330560300.0,
+          "p95_ns": 2814075850.0,
+          "stddev_ns": 401209156.4232368,
+          "min_ns": 1611689000,
+          "max_ns": 3502253000,
+          "success_count": 20,
+          "success_rate": 1.0
+        },
+        "langgraph": {
+          "samples": [
+            {
+              "duration_ns": 2167467300,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2419127700,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2541652000,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2347595600,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2645488600,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2871763400,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2065640900,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2083756300,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2236713000,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2005184600,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2004973400,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2351332400,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2951963500,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2735383000,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2269980300,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2545220100,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2644282800,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 1666679800,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 2000261800,
+              "content": "RESULT_42",
+              "success": true
+            },
+            {
+              "duration_ns": 1964858500,
+              "content": "RESULT_42",
+              "success": true
+            }
+          ],
+          "count": 20,
+          "mean_ns": 2325966250.0,
+          "median_ns": 2308787950.0,
+          "p95_ns": 2875773405.0,
+          "stddev_ns": 340659389.13825333,
+          "min_ns": 1666679800,
+          "max_ns": 2951963500,
+          "success_count": 20,
+          "success_rate": 1.0
+        }
+      },
+      "raw_files": [
+        "hno_tool.json",
+        "python_tool.json"
+      ]
+    },
+    "memory": {
+      "prompt": "Two-turn BLUE-42 memory exchange",
+      "frameworks": {
+        "hno": {
+          "samples": [
+            {
+              "duration_ns": 2188606600,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2157780800,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2226372700,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2131578300,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2622311800,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 3386166100,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2294926400,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 18221075700,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 1987722200,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 1895304300,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2409508800,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 7920709400,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 3761095000,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2148884100,
+              "success": false
+            },
+            {
+              "duration_ns": 3252398100,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 3232717200,
+              "success": false
+            },
+            {
+              "duration_ns": 2679521800,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 5485467000,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 4156370400,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2570601600,
+              "success": false
+            }
+          ],
+          "count": 20,
+          "mean_ns": 3836455915.0,
+          "median_ns": 2596456700.0,
+          "p95_ns": 8435727715.0,
+          "stddev_ns": 3679442882.1510744,
+          "min_ns": 1895304300,
+          "max_ns": 18221075700,
+          "success_count": 17,
+          "success_rate": 0.85
+        },
+        "agno": {
+          "samples": [
+            {
+              "duration_ns": 2114107300,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2032024000,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 1959888900,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2656679500,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 77246034800,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2306046400,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2506561100,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2105828600,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 3290286600,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2570120800,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2261685100,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2312600300,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2303500700,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 5058831600,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 1944894600,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2070196200,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2528425100,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2556717200,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2160051100,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2281161000,
+              "content": "BLUE-42",
+              "success": true
+            }
+          ],
+          "count": 20,
+          "mean_ns": 6213282045.0,
+          "median_ns": 2304773550.0,
+          "p95_ns": 8668191760.0,
+          "stddev_ns": 16733272291.794912,
+          "min_ns": 1944894600,
+          "max_ns": 77246034800,
+          "success_count": 20,
+          "success_rate": 1.0
+        },
+        "langgraph": {
+          "samples": [
+            {
+              "duration_ns": 2391401400,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 9329913700,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2674876700,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 3438026900,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2869962200,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 6278295600,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 8314940200,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2329246500,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2886661400,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2110583200,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 3594121600,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2390519100,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2433141800,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 3007468600,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2932621700,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 3033666600,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2552350700,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2415664300,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 2721011300,
+              "content": "BLUE-42",
+              "success": true
+            },
+            {
+              "duration_ns": 9388791800,
+              "content": "BLUE-42",
+              "success": true
+            }
+          ],
+          "count": 20,
+          "mean_ns": 3854663265.0,
+          "median_ns": 2878311800.0,
+          "p95_ns": 9332857605.0,
+          "stddev_ns": 2393864570.123695,
+          "min_ns": 2110583200,
+          "max_ns": 9388791800,
+          "success_count": 20,
+          "success_rate": 1.0
+        }
+      },
+      "raw_files": [
+        "hno_memory.json",
+        "python_memory.json"
+      ]
+    }
+  },
+  "limits": [
+    "These are external API end-to-end timings, not framework-only overhead.",
+    "Internet latency, provider queueing, service-side scheduling, and rate limits are included.",
+    "The result is valid only for this DeepSeek model, account, endpoint, time window, and protocol.",
+    "No API key value is stored in this report.",
+    "HNO memory had 17/20 successful content checks; three responses were empty without an API error.",
+    "The old local Qwen3 report is not overwritten."
+  ]
+}

@@ -13,15 +13,15 @@
 HNOをGoモジュールの依存関係としてインストール：
 
 ```bash
-go get github.com/rexleimo/HNO
+go get github.com/rexleimo/agno-go
 ```
 
 次にコードでインポート：
 
 ```go
 import (
-    "github.com/rexleimo/HNO/pkg/hno/agent"
-    "github.com/rexleimo/HNO/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 )
 ```
 
@@ -31,7 +31,7 @@ import (
 
 ```bash
 # Clone repository
-git clone https://github.com/rexleimo/HNO.git
+git clone https://github.com/rexleimo/agno-go.git
 cd HNO
 
 # Download dependencies
@@ -127,8 +127,8 @@ import (
     "log"
     "os"
 
-    "github.com/rexleimo/HNO/pkg/hno/agent"
-    "github.com/rexleimo/HNO/pkg/hno/models/openai"
+    "github.com/rexleimo/agno-go/pkg/hno/agent"
+    "github.com/rexleimo/agno-go/pkg/hno/models/openai"
 )
 
 func main() {
@@ -318,8 +318,8 @@ AGENTOS_ADDRESS=:9090
 
 問題が発生した場合：
 
-1. [GitHub Issues](https://github.com/rexleimo/HNO/issues)を確認
-2. [Discussions](https://github.com/rexleimo/HNO/discussions)で質問
+1. [GitHub Issues](https://github.com/rexleimo/agno-go/issues)を確認
+2. [Discussions](https://github.com/rexleimo/agno-go/discussions)で質問
 3. [ドキュメント](/guide/)を確認
 
 ## 次のステップ

@@ -12,8 +12,8 @@
   - **Extensibility** - Connect your agents to any MCP-compatible server
 - **🔒 보안** - 내장 명령 검증 및 셸 인젝션 보호
   - **Security** - Built-in command validation and shell injection protection
-- **🚀 성능** - 빠른 초기화 (<100μs) 및 낮은 메모리 사용량 (<10KB)
-  - **Performance** - Fast initialization (<100μs) and low memory footprint (<10KB)
+- **🚀 성능** - 초기화와 메모리는 전송 방식, 서버, 구성에 따라 달라지므로 대상 환경에서 측정
+  - **Performance** - Measure initialization and memory for the target transport and server
 - **📦 재사용성** - 기존 MCP 서버 활용, 바퀴를 재발명하지 않음
   - **Reusability** - Leverage existing MCP servers
 
@@ -25,7 +25,7 @@ pkg/hno/mcp/
 ├── client/         # MCP 클라이언트 코어 및 전송
 ├── security/       # 명령 검증 및 보안
 ├── content/        # 콘텐츠 타입 처리
-└── toolkit/        # agno 툴킷 시스템과 통합
+└── toolkit/        # HNO 툴킷 시스템과 통합
 ```
 
 ## 빠른 시작
@@ -134,10 +134,9 @@ toolkit, err := mcptoolkit.New(ctx, mcptoolkit.Config{
 
 ## 성능 | Performance
 
-- **MCP 클라이언트 초기화**: <100μs
-- **도구 검색**: 서버당 <50μs
-- **메모리**: 연결당 <10KB
-- **테스트 커버리지**: >80%
+모든 전송 방식과 서버 유형을 포함한 benchmark가 저장소에 없으므로 고정된 지연시간,
+메모리와 커버리지 수치를 공개하지 않습니다. 운영에서 사용하는 서버와 전송 방식으로
+초기화, 도구 검색, 메모리와 처리량을 측정하세요.
 
 ## 모범 사례 | Best Practices
 
@@ -152,7 +151,7 @@ toolkit, err := mcptoolkit.New(ctx, mcptoolkit.Config{
 - [MCP 데모](../examples/mcp-demo.md)를 시도해보세요
 - [MCP 구현 가이드](../../pkg/hno/mcp/IMPLEMENTATION.md)를 읽어보세요
 - [MCP 프로토콜 사양](https://spec.modelcontextprotocol.io/)을 탐색하세요
-- [GitHub](https://github.com/rexleimo/HNO/discussions)에서 토론에 참여하세요
+- [GitHub](https://github.com/rexleimo/agno-go/discussions)에서 토론에 참여하세요
 
 ## 문제 해결 | Troubleshooting
 

@@ -546,12 +546,23 @@ func whereFromMap(filter map[string]interface{}) chroma.WhereFilter {
 // metadataToMap converts a v2 DocumentMetadata into a plain map. The v2
 // interface has no key enumeration, so we reflect over the concrete
 // implementation's internal map (works for DocumentMetadataImpl from the
-// official client). Returns nil on failure.
+// official client). Returns nil on failure. Metadata is best-effort: it
+// must never panic the query path.
 //
 // metadataToMap 将 v2 DocumentMetadata 转换为普通 map。v2 接口没有
 // key 枚举方法，因此对官方客户端的 DocumentMetadataImpl 内部 map
-// 做反射读取。失败时返回 nil。
-func metadataToMap(m chroma.DocumentMetadata) map[string]interface{} {
+// 做反射读取。失败时返回 nil。metadata 是尽力而为：绝不能 panic
+// 查询路径。
+func metadataToMap(m chroma.DocumentMetadata) (out map[string]interface{}) {
+	defer func() {
+		if r := recover(); r != nil {
+			// Unexported fields are not reflect-readable; metadata is
+			// best-effort only.
+			// 未导出字段不可反射读取；metadata 仅为尽力而为。
+			out = nil
+		}
+	}()
+
 	if m == nil {
 		return nil
 	}
@@ -563,10 +574,10 @@ func metadataToMap(m chroma.DocumentMetadata) map[string]interface{} {
 		return nil
 	}
 	f := v.FieldByName("metadata")
-	if !f.IsValid() || f.Kind() != reflect.Map {
+	if !f.IsValid() || f.Kind() != reflect.Map || !f.CanInterface() {
 		return nil
 	}
-	out := make(map[string]interface{})
+	out = make(map[string]interface{})
 	iter := f.MapRange()
 	for iter.Next() {
 		key, _ := iter.Key().Interface().(string)

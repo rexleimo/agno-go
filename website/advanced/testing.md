@@ -6,24 +6,14 @@ Comprehensive testing guide for HNO development.
 
 ## Overview
 
-HNO maintains high quality through comprehensive testing with **80.8% test coverage** across the codebase. This guide covers testing standards, patterns, and best practices.
+This guide covers testing standards, patterns, and best practices. Coverage is
+not a fixed project property: it changes with the revision, build tags, target
+packages, and platform. Generate a fresh report for the code you are testing.
 
-### Test Coverage Status
+### Test Coverage
 
-| Package | Coverage | Status |
-|---------|----------|--------|
-| types | 100.0% | ✅ Excellent |
-| memory | 93.1% | ✅ Excellent |
-| team | 92.3% | ✅ Excellent |
-| toolkit | 91.7% | ✅ Excellent |
-| http | 88.9% | ✅ Good |
-| workflow | 80.4% | ✅ Good |
-| file | 76.2% | ✅ Good |
-| calculator | 75.6% | ✅ Good |
-| agent | 74.7% | ✅ Good |
-| anthropic | 50.9% | 🟡 Needs improvement |
-| openai | 44.6% | 🟡 Needs improvement |
-| ollama | 43.8% | 🟡 Needs improvement |
+No stale coverage snapshot is presented here. Run the command below to obtain
+the current result for the current checkout.
 
 ---
 
@@ -33,10 +23,10 @@ HNO maintains high quality through comprehensive testing with **80.8% test cover
 
 ```bash
 # Run all tests with coverage
-make test
+go test -race -coverprofile=coverage.out -covermode=atomic ./...
 
-# Equivalent to:
-go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+# Summarize the current report
+go tool cover -func=coverage.out
 ```
 
 ### Specific Package
