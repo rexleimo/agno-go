@@ -1,9 +1,13 @@
 package file
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -112,8 +116,8 @@ func NewSandbox(options ...SandboxOption) (*Sandbox, error) {
 		}
 		option(&config)
 	}
-	if config.maxReadBytes <= 0 {
-		return nil, fmt.Errorf("max read bytes must be positive")
+	if config.maxReadBytes <= 0 || config.maxReadBytes == math.MaxInt64 {
+		return nil, fmt.Errorf("max read bytes must be positive and below max int64")
 	}
 	if config.maxWriteBytes <= 0 {
 		return nil, fmt.Errorf("max write bytes must be positive")
@@ -193,7 +197,7 @@ func openSandboxRoot(path string) (*sandboxRoot, error) {
 	return &sandboxRoot{path: filepath.Clean(resolved), root: root}, nil
 }
 
-func (root *sandboxRoot) relativePath(path string) (string, error) {
+func (root *sandboxRoot) relativePath(path string, preserveFinalSymlink bool) (string, error) {
 	if path == "" || strings.IndexByte(path, 0) >= 0 {
 		return "", fmt.Errorf("invalid path")
 	}
@@ -205,7 +209,7 @@ func (root *sandboxRoot) relativePath(path string) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("resolve path: %w", err)
 		}
-		canonical, err := canonicalPath(absolute)
+		canonical, err := canonicalPathForComparison(absolute, preserveFinalSymlink)
 		if err != nil {
 			return "", err
 		}
@@ -234,10 +238,30 @@ func isWindowsRootedRelative(path string) bool {
 // canonicalPath resolves the deepest existing ancestor so Windows aliases and
 // existing symlinks are normalized even when the final path does not exist.
 func canonicalPath(path string) (string, error) {
+	return canonicalPathForComparison(path, false)
+}
+
+func canonicalPathForComparison(path string, preserveFinalSymlink bool) (string, error) {
 	current := filepath.Clean(path)
 	var suffix []string
 
 	for {
+		if preserveFinalSymlink && len(suffix) == 0 {
+			info, err := os.Lstat(current)
+			if err == nil && info.Mode()&fs.ModeSymlink != 0 {
+				parent := filepath.Dir(current)
+				if parent == current {
+					return "", fmt.Errorf("resolve path symlinks: invalid root path")
+				}
+				suffix = append(suffix, filepath.Base(current))
+				current = parent
+				continue
+			}
+			if err != nil && !errors.Is(err, fs.ErrNotExist) {
+				return "", fmt.Errorf("lstat path: %w", err)
+			}
+		}
+
 		resolved, err := filepath.EvalSymlinks(current)
 		if err == nil {
 			for index := len(suffix) - 1; index >= 0; index-- {
@@ -270,7 +294,7 @@ func (sandbox *Sandbox) selectReadRoot(path string) (*sandboxRoot, string, error
 	var firstRoot *sandboxRoot
 	var firstRelative string
 	for _, root := range sandbox.readRoots {
-		relative, err := root.relativePath(path)
+		relative, err := root.relativePath(path, false)
 		if err != nil {
 			continue
 		}
@@ -295,7 +319,7 @@ func (sandbox *Sandbox) writePath(path string) (*sandboxRoot, string, error) {
 	if sandbox.writeRoot == nil {
 		return nil, "", fmt.Errorf("sandbox has no write root")
 	}
-	relative, err := sandbox.writeRoot.relativePath(path)
+	relative, err := sandbox.writeRoot.relativePath(path, true)
 	if err != nil {
 		return nil, "", err
 	}
@@ -338,4 +362,200 @@ func (sandbox *Sandbox) ResolveWrite(path string) (string, error) {
 		}
 	}
 	return root.absolutePath(relative), nil
+}
+
+// ReadFile reads one regular file within a configured read root. It limits the
+// bytes read even if the file grows after its initial size check.
+func (sandbox *Sandbox) ReadFile(path string) ([]byte, error) {
+	file, root, relative, _, err := sandbox.openReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	data, err := io.ReadAll(io.LimitReader(file, sandbox.maxReadBytes+1))
+	if err != nil {
+		return nil, fmt.Errorf("read file: %w", err)
+	}
+	if int64(len(data)) > sandbox.maxReadBytes {
+		return nil, fmt.Errorf("file %q exceeds maximum read size of %d bytes", path, sandbox.maxReadBytes)
+	}
+	sandbox.record("read_file", root, relative, int64(len(data)))
+	return data, nil
+}
+
+func (sandbox *Sandbox) openReadFile(path string) (*os.File, *sandboxRoot, string, fs.FileInfo, error) {
+	root, relative, err := sandbox.selectReadRoot(path)
+	if err != nil {
+		return nil, nil, "", nil, err
+	}
+
+	file, err := root.root.Open(relative)
+	if err != nil {
+		return nil, nil, "", nil, fmt.Errorf("open file for reading: %w", err)
+	}
+	info, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return nil, nil, "", nil, fmt.Errorf("stat file for reading: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		file.Close()
+		return nil, nil, "", nil, fmt.Errorf("file %q is not a regular file", path)
+	}
+	if info.Size() > sandbox.maxReadBytes {
+		file.Close()
+		return nil, nil, "", nil, fmt.Errorf("file %q exceeds maximum read size of %d bytes", path, sandbox.maxReadBytes)
+	}
+	return file, root, relative, info, nil
+}
+
+// WriteFile atomically writes content within the configured write root. Existing
+// files are replaced only when WithAllowOverwrite(true) is configured.
+func (sandbox *Sandbox) WriteFile(path string, content []byte, mode os.FileMode) error {
+	if int64(len(content)) > sandbox.maxWriteBytes {
+		return fmt.Errorf("write to %q exceeds maximum write size of %d bytes", path, sandbox.maxWriteBytes)
+	}
+
+	root, relative, err := sandbox.writePath(path)
+	if err != nil {
+		return err
+	}
+	if relative == "." {
+		return fmt.Errorf("path must name a file below the write root")
+	}
+
+	parent := filepath.Dir(relative)
+	if err := root.root.MkdirAll(parent, 0755); err != nil {
+		return fmt.Errorf("create parent directory: %w", err)
+	}
+	parentRoot, err := root.root.OpenRoot(parent)
+	if err != nil {
+		return fmt.Errorf("open parent directory: %w", err)
+	}
+	if err := parentRoot.Close(); err != nil {
+		return fmt.Errorf("close parent directory: %w", err)
+	}
+
+	if info, err := root.root.Lstat(relative); err == nil {
+		if info.IsDir() {
+			return fmt.Errorf("write target %q is a directory", path)
+		}
+		if info.Mode()&fs.ModeSymlink != 0 {
+			return fmt.Errorf("write target %q is a symbolic link", path)
+		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("write target %q is not a regular file", path)
+		}
+		if !sandbox.allowOverwrite {
+			return fmt.Errorf("file %q already exists and overwrite is disabled", path)
+		}
+	} else if !errors.Is(err, fs.ErrNotExist) {
+		return fmt.Errorf("inspect write target: %w", err)
+	}
+
+	permissions := mode.Perm()
+	if permissions == 0 {
+		permissions = 0644
+	}
+	temporary, temporaryPath, err := root.createTemporaryFile(parent, permissions)
+	if err != nil {
+		return err
+	}
+	cleanupTemporary := true
+	defer func() {
+		if temporary != nil {
+			_ = temporary.Close()
+		}
+		if cleanupTemporary {
+			_ = root.root.Remove(temporaryPath)
+		}
+	}()
+
+	if _, err := temporary.Write(content); err != nil {
+		return fmt.Errorf("write temporary file: %w", err)
+	}
+	if err := temporary.Sync(); err != nil {
+		return fmt.Errorf("sync temporary file: %w", err)
+	}
+	if err := temporary.Close(); err != nil {
+		return fmt.Errorf("close temporary file: %w", err)
+	}
+	temporary = nil
+
+	if sandbox.allowOverwrite {
+		if err := root.root.Rename(temporaryPath, relative); err != nil {
+			return fmt.Errorf("atomically replace write target: %w", err)
+		}
+	} else if err := root.root.Link(temporaryPath, relative); err != nil {
+		return fmt.Errorf("atomically create write target without overwrite: %w", err)
+	} else if err := root.root.Remove(temporaryPath); err != nil {
+		return fmt.Errorf("remove temporary file after link: %w", err)
+	}
+	cleanupTemporary = false
+	sandbox.record("write_file", root, relative, int64(len(content)))
+	return nil
+}
+
+func (root *sandboxRoot) createTemporaryFile(parent string, mode os.FileMode) (*os.File, string, error) {
+	for attempt := 0; attempt < 10; attempt++ {
+		bytes := make([]byte, 16)
+		if _, err := rand.Read(bytes); err != nil {
+			return nil, "", fmt.Errorf("generate temporary file name: %w", err)
+		}
+		temporaryPath := filepath.Join(parent, ".sandbox-"+hex.EncodeToString(bytes)+".tmp")
+		file, err := root.root.OpenFile(temporaryPath, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
+		if errors.Is(err, fs.ErrExist) {
+			continue
+		}
+		if err != nil {
+			return nil, "", fmt.Errorf("create temporary file: %w", err)
+		}
+		return file, temporaryPath, nil
+	}
+	return nil, "", fmt.Errorf("create temporary file: too many name collisions")
+}
+
+// DeleteFile removes a file or empty directory beneath the write root.
+func (sandbox *Sandbox) DeleteFile(path string) error {
+	root, relative, err := sandbox.writePath(path)
+	if err != nil {
+		return err
+	}
+	if relative == "." {
+		return fmt.Errorf("path must name a file or directory below the write root")
+	}
+	if err := root.root.Remove(relative); err != nil {
+		return fmt.Errorf("delete file: %w", err)
+	}
+	sandbox.record("delete_file", root, relative, 0)
+	return nil
+}
+
+// MkdirAll creates a directory hierarchy beneath the write root.
+func (sandbox *Sandbox) MkdirAll(path string, mode os.FileMode) error {
+	root, relative, err := sandbox.writePath(path)
+	if err != nil {
+		return err
+	}
+	if relative == "." {
+		return nil
+	}
+	if err := root.root.MkdirAll(relative, mode.Perm()); err != nil {
+		return fmt.Errorf("create directory: %w", err)
+	}
+	sandbox.record("create_directory", root, relative, 0)
+	return nil
+}
+
+func (sandbox *Sandbox) record(operation string, root *sandboxRoot, relative string, size int64) {
+	if sandbox.audit == nil {
+		return
+	}
+	sandbox.audit(AuditEntry{
+		Operation: operation,
+		Path:      root.absolutePath(relative),
+		Size:      size,
+		At:        time.Now().UTC(),
+	})
 }
