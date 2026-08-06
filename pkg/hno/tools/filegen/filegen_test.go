@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/rexleimo/agno-go/pkg/hno/tools/file"
 )
 
 func TestFileGenToolkit_New(t *testing.T) {
@@ -291,5 +293,178 @@ func TestFileGenToolkit_GenerateFromTemplateMissingParameters(t *testing.T) {
 
 	if err == nil {
 		t.Error("Expected error for missing template parameter")
+	}
+}
+
+func TestFileGenToolkit_NewWithSandbox_ConfinesCreateOperations(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	sandbox, err := file.NewSandbox(file.WithWriteRoot(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	toolkit := NewWithSandbox(sandbox)
+	defer func() { _ = toolkit.Close() }()
+
+	ctx := context.Background()
+	filePath := filepath.Join("reports", "today.txt")
+	if _, err := toolkit.Execute(ctx, "create_file", map[string]interface{}{
+		"file_path": filePath,
+		"content":   "sandboxed",
+	}); err != nil {
+		t.Fatalf("create root-relative file: %v", err)
+	}
+	content, err := os.ReadFile(filepath.Join(root, filePath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "sandboxed" {
+		t.Fatalf("content = %q, want sandboxed", content)
+	}
+
+	if _, err := toolkit.Execute(ctx, "create_directory", map[string]interface{}{
+		"dir_path": filepath.Join("generated", "nested"),
+	}); err != nil {
+		t.Fatalf("create root-relative directory: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "generated", "nested")); err != nil {
+		t.Fatalf("stat created directory: %v", err)
+	}
+
+	for _, request := range []struct {
+		name string
+		args map[string]interface{}
+	}{
+		{
+			name: "absolute file path",
+			args: map[string]interface{}{
+				"file_path": filepath.Join(outside, "blocked.txt"),
+				"content":   "blocked",
+			},
+		},
+		{
+			name: "traversal file path",
+			args: map[string]interface{}{
+				"file_path": filepath.Join("..", "blocked.txt"),
+				"content":   "blocked",
+			},
+		},
+		{
+			name: "absolute directory path",
+			args: map[string]interface{}{
+				"dir_path": filepath.Join(outside, "blocked"),
+			},
+		},
+		{
+			name: "traversal directory path",
+			args: map[string]interface{}{
+				"dir_path": filepath.Join("..", "blocked"),
+			},
+		},
+	} {
+		t.Run(request.name, func(t *testing.T) {
+			function := "create_file"
+			if _, ok := request.args["dir_path"]; ok {
+				function = "create_directory"
+			}
+			if _, err := toolkit.Execute(ctx, function, request.args); err == nil {
+				t.Fatalf("expected %s to be rejected", request.name)
+			}
+		})
+	}
+}
+
+func TestFileGenToolkit_NewWithSandbox_OverwriteRequiresDualOptIn(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "existing.txt")
+	if err := os.WriteFile(target, []byte("old"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	ctx := context.Background()
+	withoutPolicy, err := file.NewSandbox(file.WithWriteRoot(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	withoutPolicyTools := NewWithSandbox(withoutPolicy)
+	if _, err := withoutPolicyTools.Execute(ctx, "create_file", map[string]interface{}{
+		"file_path": "existing.txt",
+		"content":   "new",
+		"overwrite": true,
+	}); err == nil {
+		t.Fatal("expected overwrite to require sandbox policy")
+	}
+	if err := withoutPolicyTools.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	withPolicy, err := file.NewSandbox(file.WithWriteRoot(root), file.WithAllowOverwrite(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	withPolicyTools := NewWithSandbox(withPolicy)
+	defer func() { _ = withPolicyTools.Close() }()
+	if _, err := withPolicyTools.Execute(ctx, "create_file", map[string]interface{}{
+		"file_path": "existing.txt",
+		"content":   "new",
+	}); err == nil {
+		t.Fatal("expected overwrite to require the tool argument")
+	}
+	if _, err := withPolicyTools.Execute(ctx, "create_file", map[string]interface{}{
+		"file_path": "existing.txt",
+		"content":   "new",
+		"overwrite": true,
+	}); err != nil {
+		t.Fatalf("overwrite with both opt-ins: %v", err)
+	}
+	content, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "new" {
+		t.Fatalf("content = %q, want new", content)
+	}
+}
+
+func TestFileGenToolkit_NewWithSandbox_RejectsDirectorySymlinkEscape(t *testing.T) {
+	root := t.TempDir()
+	outside := t.TempDir()
+	if err := os.Symlink(outside, filepath.Join(root, "out")); err != nil {
+		t.Skipf("symlink unsupported: %v", err)
+	}
+
+	sandbox, err := file.NewSandbox(file.WithWriteRoot(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	toolkit := NewWithSandbox(sandbox)
+	defer func() { _ = toolkit.Close() }()
+
+	if _, err := toolkit.Execute(context.Background(), "create_file", map[string]interface{}{
+		"file_path": filepath.Join("out", "escaped.txt"),
+		"content":   "blocked",
+	}); err == nil {
+		t.Fatal("expected file creation through a directory symlink to fail")
+	}
+	if _, err := toolkit.Execute(context.Background(), "create_directory", map[string]interface{}{
+		"dir_path": filepath.Join("out", "escaped-dir"),
+	}); err == nil {
+		t.Fatal("expected directory creation through a directory symlink to fail")
+	}
+	if _, err := os.Stat(filepath.Join(outside, "escaped.txt")); !os.IsNotExist(err) {
+		t.Fatalf("outside file was created or could not be checked: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(outside, "escaped-dir")); !os.IsNotExist(err) {
+		t.Fatalf("outside directory was created or could not be checked: %v", err)
+	}
+}
+
+func TestFileGenToolkit_NewWithSandbox_NilSandboxFailsClosed(t *testing.T) {
+	toolkit := NewWithSandbox(nil)
+	if _, err := toolkit.Execute(context.Background(), "create_file", map[string]interface{}{
+		"file_path": "blocked.txt",
+		"content":   "blocked",
+	}); err == nil {
+		t.Fatal("expected nil sandbox configuration to fail closed")
 	}
 }

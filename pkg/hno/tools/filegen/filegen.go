@@ -7,27 +7,57 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/rexleimo/agno-go/pkg/hno/tools/file"
 	"github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 )
 
-// FileGenToolkit provides file generation capabilities
-// This is a basic implementation for development tools
-
-// FileGenToolkit provides file generation capabilities
+// FileGenToolkit provides file generation capabilities.
 type FileGenToolkit struct {
 	*toolkit.BaseToolkit
+	sandbox    *file.Sandbox
+	sandboxErr error
 }
 
-// New creates a new FileGen toolkit
+// New creates unrestricted file generation tools for trusted environments only.
+// Production agents should use NewWithSandbox.
 func New() *FileGenToolkit {
-	t := &FileGenToolkit{
-		BaseToolkit: toolkit.NewBaseToolkit("file_generation"),
-	}
+	t := &FileGenToolkit{BaseToolkit: toolkit.NewBaseToolkit("file_generation")}
+	t.registerFunctions()
+	return t
+}
 
-	// Register file creation function
+// NewWithSandbox creates file generation tools confined to a sandbox write root.
+// File and directory paths must be relative to that root.
+func NewWithSandbox(sandbox *file.Sandbox) *FileGenToolkit {
+	t := New()
+	if sandbox == nil {
+		t.sandboxErr = fmt.Errorf("sandbox cannot be nil")
+		return t
+	}
+	t.sandbox = sandbox
+	return t
+}
+
+// Close closes the configured sandbox. When a sandbox is shared by multiple
+// toolkits, close it only after all of them have finished.
+func (f *FileGenToolkit) Close() error {
+	if f.sandbox == nil {
+		return nil
+	}
+	return f.sandbox.Close()
+}
+
+func (f *FileGenToolkit) sandboxConfigurationError() error {
+	if f.sandboxErr == nil {
+		return nil
+	}
+	return fmt.Errorf("file generation sandbox configuration: %w", f.sandboxErr)
+}
+
+func (t *FileGenToolkit) registerFunctions() {
 	t.RegisterFunction(&toolkit.Function{
 		Name:        "create_file",
-		Description: "Create a new file with specified content",
+		Description: "Create a new file with specified content. In sandboxed mode, file_path must be relative to the configured write root.",
 		Parameters: map[string]toolkit.Parameter{
 			"file_path": {
 				Type:        "string",
@@ -52,7 +82,7 @@ func New() *FileGenToolkit {
 	// Register directory creation function
 	t.RegisterFunction(&toolkit.Function{
 		Name:        "create_directory",
-		Description: "Create a new directory",
+		Description: "Create a new directory. In sandboxed mode, dir_path must be relative to the configured write root.",
 		Parameters: map[string]toolkit.Parameter{
 			"dir_path": {
 				Type:        "string",
@@ -82,8 +112,6 @@ func New() *FileGenToolkit {
 		},
 		Handler: t.generateFromTemplate,
 	})
-
-	return t
 }
 
 // createFile creates a new file with specified content
@@ -103,20 +131,26 @@ func (f *FileGenToolkit) createFile(ctx context.Context, args map[string]interfa
 		overwrite = overwriteArg
 	}
 
-	// Check if file already exists
-	if _, err := os.Stat(filePath); err == nil && !overwrite {
-		return nil, fmt.Errorf("file already exists and overwrite is false: %s", filePath)
+	if err := f.sandboxConfigurationError(); err != nil {
+		return nil, err
 	}
 
-	// Create directory if it doesn't exist
-	dir := filepath.Dir(filePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create directory: %w", err)
-	}
+	if f.sandbox != nil {
+		if err := f.sandbox.CreateFile(filePath, []byte(content), 0644, overwrite); err != nil {
+			return nil, fmt.Errorf("failed to create file: %w", err)
+		}
+	} else {
+		if _, err := os.Stat(filePath); err == nil && !overwrite {
+			return nil, fmt.Errorf("file already exists and overwrite is false: %s", filePath)
+		}
 
-	// Write file
-	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
-		return nil, fmt.Errorf("failed to write file: %w", err)
+		dir := filepath.Dir(filePath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create directory: %w", err)
+		}
+		if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+			return nil, fmt.Errorf("failed to write file: %w", err)
+		}
 	}
 
 	return map[string]interface{}{
@@ -134,14 +168,21 @@ func (f *FileGenToolkit) createDirectory(ctx context.Context, args map[string]in
 		return nil, fmt.Errorf("dir_path must be a string")
 	}
 
-	// Check if directory already exists
-	if _, err := os.Stat(dirPath); err == nil {
-		return nil, fmt.Errorf("directory already exists: %s", dirPath)
+	if err := f.sandboxConfigurationError(); err != nil {
+		return nil, err
 	}
 
-	// Create directory
-	if err := os.MkdirAll(dirPath, 0755); err != nil {
-		return nil, fmt.Errorf("failed to create directory: %w", err)
+	if f.sandbox != nil {
+		if err := f.sandbox.CreateDirectory(dirPath, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create directory: %w", err)
+		}
+	} else {
+		if _, err := os.Stat(dirPath); err == nil {
+			return nil, fmt.Errorf("directory already exists: %s", dirPath)
+		}
+		if err := os.MkdirAll(dirPath, 0755); err != nil {
+			return nil, fmt.Errorf("failed to create directory: %w", err)
+		}
 	}
 
 	return map[string]interface{}{

@@ -86,7 +86,8 @@ func WithMaxWriteBytes(size int64) SandboxOption {
 	}
 }
 
-// WithAllowOverwrite permits WriteFile to replace an existing regular file.
+// WithAllowOverwrite permits WriteFile to replace an existing regular file and
+// enables CreateFile's explicit overwrite opt-in.
 func WithAllowOverwrite(allow bool) SandboxOption {
 	return func(config *sandboxConfig) {
 		config.allowOverwrite = allow
@@ -352,12 +353,24 @@ func (sandbox *Sandbox) Stat(path string) (fs.FileInfo, error) {
 	return info, nil
 }
 
-// WriteFile writes content within the configured write root. New targets are
-// created with O_EXCL; replacing an existing regular file requires
-// WithAllowOverwrite(true). Go 1.24 does not expose a root-bound rename, so an
-// allowed overwrite has normal truncate-and-write semantics rather than an
-// atomic replacement.
+// WriteFile writes content within the configured write root according to the
+// Sandbox overwrite policy.
 func (sandbox *Sandbox) WriteFile(path string, content []byte, mode os.FileMode) error {
+	return sandbox.writeFile(path, content, mode, sandbox.allowOverwrite, "write_file")
+}
+
+// CreateFile creates a file within the configured write root. Replacing an
+// existing file requires both overwrite=true and WithAllowOverwrite(true).
+func (sandbox *Sandbox) CreateFile(path string, content []byte, mode os.FileMode, overwrite bool) error {
+	return sandbox.writeFile(path, content, mode, overwrite && sandbox.allowOverwrite, "create_file")
+}
+
+// writeFile writes content within the configured write root. New targets are
+// created with O_EXCL; replacing an existing regular file requires an allowed
+// overwrite. Go 1.24 does not expose a root-bound rename, so an allowed
+// overwrite has normal truncate-and-write semantics rather than an atomic
+// replacement.
+func (sandbox *Sandbox) writeFile(path string, content []byte, mode os.FileMode, allowOverwrite bool, operation string) error {
 	if int64(len(content)) > sandbox.maxWriteBytes {
 		return fmt.Errorf("write to %q exceeds maximum write size of %d bytes", path, sandbox.maxWriteBytes)
 	}
@@ -387,7 +400,7 @@ func (sandbox *Sandbox) WriteFile(path string, content []byte, mode os.FileMode)
 		if !info.Mode().IsRegular() {
 			return fmt.Errorf("write target %q is not a regular file", path)
 		}
-		if !sandbox.allowOverwrite {
+		if !allowOverwrite {
 			return fmt.Errorf("file %q already exists and overwrite is disabled", path)
 		}
 	} else if !errors.Is(err, fs.ErrNotExist) {
@@ -430,7 +443,7 @@ func (sandbox *Sandbox) WriteFile(path string, content []byte, mode os.FileMode)
 		return fmt.Errorf("close file: %w", err)
 	}
 	cleanupCreatedFile = false
-	sandbox.record("write_file", relative, int64(len(content)))
+	sandbox.record(operation, relative, int64(len(content)))
 	return nil
 }
 
@@ -447,8 +460,12 @@ func mkdirAllInRoot(root *os.Root, path string, mode os.FileMode) error {
 		}
 	}()
 
+	separator := rune(filepath.Separator)
 	for _, component := range strings.FieldsFunc(path, func(r rune) bool {
-		return r == '/' || r == '\\'
+		if r == separator {
+			return true
+		}
+		return runtime.GOOS == "windows" && r == '/'
 	}) {
 		if component == "" || component == "." {
 			continue
@@ -482,6 +499,32 @@ func (sandbox *Sandbox) DeleteFile(path string) error {
 		return fmt.Errorf("delete file: %w", err)
 	}
 	sandbox.record("delete_file", relative, 0)
+	return nil
+}
+
+// CreateDirectory creates one directory beneath the write root. Its parent
+// hierarchy is created as needed, but an existing target remains an error.
+func (sandbox *Sandbox) CreateDirectory(path string, mode os.FileMode) error {
+	root, relative, err := sandbox.writePath(path)
+	if err != nil {
+		return err
+	}
+	if relative == "." {
+		return fmt.Errorf("path must name a directory below the write root")
+	}
+
+	parent := filepath.Dir(relative)
+	if err := mkdirAllInRoot(root.root, parent, 0755); err != nil {
+		return fmt.Errorf("create parent directory: %w", err)
+	}
+	permissions := mode.Perm()
+	if permissions == 0 {
+		permissions = 0755
+	}
+	if err := root.root.Mkdir(relative, permissions); err != nil {
+		return fmt.Errorf("create directory: %w", err)
+	}
+	sandbox.record("create_directory", relative, 0)
 	return nil
 }
 

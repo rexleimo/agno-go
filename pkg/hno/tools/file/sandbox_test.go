@@ -183,6 +183,93 @@ func TestSandbox_WriteFile_OverwriteAllowed(t *testing.T) {
 	}
 }
 
+func TestSandbox_CreateFile_OverwriteRequiresCallerAndPolicy(t *testing.T) {
+	root := t.TempDir()
+	target := filepath.Join(root, "existing.txt")
+	if err := os.WriteFile(target, []byte("old"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	withoutPolicy, err := NewSandbox(WithWriteRoot(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := withoutPolicy.CreateFile("existing.txt", []byte("new"), 0644, true); err == nil {
+		t.Fatal("expected overwrite to require sandbox policy")
+	}
+	if err := withoutPolicy.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	withPolicy, err := NewSandbox(WithWriteRoot(root), WithAllowOverwrite(true))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = withPolicy.Close() }()
+	if err := withPolicy.CreateFile("existing.txt", []byte("new"), 0644, false); err == nil {
+		t.Fatal("expected overwrite to require caller opt-in")
+	}
+	if err := withPolicy.CreateFile("existing.txt", []byte("new"), 0644, true); err != nil {
+		t.Fatalf("overwrite with both opt-ins: %v", err)
+	}
+	got, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "new" {
+		t.Errorf("content = %q, want new", got)
+	}
+}
+
+func TestSandbox_CreateDirectory_CreatesParentsAndRejectsExistingTarget(t *testing.T) {
+	root := t.TempDir()
+	sandbox, err := NewSandbox(WithWriteRoot(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = sandbox.Close() }()
+
+	path := filepath.Join("generated", "nested")
+	if err := sandbox.CreateDirectory(path, 0755); err != nil {
+		t.Fatalf("create directory: %v", err)
+	}
+	info, err := os.Stat(filepath.Join(root, path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !info.IsDir() {
+		t.Fatal("created target is not a directory")
+	}
+	if err := sandbox.CreateDirectory(path, 0755); err == nil {
+		t.Fatal("expected existing directory target to fail")
+	}
+}
+
+func TestSandbox_WriteFile_PreservesBackslashesOnUnix(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("backslash is a path separator on Windows")
+	}
+
+	root := t.TempDir()
+	sandbox, err := NewSandbox(WithWriteRoot(root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = sandbox.Close() }()
+
+	path := "reports\\drafts/summary.txt"
+	if err := sandbox.WriteFile(path, []byte("sandboxed"), 0644); err != nil {
+		t.Fatalf("write file with Unix backslash name: %v", err)
+	}
+	content, err := os.ReadFile(filepath.Join(root, "reports\\drafts", "summary.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(content) != "sandboxed" {
+		t.Fatalf("content = %q, want sandboxed", content)
+	}
+}
+
 func TestSandbox_WriteFile_SizeLimit(t *testing.T) {
 	root := t.TempDir()
 	sandbox, err := NewSandbox(WithWriteRoot(root), WithMaxWriteBytes(4))

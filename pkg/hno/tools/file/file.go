@@ -58,7 +58,8 @@ func NewWithBaseDir(baseDir string) *FileTools {
 	return newFileTools(sandbox, nil, pathMapper)
 }
 
-// Close releases resources held by the configured sandbox.
+// Close closes the configured sandbox. When a sandbox is shared by multiple
+// toolkits, close it only after all of them have finished.
 func (ft *FileTools) Close() error {
 	if ft.sandbox == nil {
 		return nil
