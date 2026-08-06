@@ -23,17 +23,20 @@ head:
 
 ## 最新文章
 
-### AI Agent 框架性能怎么测：为什么运行时开销比模型延迟更重要
+### Agent 文件工具不能只靠路径前缀：HNO 如何用根句柄做沙盒
 
-[阅读完整文章](/zh/blog/ai-agent-runtime-benchmark)
+[阅读完整文章](/zh/blog/sandboxed-file-io)
 
-使用同一个本地 OpenAI-compatible Stub，对 HNO、Agno 和 LangGraph 进行可复现
-对比：每组 100 次正式操作，并发度 1、8、32。文章解释了为什么看到某个新模型
-或 Agent 框架登上热点时，不能直接把宣传中的模型速度当成框架性能。
+一篇工程文章，说明为什么字符串路径白名单不是 Agent 安全边界，以及 HNO 如何结合
+显式读写能力和 Go 的根句柄绑定文件系统操作来约束文件工具。
 
-- **分类：**性能基准
-- **标签：**AI Agent、框架性能、Go、Python、LangGraph、Agno
-- **证据：**5 次预热、100 次正式请求、相同的本地 OpenAI-compatible Stub
+- **分类：**安全工程
+- **标签：**AI Agent、Agent 安全、沙盒、文件 I/O、Go
+- **证据：**根相对工具路径、`os.Root` 强制执行、逃逸回归测试与明确的部署边界
+
+### 同期文章：AI Agent 框架性能怎么测：为什么运行时开销比模型延迟更重要
+
+[阅读性能基准](/zh/blog/ai-agent-runtime-benchmark)
 
 ## HNO 如何使用热点
 
@@ -43,8 +46,8 @@ head:
 1. **记录热点来源。** 保存来源 URL 和发布时间。
 2. **连接到真实的 HNO 问题。** 不为了关键词强行写无关内容。
 3. **补充证据。** 优先使用代码、benchmark、trace 或可复现的测量。
-4. **链接到长期文档。** 读者可以继续查看 [Agent 指南](/zh/guide/agent)、
-   [性能报告](/zh/advanced/performance) 或[系统开销矩阵](/zh/advanced/system-overhead)。
+4. **链接到长期文档。** 读者可以继续查看[沙盒化文件 I/O 指南](/zh/guide/sandboxed-file-io)、
+   [Agent 指南](/zh/guide/agent)、[性能报告](/zh/advanced/performance) 或[系统开销矩阵](/zh/advanced/system-overhead)。
 5. **持续更新而不是重复发文。** 同一热点出现新进展时，更新原文章并记录变化。
 
 ## 主题方向

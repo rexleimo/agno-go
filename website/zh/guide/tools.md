@@ -124,39 +124,39 @@ httpTool := http.New(http.Config{
 
 ## File 工具
 
-带内置安全控制的文件读写。
-
-### 操作
-
-- `read_file(path)` - 读取文件内容
-- `write_file(path, content)` - 写入内容到文件
-- `list_directory(path)` - 列出目录内容
-- `delete_file(path)` - 删除文件
-
-### 示例
+对于 Agent 面向的文件访问，请优先使用根句柄绑定的 sandbox。Sandbox 将读写能力分离，只接收根相对路径，使用 `os.Root` 执行真实文件操作，应用字节上限，并可输出审计记录。
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/hno/tools/file"
+import (
+    "github.com/rexleimo/agno-go/pkg/hno/tools/file"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/filegen"
+)
 
-fileTool := file.New(file.Config{
-    AllowedPaths: []string{"/tmp", "./data"},  // Restrict access
-    MaxFileSize:  1024 * 1024,                 // 1MB limit
+sandbox, err := file.NewSandbox(
+    file.WithReadRoots("./agent-inputs"),
+    file.WithWriteRoot("./agent-workspace"),
+)
+if err != nil {
+    log.Fatal(err)
+}
+defer sandbox.Close()
+
+agent, err := agent.New(agent.Config{
+    Model: model,
+    Toolkits: []toolkit.Toolkit{
+        file.NewWithSandbox(sandbox),
+        filegen.NewWithSandbox(sandbox),
+    },
 })
-
-agent, _ := agent.New(agent.Config{
-    Model:    model,
-    Toolkits: []toolkit.Toolkit{fileTool},
-})
-
-output, _ := agent.Run(ctx, "Read the contents of ./data/report.txt")
 ```
 
-### 安全特性
+在此配置中，`"report.txt"` 和 `"drafts/summary.md"` 是有效的 Agent 路径；绝对路径、`..` 穿越以及会逃出根目录的符号链接都会被拒绝。已有生成文件必须同时满足 `create_file` 调用中的 `overwrite: true` 和 sandbox 配置中的 `file.WithAllowOverwrite(true)` 才能覆盖。多个 Toolkit 共用一个 `Sandbox` 时，应在所有工作结束后统一调用 `sandbox.Close()`；关闭任意一个 Toolkit 都会关闭共享 sandbox。
 
-- 路径限制 (白名单)
-- 文件大小限制
-- 只读模式选项
-- 自动路径清理
+::: warning
+为兼容性保留的 `file.New()` 没有文件系统限制，只适用于可信调用方。文件路径 sandbox 不是 OS/进程 sandbox；面对不可信或多租户工作负载，仍需使用每次运行独立卷、ACL、执行隔离、配额和 egress 控制。
+:::
+
+完整架构、API 契约和部署边界请参阅[沙盒化文件 I/O 指南](/zh/guide/sandboxed-file-io)。
 
 ---
 
@@ -165,20 +165,29 @@ output, _ := agent.Run(ctx, "Read the contents of ./data/report.txt")
 Agent 可以使用多个工具:
 
 ```go
-agent, _ := agent.New(agent.Config{
+sandbox, err := file.NewSandbox(
+    file.WithReadRoots("./data"),
+    file.WithWriteRoot("./workspace"),
+)
+if err != nil {
+    log.Fatal(err)
+}
+defer sandbox.Close()
+
+fileTool := file.NewWithSandbox(sandbox)
+
+ag, err := agent.New(agent.Config{
     Name:  "Multi-Tool Agent",
     Model: model,
     Toolkits: []toolkit.Toolkit{
         calculator.New(),
         http.New(),
-        file.New(file.Config{
-            AllowedPaths: []string{"./data"},
-        }),
+        fileTool,
     },
 })
 
 // Agent can now calculate, fetch data, and read files
-output, _ := agent.Run(ctx,
+output, _ := ag.Run(ctx,
     "Fetch weather data, calculate average temperature, and save to file")
 ```
 
@@ -357,11 +366,15 @@ func (t *MyToolkit) fetchData(args map[string]interface{}) (interface{}, error) 
 限制工具能力:
 
 ```go
-// Whitelist allowed operations
-fileTool := file.New(file.Config{
-    AllowedPaths: []string{"/safe/path"},
-    ReadOnly:     true,  // Prevent writes
-})
+// 只有读根、没有写根的 sandbox 是只读的。
+readOnlySandbox, err := file.NewSandbox(
+    file.WithReadRoots("/safe/path"),
+)
+if err != nil {
+    log.Fatal(err)
+}
+defer readOnlySandbox.Close()
+fileTool := file.NewWithSandbox(readOnlySandbox)
 
 // Validate domains
 httpTool := http.New(http.Config{

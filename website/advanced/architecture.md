@@ -178,8 +178,16 @@ LLM provider implementations:
 Extensible toolkit system:
 - `calculator/` - Math operations
 - `http/` - HTTP requests
-- `file/` - File operations
+- `file/` - Root-bound sandboxed file operations with separate read/write capabilities
+- `filegen/` - Sandboxed artifact and directory generation via the same write capability
 - `search/` - Web search
+
+For Agent-facing paths, create `file.NewSandbox` with explicit read and write
+roots, then supply `file.NewWithSandbox` and/or `filegen.NewWithSandbox`. The
+sandbox delegates actual operations to Go `os.Root` handles, so paths remain
+confined to their configured roots even when a symbolic link is encountered.
+See [Sandboxed File I/O](/guide/sandboxed-file-io) for the diagram, API contract,
+and deployment boundary.
 
 ## AgentOS Production Server
 

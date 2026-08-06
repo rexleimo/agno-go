@@ -62,6 +62,7 @@ export default defineConfig({
                 { text: 'Models', link: '/guide/models' },
                 { text: 'Embeddings', link: '/guide/embeddings' },
                 { text: 'Tools', link: '/guide/tools' },
+                { text: 'Sandboxed File I/O', link: '/guide/sandboxed-file-io' },
                 { text: 'Memory', link: '/guide/memory' },
                 { text: 'Session State', link: '/guide/session-state' },
                 { text: 'Session Service', link: '/guide/session-service' },
@@ -124,6 +125,7 @@ export default defineConfig({
               text: 'Blog',
               items: [
                 { text: 'Latest article', link: '/blog/' },
+                { text: 'Sandboxed file I/O', link: '/blog/sandboxed-file-io' },
                 { text: 'AI Agent runtime benchmark', link: '/blog/ai-agent-runtime-benchmark' }
               ]
             }
@@ -178,6 +180,7 @@ export default defineConfig({
                 { text: 'Models 模型', link: '/zh/guide/models' },
                 { text: 'Embeddings 嵌入', link: '/zh/guide/embeddings' },
                 { text: 'Tools 工具', link: '/zh/guide/tools' },
+                { text: '沙盒化文件 I/O', link: '/zh/guide/sandboxed-file-io' },
                 { text: 'Memory 记忆', link: '/zh/guide/memory' },
                 { text: '会话状态', link: '/zh/guide/session-state' },
                 { text: 'Go 会话服务', link: '/zh/guide/session-service' },
@@ -240,6 +243,7 @@ export default defineConfig({
               text: '博客',
               items: [
                 { text: '最新文章', link: '/zh/blog/' },
+                { text: '沙盒化文件 I/O', link: '/zh/blog/sandboxed-file-io' },
                 { text: 'AI Agent 框架性能基准', link: '/zh/blog/ai-agent-runtime-benchmark' }
               ]
             }
@@ -509,6 +513,7 @@ export default defineConfig({
             { text: 'Models', link: '/guide/models' },
             { text: 'Embeddings', link: '/guide/embeddings' },
             { text: 'Tools', link: '/guide/tools' },
+            { text: 'Sandboxed File I/O', link: '/guide/sandboxed-file-io' },
             { text: 'Memory', link: '/guide/memory' },
             { text: 'Session State', link: '/guide/session-state' },
             { text: 'MCP Integration', link: '/guide/mcp' }
@@ -567,6 +572,7 @@ export default defineConfig({
           text: 'Blog',
           items: [
             { text: 'Latest article', link: '/blog/' },
+            { text: 'Sandboxed file I/O', link: '/blog/sandboxed-file-io' },
             { text: 'AI Agent runtime benchmark', link: '/blog/ai-agent-runtime-benchmark' }
           ]
         }

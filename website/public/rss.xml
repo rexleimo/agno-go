@@ -7,6 +7,34 @@
     <language>en</language>
     <atom:link href="https://hno.rexai.top/rss.xml" rel="self" type="application/rss+xml" />
   <item>
+    <title>Agent 文件工具不能只靠路径前缀：HNO 如何用根句柄做沙盒</title>
+    <link>https://hno.rexai.top/zh/blog/sandboxed-file-io</link>
+    <guid isPermaLink="true">https://hno.rexai.top/zh/blog/sandboxed-file-io</guid>
+    <pubDate>Thu, 06 Aug 2026 00:00:00 GMT</pubDate>
+    <dc:language>zh-CN</dc:language>
+    <description>HNO 通过显式能力、Go root-bound 文件系统句柄、读写限额与独立部署隔离层，约束 Agent 的文件读写。</description>
+    <category>安全工程</category>
+    <category>AI Agent</category>
+    <category>Agent 安全</category>
+    <category>沙盒</category>
+    <category>文件 I/O</category>
+    <category>Go</category>
+  </item>
+  <item>
+    <title>Agent File Tools Need Root-Bound Sandboxes, Not Path Prefix Checks</title>
+    <link>https://hno.rexai.top/blog/sandboxed-file-io</link>
+    <guid isPermaLink="true">https://hno.rexai.top/blog/sandboxed-file-io</guid>
+    <pubDate>Thu, 06 Aug 2026 00:00:00 GMT</pubDate>
+    <dc:language>en</dc:language>
+    <description>How HNO confines agent file reads and writes with explicit capabilities, root-bound Go filesystem handles, bounded I/O, and a separate deployment-isolation layer.</description>
+    <category>Security engineering</category>
+    <category>AI agents</category>
+    <category>agent security</category>
+    <category>sandbox</category>
+    <category>file I/O</category>
+    <category>Go</category>
+  </item>
+  <item>
     <title>AI Agent 框架性能怎么测：为什么运行时开销比模型延迟更重要</title>
     <link>https://hno.rexai.top/zh/blog/ai-agent-runtime-benchmark</link>
     <guid isPermaLink="true">https://hno.rexai.top/zh/blog/ai-agent-runtime-benchmark</guid>

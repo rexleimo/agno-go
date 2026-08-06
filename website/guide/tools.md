@@ -124,39 +124,39 @@ httpTool := http.New(http.Config{
 
 ## File Tool
 
-Read and write files with built-in safety controls.
-
-### Operations
-
-- `read_file(path)` - Read file content
-- `write_file(path, content)` - Write content to file
-- `list_directory(path)` - List directory contents
-- `delete_file(path)` - Delete a file
-
-### Example
+For Agent-facing file access, prefer a root-bound sandbox. The sandbox separates read and write capabilities, accepts root-relative paths only, uses `os.Root` for the actual filesystem operation, applies byte limits, and can emit audit records.
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/hno/tools/file"
+import (
+    "github.com/rexleimo/agno-go/pkg/hno/tools/file"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/filegen"
+)
 
-fileTool := file.New(file.Config{
-    AllowedPaths: []string{"/tmp", "./data"},  // Restrict access
-    MaxFileSize:  1024 * 1024,                 // 1MB limit
+sandbox, err := file.NewSandbox(
+    file.WithReadRoots("./agent-inputs"),
+    file.WithWriteRoot("./agent-workspace"),
+)
+if err != nil {
+    log.Fatal(err)
+}
+defer sandbox.Close()
+
+agent, err := agent.New(agent.Config{
+    Model: model,
+    Toolkits: []toolkit.Toolkit{
+        file.NewWithSandbox(sandbox),
+        filegen.NewWithSandbox(sandbox),
+    },
 })
-
-agent, _ := agent.New(agent.Config{
-    Model:    model,
-    Toolkits: []toolkit.Toolkit{fileTool},
-})
-
-output, _ := agent.Run(ctx, "Read the contents of ./data/report.txt")
 ```
 
-### Safety Features
+In this configuration, `"report.txt"` and `"drafts/summary.md"` are valid Agent paths, while absolute paths, `..` traversal, and escaping symbolic links are denied. Existing generated files require both `overwrite: true` in a `create_file` call and `file.WithAllowOverwrite(true)` in the sandbox configuration. When multiple toolkits share one `Sandbox`, call `sandbox.Close()` once after all work finishes; closing either toolkit closes the shared sandbox.
 
-- Path restrictions (whitelist)
-- File size limits
-- Read-only mode option
-- Automatic path sanitization
+::: warning
+`file.New()` remains unrestricted for compatibility and is suitable only for trusted callers. A file-path sandbox is not an OS/process sandbox; use per-run volumes, ACLs, execution isolation, quotas, and egress controls for untrusted or multi-tenant workloads.
+:::
+
+See the [Sandboxed File I/O guide](/guide/sandboxed-file-io) for the architecture, full API contract, and deployment boundary.
 
 ---
 
@@ -165,20 +165,29 @@ output, _ := agent.Run(ctx, "Read the contents of ./data/report.txt")
 Agents can use multiple tools:
 
 ```go
-agent, _ := agent.New(agent.Config{
+sandbox, err := file.NewSandbox(
+    file.WithReadRoots("./data"),
+    file.WithWriteRoot("./workspace"),
+)
+if err != nil {
+    log.Fatal(err)
+}
+defer sandbox.Close()
+
+fileTool := file.NewWithSandbox(sandbox)
+
+ag, err := agent.New(agent.Config{
     Name:  "Multi-Tool Agent",
     Model: model,
     Toolkits: []toolkit.Toolkit{
         calculator.New(),
         http.New(),
-        file.New(file.Config{
-            AllowedPaths: []string{"./data"},
-        }),
+        fileTool,
     },
 })
 
 // Agent can now calculate, fetch data, and read files
-output, _ := agent.Run(ctx,
+output, _ := ag.Run(ctx,
     "Fetch weather data, calculate average temperature, and save to file")
 ```
 
@@ -388,11 +397,15 @@ func (t *MyToolkit) fetchData(args map[string]interface{}) (interface{}, error) 
 Restrict tool capabilities:
 
 ```go
-// Whitelist allowed operations
-fileTool := file.New(file.Config{
-    AllowedPaths: []string{"/safe/path"},
-    ReadOnly:     true,  // Prevent writes
-})
+// A sandbox with read roots but no write root is read-only.
+readOnlySandbox, err := file.NewSandbox(
+    file.WithReadRoots("/safe/path"),
+)
+if err != nil {
+    log.Fatal(err)
+}
+defer readOnlySandbox.Close()
+fileTool := file.NewWithSandbox(readOnlySandbox)
 
 // Validate domains
 httpTool := http.New(http.Config{

@@ -50,35 +50,68 @@ ag, _ := agent.New(agent.Config{
 
 ## File
 
-带安全控制的文件操作。/ File operations with safety controls.
+带显式能力控制的沙盒化文件操作。对于 Agent 面向的路径，请使用 `Sandbox` 和 `NewWithSandbox`；`New()` 仅为可信调用方保留不受限制的旧行为。
 
-**创建 / Create:**
+**创建：**
 ```go
-func New(config Config) *FileToolkit
+func New() *FileTools
+func NewWithBaseDir(baseDir string) *FileTools
+func NewWithSandbox(sandbox *Sandbox) *FileTools
 
-type Config struct {
-    AllowedPaths []string // 允许的目录白名单 / Whitelist of allowed directories
-    MaxFileSize  int64    // 最大文件大小(字节) (默认: 10MB) / Max file size in bytes (default: 10MB)
+func NewSandbox(options ...SandboxOption) (*Sandbox, error)
+```
+
+**Sandbox 选项：**
+```go
+file.WithReadRoots("./inputs", "./templates")
+file.WithWriteRoot("./workspace")
+file.WithMaxReadBytes(10 << 20)
+file.WithMaxWriteBytes(5 << 20)
+file.WithAllowOverwrite(true)
+file.WithAudit(func(entry file.AuditEntry) { /* 记录审计事件 */ })
+```
+
+`NewSandbox` 默认 fail-closed：没有读根就拒绝读取，没有写根就拒绝写入。沙盒路径必须相对其配置根目录。绝对路径、路径穿越、逃逸性符号链接和 Windows 特殊路径都会被拒绝。
+
+**函数：**
+- `read_file(path)`：读取读根下的一个普通文件。
+- `write_file(path, content)`：根据 sandbox 覆盖策略，在写根下创建或替换文件。
+- `list_files(path)`：列出读根下的一个目录。
+- `file_exists(path)`：查询读根下的文件元数据。
+- `read_pptx(path)`：从通过读根打开的文件中提取 PPTX 幻灯片文本。
+- `delete_file(path)`：删除写根下的文件或空目录。
+
+**文件生成：**
+```go
+func filegen.New() *filegen.FileGenToolkit
+func filegen.NewWithSandbox(sandbox *file.Sandbox) *filegen.FileGenToolkit
+```
+
+- `create_file(file_path, content, overwrite)`：在写根下创建产物。覆盖已有文件必须同时满足 `overwrite: true` 和 `WithAllowOverwrite(true)`。
+- `create_directory(dir_path)`：在写根下创建目录；目标已存在时返回错误。
+- `generate_from_template(template, variables)`：仅在内存中替换模板，不访问文件系统。
+
+**示例：**
+```go
+sandbox, err := file.NewSandbox(
+    file.WithReadRoots("./inputs"),
+    file.WithWriteRoot("./workspace"),
+)
+if err != nil {
+    log.Fatal(err)
 }
-```
+defer sandbox.Close()
 
-**函数 / Functions:**
-- `read_file(path)`: 读取文件内容 / Read file content
-- `write_file(path, content)`: 写入文件 / Write file
-- `list_files(directory)`: 列出目录 / List directory
-- `delete_file(path)`: 删除文件 / Delete file
-
-**示例 / Example:**
-```go
-file := file.New(file.Config{
-    AllowedPaths: []string{"/data", "/tmp"},
-    MaxFileSize:  5 * 1024 * 1024, // 5MB
-})
-
-ag, _ := agent.New(agent.Config{
-    Toolkits: []toolkit.Toolkit{file},
+ag, err := agent.New(agent.Config{
+    Toolkits: []toolkit.Toolkit{
+        file.NewWithSandbox(sandbox),
+        filegen.NewWithSandbox(sandbox),
+    },
+    // ...
 })
 ```
+
+架构、生命周期、限制和部署建议请参阅[沙盒化文件 I/O 指南](/zh/guide/sandboxed-file-io)。
 
 ## 自定义工具 / Custom Tools
 

@@ -23,18 +23,21 @@ and the engineering ideas behind the news cycle.
 
 ## Latest article
 
-### AI Agent Framework Benchmarks: Why Runtime Overhead Matters More Than Model Latency
+### Agent File Tools Need Root-Bound Sandboxes, Not Path Prefix Checks
 
-[Read the full article](/blog/ai-agent-runtime-benchmark)
+[Read the full article](/blog/sandboxed-file-io)
 
-A reproducible local-stub comparison of HNO, Agno, and LangGraph using 100 measured
-operations at concurrency 1, 8, and 32. The article explains why a new model
-release or an AI agent performance headline should not be treated as a framework
-benchmark without a controlled protocol.
+An engineering note on why a string path allowlist is not an Agent security
+boundary, and how HNO uses explicit read/write capabilities plus Go's
+root-bound filesystem handles to contain file-tool operations.
 
-- **Category:** Benchmark
-- **Tags:** AI agents, framework performance, Go, Python, LangGraph, Agno
-- **Evidence:** 5 warmups, 100 measured requests, the same local OpenAI-compatible stub
+- **Category:** Security engineering
+- **Tags:** AI agents, Agent security, sandbox, file I/O, Go
+- **Evidence:** Root-relative tool paths, `os.Root` enforcement, escape-regression tests, and documented deployment limits
+
+### Also recent: AI Agent Framework Benchmarks: Why Runtime Overhead Matters More Than Model Latency
+
+[Read the benchmark](/blog/ai-agent-runtime-benchmark)
 
 ## How HNO uses timely topics
 
@@ -46,8 +49,8 @@ useful after the headline stops trending.
 2. **Connect it to a real HNO question.** Do not force an unrelated keyword into an article.
 3. **Add evidence.** Prefer code, benchmark commands, traces, or a clear limitation.
 4. **Link to durable documentation.** Readers should be able to continue to the
-   [Agent guide](/guide/agent), [performance report](/advanced/performance), or
-   [system overhead matrix](/advanced/system-overhead).
+   [Sandboxed File I/O guide](/guide/sandboxed-file-io), [Agent guide](/guide/agent),
+   [performance report](/advanced/performance), or [system overhead matrix](/advanced/system-overhead).
 5. **Update instead of duplicating.** If the same topic evolves, update the original
    article and record what changed.
 

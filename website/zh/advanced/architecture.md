@@ -132,8 +132,14 @@ LLM 提供商实现:
 可扩展的工具系统:
 - `calculator/` - 数学运算
 - `http/` - HTTP 请求
-- `file/` - 文件操作
+- `file/` - 使用独立读写能力的根句柄绑定沙盒化文件操作
+- `filegen/` - 通过同一写能力进行沙盒化产物和目录生成
 - `search/` - 网络搜索
+
+对于 Agent 面向的路径，应通过 `file.NewSandbox` 显式配置读根和写根，再传入
+`file.NewWithSandbox` 和/或 `filegen.NewWithSandbox`。Sandbox 将真实操作委托给
+Go `os.Root` 句柄，因此即使遇到符号链接，路径也被限制在配置根目录内。图示、
+API 契约与部署边界请见[沙盒化文件 I/O](/zh/guide/sandboxed-file-io)。
 
 ## AgentOS 生产服务器 / AgentOS Production Server
 

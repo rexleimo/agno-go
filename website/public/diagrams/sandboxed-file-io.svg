@@ -1,0 +1,109 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1100" viewBox="0 0 1600 1100" role="img" aria-labelledby="title desc">
+  <title id="title">HNO sandboxed file I/O architecture</title>
+  <desc id="desc">Agent tool calls pass through file toolkits, a capability policy, and root-bound os.Root handles. Separate read roots and a write root are confined while outside-root paths are denied. Deployment isolation is a separate outer layer.</desc>
+  <defs>
+    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1020"/>
+      <stop offset="100%" stop-color="#111c31"/>
+    </linearGradient>
+    <linearGradient id="toolkit" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#123457"/>
+      <stop offset="100%" stop-color="#132b4b"/>
+    </linearGradient>
+    <linearGradient id="policy" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#153c52"/>
+      <stop offset="100%" stop-color="#123044"/>
+    </linearGradient>
+    <linearGradient id="root" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#24325d"/>
+      <stop offset="100%" stop-color="#1d2a4f"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0,0 L12,6 L0,12 z" fill="#7dd3fc"/>
+    </marker>
+    <style>
+      .title { fill: #f8fafc; font: 700 36px Inter, Arial, sans-serif; letter-spacing: .2px; }
+      .subtitle { fill: #a7b7cc; font: 400 19px Inter, Arial, sans-serif; }
+      .section { fill: #dbeafe; font: 700 20px Inter, Arial, sans-serif; letter-spacing: .4px; }
+      .heading { fill: #f8fafc; font: 700 24px Inter, Arial, sans-serif; }
+      .body { fill: #cbd5e1; font: 400 20px Inter, Arial, sans-serif; }
+      .small { fill: #a7b7cc; font: 400 19px Inter, Arial, sans-serif; }
+      .tag { fill: #67e8f9; font: 700 16px Inter, Arial, sans-serif; letter-spacing: .6px; }
+      .warn { fill: #fecdd3; font: 700 20px Inter, Arial, sans-serif; }
+      .arrow { fill: none; stroke: #7dd3fc; stroke-width: 3; marker-end: url(#arrow); }
+      .subtle { fill: none; stroke: #40506d; stroke-width: 1.5; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="1100" rx="28" fill="url(#background)"/>
+  <text x="80" y="66" class="title">HNO sandboxed file I/O architecture</text>
+  <text x="80" y="96" class="subtitle">Pathname confinement with explicit capabilities; not a complete operating-system sandbox.</text>
+
+  <rect x="610" y="128" width="380" height="64" rx="14" fill="#172b46" stroke="#38bdf8" stroke-width="2"/>
+  <text x="800" y="156" text-anchor="middle" class="heading">Agent / model tool call</text>
+  <text x="800" y="179" text-anchor="middle" class="small">untrusted path and operation arguments</text>
+  <path d="M800 192 V226" class="arrow"/>
+
+  <rect x="70" y="230" width="1460" height="166" rx="20" fill="none" stroke="#355171" stroke-width="2"/>
+  <text x="98" y="262" class="section">1. CAPABILITY-FACING TOOLKITS</text>
+  <rect x="98" y="282" width="666" height="88" rx="14" fill="url(#toolkit)" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="126" y="316" class="heading">file.FileTools</text>
+  <text x="126" y="343" class="body">read_file, list_files, file_exists, read_pptx</text>
+  <text x="126" y="364" class="small">write_file and delete_file only when a write root exists</text>
+  <rect x="836" y="282" width="666" height="88" rx="14" fill="url(#toolkit)" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="864" y="316" class="heading">filegen.FileGenToolkit</text>
+  <text x="864" y="343" class="body">create_file and create_directory</text>
+  <text x="864" y="364" class="small">NewWithSandbox requires paths relative to the write root</text>
+  <path d="M800 396 V426" class="arrow"/>
+
+  <rect x="70" y="430" width="1460" height="238" rx="20" fill="none" stroke="#355171" stroke-width="2"/>
+  <text x="98" y="462" class="section">2. SANDBOX POLICY AND VALIDATION</text>
+
+  <rect x="98" y="484" width="410" height="154" rx="14" fill="url(#policy)" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="124" y="517" class="tag">PATH GATE</text>
+  <text x="124" y="546" class="heading">Root-relative names only</text>
+  <text x="124" y="574" class="body">Reject absolute paths, traversal, NUL</text>
+  <text x="124" y="598" class="body">and Windows device / ADS forms.</text>
+  <text x="124" y="622" class="small">Validation is not the enforcement boundary.</text>
+
+  <rect x="595" y="484" width="410" height="154" rx="14" fill="url(#policy)" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="621" y="517" class="tag">LEAST PRIVILEGE</text>
+  <text x="621" y="546" class="heading">Separate read and write grants</text>
+  <text x="621" y="574" class="body">0..N ordered read roots</text>
+  <text x="621" y="598" class="body">one optional write root</text>
+  <text x="621" y="622" class="small">No roots means fail closed.</text>
+
+  <rect x="1092" y="484" width="410" height="154" rx="14" fill="url(#policy)" stroke="#22d3ee" stroke-width="1.5"/>
+  <text x="1118" y="517" class="tag">GUARDRAILS</text>
+  <text x="1118" y="546" class="heading">Bounded and auditable operations</text>
+  <text x="1118" y="574" class="body">Read / write byte limits and fsync</text>
+  <text x="1118" y="598" class="body">Explicit overwrite policy</text>
+  <text x="1118" y="622" class="small">Successful operations emit AuditEntry.</text>
+
+  <rect x="1170" y="654" width="332" height="50" rx="12" fill="#4a1f36" stroke="#fb7185" stroke-width="1.5"/>
+  <text x="1336" y="684" text-anchor="middle" class="warn">Outside-root paths: denied</text>
+  <path d="M1336 638 V654" stroke="#fb7185" stroke-width="2" stroke-dasharray="6 6"/>
+
+  <path d="M800 668 V718" class="arrow"/>
+
+  <rect x="70" y="722" width="1460" height="156" rx="20" fill="none" stroke="#355171" stroke-width="2"/>
+  <text x="98" y="754" class="section">3. ROOT-BOUND FILESYSTEM OPERATIONS</text>
+  <rect x="280" y="778" width="1040" height="72" rx="14" fill="url(#root)" stroke="#818cf8" stroke-width="1.5"/>
+  <text x="800" y="810" text-anchor="middle" class="heading">os.OpenRoot creates directory handles; *os.Root performs the I/O</text>
+  <text x="800" y="834" text-anchor="middle" class="body">Open, Stat, OpenFile, Mkdir, OpenRoot, and Remove stay beneath their opened root.</text>
+  <path d="M600 878 V926 H412 V954" class="arrow"/>
+  <path d="M1000 878 V926 H1188 V954" class="arrow"/>
+
+  <rect x="136" y="958" width="552" height="92" rx="14" fill="#133b3a" stroke="#34d399" stroke-width="1.5"/>
+  <text x="164" y="990" class="tag">READ ROOTS</text>
+  <text x="164" y="1019" class="heading">Inputs, templates, and references</text>
+  <text x="164" y="1042" class="small">The first configured root containing a relative name is selected.</text>
+
+  <rect x="912" y="958" width="552" height="92" rx="14" fill="#193a56" stroke="#38bdf8" stroke-width="1.5"/>
+  <text x="940" y="990" class="tag">WRITE ROOT</text>
+  <text x="940" y="1019" class="heading">Private workspace and generated artifacts</text>
+  <text x="940" y="1042" class="small">New files are exclusive by default; overwrites require explicit policy.</text>
+
+  <rect x="70" y="1066" width="1460" height="1" fill="#355171"/>
+  <text x="800" y="1090" text-anchor="middle" class="subtitle">Defense in depth for multi-tenant or code-execution workloads: private volumes, OS ACLs, containers or VMs, resource limits, and egress controls.</text>
+</svg>

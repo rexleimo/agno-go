@@ -50,35 +50,40 @@ ag, _ := agent.New(agent.Config{
 
 ## File
 
-安全制御付きのファイル操作。
+Agent が指定するパスには明示的な capability を持つ `Sandbox` と
+`NewWithSandbox` を使用します。`New()` は信頼できる呼び出し元向けの無制限な
+互換 API です。
 
 **作成:**
 ```go
-func New(config Config) *FileToolkit
-
-type Config struct {
-    AllowedPaths []string // 許可されたディレクトリのホワイトリスト
-    MaxFileSize  int64    // 最大ファイルサイズ(バイト) (デフォルト: 10MB)
-}
+func New() *FileTools
+func NewWithBaseDir(baseDir string) *FileTools
+func NewWithSandbox(sandbox *Sandbox) *FileTools
+func NewSandbox(options ...SandboxOption) (*Sandbox, error)
 ```
+
+```go
+sandbox, err := file.NewSandbox(
+    file.WithReadRoots("./inputs", "./templates"),
+    file.WithWriteRoot("./workspace"),
+    file.WithMaxReadBytes(10 << 20),
+    file.WithMaxWriteBytes(5 << 20),
+)
+```
+
+Sandbox は fail-closed です。read root がなければ read 操作、write root が
+なければ write 操作を拒否します。Sandboxed path は root 相対であり、絶対パス、
+traversal、ルート外に出る symbolic link は拒否されます。
 
 **関数:**
-- `read_file(path)`: ファイル内容を読み取り
-- `write_file(path, content)`: ファイルを書き込み
-- `list_files(directory)`: ディレクトリを一覧表示
-- `delete_file(path)`: ファイルを削除
+- `read_file(path)`, `list_files(path)`, `file_exists(path)`, `read_pptx(path)`:
+  read root の下でのみ実行されます。
+- `write_file(path, content)`, `delete_file(path)`: write root の下でのみ実行されます。
+- `filegen.NewWithSandbox(sandbox)` は `create_file` と `create_directory` に同じ
+  write capability を使用します。既存ファイルの置換には `overwrite: true` と
+  `WithAllowOverwrite(true)` の両方が必要です。
 
-**例:**
-```go
-file := file.New(file.Config{
-    AllowedPaths: []string{"/data", "/tmp"},
-    MaxFileSize:  5 * 1024 * 1024, // 5MB
-})
-
-ag, _ := agent.New(agent.Config{
-    Toolkits: []toolkit.Toolkit{file},
-})
-```
+詳しくは英語の [Sandboxed File I/O guide](/guide/sandboxed-file-io) を参照してください。
 
 ## カスタムツール
 

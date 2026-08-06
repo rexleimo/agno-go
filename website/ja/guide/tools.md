@@ -124,39 +124,36 @@ httpTool := http.New(http.Config{
 
 ## File Tool
 
-組み込みの安全制御でファイルを読み書きします。
-
-### 操作
-
-- `read_file(path)` - ファイル内容を読み取り
-- `write_file(path, content)` - ファイルに内容を書き込み
-- `list_directory(path)` - ディレクトリ内容をリスト
-- `delete_file(path)` - ファイルを削除
-
-### 例
+モデルまたはユーザーが指定するパスには、root-bound sandbox を使用してください。
+Sandbox は読み取りと書き込みの能力を分離し、ルート相対パスだけを受け入れ、
+実際の操作を `os.Root` に束縛します。
 
 ```go
-import "github.com/rexleimo/agno-go/pkg/hno/tools/file"
+import (
+    "github.com/rexleimo/agno-go/pkg/hno/tools/file"
+    "github.com/rexleimo/agno-go/pkg/hno/tools/filegen"
+)
 
-fileTool := file.New(file.Config{
-    AllowedPaths: []string{"/tmp", "./data"},  // アクセスを制限
-    MaxFileSize:  1024 * 1024,                 // 1MB制限
+sandbox, err := file.NewSandbox(
+    file.WithReadRoots("./agent-inputs"),
+    file.WithWriteRoot("./agent-workspace"),
 })
+if err != nil {
+    log.Fatal(err)
+}
+defer sandbox.Close()
 
-agent, _ := agent.New(agent.Config{
-    Model:    model,
-    Toolkits: []toolkit.Toolkit{fileTool},
-})
-
-output, _ := agent.Run(ctx, "Read the contents of ./data/report.txt")
+fileTool := file.NewWithSandbox(sandbox)
+fileGenTool := filegen.NewWithSandbox(sandbox)
 ```
 
-### 安全機能
+この構成では、絶対パス、`..` の traversal、ルート外へ出る symbolic link は拒否
+されます。既存の生成ファイルを置換するには、`create_file` の `overwrite: true` と
+`file.WithAllowOverwrite(true)` の両方が必要です。`file.New()` は互換性のために
+無制限のままなので、信頼できる呼び出し元だけで使用してください。
 
-- パス制限（ホワイトリスト）
-- ファイルサイズ制限
-- 読み取り専用モードオプション
-- 自動パスサニタイゼーション
+詳細なアーキテクチャ、制限、運用境界は英語の
+[Sandboxed File I/O guide](/guide/sandboxed-file-io) を参照してください。
 
 ---
 
@@ -171,9 +168,7 @@ agent, _ := agent.New(agent.Config{
     Toolkits: []toolkit.Toolkit{
         calculator.New(),
         http.New(),
-        file.New(file.Config{
-            AllowedPaths: []string{"./data"},
-        }),
+        fileTool, // 上で構成した sandboxed file toolkit
     },
 })
 
@@ -357,11 +352,15 @@ func (t *MyToolkit) fetchData(args map[string]interface{}) (interface{}, error) 
 ツール機能を制限:
 
 ```go
-// 許可された操作をホワイトリスト化
-fileTool := file.New(file.Config{
-    AllowedPaths: []string{"/safe/path"},
-    ReadOnly:     true,  // 書き込みを防止
-})
+// 読み取り root だけを構成すれば読み取り専用になります。
+readOnlySandbox, err := file.NewSandbox(
+    file.WithReadRoots("/safe/path"),
+)
+if err != nil {
+    log.Fatal(err)
+}
+defer readOnlySandbox.Close()
+fileTool := file.NewWithSandbox(readOnlySandbox)
 
 // ドメインを検証
 httpTool := http.New(http.Config{
