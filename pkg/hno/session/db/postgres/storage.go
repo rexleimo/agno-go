@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/rexleimo/agno-go/pkg/hno/agent"
-	"github.com/rexleimo/agno-go/pkg/hno/session/db/batch"
 	"github.com/rexleimo/agno-go/pkg/hno/session"
+	"github.com/rexleimo/agno-go/pkg/hno/session/db/batch"
 )
 
 var identifierPattern = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
@@ -228,12 +228,20 @@ func (p *PostgresStorage) ListByUser(ctx context.Context, userID string) ([]*ses
 	})
 }
 
-// Close 释放资源（当前仅关闭批量写入器）。
+// Close releases the batch writer and database connection pool.
 func (p *PostgresStorage) Close() error {
+	var errs []error
 	if p.writer != nil {
-		return p.writer.Close()
+		if err := p.writer.Close(); err != nil {
+			errs = append(errs, err)
+		}
 	}
-	return nil
+	if p.db != nil {
+		if err := p.db.Close(); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
 }
 
 // BulkUpsertSessions 批量导入 Session（迁移场景）。

@@ -1,5 +1,7 @@
 # Build stage
-FROM golang:1.21-alpine AS builder
+ARG GO_IMAGE=golang:1.24.11-alpine
+ARG RUNTIME_IMAGE=alpine:3.22
+FROM ${GO_IMAGE} AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git make
@@ -10,17 +12,24 @@ WORKDIR /app
 # Copy go mod files
 COPY go.mod go.sum ./
 
-# Download dependencies
-RUN go mod download
-
 # Copy source code
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o agentos cmd/server/main.go
+# Module downloads and the build can hit transient proxy resets on some
+# networks. Retry in-place so already-downloaded modules persist between
+# attempts, then fail loudly if the build still did not complete.
+RUN set -eu; \
+    for attempt in $(seq 1 6); do \
+        if CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o agentos ./cmd/agentos; then \
+            break; \
+        fi; \
+        echo "go build attempt ${attempt} failed; retrying"; \
+        sleep 3; \
+    done; \
+    test -x agentos
 
 # Final stage
-FROM alpine:latest
+FROM ${RUNTIME_IMAGE}
 
 # Install ca-certificates for HTTPS requests
 RUN apk --no-cache add ca-certificates

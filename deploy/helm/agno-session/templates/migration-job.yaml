@@ -1,0 +1,39 @@
+{{- if and .Values.migrations.enabled (or .Values.config.existingSecret .Values.config.dsn) }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "agno-session.fullname" . }}-migrate
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: {{ .Values.migrations.image | quote }}
+          command:
+            - sh
+            - -ec
+            - psql "$AGNO_PG_DSN" -v ON_ERROR_STOP=1 -f /migrations/002_session_service.sql
+          env:
+            - name: AGNO_PG_DSN
+              {{- if .Values.config.existingSecret }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.existingSecret | quote }}
+                  key: {{ .Values.config.dsnKey | quote }}
+              {{- else }}
+              value: {{ .Values.config.dsn | quote }}
+              {{- end }}
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+      volumes:
+        - name: migrations
+          configMap:
+            name: {{ include "agno-session.fullname" . }}-migrations
+{{- end }}

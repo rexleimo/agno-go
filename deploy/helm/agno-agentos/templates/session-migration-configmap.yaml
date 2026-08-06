@@ -1,0 +1,13 @@
+{{- if and .Values.session.enabled .Values.session.migrations.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "agno-agentos.fullname" . }}-session-migrations
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+  001_agentos_sessions.sql: |-
+{{ .Files.Get "files/001_agentos_sessions.sql" | indent 4 }}
+{{- end }}

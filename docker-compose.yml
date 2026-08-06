@@ -1,30 +1,40 @@
-version: '3.8'
-
 services:
   # AgentOS API Server
   agentos:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: agentos
     ports:
       - "8080:8080"
     environment:
-      # Server configuration
-      - AGENTOS_ADDRESS=:8080
-      - AGENTOS_DEBUG=true
+      AGENTOS_ADDRESS: ${AGENTOS_ADDRESS:-:8080}
+      AGENTOS_DEBUG: ${AGENTOS_DEBUG:-false}
+      AGENTOS_PREFIX: ${AGENTOS_PREFIX:-}
+      AGENTOS_ALLOW_ORIGINS: ${AGENTOS_ALLOW_ORIGINS:-}
 
-      # OpenAI API Key (required)
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # Knowledge API is opt-in in the base stack. Use docker-compose.knowledge.yml
+      # for the Chroma/OpenAI-enabled profile.
+      KNOWLEDGE_ENABLED: ${KNOWLEDGE_ENABLED:-false}
+      CHROMA_URL: ${CHROMA_URL:-http://chromadb:8000}
+      CHROMA_TENANT: ${CHROMA_TENANT:-default_tenant}
+      CHROMA_DATABASE: ${CHROMA_DATABASE:-default_database}
+      KNOWLEDGE_COLLECTION: ${KNOWLEDGE_COLLECTION:-hno_knowledge}
+      KNOWLEDGE_HEALTH_ENABLED: ${KNOWLEDGE_HEALTH_ENABLED:-true}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
 
-      # Optional: Anthropic API Key
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      # Optional persistent AgentOS session storage
+      AGENTOS_SESSION_DSN: ${AGENTOS_SESSION_DSN:-postgres://agno:agno_password@postgres:5432/agentos?sslmode=disable}
+      AGENTOS_SESSION_SCHEMA: ${AGENTOS_SESSION_SCHEMA:-public}
+      AGENTOS_SESSION_TABLE: ${AGENTOS_SESSION_TABLE:-agno_agentos_sessions}
 
-      # Optional: Ollama base URL (if using local Ollama)
-      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      # Optional model provider variables used by other integrations
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://ollama:11434}
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
     restart: unless-stopped
     networks:
       - agno-network
@@ -37,17 +47,17 @@ services:
 
   # PostgreSQL Database (for persistent session storage)
   postgres:
-    image: postgres:15-alpine
-    container_name: agentos-postgres
+    image: postgres:16-alpine
     environment:
       - POSTGRES_USER=agno
       - POSTGRES_PASSWORD=agno_password
       - POSTGRES_DB=agentos
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - ./scripts/migrations/001_agentos_sessions.sql:/docker-entrypoint-initdb.d/001_agentos_sessions.sql:ro
     restart: unless-stopped
     networks:
       - agno-network
@@ -57,27 +67,9 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis (for caching and session management)
-  redis:
-    image: redis:7-alpine
-    container_name: agentos-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-    restart: unless-stopped
-    networks:
-      - agno-network
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-
   # Ollama (optional - for local LLM models)
   ollama:
     image: ollama/ollama:latest
-    container_name: agentos-ollama
     ports:
       - "11434:11434"
     volumes:
@@ -91,7 +83,6 @@ services:
   # ChromaDB (optional - for vector storage)
   chromadb:
     image: chromadb/chroma:latest
-    container_name: agentos-chromadb
     ports:
       - "8000:8000"
     volumes:
@@ -107,8 +98,6 @@ services:
 
 volumes:
   postgres-data:
-    driver: local
-  redis-data:
     driver: local
   ollama-data:
     driver: local

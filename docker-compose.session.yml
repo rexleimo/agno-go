@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -9,6 +7,8 @@ services:
       POSTGRES_PASSWORD: agentos
     ports:
       - "5433:5432"
+    volumes:
+      - ./scripts/migrations/002_session_service.sql:/docker-entrypoint-initdb.d/002_session_service.sql:ro
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "agentos"]
       interval: 5s

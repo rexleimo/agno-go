@@ -1,0 +1,75 @@
+replicaCount: 1
+
+image:
+  repository: ghcr.io/rexleimo/agno-agentos
+  tag: latest
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+agentos:
+  prefix: ""
+  debug: false
+  allowOrigins: ""
+
+knowledge:
+  enabled: false
+  chromaURL: http://chromadb:8000
+  chromaTenant: default_tenant
+  chromaDatabase: default_database
+  collection: hno_knowledge
+  embeddingModel: text-embedding-3-small
+  openAIBaseURL: ""
+  existingSecret: ""
+  openAIAPIKeyKey: OPENAI_API_KEY
+
+session:
+  enabled: false
+  existingSecret: ""
+  dsnKey: AGENTOS_SESSION_DSN
+  schema: public
+  table: agno_agentos_sessions
+  migrations:
+    enabled: true
+    image: postgres:16-alpine
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+livenessProbe:
+  path: /health
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+readinessProbe:
+  path: /health
+  knowledgePath: /api/v1/knowledge/health
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+env: []
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+podSecurityContext: {}
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 1000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts: []
+  tls: []

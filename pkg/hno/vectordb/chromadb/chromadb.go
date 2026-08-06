@@ -83,9 +83,12 @@ func New(config Config) (*ChromaDB, error) {
 		distanceMetric = embeddings.L2
 	}
 
-	// Create client options
-	var clientOpts []chroma.ClientOption
-	clientOpts = append(clientOpts, chroma.WithBaseURL(config.BaseURL))
+	// Keep every collection operation in the configured tenant/database rather
+	// than silently falling back to Chroma's defaults.
+	clientOpts := []chroma.ClientOption{
+		chroma.WithBaseURL(config.BaseURL),
+		chroma.WithDatabaseAndTenant(config.Database, config.Tenant),
+	}
 	if config.CloudAPIKey != "" {
 		clientOpts = append(clientOpts, chroma.WithAuth(
 			chroma.NewTokenAuthCredentialsProvider(config.CloudAPIKey, chroma.XChromaTokenHeader),
@@ -128,12 +131,24 @@ func (c *ChromaDB) CreateCollection(ctx context.Context, name string, metadata m
 		}
 	}
 
-	// Get or create collection
+	// Get or create collection. Pass the configured embedding function so the
+	// client never falls back to its default local ONNX embedding function
+	// (which bootstraps an onnxruntime download and can fail with GitHub API
+	// rate limits).
+	createOpts := []chroma.CreateCollectionOption{
+		chroma.WithHNSWSpaceCreate(c.distanceFunc),
+		chroma.WithCollectionMetadataCreate(chromaMetadata),
+	}
+	if c.embeddingFunc != nil {
+		createOpts = append(createOpts, chroma.WithEmbeddingFunctionCreate(&chromaEmbeddingFunc{
+			embed: c.embeddingFunc,
+			space: c.distanceFunc,
+		}))
+	}
 	collection, err := c.client.GetOrCreateCollection(
 		ctx,
 		c.collectionName,
-		chroma.WithHNSWSpaceCreate(c.distanceFunc),
-		chroma.WithCollectionMetadataCreate(chromaMetadata),
+		createOpts...,
 	)
 	if err != nil {
 		return fmt.Errorf("failed to create collection: %w", err)
@@ -488,6 +503,54 @@ func (c *ChromaDB) Close() error {
 	c.collection = nil
 	c.client = nil
 	return nil
+}
+
+// chromaEmbeddingFunc adapts a vectordb.EmbeddingFunction to the chroma-go
+// embeddings.EmbeddingFunction interface. Without it, collection creation
+// falls back to chroma-go's default local ONNX embedding function, which
+// bootstraps an onnxruntime download and can fail on GitHub API rate limits.
+type chromaEmbeddingFunc struct {
+	embed vectordb.EmbeddingFunction
+	space embeddings.DistanceMetric
+}
+
+func (f *chromaEmbeddingFunc) EmbedDocuments(ctx context.Context, texts []string) ([]embeddings.Embedding, error) {
+	vectors, err := f.embed.Embed(ctx, texts)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]embeddings.Embedding, len(vectors))
+	for i, vector := range vectors {
+		result[i] = embeddings.NewEmbeddingFromFloat32(vector)
+	}
+	return result, nil
+}
+
+func (f *chromaEmbeddingFunc) EmbedQuery(ctx context.Context, text string) (embeddings.Embedding, error) {
+	vectors, err := f.embed.Embed(ctx, []string{text})
+	if err != nil {
+		return nil, err
+	}
+	if len(vectors) == 0 {
+		return nil, fmt.Errorf("no embedding generated for query")
+	}
+	return embeddings.NewEmbeddingFromFloat32(vectors[0]), nil
+}
+
+func (f *chromaEmbeddingFunc) Name() string {
+	return "agno-custom"
+}
+
+func (f *chromaEmbeddingFunc) GetConfig() embeddings.EmbeddingFunctionConfig {
+	return embeddings.EmbeddingFunctionConfig{}
+}
+
+func (f *chromaEmbeddingFunc) DefaultSpace() embeddings.DistanceMetric {
+	return f.space
+}
+
+func (f *chromaEmbeddingFunc) SupportedSpaces() []embeddings.DistanceMetric {
+	return []embeddings.DistanceMetric{f.space}
 }
 
 // convertToChromaEmbeddings converts [][]float32 to []embeddings.Embedding

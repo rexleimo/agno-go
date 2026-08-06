@@ -1,0 +1,110 @@
+{{- if and .Values.knowledge.enabled (not .Values.knowledge.existingSecret) }}
+{{- fail "knowledge.existingSecret is required when knowledge.enabled is true" }}
+{{- end }}
+{{- if and .Values.session.enabled (not .Values.session.existingSecret) }}
+{{- fail "session.existingSecret is required when session.enabled is true" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "agno-agentos.fullname" . }}
+  labels:
+    app.kubernetes.io/name: {{ include "agno-agentos.name" . }}
+    helm.sh/chart: {{ include "agno-agentos.chart" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "agno-agentos.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "agno-agentos.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: agentos
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          env:
+            - name: AGENTOS_ADDRESS
+              value: ":{{ .Values.service.port }}"
+            - name: AGENTOS_PREFIX
+              value: {{ .Values.agentos.prefix | quote }}
+            - name: AGENTOS_DEBUG
+              value: {{ .Values.agentos.debug | quote }}
+            - name: AGENTOS_ALLOW_ORIGINS
+              value: {{ .Values.agentos.allowOrigins | quote }}
+            {{- if .Values.knowledge.enabled }}
+            - name: KNOWLEDGE_ENABLED
+              value: "true"
+            - name: KNOWLEDGE_HEALTH_ENABLED
+              value: "true"
+            - name: CHROMA_URL
+              value: {{ .Values.knowledge.chromaURL | quote }}
+            - name: CHROMA_TENANT
+              value: {{ .Values.knowledge.chromaTenant | quote }}
+            - name: CHROMA_DATABASE
+              value: {{ .Values.knowledge.chromaDatabase | quote }}
+            - name: KNOWLEDGE_COLLECTION
+              value: {{ .Values.knowledge.collection | quote }}
+            - name: EMBEDDING_MODEL
+              value: {{ .Values.knowledge.embeddingModel | quote }}
+            - name: OPENAI_BASE_URL
+              value: {{ .Values.knowledge.openAIBaseURL | quote }}
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.knowledge.existingSecret | quote }}
+                  key: {{ .Values.knowledge.openAIAPIKeyKey | quote }}
+            {{- else }}
+            - name: KNOWLEDGE_ENABLED
+              value: "false"
+            {{- end }}
+            {{- if .Values.session.enabled }}
+            - name: AGENTOS_SESSION_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.session.existingSecret | quote }}
+                  key: {{ .Values.session.dsnKey | quote }}
+            - name: AGENTOS_SESSION_SCHEMA
+              value: {{ .Values.session.schema | quote }}
+            - name: AGENTOS_SESSION_TABLE
+              value: {{ .Values.session.table | quote }}
+            {{- end }}
+            {{- with .Values.env }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.livenessProbe.path | quote }}
+              port: http
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ if .Values.knowledge.enabled }}{{ .Values.readinessProbe.knowledgePath | quote }}{{ else }}{{ .Values.readinessProbe.path | quote }}{{ end }}
+              port: http
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+      volumes:
+        - name: tmp
+          emptyDir: {}

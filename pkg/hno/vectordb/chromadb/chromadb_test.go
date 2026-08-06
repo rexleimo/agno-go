@@ -88,6 +88,25 @@ func TestNew(t *testing.T) {
 	}
 }
 
+func TestNewUsesConfiguredDatabaseAndTenant(t *testing.T) {
+	db, err := New(Config{
+		CollectionName: "knowledge",
+		Database:       "team_docs",
+		Tenant:         "tenant_alpha",
+	})
+	if err != nil {
+		t.Fatalf("New() error = %v", err)
+	}
+	defer func() { _ = db.Close() }()
+
+	if got := db.client.CurrentTenant().Name(); got != "tenant_alpha" {
+		t.Fatalf("tenant = %q, want %q", got, "tenant_alpha")
+	}
+	if got := db.client.CurrentDatabase().Name(); got != "team_docs" {
+		t.Fatalf("database = %q, want %q", got, "team_docs")
+	}
+}
+
 func TestCreateCollection(t *testing.T) {
 	// This test requires a running ChromaDB instance
 	// Skip if ChromaDB is not available

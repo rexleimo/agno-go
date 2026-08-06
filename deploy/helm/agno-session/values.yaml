@@ -18,7 +18,14 @@ resources:
     memory: 128Mi
 
 config:
-  dsn: "postgres://agentos:agentos@postgres:5432/agentos?sslmode=disable"
+  # Prefer existingSecret in production. config.dsn remains a local-development fallback.
+  existingSecret: ""
+  dsnKey: AGNO_PG_DSN
+  dsn: ""
+
+migrations:
+  enabled: true
+  image: postgres:16-alpine
 
 env: []
 

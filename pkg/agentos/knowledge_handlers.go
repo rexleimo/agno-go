@@ -186,6 +186,22 @@ func (s *KnowledgeService) isCollectionAllowed(name string) bool {
 	return ok
 }
 
+func (s *KnowledgeService) searchFilters(collectionName string, filters map[string]interface{}) (map[string]interface{}, error) {
+	if collectionName == "" {
+		return filters, nil
+	}
+
+	merged := make(map[string]interface{}, len(filters)+1)
+	for key, value := range filters {
+		merged[key] = value
+	}
+	if existing, ok := merged["collection_name"]; ok && !strings.EqualFold(fmt.Sprint(existing), collectionName) {
+		return nil, fmt.Errorf("filters.collection_name conflicts with collection_name")
+	}
+	merged["collection_name"] = collectionName
+	return merged, nil
+}
+
 func (s *KnowledgeService) validateSourceMetadata(metadata map[string]interface{}) error {
 	if metadata == nil || len(s.schemes) == 0 {
 		return nil
@@ -235,12 +251,8 @@ func (s *KnowledgeService) validateSourceURL(raw string) error {
 // handleKnowledgeSearch 处理知识库搜索请求
 // handleKnowledgeSearch handles knowledge search requests
 func (s *Server) handleKnowledgeSearch(c *gin.Context) {
-	knowledgeSvc := s.getKnowledgeService()
-	if knowledgeSvc == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error":   "service_unavailable",
-			"message": "knowledge service not configured",
-		})
+	knowledgeSvc, ok := s.requireKnowledgeService(c)
+	if !ok {
 		return
 	}
 	if !knowledgeSvc.config.EnableSearch {
@@ -268,6 +280,15 @@ func (s *Server) handleKnowledgeSearch(c *gin.Context) {
 		return
 	}
 
+	filters, err := knowledgeSvc.searchFilters(req.CollectionName, req.Filters)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":   "invalid_request",
+			"message": err.Error(),
+		})
+		return
+	}
+
 	if req.Limit <= 0 {
 		req.Limit = knowledgeSvc.config.DefaultLimit
 	}
@@ -281,12 +302,12 @@ func (s *Server) handleKnowledgeSearch(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), knowledgeSvc.searchTimeout())
 	defer cancel()
 
-	results, err := knowledgeSvc.vectorDB.Query(ctx, req.Query, req.Limit+req.Offset, req.Filters)
+	results, err := knowledgeSvc.vectorDB.Query(ctx, req.Query, req.Limit+req.Offset, filters)
 	if err != nil {
 		s.logger.Error("knowledge search failed", "error", err, "query", req.Query)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "search_failed",
-			"message": fmt.Sprintf("failed to search: %v", err),
+			"message": "knowledge search failed",
 		})
 		return
 	}
@@ -352,12 +373,8 @@ func (s *Server) handleKnowledgeSearch(c *gin.Context) {
 // handleKnowledgeConfig 处理知识库配置查询
 // handleKnowledgeConfig handles knowledge configuration query
 func (s *Server) handleKnowledgeConfig(c *gin.Context) {
-	knowledgeSvc := s.getKnowledgeService()
-	if knowledgeSvc == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error":   "service_unavailable",
-			"message": "knowledge service not configured",
-		})
+	knowledgeSvc, ok := s.requireKnowledgeService(c)
+	if !ok {
 		return
 	}
 
@@ -447,12 +464,8 @@ func (s *Server) handleKnowledgeConfig(c *gin.Context) {
 
 // handleKnowledgeHealth 返回知识库健康状态
 func (s *Server) handleKnowledgeHealth(c *gin.Context) {
-	knowledgeSvc := s.getKnowledgeService()
-	if knowledgeSvc == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error":   "service_unavailable",
-			"message": "knowledge service not configured",
-		})
+	knowledgeSvc, ok := s.requireKnowledgeService(c)
+	if !ok {
 		return
 	}
 	if !knowledgeSvc.config.EnableHealth {
@@ -480,24 +493,23 @@ func (s *Server) handleKnowledgeHealth(c *gin.Context) {
 		"default_limit": knowledgeSvc.config.DefaultLimit,
 	}
 
+	statusCode := http.StatusOK
 	if err != nil {
 		response["status"] = "degraded"
-		response["error"] = err.Error()
+		response["error"] = "knowledge store unavailable"
 		delete(response, "documents")
+		s.logger.Warn("knowledge health check failed", "error", err)
+		statusCode = http.StatusServiceUnavailable
 	}
 
-	c.JSON(http.StatusOK, response)
+	c.JSON(statusCode, response)
 }
 
 // handleAddContent 处理添加内容到知识库的请求
 // handleAddContent handles adding content to the knowledge base
 func (s *Server) handleAddContent(c *gin.Context) {
-	knowledgeSvc := s.getKnowledgeService()
-	if knowledgeSvc == nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{
-			"error":   "service_unavailable",
-			"message": "knowledge service not configured",
-		})
+	knowledgeSvc, ok := s.requireKnowledgeService(c)
+	if !ok {
 		return
 	}
 	if !knowledgeSvc.config.EnableIngestion {
@@ -667,7 +679,7 @@ func (s *Server) handleAddContent(c *gin.Context) {
 		)
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error":   "ingestion_failed",
-			"message": fmt.Sprintf("failed to ingest content: %v", err),
+			"message": "knowledge ingestion failed",
 		})
 		return
 	}
@@ -808,10 +820,33 @@ func parsePositiveInt(raw string, defaultVal int) int {
 	return value
 }
 
-// getKnowledgeService 获取知识库服务实例（从 Server 配置中）
-// getKnowledgeService gets the knowledge service instance from server config
+func (s *Server) requireKnowledgeService(c *gin.Context) (*KnowledgeService, bool) {
+	knowledgeSvc := s.getKnowledgeService()
+	if knowledgeSvc != nil {
+		return knowledgeSvc, true
+	}
+
+	if s.knowledgeConfigured() {
+		_ = s.initializeKnowledgeService()
+		if knowledgeSvc = s.getKnowledgeService(); knowledgeSvc != nil {
+			return knowledgeSvc, true
+		}
+	}
+
+	message := "knowledge service not configured"
+	if s.getKnowledgeInitErr() != nil {
+		message = "knowledge service unavailable"
+	}
+	c.JSON(http.StatusServiceUnavailable, gin.H{
+		"error":   "service_unavailable",
+		"message": message,
+	})
+	return nil, false
+}
+
+// getKnowledgeService gets the current knowledge service instance.
 func (s *Server) getKnowledgeService() *KnowledgeService {
-	// 这个方法会在 Server 结构体添加 knowledgeService 字段后正常工作
-	// This method will work properly after adding knowledgeService field to Server struct
+	s.knowledgeMu.RLock()
+	defer s.knowledgeMu.RUnlock()
 	return s.knowledgeService
 }

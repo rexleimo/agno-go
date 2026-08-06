@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -20,19 +21,24 @@ import (
 
 // Server represents the AgentOS HTTP server
 type Server struct {
-	router           *gin.Engine
-	config           *Config
-	sessionStorage   session.Storage
-	agentRegistry    *AgentRegistry
-	teamRegistry     *TeamRegistry
-	logger           *slog.Logger
-	httpServer       *http.Server
-	knowledgeService *KnowledgeService // 知识库服务
-	summaryManager   *session.SummaryManager
-	ops              *opsHandler // 运维端点（S4）
-	opsUI            *opsUI      // 运维平台 UI（S4）
-	instantiatedAt   time.Time
-	docsMounted      bool
+	router               *gin.Engine
+	config               *Config
+	sessionStorage       session.Storage
+	agentRegistry        *AgentRegistry
+	teamRegistry         *TeamRegistry
+	logger               *slog.Logger
+	httpServer           *http.Server
+	knowledgeMu          sync.RWMutex
+	knowledgeInitMu      sync.Mutex
+	knowledgeService     *KnowledgeService // 知识库服务
+	knowledgeInitErr     error
+	knowledgeLastAttempt time.Time
+	knowledgeClosed      bool
+	summaryManager       *session.SummaryManager
+	ops                  *opsHandler // 运维端点（S4）
+	opsUI                *opsUI      // 运维平台 UI（S4）
+	instantiatedAt       time.Time
+	docsMounted          bool
 }
 
 // Config holds server configuration
@@ -42,8 +48,10 @@ type Config struct {
 	// 服务器地址 (默认: :8080)
 	Address string
 
-	// API route prefix (e.g., "/api/v1", "/chat", empty for no prefix)
-	// API 路由前缀 (例如: "/api/v1", "/chat", 空字符串表示无前缀)
+	// Prefix mounts API v1 below an optional path. The default API path is
+	// /api/v1. A prefix already ending in /api/v1 is used as-is.
+	// Prefix 将 API v1 挂载在可选路径下。默认 API 路径是 /api/v1；已经以
+	// /api/v1 结尾的前缀会直接使用。
 	Prefix string
 
 	// Session storage
@@ -291,14 +299,13 @@ func NewServer(config *Config) (*Server, error) {
 		config.Logger.Warn("failed to load ops UI", "error", err)
 	}
 
-	// 初始化知识库服务（如果配置了）
-	// Initialize knowledge service (if configured)
-	if config.VectorDBConfig != nil && config.EmbeddingConfig != nil {
-		knowledgeSvc, err := initKnowledgeService(config, config.Logger)
-		if err != nil {
-			config.Logger.Warn("failed to initialize knowledge service", "error", err)
+	// Initialize the knowledge service only when a backend was requested. The
+	// request handlers retry a failed backend initialization after a short delay
+	// so a Chroma container that starts after AgentOS can recover without a restart.
+	if server.knowledgeConfigured() {
+		if err := server.initializeKnowledgeService(); err != nil {
+			config.Logger.Error("failed to initialize knowledge service", "error", err)
 		} else {
-			server.knowledgeService = knowledgeSvc
 			config.Logger.Info("knowledge service initialized")
 		}
 	}
@@ -343,6 +350,22 @@ func (s *Server) Shutdown(ctx context.Context) error {
 			s.logger.Warn("failed to close session storage", "error", err)
 		}
 	}
+	s.knowledgeMu.Lock()
+	s.knowledgeClosed = true
+	knowledgeSvc := s.knowledgeService
+	s.knowledgeService = nil
+	s.knowledgeMu.Unlock()
+
+	// Wait for an in-flight initialization before closing the newly created
+	// vector database. The initializer also checks knowledgeClosed and releases
+	// any client it created after shutdown began.
+	s.knowledgeInitMu.Lock()
+	s.knowledgeInitMu.Unlock()
+	if knowledgeSvc != nil && knowledgeSvc.vectorDB != nil {
+		if err := knowledgeSvc.vectorDB.Close(); err != nil {
+			s.logger.Warn("failed to close knowledge vector database", "error", err)
+		}
+	}
 
 	return nil
 }
@@ -373,24 +396,15 @@ func (s *Server) GetTeamRegistry() *TeamRegistry {
 // registerRoutes registers all API routes
 // registerRoutes 注册所有 API 路由
 func (s *Server) registerRoutes() {
-	// Create base group with prefix (if specified)
-	// 使用前缀创建基础路由组 (如果指定了前缀)
-	var baseGroup *gin.RouterGroup
-	if s.config.Prefix != "" {
-		baseGroup = s.router.Group(s.config.Prefix)
-	} else {
-		baseGroup = &s.router.RouterGroup
-	}
-
 	// Health check (always at root level, customizable via GetHealthRouter)
 	if group := s.GetHealthRouter(s.config.HealthPath); group != nil {
 		group.GET("", s.handleHealth)
 	}
 	s.RegisterDocs(nil)
 
-	// API v1 under the prefix
-	// 前缀下的 API v1
-	v1 := baseGroup.Group("/api/v1")
+	// API v1 under an optional mount prefix. Treat a prefix that already names
+	// /api/v1 as the complete API path to avoid /api/v1/api/v1 duplication.
+	v1 := s.router.Group(apiV1RoutePath(s.config.Prefix))
 	{
 		// Session endpoints
 		// Session 端点
@@ -422,21 +436,14 @@ func (s *Server) registerRoutes() {
 			teams.GET("/:id/tools", s.handleTeamTools)
 		}
 
-		// Knowledge endpoints
-		if s.knowledgeService != nil {
-			knowledge := v1.Group("/knowledge")
-			knowledge.GET("/config", s.handleKnowledgeConfig)
-			if s.knowledgeService.config.EnableSearch {
-				knowledge.POST("/search", s.handleKnowledgeSearch)
-			}
-			if s.knowledgeService.config.EnableIngestion {
-				knowledge.POST("/content", s.handleAddContent)
-				knowledge.POST("/upload", s.handleAddContent)
-			}
-			if s.knowledgeService.config.EnableHealth {
-				knowledge.GET("/health", s.handleKnowledgeHealth)
-			}
-		}
+		// Knowledge routes stay discoverable even when their backend fails to
+		// initialize. The handlers return structured 503/feature-disabled errors.
+		knowledge := v1.Group("/knowledge")
+		knowledge.GET("/config", s.handleKnowledgeConfig)
+		knowledge.POST("/search", s.handleKnowledgeSearch)
+		knowledge.POST("/content", s.handleAddContent)
+		knowledge.POST("/upload", s.handleAddContent)
+		knowledge.GET("/health", s.handleKnowledgeHealth)
 
 		// Ops endpoints (S4): /skills /observability /eval-runs
 		// 运维端点（S4）：/skills /observability /eval-runs
@@ -444,6 +451,21 @@ func (s *Server) registerRoutes() {
 			s.ops.register(v1)
 		}
 	}
+}
+
+const apiV1Route = "/api/v1"
+
+func apiV1RoutePath(prefix string) string {
+	normalized := strings.Trim(strings.TrimSpace(prefix), "/")
+	if normalized == "" {
+		return apiV1Route
+	}
+
+	path := "/" + normalized
+	if path == apiV1Route || strings.HasSuffix(path, apiV1Route) {
+		return path
+	}
+	return path + apiV1Route
 }
 
 // GetHealthRouter returns a router group for the given health path so callers
@@ -575,9 +597,100 @@ func timeoutMiddleware(timeout time.Duration) gin.HandlerFunc {
 	}
 }
 
+const knowledgeInitRetryInterval = 5 * time.Second
+
+func (s *Server) knowledgeConfigured() bool {
+	return s.config != nil && (s.config.VectorDBConfig != nil || s.config.EmbeddingConfig != nil)
+}
+
+func (s *Server) initializeKnowledgeService() error {
+	if s.config == nil || s.config.VectorDBConfig == nil || s.config.EmbeddingConfig == nil {
+		err := fmt.Errorf("both VectorDBConfig and EmbeddingConfig are required")
+		s.knowledgeMu.Lock()
+		if !s.knowledgeClosed {
+			s.knowledgeInitErr = err
+			s.knowledgeLastAttempt = time.Now()
+		}
+		s.knowledgeMu.Unlock()
+		return err
+	}
+
+	// Serialize attempts without holding the state lock during network I/O.
+	s.knowledgeInitMu.Lock()
+	defer s.knowledgeInitMu.Unlock()
+
+	s.knowledgeMu.RLock()
+	if s.knowledgeService != nil {
+		s.knowledgeMu.RUnlock()
+		return nil
+	}
+	if s.knowledgeClosed {
+		s.knowledgeMu.RUnlock()
+		return fmt.Errorf("knowledge service is closed")
+	}
+	if s.knowledgeInitErr != nil && time.Since(s.knowledgeLastAttempt) < knowledgeInitRetryInterval {
+		err := s.knowledgeInitErr
+		s.knowledgeMu.RUnlock()
+		return err
+	}
+	s.knowledgeMu.RUnlock()
+
+	// Record the attempt before the slow initialization so concurrent requests
+	// and retry timers observe the backoff window.
+	s.knowledgeMu.Lock()
+	if s.knowledgeClosed {
+		s.knowledgeMu.Unlock()
+		return fmt.Errorf("knowledge service is closed")
+	}
+	if s.knowledgeService != nil {
+		s.knowledgeMu.Unlock()
+		return nil
+	}
+	if s.knowledgeInitErr != nil && time.Since(s.knowledgeLastAttempt) < knowledgeInitRetryInterval {
+		err := s.knowledgeInitErr
+		s.knowledgeMu.Unlock()
+		return err
+	}
+	s.knowledgeLastAttempt = time.Now()
+	s.knowledgeMu.Unlock()
+
+	knowledgeSvc, err := initKnowledgeService(s.config)
+
+	s.knowledgeMu.Lock()
+	if s.knowledgeClosed {
+		s.knowledgeMu.Unlock()
+		if knowledgeSvc != nil && knowledgeSvc.vectorDB != nil {
+			_ = knowledgeSvc.vectorDB.Close()
+		}
+		return fmt.Errorf("knowledge service is closed")
+	}
+	if err != nil {
+		s.knowledgeInitErr = err
+		s.knowledgeMu.Unlock()
+		return err
+	}
+	if s.knowledgeService != nil {
+		s.knowledgeMu.Unlock()
+		if knowledgeSvc != nil && knowledgeSvc.vectorDB != nil {
+			_ = knowledgeSvc.vectorDB.Close()
+		}
+		return nil
+	}
+	s.knowledgeService = knowledgeSvc
+	s.knowledgeInitErr = nil
+	s.knowledgeMu.Unlock()
+	return nil
+}
+
+func (s *Server) getKnowledgeInitErr() error {
+	s.knowledgeMu.RLock()
+	defer s.knowledgeMu.RUnlock()
+	return s.knowledgeInitErr
+}
+
 // initKnowledgeService 初始化知识库服务
 // initKnowledgeService initializes the knowledge service
-func initKnowledgeService(config *Config, logger *slog.Logger) (*KnowledgeService, error) {
+func initKnowledgeService(config *Config) (*KnowledgeService, error) {
 	// 初始化嵌入函数
 	// Initialize embedding function
 	embConfig := openai.Config{
@@ -607,14 +720,14 @@ func initKnowledgeService(config *Config, logger *slog.Logger) (*KnowledgeServic
 			return nil, fmt.Errorf("failed to create chromadb: %w", err)
 		}
 
-		// 创建或连接到集合
-		// Create or connect to collection
+		// Create or connect to the collection. GetOrCreateCollection already
+		// handles an existing collection, so any error here signals a real
+		// backend/configuration failure and must not be ignored.
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := chromaDB.CreateCollection(ctx, chromaConfig.CollectionName, nil); err != nil {
-			// 如果集合已存在，忽略错误
-			// Ignore error if collection already exists
-			logger.Debug("collection may already exist", "collection", chromaConfig.CollectionName, "error", err)
+			_ = chromaDB.Close()
+			return nil, fmt.Errorf("initialize chroma collection %q: %w", chromaConfig.CollectionName, err)
 		}
 
 		vdb = chromaDB

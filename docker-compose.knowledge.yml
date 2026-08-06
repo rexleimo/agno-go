@@ -1,0 +1,23 @@
+# Knowledge-enabled AgentOS stack.
+# Run with:
+#   docker compose -f docker-compose.yml -f docker-compose.knowledge.yml \
+#     --profile with-vectordb up -d
+services:
+  agentos:
+    environment:
+      KNOWLEDGE_ENABLED: "true"
+      CHROMA_URL: http://chromadb:8000
+      CHROMA_TENANT: ${CHROMA_TENANT:-default_tenant}
+      CHROMA_DATABASE: ${CHROMA_DATABASE:-default_database}
+      KNOWLEDGE_COLLECTION: ${KNOWLEDGE_COLLECTION:-hno_knowledge}
+      KNOWLEDGE_HEALTH_ENABLED: "true"
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-text-embedding-3-small}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?set OPENAI_API_KEY for the knowledge profile}
+    depends_on:
+      chromadb:
+        condition: service_started
+
+  chromadb:
+    profiles:
+      - with-vectordb

@@ -684,10 +684,29 @@ func TestHandleKnowledgeHealth_Degraded(t *testing.T) {
 
 	router.ServeHTTP(w, httpReq)
 
-	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Equal(t, http.StatusServiceUnavailable, w.Code)
 	var resp map[string]interface{}
 	assert.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 	assert.Equal(t, "degraded", resp["status"])
-	assert.Equal(t, "unreachable", resp["error"])
+	assert.Equal(t, "knowledge store unavailable", resp["error"])
 	mockVectorDB.AssertExpectations(t)
+}
+
+func TestKnowledgeServiceSearchFilters(t *testing.T) {
+	knowledgeSvc := NewKnowledgeService(nil, nil, KnowledgeServiceConfig{})
+
+	filters, err := knowledgeSvc.searchFilters("team_docs", map[string]interface{}{"source": "manual"})
+	if err != nil {
+		t.Fatalf("searchFilters() error = %v", err)
+	}
+	if got := filters["collection_name"]; got != "team_docs" {
+		t.Fatalf("collection_name filter = %#v", got)
+	}
+	if got := filters["source"]; got != "manual" {
+		t.Fatalf("source filter = %#v", got)
+	}
+
+	if _, err := knowledgeSvc.searchFilters("team_docs", map[string]interface{}{"collection_name": "other"}); err == nil {
+		t.Fatal("searchFilters() error = nil, want conflicting collection error")
+	}
 }

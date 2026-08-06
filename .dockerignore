@@ -39,6 +39,13 @@ cmd/examples/
 .env.*.local
 
 # Temporary files
+.tmp/
+.aios/
+.hermes/
+.contextdb-enable
+NUL
+benchmarks/framework_comparison/results/
+**/__pycache__/
 tmp/
 temp/
 *.tmp

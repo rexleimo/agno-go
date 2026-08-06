@@ -1,0 +1,35 @@
+{{- if and .Values.session.enabled .Values.session.migrations.enabled }}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "agno-agentos.fullname" . }}-session-migrate
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: {{ .Values.session.migrations.image | quote }}
+          command:
+            - sh
+            - -ec
+            - psql "$AGENTOS_SESSION_DSN" -v ON_ERROR_STOP=1 -f /migrations/001_agentos_sessions.sql
+          env:
+            - name: AGENTOS_SESSION_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.session.existingSecret | quote }}
+                  key: {{ .Values.session.dsnKey | quote }}
+          volumeMounts:
+            - name: migrations
+              mountPath: /migrations
+              readOnly: true
+      volumes:
+        - name: migrations
+          configMap:
+            name: {{ include "agno-agentos.fullname" . }}-session-migrations
+{{- end }}

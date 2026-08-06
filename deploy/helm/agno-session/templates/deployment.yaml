@@ -24,7 +24,14 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             - name: AGNO_PG_DSN
+              {{- if .Values.config.existingSecret }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.config.existingSecret | quote }}
+                  key: {{ .Values.config.dsnKey | quote }}
+              {{- else }}
               value: {{ .Values.config.dsn | quote }}
+              {{- end }}
             - name: AGNO_SERVICE_PORT
               value: "{{ .Values.service.port }}"
           {{- range .Values.env }}

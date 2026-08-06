@@ -12,6 +12,7 @@ Complete API reference for HNO v1.0.
 - [Memory](/api/memory) - Conversation history management
 - [Types](/api/types) - Core types and errors
 - [AgentOS Server](/api/agentos) - Production HTTP server
+- [Knowledge API](/api/knowledge) - Chroma-backed ingestion and semantic search
 
 ## Quick Links
 

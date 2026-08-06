@@ -10,6 +10,10 @@ info:
     - Support for tool-enabled agents
     - Memory and context management
 
+    ## Routing
+    API paths below include `/api/v1`. When AgentOS is mounted with `Config.Prefix`,
+    prepend that mount path unless it already ends in `/api/v1`.
+
     ## Authentication
     Currently no authentication is required. Authentication can be added via middleware.
 
@@ -23,9 +27,7 @@ info:
 
 servers:
   - url: http://localhost:8080
-    description: Local development server
-  - url: http://localhost:8080/api/v1
-    description: API v1 endpoint
+    description: Local development server; paths already include /api/v1.
 
 tags:
   - name: Health
@@ -441,7 +443,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
-          description: Knowledge service not configured
+          description: Knowledge service unavailable or not configured
           content:
             application/json:
               schema:
@@ -462,7 +464,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/KnowledgeConfigResponse'
         '503':
-          description: Knowledge service not configured
+          description: Knowledge service unavailable or not configured
           content:
             application/json:
               schema:
@@ -519,7 +521,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
-          description: Knowledge service not configured
+          description: Knowledge service unavailable or not configured
           content:
             application/json:
               schema:
@@ -546,7 +548,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
-          description: Knowledge service not configured
+          description: Knowledge service unavailable or not configured
           content:
             application/json:
               schema:

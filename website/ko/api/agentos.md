@@ -10,7 +10,7 @@ func NewServer(config *Config) (*Server, error)
 
 type Config struct {
     Address        string           // 서버 주소 (기본값: :8080)
-    Prefix         string           // API 프리픽스 (기본값: /api/v1)
+    Prefix         string           // Optional mount prefix; empty exposes /api/v1
     SessionStorage session.Storage  // 세션 저장소 (기본값: memory)
     Logger         *slog.Logger     // 로거 (기본값: slog.Default())
     Debug          bool             // 디버그 모드 (기본값: false)

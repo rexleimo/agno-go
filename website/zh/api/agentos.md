@@ -10,7 +10,7 @@ func NewServer(config *Config) (*Server, error)
 
 type Config struct {
     Address        string           // 服务器地址 (默认: :8080) / Server address (default: :8080)
-    Prefix         string           // API 前缀 (默认: /api/v1) / API prefix (default: /api/v1)
+    Prefix         string           // 可选挂载前缀；为空时暴露 /api/v1 / Optional mount prefix
     SessionStorage session.Storage  // 会话存储 (默认: memory) / Session storage (default: memory)
     Logger         *slog.Logger     // 日志记录器 (默认: slog.Default()) / Logger (default: slog.Default())
     Debug          bool             // 调试模式 (默认: false) / Debug mode (default: false)

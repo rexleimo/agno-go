@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -69,6 +70,137 @@ func TestNewServer_WithConfig(t *testing.T) {
 
 	if !server.config.Debug {
 		t.Error("Debug should be true")
+	}
+}
+
+func TestAPIV1RoutePath(t *testing.T) {
+	tests := []struct {
+		name   string
+		prefix string
+		want   string
+	}{
+		{name: "default", prefix: "", want: "/api/v1"},
+		{name: "mount prefix", prefix: "/chat", want: "/chat/api/v1"},
+		{name: "already versioned", prefix: "/api/v1", want: "/api/v1"},
+		{name: "versioned mount", prefix: "/aig/api/v1/", want: "/aig/api/v1"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := apiV1RoutePath(tt.prefix); got != tt.want {
+				t.Fatalf("apiV1RoutePath(%q) = %q, want %q", tt.prefix, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestKnowledgeRoutesRemainDiscoverableWhenUnavailable(t *testing.T) {
+	server, err := NewServer(&Config{
+		VectorDBConfig: &VectorDBConfig{Type: "chromadb", CollectionName: "docs"},
+	})
+	if err != nil {
+		t.Fatalf("NewServer() error = %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/knowledge/config", nil)
+	w := httptest.NewRecorder()
+	server.router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("knowledge config status = %d, want %d; body=%s", w.Code, http.StatusServiceUnavailable, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), "knowledge service unavailable") {
+		t.Fatalf("knowledge config response did not identify initialization failure: %s", w.Body.String())
+	}
+}
+
+func TestPrefixDoesNotDuplicateAPIV1(t *testing.T) {
+	server, err := NewServer(&Config{Prefix: "/api/v1"})
+	if err != nil {
+		t.Fatalf("NewServer() error = %v", err)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/knowledge/config", nil)
+	w := httptest.NewRecorder()
+	server.router.ServeHTTP(w, req)
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("versioned prefix status = %d, want %d; body=%s", w.Code, http.StatusServiceUnavailable, w.Body.String())
+	}
+
+	duplicateReq := httptest.NewRequest(http.MethodGet, "/api/v1/api/v1/knowledge/config", nil)
+	duplicateW := httptest.NewRecorder()
+	server.router.ServeHTTP(duplicateW, duplicateReq)
+	if duplicateW.Code != http.StatusNotFound {
+		t.Fatalf("duplicate versioned prefix status = %d, want %d", duplicateW.Code, http.StatusNotFound)
+	}
+}
+
+func TestShutdownWaitsForKnowledgeInitialization(t *testing.T) {
+	started := make(chan struct{})
+	release := make(chan struct{})
+	chromaServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/api/v2/tenants/tenant_alpha/databases/knowledge_db/collections" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		close(started)
+		<-release
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"8ecf0f7e-e806-47f8-96a1-4732ef42359e","name":"physical_docs","tenant":"tenant_alpha","database":"knowledge_db","dimension":1536}`))
+	}))
+	defer chromaServer.Close()
+
+	server := &Server{
+		config: &Config{
+			VectorDBConfig: &VectorDBConfig{
+				Type:           "chromadb",
+				BaseURL:        chromaServer.URL,
+				CollectionName: "physical_docs",
+				Database:       "knowledge_db",
+				Tenant:         "tenant_alpha",
+			},
+			EmbeddingConfig: &EmbeddingConfig{
+				Provider: "openai",
+				APIKey:   "test-key",
+				Model:    "text-embedding-3-small",
+			},
+			KnowledgeAPI: &KnowledgeAPIOptions{EnableHealth: true},
+		},
+		logger: slog.Default(),
+	}
+
+	initDone := make(chan error, 1)
+	go func() { initDone <- server.initializeKnowledgeService() }()
+	select {
+	case <-started:
+	case <-time.After(2 * time.Second):
+		t.Fatal("knowledge initialization did not reach Chroma")
+	}
+
+	shutdownDone := make(chan error, 1)
+	go func() { shutdownDone <- server.Shutdown(context.Background()) }()
+	select {
+	case <-shutdownDone:
+		t.Fatal("Shutdown returned while knowledge initialization was still blocked")
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	close(release)
+	select {
+	case err := <-initDone:
+		if err == nil || !strings.Contains(err.Error(), "closed") {
+			t.Fatalf("initializeKnowledgeService() error = %v, want closed error", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("knowledge initialization did not finish after release")
+	}
+	select {
+	case err := <-shutdownDone:
+		if err != nil {
+			t.Fatalf("Shutdown() error = %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("Shutdown did not finish after initialization released")
 	}
 }
 

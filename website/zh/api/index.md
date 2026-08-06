@@ -12,6 +12,7 @@ HNO v1.0 的完整 API 参考文档。
 - [Memory](/api/memory) - 对话历史管理 / Conversation history management
 - [Types](/api/types) - 核心类型和错误 / Core types and errors
 - [AgentOS Server](/api/agentos) - 生产环境 HTTP 服务器 / Production HTTP server
+- [知识库 API](/zh/api/knowledge) - Chroma 入库与语义搜索 / Chroma ingestion and semantic search
 
 ## 快速链接 / Quick Links
 

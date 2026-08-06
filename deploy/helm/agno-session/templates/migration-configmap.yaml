@@ -1,0 +1,13 @@
+{{- if and .Values.migrations.enabled (or .Values.config.existingSecret .Values.config.dsn) }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "agno-session.fullname" . }}-migrations
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-1"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+data:
+  002_session_service.sql: |-
+{{ .Files.Get "files/002_session_service.sql" | indent 4 }}
+{{- end }}

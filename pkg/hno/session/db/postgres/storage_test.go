@@ -14,6 +14,7 @@ import (
 
 type mockBatchWriter struct {
 	calls            int
+	closeCalls       int
 	lastPreserveFlag bool
 }
 
@@ -24,6 +25,7 @@ func (m *mockBatchWriter) UpsertSessions(ctx context.Context, sessions []*sessio
 }
 
 func (m *mockBatchWriter) Close() error {
+	m.closeCalls++
 	return nil
 }
 
@@ -44,6 +46,30 @@ func TestNewStorage_Defaults(t *testing.T) {
 	}
 	if storage.cfg.Table != defaultTable {
 		t.Fatalf("expected default table %s, got %s", defaultTable, storage.cfg.Table)
+	}
+}
+
+func TestCloseClosesWriterAndDatabase(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+
+	writer := &mockBatchWriter{}
+	storage, err := NewStorage(db, WithBatchWriter(writer))
+	if err != nil {
+		t.Fatalf("NewStorage() error = %v", err)
+	}
+
+	mock.ExpectClose()
+	if err := storage.Close(); err != nil {
+		t.Fatalf("Close() error = %v", err)
+	}
+	if writer.closeCalls != 1 {
+		t.Fatalf("writer close calls = %d, want 1", writer.closeCalls)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("unmet database expectations: %v", err)
 	}
 }
 
