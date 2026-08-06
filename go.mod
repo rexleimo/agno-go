@@ -37,7 +37,7 @@ require (
 	github.com/Azure/go-ansiterm v0.0.0-20230124172434-306776ec8161 // indirect
 	github.com/Masterminds/semver/v3 v3.4.0 // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
-	github.com/amikos-tech/chroma-go-local v0.3.4 // indirect
+	github.com/amikos-tech/chroma-go-local v0.3.5 // indirect
 	github.com/amikos-tech/pure-onnx v0.0.1 // indirect
 	github.com/amikos-tech/pure-tokenizers v0.1.5 // indirect
 	github.com/bytedance/sonic v1.14.0 // indirect
