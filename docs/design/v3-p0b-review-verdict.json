@@ -1,0 +1,145 @@
+{
+  "kind": "rex.standards-spec-review.v1",
+  "workItemKey": "agno-go-v3-p0b-runner-capabilities",
+  "activationId": "701285da-2d6a-4056-9925-ecf3ae6e00b6",
+  "fixedPoint": {
+    "ref": "17e86c5",
+    "resolved": true,
+    "verification": "git rev-parse 17e86c5 成功；git log 17e86c5..HEAD --oneline 为空（无新提交）"
+  },
+  "diff": {
+    "command": "git diff 17e86c5 --stat",
+    "nonEmpty": true,
+    "stat": "6 files changed, 175 insertions(+), 119 deletions(-)",
+    "tracked": [
+      "pkg/hno/agent/agent.go",
+      "pkg/hno/agent/config.go",
+      "pkg/hno/agent/run.go",
+      "pkg/hno/agent/tool_executor.go",
+      "pkg/hno/runner/runner.go",
+      "pkg/hno/tools/toolkit/toolkit.go"
+    ],
+    "untracked": [
+      "pkg/hno/agent/runner_adapter.go",
+      "pkg/hno/agent/p0b_red_test.go"
+    ],
+    "note": "技能要求的三点式 `git diff 17e86c5...HEAD` 结果为空，因本工作项全部改动尚未提交。已改用相对 fixed-point 的工作树差异 `git diff 17e86c5`，该差异非空。"
+  },
+  "specSources": [
+    "docs/design/v3-test-scope-p0b.md",
+    "docs/design/v3-p0b-minimal-construction.md",
+    "docs/design/v3-testability-decision-p0b.json",
+    "docs/design/v3-delivery-ticket.json",
+    "docs/design/v3-test-scope-p0.md"
+  ],
+  "standardsSource": "AGENTS.md > Coding Style & Naming Conventions",
+  "axes": {
+    "standards": {
+      "reviewedBy": "fresh sub-agent (codex exec, workspace-write)",
+      "findings": [
+        {
+          "id": "STD-1",
+          "location": "pkg/hno/agent/run.go:56,62",
+          "evidence": "AGENTS.md: \"No inline comments unless clarifying novel logic.\" 差异含注释 `// 构建工具定义` 与 `// 创建 runner 并执行`，仅复述紧随其后的代码动作。",
+          "severity": "hard",
+          "fix": "删除这两条复述性注释。"
+        },
+        {
+          "id": "STD-2",
+          "location": "pkg/hno/agent/run.go:68-77 与 139-147（另见 pkg/hno/agent/runner_adapter.go:22-32）",
+          "evidence": "三处重复同一构造：`messages := a.Memory.GetMessages(...)` → `if instructions != \"\" { updateSystemMessage(...) }` → `req := &models.InvokeRequest{Messages: messages, Tools: tools}` → `attachRunContextToRequest(ctx, req)`。",
+          "severity": "judgement",
+          "fix": "提取单一 helper 构造请求，三处调用它。审查子 Agent 只识别出 2 处，实际为 3 处（runner_adapter 的 MessageBuilder 亦重复）。"
+        },
+        {
+          "id": "STD-3",
+          "location": "pkg/hno/agent/run.go:16-225",
+          "evidence": "单一 `Run` 函数约 210 行，同时处理 hooks、缓存查询/写入、runner 接线、事件构造、输出裁剪。",
+          "severity": "judgement",
+          "fix": "按阶段拆分：pre-run hooks、cache lookup、runner 执行、output 组装。"
+        },
+        {
+          "id": "STD-4",
+          "location": "pkg/hno/agent/agent.go:75",
+          "evidence": "`StopReason string `json:\"stop_reason,omitempty\"``，而 runner 已有类型化 `type StopReason string`（stop.go:5）及一组常量。",
+          "severity": "judgement",
+          "fix": "可保留 string（该字段需 JSON 序列化，属对外 DTO），但应在 GoDoc 注明与 `runner.StopReason` 常量一一对应，避免字面量散落。"
+        }
+      ],
+      "smellBaseline": {
+        "MysteriousName": "未见",
+        "DuplicatedCode": "命中 — STD-2",
+        "FeatureEnvy": "未见",
+        "DataClumps": "未见",
+        "PrimitiveObsession": "命中 — STD-4",
+        "RepeatedSwitches": "未见",
+        "ShotgunSurgery": "未见",
+        "DivergentChange": "命中 — STD-3",
+        "SpeculativeGenerality": "未见（OnSkippedToolCalls 有真实使用者，agent 侧）",
+        "MessageChains": "未见",
+        "MiddleMan": "未见（agentMessageBuilder 承担指令合并与上下文注入，非纯转发）",
+        "RefusedBequest": "未见"
+      },
+      "checkedClean": [
+        "命名约定（UpperCamel/lowerCamel/NewX/Config/-er）：未见违规",
+        "错误包装与小写消息：未见违规",
+        "导出符号 GoDoc：未见新增缺失",
+        "gofmt / git diff --check：未见问题"
+      ]
+    },
+    "spec": {
+      "reviewedBy": "fresh sub-agent (codex exec, workspace-write)",
+      "findings": [
+        {
+          "id": "SPEC-1",
+          "location": "pkg/hno/agent/stream.go:89,152",
+          "evidence": "规格 `v3-p0b-minimal-construction.md` 最小实现清单第 6 项：「`Agent.Run` / `RunStream` 内部改走 `runner.Run`」。实际 `grep -n 'runner\\.' pkg/hno/agent/stream.go` 无任何命中；stream.go:89 仍是 `for loopCount < a.MaxLoops` 自有循环，:152 直接调 `a.executeToolCalls`。后果：流式路径不支持 `ToolCallLimit`、不支持 `StopLoop`、不填 `StopReason`。",
+          "severity": "hard",
+          "fix": "将 `RunStream` 接入同一 runner 适配器并映射输出；或修订规格清单第 6 项，明确本周期只覆盖非流式路径，并把流式能力差异记入 P0 收口项。"
+        },
+        {
+          "id": "SPEC-2",
+          "location": "pkg/hno/agent/run.go:153-160",
+          "evidence": "agent 侧自行复制 runner 的跳过消息构造：`&types.Message{Role: types.RoleTool, ToolCallID: c.ID, Content: \"tool call limit reached; call not executed\"}`，与 `pkg/hno/runner/runner.go:280-285` 逐字段、逐字面量相同。规格要求 runner 为唯一语义源。漂移风险已实证：`p0b_red_test.go` 的期望值只被 `runner.go:284` 一处定义，若 runner 改措辞而 agent 不改，测试失败但行为已分叉。",
+          "severity": "judgement",
+          "fix": "在 runner 暴露共享构造函数（如 `runner.SkippedToolMessage(c types.ToolCall) *types.Message`）供两侧调用，消除字面量复制。"
+        },
+        {
+          "id": "SPEC-3",
+          "location": "pkg/hno/runner/runner.go:103-108,273-279",
+          "evidence": "新增公开 API `Config.OnSkippedToolCalls func([]types.ToolCall)` 不在 `v3-p0b-minimal-construction.md` 最小实现清单 7 项之内。系 GREEN 阶段为修复「同一批消息两个写入者」缺陷而引入。",
+          "severity": "judgement",
+          "fix": "有真实使用者，不建议删除。应在 `v3-p0b-minimal-construction.md` 补记该增补及其理由（消除双写入者），使规格与实现重新对齐。"
+        }
+      ],
+      "specConflict": {
+        "id": "CONFLICT-1",
+        "location": "docs/design/v3-delivery-ticket.json › work-p0b-runner-capability-adoption › completionCriteria[2]",
+        "evidence": "交付票要求「工具可声明 HITLBlocked，触发后以可观察状态退出而非静默完成」；而 `v3-test-scope-p0b.md` N1 与 C6 要求「不实现 HITLBlocked」，`grep -rn 'HITLBlocked' pkg/hno/agent/` 必须为空。两者直接冲突。",
+        "adjudication": "以 `v3-p0b-minimal-construction.md` 为准，HITLBlocked 不实现。理由：最小构造阶梯第 1 级判定其与 `work-p5` 的持久化 HITL 重复，属应删除的偶然复杂度；且该文档是交付票之后由 `implementation.minimize` 阶段产生的**更晚且更窄**的决策。",
+        "severity": "hard",
+        "fix": "更新 `v3-delivery-ticket.json` 的 P0b 范围与 completionCriteria，移除 HITLBlocked 条目，并把标题改为「ToolCallLimit / StopLoop / StopReason」，使交付票与最小构造决策一致。当前实现符合更晚规格，但交付票已过期。"
+      },
+      "specSatisfied": [
+        "C6：`grep -rn HITLBlocked pkg/hno/agent/` 为空 — 已核验通过",
+        "范围内 N1/N2/N3：ToolCallLimit 截断、StopLoop 提前终止、StopReason 暴露均有测试且通过",
+        "R1 等价性：既有 43 个 agent 测试 + 11 个 runner 测试 + 9 个 contract 测试全绿且断言零改动",
+        "验证命令：`go build ./...`、`go test -race ./pkg/hno/agent/...` 均 exit 0"
+      ]
+    }
+  },
+  "verdict": {
+    "outcome": "changes-requested",
+    "reason": "两轴均已独立完成，diff 非空、fixed-point 可 resolve。Spec 轴存在 1 项 hard 发现（SPEC-1：RunStream 未接入 runner，流式路径缺少全部三项能力）与 1 项规格冲突（CONFLICT-1：交付票已过期）。Standards 轴 1 项 hard（STD-1：复述性注释）。",
+    "blocking": ["SPEC-1", "CONFLICT-1", "STD-1"],
+    "nonBlocking": ["STD-2", "STD-3", "STD-4", "SPEC-2", "SPEC-3"]
+  },
+  "evidenceRefs": [
+    "receipt:a4ae133c-0e65-4544-8aca-8106d4e56856",
+    "receipt:c2b796b1-6ce7-4ac3-9aa5-d1ccb8fc3542",
+    "artifact:docs/design/v3-p0b-green.md",
+    "artifact:docs/design/v3-p0b-test-diff-review.md",
+    "artifact:docs/design/v3-test-scope-p0b.md",
+    "artifact:docs/design/v3-p0b-minimal-construction.md"
+  ]
+}

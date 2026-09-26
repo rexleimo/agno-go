@@ -1,0 +1,16 @@
+{
+  "kind": "behavior-preserving-hardening",
+  "decisionRef": "artifact:testability-decision:p0-loop-consolidation",
+  "baseline": {
+    "publicEntry": "(*agent.Agent).Run(ctx, string) (*agent.RunOutput, error) 与 (*agent.Agent).RunStream(ctx, string)；断言落在返回的 RunOutput（Status/Content/Messages/Metadata）与返回的 *types.HnoError.Code 上，不使用任何内部状态机探针。",
+    "setup": "干净工作树，HEAD=17e86c5。真实仓库 pkg/hno/agent 与 pkg/hno/runner 包的全部既有测试（共 44 个 agent 测试 + runner 包测试），包含缓存命中、MaxLoops 截断、上下文取消、工具调用循环、并发工具执行有序回填、工具/历史消息存储开关、临时指令自动清理、RunContext 贯穿 hooks 与 tools、流式工具循环。场景可清理：go test 使用临时目录与 httptest，无外部网络、无云凭据、无跨用例共享状态。",
+    "command": {
+      "executable": "go",
+      "args": ["test", "./pkg/hno/agent/...", "./pkg/hno/runner/...", "-count=1"],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "退出码 0，pkg/hno/agent 与 pkg/hno/runner 两个包均为 ok，作为循环收口前的行为基线被冻结。",
+    "observed": "退出码 0。输出：ok github.com/rexleimo/agno-go/pkg/hno/agent 3.339s；ok github.com/rexleimo/agno-go/pkg/hno/runner 3.187s。",
+    "receiptRef": "receipt:a7240aa8-bd16-4d40-8488-6ca50d86ab79"
+  }
+}

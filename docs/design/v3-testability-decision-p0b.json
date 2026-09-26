@@ -1,0 +1,17 @@
+{
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:testability-decision:p0b-runner-capabilities",
+  "redCandidate": {
+    "publicEntry": "(*agent.Agent).Run(ctx, string) (*agent.RunOutput, error)。断言落在 RunOutput.StopReason、RunOutput.Messages 中 RoleTool 的 ToolCallID 与 Content、以及 fake models.Model 的调用次数上；不使用 runner 私有字段或内部状态机。",
+    "setup": "干净工作树，仅新增 pkg/hno/agent/p0b_red_test.go（263+ 行），未修改任何非测试生产代码与任何既有测试。git status 在 pkg/ 下仅显示 ?? pkg/hno/agent/p0b_red_test.go。测试在 agent 包内自建 fakeModel（脚本化 responses + index 游标，形状参照 pkg/hno/runner/runner_test.go 的 mockModel）与 fakeToolkit（构造 toolkit.Function）。场景可清理：全部为内存 fake，无网络、无云凭据、无跨用例共享状态。gofmt -l 该文件无输出。",
+    "command": {
+      "executable": "go",
+      "args": ["test", "./pkg/hno/agent/...", "-run", "P0B", "-count=1"],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "退出码非 0，且全部编译错误只对应本周期三项缺失能力：(1) toolkit.Function.StopLoop 不存在——工具声明 StopLoop 的机制尚未实现；(2) agent.Config.ToolCallLimit 不存在——工具调用上限未暴露；(3) agent.RunOutput.StopReason 不存在——终止原因不可观察。不得出现任何与三项能力无关的报错。",
+    "observed": "退出码 1，FAIL github.com/rexleimo/agno-go/pkg/hno/agent [build failed]。完整编译错误：p0b_red_test.go:66:4 unknown field StopLoop in struct literal of type toolkit.Function；:104:3 unknown field ToolCallLimit in struct literal of type Config；:139:12 与 :140:66 output.StopReason undefined (type *RunOutput has no field or method StopReason)；:170:3 unknown field ToolCallLimit；:193:12 与 :194:66 output.StopReason undefined；:232:12 与 :233:73 output.StopReason undefined；:265:12 output.StopReason undefined（too many errors）。全部 9 条错误精确映射到上述三项能力缺失，无第四条无关错误。",
+    "receiptRef": "receipt:bdc53fe3-5cb2-4630-ada8-992ac163eadb",
+    "failureReason": "本周期为新增用户可观察行为，三项能力在当前 Agent 上确实不存在。第一版提交曾因编造 toolkit.Function.Metadata 夹具（该字段不存在且与三项能力无关）被判为非法 RED 并驳回重做；修正版改用本周期将交付的 toolkit.Function.StopLoop，编译失败原因已全部收敛为真实能力缺失。gofmt 干净，无生产代码改动，故为合法 RED。"
+  }
+}

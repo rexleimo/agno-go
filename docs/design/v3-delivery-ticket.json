@@ -1,0 +1,432 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.delivery-ticket.v1",
+  "status": "ready",
+  "objective": "把 agno-go 从 1.2.9 升级为 v3.0：先收口重复循环到唯一 runner 内核，再引入控制流图引擎作为 agent 运行时底座（图引擎含动态 Send 扇出、节点策略四合一、Durability 三档与 recursion_limit 安全阀），统一流式协议为 StreamMode 七模式，落地会话事件化与 HITL interrupt/resume，交付 Store 长期记忆，并把既有 workflow 迁移到图上且公共 API 不变。",
+  "decisionTicketRef": "artifact:decision-ticket:agno-go-v3-scope",
+  "workItems": [
+    {
+      "id": "work-p0-loop-consolidation",
+      "title": "P0 循环收口：agent 切到唯一 runner 内核",
+      "outcome": "pkg/hno/runner 不再是死代码；agent 的同步与流式路径共享同一循环内核，仓库内循环实现从 4 份降为 2 份（runner + run.Loop）。",
+      "completionCriteria": [
+        "agent 全部 tool 循环改由 pkg/hno/runner 驱动，run.go 与 stream.go 内的循环被删除",
+        "严格等价：Agent 对外只暴露 MaxLoops 语义，runner 的 ToolCallLimit / StopLoop / HITLBlocked 增量能力在本次收口中【不启用】，其采纳见 work-p0b-runner-capability-adoption",
+        "并发工具执行的有序消息回填语义保持不变（run.go 的 goroutine+有序 results 对应 runner ToolExecutor 的有序 outcome 契约）",
+        "为当前 Agent 真实存在但零覆盖的路径补齐特征化测试（见 test-scope 契约 §3）",
+        "对外签名 Agent.Run / Agent.RunStream / RunStreamResult 零变更",
+        "发布为独立 minor 版本（D4 裁定）"
+      ],
+      "verification": [
+        "go build ./...",
+        "go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1",
+        "go test -race ./pkg/hno/agent/... -count=1",
+        "grep -rn 'hno/runner' --include='*.go' . | grep -v '^./pkg/hno/runner/' | wc -l",
+        "grep -c 'for {' pkg/hno/agent/run.go pkg/hno/agent/stream.go"
+      ],
+      "evidenceRefs": [
+        "artifact:docs/design/v3-baseline-evidence.md#2",
+        "artifact:docs/design/v3-test-scope-p0.md",
+        "artifact:docs/design/v3-decision-ticket.md"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "work-p0b-runner-capability-adoption",
+      "title": "P0b 采纳 runner 增量能力：ToolCallLimit / StopLoop / StopReason",
+      "outcome": "把 runner 相对当前 Agent 的两项增量循环控制能力（tool call limit、工具请求停止）通过 Agent.Run 公共接口暴露，并让 StopReason 可被用户观察。人工审批阻断（HITLBlocked）经最小构造第 1 级判定为与 P5 重复的偶然复杂度，已从本项删除。",
+      "completionCriteria": [
+        "Agent.Config 新增 ToolCallLimit，达到上限时未执行的调用按 runner 语义回注 tool 错误消息且不丢 ToolCallID 配对",
+        "工具可声明 StopLoop，触发后循环在该次工具调用后终止且不再回调模型",
+        "StopReason 经由 RunOutput 暴露，取代当前的隐式错误码推断",
+        "本项为新增用户可观察行为，必须走 RED 优先 TDD，不得以基线通过替代",
+        "不得改变 P0 已钉死的等价行为（B1-B11）",
+        "范围限于 Agent.Run；Agent.RunStream 不纳入本项，能力缺口随附 work-p0-stream-loop-consolidation 一并处理"
+      ],
+      "verification": [
+        "go build ./...",
+        "go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1",
+        "go test -race ./pkg/hno/agent/... -count=1"
+      ],
+      "evidenceRefs": [
+        "artifact:docs/design/v3-test-scope-p0.md",
+        "artifact:docs/design/v3-baseline-evidence.md#2"
+      ],
+      "dependsOn": [
+        "work-p0-loop-consolidation"
+      ]
+    },
+    {
+      "id": "work-p0-stream-loop-consolidation",
+      "title": "P0-stream 收口流式循环：让 RunStream 与 Run 共用唯一内核",
+      "outcome": "把 Agent.RunStream 接入与 Agent.Run 相同的 runner 内核，消除同步与流式两套 tool 循环；补齐流式路径此前缺失的 ToolCallLimit / StopLoop / StopReason 能力。",
+      "completionCriteria": [
+        "Agent.RunStream 内部改走 pkg/hno/runner，不再使用 stream.go:89 的 for loopCount < a.MaxLoops 自有循环",
+        "流式路径同样支持 ToolCallLimit 截断，并回注与 sync 路径一致的 skipped tool 消息（含 ToolCallID 配对）",
+        "流式路径同样支持工具声明 StopLoop，且 RunStreamResult 暴露 StopReason",
+        "stream_aggregator 的增量聚合语义与既有 stream 测试逐字不变（不得为接入 runner 而弱化事件顺序或分块边界）",
+        "sync 与 stream 两条路径对同一场景产出的消息序列完全一致（须有对照测试钉住）"
+      ],
+      "verification": [
+        "go build ./...",
+        "go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1",
+        "go test -race ./pkg/hno/agent/... -count=1"
+      ],
+      "evidenceRefs": [
+        "artifact:docs/design/v3-p0b-review-verdict.json#SPEC-1",
+        "artifact:docs/design/v3-p0b-minimal-construction.md#第-6-项收窄裁定",
+        "artifact:docs/design/v3-baseline-evidence.md#2"
+      ],
+      "dependsOn": [
+        "work-p0b-runner-capability-adoption"
+      ]
+    },
+    {
+      "id": "work-p1-graph-engine",
+      "title": "P1 图引擎：pkg/hno/graph 控制流调度内核",
+      "outcome": "新增零锁控制流图引擎，支持无条件边、条件边、Default 兜底、并行扇出、Join 汇聚屏障、跨节点环、并发上限与构建期校验。",
+      "completionCriteria": [
+        "Graph/Node/Predicate 公共 API 按设计文档 §3.2 落地，Node.Run 签名为 (ctx, any) (any, error)",
+        "scheduler 采用单消费者模型：生产者只向 channel 发送，消费者独占可变状态，全程无 mutex",
+        "8 项构建期校验全部实现：悬空边、重复名、无入口、不可达节点、无出口、Join 前驱数、无条件边成环、stepLimit 缺失告警",
+        "并发上限 maxConcurrency 打满时激活进入 FIFO 等待队列，完成后自动派发",
+        "五类图（DAG / 并行 / 汇聚 / 条件路由 / 环）各有端到端测试",
+        "引擎核心非测试 LOC 控制在 1500 以内"
+      ],
+      "verification": [
+        "go build ./...",
+        "go test ./pkg/hno/graph/... -count=1",
+        "go test -race ./pkg/hno/graph/... -count=1",
+        "go vet ./pkg/hno/graph/..."
+      ],
+      "evidenceRefs": [
+        "artifact:docs/design/v3-platform.md#3",
+        "artifact:docs/design/v3-baseline-evidence.md#4",
+        "artifact:docs/design/v3-baseline-evidence.md#5"
+      ],
+      "dependsOn": [
+        "work-p0-loop-consolidation"
+      ]
+    },
+    {
+      "id": "work-p2-node-policies",
+      "title": "P2 节点策略四合一：Retry / Cache / Timeout / Trace",
+      "outcome": "图节点可声明式挂载重试、缓存、超时、追踪四类策略，重试含退避与 jitter，缓存支持自定义 keyFunc 与 TTL。",
+      "completionCriteria": [
+        "RetryConfig 含 MaxAttempts/InitialDelay/BackoffFactor/MaxDelay/Jitter/ShouldRetry，默认不重试确定性输入错误",
+        "CacheConfig 支持 KeyFunc 与 TTL，泛化 CacheStore 接口与现有 cache.Provider 并存且互不破坏",
+        "TimeoutConfig 区分单次尝试超时与整节点超时",
+        "TraceConfig 可控制节点级 span 记录与输入输出脱敏",
+        "每个策略有独立测试与组合测试"
+      ],
+      "verification": [
+        "go build ./...",
+        "go test ./pkg/hno/graph/... -count=1",
+        "go test -race ./pkg/hno/graph/... -count=1",
+        "go test ./pkg/hno/cache/... -count=1"
+      ],
+      "evidenceRefs": [
+        "artifact:docs/design/v3-platform.md#4",
+        "artifact:docs/design/v3-baseline-evidence.md#6"
+      ],
+      "dependsOn": [
+        "work-p1-graph-engine"
+      ]
+    },
+    {
+      "id": "work-p3-send-durability",
+      "title": "P3 动态 Send 扇出 + Durability 三档 + stepLimit 安全阀",
+      "outcome": "节点可在运行时决定扇出数量与参数（map-reduce），并提供三档持久化强度与图级步数上限。",
+      "completionCriteria": [
+        "Sender 节点返回 []Send，运行时决定扇出目标与各自入参",
+        "map-reduce 模式端到端可用：扇出 N 个任务后由 Join 聚合",
+        "Durability 支持 sync/async/exit 三档并实际影响节点完成后的提交时机",
+        "stepLimit 默认 1000，超限返回 ErrStepLimitExceeded",
+        "存在无条件环且未设 stepLimit 时构建期告警"
+      ],
+      "verification": [
+        "go build ./...",
+        "go test ./pkg/hno/graph/... -count=1",
+        "go test -race ./pkg/hno/graph/... -count=1"
+      ],
+      "evidenceRefs": [
+        "artifact:docs/design/v3-platform.md#6",
+        "artifact:docs/design/v3-platform.md#7",
+        "artifact:docs/design/v3-baseline-evidence.md#6"
+      ],
+      "dependsOn": [
+        "work-p1-graph-engine"
+      ]
+    },
+    {
+      "id": "work-p4-streammode",
+      "title": "P4 StreamMode 七模式统一流式协议",
+      "outcome": "流式协议从固定双 channel 扩展为七种模式，同时保留 run_content/run_completed 旧事件类型以保证向后兼容。",
+      "completionCriteria": [
+        "run 事件体系扩展出 NodeStarted/NodeCompleted/TaskError/Checkpoint/StateUpdate/Custom 事件",
+        "新增 RunStreamMode 入口，RunStream 保留为 StreamMessages 的包装",
+        "旧事件类型 run_content 与 run_completed 的既有行为逐字不变",
+        "team/inheritance.go、workflow/run.go、workflow/step.go 三处既有 Events 消费方不需改动即可继续工作",
+        "已核实 RunStreamResult 无外部消费方，变更爆炸半径受控"
+      ],
+      "verification": [
+        "go build ./...",
+        "go test ./pkg/hno/run/... ./pkg/hno/agent/... ./pkg/hno/team/... ./pkg/hno/workflow/... -count=1",
+        "go test -race ./pkg/hno/agent/... -count=1"
+      ],
+      "evidenceRefs": [
+        "artifact:docs/design/v3-platform.md#5",
+        "artifact:docs/design/v3-baseline-evidence.md#7"
+      ],
+      "dependsOn": [
+        "work-p0-loop-consolidation",
+        "work-p0-stream-loop-consolidation"
+      ]
+    },
+    {
+      "id": "work-p5-event-hitl",
+      "title": "P5 会话事件化 + HITL interrupt/resume",
+      "outcome": "会话内部改为不可变事件流存储，RunOutput 保持为派生视图；HITL 支持 schema 校验、幂等恢复与重入/交接两种恢复模式，且不改动 Session 对外 JSON。",
+      "completionCriteria": [
+        "事件类型仅含 Input/ModelCall/ModelResponse/ToolCall/ToolResult/Interrupt/InterruptResponse 七种，不引入 adk 的 ArtifactDelta/TransferToAgent/Escalate/Compaction",
+        "Session 对外 JSON 结构不变，RunOutput 由事件流投影生成",
+        "internal/session/contract 9 个契约测试全部保持绿色",
+        "Resume 实现三项语义：ResponseSchema 校验失败时节点保持 Waiting 可重试；重复 Resume 同一 InterruptID 为 no-op 并返回 ErrNothingToResume；Rerun 与 Handoff 两种恢复模式均有测试",
+        "跨进程中断恢复端到端测试：中断后重启进程仍能恢复"
+      ],
+      "verification": [
+        "go build ./...",
+        "go test ./internal/session/contract/... -count=1",
+        "go test ./pkg/hno/session/... -count=1",
+        "go test ./pkg/hno/graph/... -count=1"
+      ],
+      "evidenceRefs": [
+        "artifact:docs/design/v3-platform.md#9",
+        "artifact:docs/design/v3-decision-ticket.md",
+        "artifact:docs/design/v3-baseline-evidence.md#7"
+      ],
+      "dependsOn": [
+        "work-p0-loop-consolidation",
+        "work-p1-graph-engine"
+      ]
+    },
+    {
+      "id": "work-p6-workflow-migration",
+      "title": "P6 workflow 迁移到图引擎，公共 API 不变",
+      "outcome": "现有线性 Steps 工作流内部编译为链式图驱动，Node.Execute(ctx, *ExecutionContext) 签名与全部对外行为保持不变。",
+      "completionCriteria": [
+        "workflow/executor.go 不再自行驱动 run.Loop，改由图引擎调度",
+        "Node 接口签名 Execute(ctx, *ExecutionContext) (*ExecutionContext, error) 保持不变",
+        "现有 workflow 全部测试在未修改测试文件的前提下通过",
+        "线性 Steps 语义正确映射为无条件边链，Step 内 Parallel/Loop/Condition/Router 容器节点行为等价"
+      ],
+      "verification": [
+        "go build ./...",
+        "go test ./pkg/hno/workflow/... -count=1",
+        "go test -race ./pkg/hno/workflow/... -count=1",
+        "make test"
+      ],
+      "evidenceRefs": [
+        "artifact:docs/design/v3-platform.md#10",
+        "artifact:docs/design/v3-decision-ticket.md"
+      ],
+      "dependsOn": [
+        "work-p1-graph-engine",
+        "work-p2-node-policies",
+        "work-p3-send-durability",
+        "work-p4-streammode"
+      ]
+    },
+    {
+      "id": "work-p7-observability",
+      "title": "P7 观测接线：把已有零件接进 runner",
+      "outcome": "现有 observability 的 retry/breaker/ratelimit/tracing 从未接线状态转为实际生效，span 覆盖 run/agent/model/tool 四级。",
+      "completionCriteria": [
+        "重试与熔断在 runner 的模型调用路径实际生效，可由测试观察触发与恢复",
+        "仅接线现有 observability 零件，不新增能力、不修改 runner 公共接口、不依赖 pkg/hno/graph（这是本项不排在 work-p1 之后的理由）",
+        "run/agent/model/tool 四级 span 齐备，含 usage 归集",
+        "破坏性变更最小化：不改变现有 Model 接口契约",
+        "禁用全部观测时零开销路径保持"
+      ],
+      "verification": [
+        "go build ./...",
+        "go test ./pkg/hno/observability/... ./pkg/hno/runner/... -count=1",
+        "go test -race ./pkg/hno/observability/... -count=1"
+      ],
+      "evidenceRefs": [
+        "artifact:docs/design/v3-baseline-evidence.md#3",
+        "artifact:docs/design/v3-platform.md#4"
+      ],
+      "dependsOn": [
+        "work-p0-loop-consolidation"
+      ]
+    },
+    {
+      "id": "work-p8-store",
+      "title": "P8 Store 长期记忆：层级 namespace + 向量检索",
+      "outcome": "新增跨会话长期记忆存储，提供层级命名空间下的 KV 与向量检索，并明确与 memory/knowledge/session.State 的职责边界。",
+      "completionCriteria": [
+        "Store 接口含 Get/Put/Delete/List/Search，namespace 为层级切片",
+        "v1 提供内存实现与基于现有 session/db 的持久化实现",
+        "与 pkg/hno/knowledge、pkg/hno/vectordb、pkg/hno/memory 的职责边界在文档中写明且无重叠",
+        "Search 路径需 Embedder，可复用现有 pkg/hno/embeddings",
+        "有跨会话读写端到端测试"
+      ],
+      "verification": [
+        "go build ./...",
+        "go test ./pkg/hno/store/... -count=1",
+        "go test ./pkg/hno/knowledge/... ./pkg/hno/vectordb/... -count=1"
+      ],
+      "evidenceRefs": [
+        "artifact:docs/design/v3-platform.md#8",
+        "artifact:docs/design/v3-decision-ticket.md",
+        "artifact:docs/design/v3-baseline-evidence.md#6"
+      ],
+      "dependsOn": []
+    },
+    {
+      "id": "work-p9-release",
+      "title": "P9 v3.0 发布",
+      "outcome": "发布 v3.0.0，含 CHANGELOG、破坏性变更清单、迁移指南，以及与 adk-go / LangGraph 的定位对比文档。",
+      "completionCriteria": [
+        "CHANGELOG 完整记录 BC-1 至 BC-5 五项破坏性变更",
+        "提供 v2 到 v3 迁移指南，覆盖 RunStream、workflow.Node、Session 三处",
+        "make test / make lint / make contract-test 全绿",
+        "docs/design/v3-platform.md 更新为已实现状态并标注实际 LOC 与实测数据",
+        "对比文档说明为何不引入 Pregel BSP 与 checkpoint time-travel"
+      ],
+      "verification": [
+        "go build ./...",
+        "make test",
+        "make lint",
+        "make contract-test"
+      ],
+      "evidenceRefs": [
+        "artifact:docs/design/v3-platform.md#11",
+        "artifact:docs/design/v3-baseline-evidence.md"
+      ],
+      "dependsOn": [
+        "work-p6-workflow-migration",
+        "work-p7-observability",
+        "work-p8-store",
+        "work-p0b-runner-capability-adoption",
+        "work-p0-stream-loop-consolidation"
+      ]
+    }
+  ],
+  "frontier": {
+    "ready": [
+      "work-p0-loop-consolidation",
+      "work-p8-store"
+    ],
+    "blocked": [
+      {
+        "workItemId": "work-p0b-runner-capability-adoption",
+        "reason": "依赖 work-p0-loop-consolidation 未完成：必须在收口后的单一循环内核上新增能力，不得在两套循环上并行开发。",
+        "evidenceRefs": [
+          "artifact:docs/design/v3-test-scope-p0.md"
+        ]
+      },
+      {
+        "workItemId": "work-p1-graph-engine",
+        "reason": "依赖 work-p0-loop-consolidation 未完成：图节点需以收口后的 runner 为 Node 实现基础，先收口可避免在两套循环上并行开发。",
+        "evidenceRefs": [
+          "artifact:docs/design/v3-baseline-evidence.md#2"
+        ]
+      },
+      {
+        "workItemId": "work-p2-node-policies",
+        "reason": "依赖 work-p1-graph-engine 未完成：节点策略需挂载在已存在的 Node 契约与 scheduler 上。",
+        "evidenceRefs": [
+          "artifact:docs/design/v3-platform.md#4"
+        ]
+      },
+      {
+        "workItemId": "work-p3-send-durability",
+        "reason": "依赖 work-p1-graph-engine 未完成：Send 派发与 Durality 均作用于 scheduler 调度路径。",
+        "evidenceRefs": [
+          "artifact:docs/design/v3-platform.md#6"
+        ]
+      },
+      {
+        "workItemId": "work-p4-streammode",
+        "reason": "依赖 work-p0-loop-consolidation 未完成：七模式统一流式必须建立在 sync/stream 共享同一循环内核之上，否则仍是两份实现各自扩展。 现另依赖 work-p0-stream-loop-consolidation：必须先消除流式自有循环，否则七模式会继续在两套内核上扩展。",
+        "evidenceRefs": [
+          "artifact:docs/design/v3-baseline-evidence.md#2"
+        ]
+      },
+      {
+        "workItemId": "work-p5-event-hitl",
+        "reason": "依赖 work-p0-loop-consolidation 与 work-p1-graph-engine 未完成：事件化需稳定的循环内核产出事件，Resume 需图引擎的节点状态机支撑。",
+        "evidenceRefs": [
+          "artifact:docs/design/v3-platform.md#9"
+        ]
+      },
+      {
+        "workItemId": "work-p6-workflow-migration",
+        "reason": "依赖 work-p1/p2/p3/p4 未完成：迁移目标必须是功能完整的引擎，否则需要二次迁移。",
+        "evidenceRefs": [
+          "artifact:docs/design/v3-platform.md#10"
+        ]
+      },
+      {
+        "workItemId": "work-p7-observability",
+        "reason": "依赖 work-p0-loop-consolidation 未完成：观测要挂在收口后的唯一循环上，挂在旧路径上会随 P0 一起作废。",
+        "evidenceRefs": [
+          "artifact:docs/design/v3-baseline-evidence.md#3"
+        ]
+      },
+      {
+        "workItemId": "work-p9-release",
+        "reason": "依赖 work-p6/work-p7/work-p8 全部完成，v3.0.0 为收敛发布。",
+        "evidenceRefs": [
+          "artifact:docs/design/v3-platform.md#11"
+        ]
+      },
+      {
+        "workItemId": "work-p0-stream-loop-consolidation",
+        "reason": "依赖 work-p0b-runner-capability-adoption 未完成：需先在 Agent.Run 上跑通 runner 内核与适配器，才能把同一内核接到 RunStream；且 P0b 已把 runner 从死代码变为实际内核，本项在其之上收口剩余的流式循环。",
+        "evidenceRefs": [
+          "artifact:docs/design/v3-p0b-review-verdict.json#SPEC-1"
+        ]
+      }
+    ]
+  },
+  "parallelGroups": [
+    [
+      "work-p0-loop-consolidation"
+    ],
+    [
+      "work-p0b-runner-capability-adoption"
+    ],
+    [
+      "work-p0-stream-loop-consolidation"
+    ],
+    [
+      "work-p1-graph-engine",
+      "work-p4-streammode",
+      "work-p7-observability",
+      "work-p8-store"
+    ],
+    [
+      "work-p2-node-policies",
+      "work-p3-send-durability",
+      "work-p5-event-hitl"
+    ],
+    [
+      "work-p6-workflow-migration"
+    ],
+    [
+      "work-p9-release"
+    ]
+  ],
+  "convergenceGate": {
+    "requiredEvidenceRefs": [
+      "artifact:docs/design/v3-delivery-ticket.json",
+      "artifact:docs/design/v3-baseline-evidence.md"
+    ],
+    "verification": "go build ./... && make test && make lint && make contract-test 全部通过，且 work-p9-release 的 CHANGELOG 与迁移指南已落盘。",
+    "joinCondition": "work-p0 至 work-p8 全部完成并各自携带通过的真实测试回执；契约层 9 个 Go 与 Python 对齐测试保持绿色；无任何工作项处于 blocked 或 partial 状态。"
+  },
+  "completionClaim": "soft"
+}

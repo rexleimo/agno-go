@@ -1,0 +1,6 @@
+{
+  "kind": "blocked",
+  "decisionRef": "artifact:testability-decision:p0-loop-consolidation-blocked",
+  "reason": "当前周期 work-p0-loop-consolidation 是严格等价重构（已核实：Agent 对外仅暴露 MaxLoops；ToolCallLimit / StopLoop / HITLBlocked / StopReason 只存在于死代码 pkg/hno/runner，见 artifact:docs/design/v3-test-scope-p0.md 第 0 节）。重构不产生新的用户可观察行为，因此不存在可通过稳定公共入口真实复现为失败的诚实 RED。harness 约束 TDD 必须以 behavior-delta 启动（software-workflow-runtime.mjs:288），故本周期无法进入 rex-tdd。本结论不伪造 RED，也不将既有行为的特征化测试冒充行为增量。",
+  "missingAcceptance": "本周期缺少任何【新增的用户可观察行为】验收条件，这是 TDD 所需的 behavior-delta 前置。请求把当前周期重定义为 work-p0b-runner-capability-adoption：经公共入口 (*agent.Agent).Run 暴露 ToolCallLimit 截断、工具请求停止（StopLoop）、人工审批阻断（StopHITLBlocked）与 StopReason。这三项当前在 Agent 上确实不存在，写出的测试会真实失败，构成诚实 RED。该范围已在 artifact:docs/design/v3-delivery-ticket.json 中登记为 work-p0b-runner-capability-adoption，dependsOn=[work-p0-loop-consolidation]。P0 的严格等价重构本身不变，其基线回执已备妥：receipt:a7240aa8-bd16-4d40-8488-6ca50d86ab79（退出码 0），可在后续按 behavior-preserving-hardening 消费。"
+}
