@@ -317,7 +317,8 @@
   "frontier": {
     "ready": [
       "work-p0-loop-consolidation",
-      "work-p8-store"
+      "work-p8-store",
+      "work-p0-stream-loop-consolidation"
     ],
     "blocked": [
       {
@@ -381,13 +382,6 @@
         "reason": "依赖 work-p6/work-p7/work-p8 全部完成，v3.0.0 为收敛发布。",
         "evidenceRefs": [
           "artifact:docs/design/v3-platform.md#11"
-        ]
-      },
-      {
-        "workItemId": "work-p0-stream-loop-consolidation",
-        "reason": "依赖 work-p0b-runner-capability-adoption 未完成：需先在 Agent.Run 上跑通 runner 内核与适配器，才能把同一内核接到 RunStream；且 P0b 已把 runner 从死代码变为实际内核，本项在其之上收口剩余的流式循环。",
-        "evidenceRefs": [
-          "artifact:docs/design/v3-p0b-review-verdict.json#SPEC-1"
         ]
       }
     ]
