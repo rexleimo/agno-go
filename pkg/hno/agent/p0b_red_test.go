@@ -139,6 +139,30 @@ func TestP0B_ToolCallLimitTruncatesBatch_SingleRound(t *testing.T) {
 	if output.StopReason != "limit_reached" {
 		t.Errorf("Expected StopReason 'limit_reached', got %q", output.StopReason)
 	}
+
+	// 逐条校验身份与内容：前两条是真实执行结果，第三条才是被跳过的。
+	// 只断言条数无法区分「正确执行了 2 个」与「一个都没执行」。
+	// Verify identity and content per message: two real results, one skipped.
+	gotContent := map[string]string{}
+	for _, m := range output.Messages {
+		if m.Role == types.RoleTool {
+			gotContent[m.ToolCallID] = m.Content
+		}
+	}
+	wantContent := map[string]string{
+		// toolkit.FormatResult 对 handler 返回值做 json.Marshal，字符串会带上引号；
+		// call3 的跳过消息由 runner 直接构造，不经格式化。
+		// FormatResult JSON-marshals handler returns, so strings arrive quoted;
+		// call3's skip message is built by runner and is not formatted.
+		"call1": "\"result1\"",
+		"call2": "\"result2\"",
+		"call3": "tool call limit reached; call not executed",
+	}
+	for _, id := range []string{"call1", "call2", "call3"} {
+		if gotContent[id] != wantContent[id] {
+			t.Errorf("call %s: expected %q, got %q", id, wantContent[id], gotContent[id])
+		}
+	}
 }
 
 // TestP0B_ToolCallLimitTruncatesBatch_MultiRound tests limit exhaustion across rounds.
@@ -198,6 +222,21 @@ func TestP0B_ToolCallLimitTruncatesBatch_MultiRound(t *testing.T) {
 	if model.index != 3 {
 		t.Errorf("Expected model called 3 times, got %d", model.index)
 	}
+
+	// 跨轮消耗掉的两条调用应分别是 call1、call2。
+	// 只数条数会漏掉「数量对、身份错」的情况。
+	// The two calls consumed across rounds must be call1 and call2 specifically.
+	gotRound := map[string]string{}
+	for _, m := range output.Messages {
+		if m.Role == types.RoleTool {
+			gotRound[m.ToolCallID] = m.Content
+		}
+	}
+	for id, w := range map[string]string{"call1": "\"result1\"", "call2": "\"result2\""} {
+		if gotRound[id] != w {
+			t.Errorf("call %s: expected %q, got %q", id, w, gotRound[id])
+		}
+	}
 }
 
 // TestP0B_StopLoopHaltsBeforeNextModelCall tests stopLoop tool behavior.
@@ -236,6 +275,21 @@ func TestP0B_StopLoopHaltsBeforeNextModelCall(t *testing.T) {
 	// Model should be called only once (stopLoop prevents second call)
 	if model.index != 1 {
 		t.Errorf("Expected model called once (stopLoop active), got %d times", model.index)
+	}
+
+	// 工具结果必须保留在消息中，不能因 stopLoop 而丢弃。
+	// 此前该场景下「终止循环但丢弃工具输出」的实现可以完全通过测试。
+	// The tool result must survive in the message stream; stopLoop must not discard it.
+	// stopTool 的结果同样经 FormatResult 序列化，故为带引号的 "\"stopped\""。
+	// stopTool's result is also JSON-marshalled, hence the quoted form.
+	var keptResult bool
+	for _, m := range output.Messages {
+		if m.Role == types.RoleTool && m.ToolCallID == "call1" && m.Content == "\"stopped\"" {
+			keptResult = true
+		}
+	}
+	if !keptResult {
+		t.Error("stopTool result message should be preserved in output.Messages")
 	}
 }
 
