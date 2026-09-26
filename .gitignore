@@ -57,3 +57,6 @@ NUL
 benchmarks/framework_comparison/__pycache__/
 benchmarks/framework_comparison/results/remote_agnes_2_5_flash/
 benchmarks/framework_comparison/results/**/*.stderr
+
+# rex-harness 本机状态（receipts / activations / evidence），不入库
+.rex-harness/
