@@ -14,6 +14,7 @@ type Function struct {
 	Description string
 	Parameters  map[string]Parameter
 	Handler     HandlerFunc
+	StopLoop    bool // 工具执行后请求终止循环 / Request loop termination after execution
 }
 
 // Parameter defines a function parameter

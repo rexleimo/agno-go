@@ -103,6 +103,9 @@ type Config struct {
 	// OnStep is invoked after every loop iteration (optional).
 	// OnStep 在每次循环迭代后调用（可选）。
 	OnStep func(StepEvent)
+	// OnSkippedToolCalls is invoked when ToolCallLimit truncates a batch (optional).
+	// OnSkippedToolCalls 在 ToolCallLimit 截断批次时被调用（可选）。
+	OnSkippedToolCalls func([]types.ToolCall)
 	// Logger for structured diagnostics (optional).
 	// Logger 用于结构化诊断（可选）。
 	Logger *slog.Logger
@@ -113,14 +116,15 @@ type Config struct {
 // Runner 以显式状态机实现代理工具调用循环。
 // 该循环是同步与流式运行共享的唯一事实来源。
 type Runner struct {
-	model          models.Model
-	tools          []models.ToolDefinition
-	maxTurns       int
-	toolCallLimit  int
-	messageBuilder MessageBuilder
-	toolExecutor   ToolExecutor
-	onStep         func(StepEvent)
-	logger         *slog.Logger
+	model              models.Model
+	tools              []models.ToolDefinition
+	maxTurns           int
+	toolCallLimit      int
+	messageBuilder     MessageBuilder
+	toolExecutor       ToolExecutor
+	onStep             func(StepEvent)
+	onSkippedToolCalls func([]types.ToolCall)
+	logger             *slog.Logger
 }
 
 // New creates a Runner with defaults applied.
@@ -153,14 +157,15 @@ func New(cfg Config) (*Runner, error) {
 	}
 
 	return &Runner{
-		model:          cfg.Model,
-		tools:          cfg.Tools,
-		maxTurns:       maxTurns,
-		toolCallLimit:  toolCallLimit,
-		messageBuilder: messageBuilder,
-		toolExecutor:   cfg.ToolExecutor,
-		onStep:         cfg.OnStep,
-		logger:         logger,
+		model:              cfg.Model,
+		tools:              cfg.Tools,
+		maxTurns:           maxTurns,
+		toolCallLimit:      toolCallLimit,
+		messageBuilder:     messageBuilder,
+		toolExecutor:       cfg.ToolExecutor,
+		onStep:             cfg.OnStep,
+		onSkippedToolCalls: cfg.OnSkippedToolCalls,
+		logger:             logger,
 	}, nil
 }
 
@@ -268,7 +273,11 @@ func (r *Runner) Run(ctx context.Context, messages []*types.Message) (*types.Mod
 			// Report skipped calls when the limit cut the batch short.
 			// 当上限截断了批次时，报告被跳过的调用。
 			if limitHit {
-				for _, c := range response.ToolCalls[len(callsToRun):] {
+				skipped := response.ToolCalls[len(callsToRun):]
+				if r.onSkippedToolCalls != nil {
+					r.onSkippedToolCalls(skipped)
+				}
+				for _, c := range skipped {
 					allMessages = append(allMessages, &types.Message{
 						Role:       types.RoleTool,
 						ToolCallID: c.ID,

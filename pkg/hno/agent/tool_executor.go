@@ -65,8 +65,9 @@ func (a *Agent) executeToolCalls(ctx context.Context, toolCalls []types.ToolCall
 // toolResult carries the outcome of a single tool call.
 // toolResult 携带单个工具调用的结果。
 type toolResult struct {
-	callID  string
-	message string
+	callID   string
+	message  string
+	stopLoop bool // 工具是否请求终止循环 / whether the tool requests loop termination
 }
 
 // executeOneTool dispatches a single tool call with validation and tracing.
@@ -104,5 +105,5 @@ func (a *Agent) executeOneTool(ctx context.Context, index map[string]*toolkit.Fu
 		resultStr = fmt.Sprintf("%v", result)
 	}
 	a.logger.Info("tool executed successfully", "function", tc.Function.Name)
-	return toolResult{callID: tc.ID, message: resultStr}
+	return toolResult{callID: tc.ID, message: resultStr, stopLoop: fn.StopLoop}
 }

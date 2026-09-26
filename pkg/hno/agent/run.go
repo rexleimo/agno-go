@@ -8,6 +8,7 @@ import (
 	"github.com/rexleimo/agno-go/pkg/hno/hooks"
 	"github.com/rexleimo/agno-go/pkg/hno/models"
 	"github.com/rexleimo/agno-go/pkg/hno/run"
+	"github.com/rexleimo/agno-go/pkg/hno/runner"
 	"github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 	"github.com/rexleimo/agno-go/pkg/hno/types"
 )
@@ -20,7 +21,6 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 	}
 
 	ctx, runCtx := ensureRunContext(ctx)
-	// Enrich run context with known identifiers so downstream models can access them
 	if runCtx != nil && runCtx.UserID == "" && a.UserID != "" {
 		runCtx.UserID = a.UserID
 	}
@@ -53,98 +53,136 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 		Metadata:  map[string]interface{}{},
 	}
 
-	var finalResponse *types.ModelResponse
-	loopCount := 0
-	cacheHit := false
+	var tools []models.ToolDefinition
+	if len(a.Toolkits) > 0 {
+		tools = toolkit.ToModelToolDefinitions(a.Toolkits)
+	}
 
-	for loopCount < a.MaxLoops {
-		if ctxErr := ctx.Err(); ctxErr != nil {
-			cancelled := a.markRunCancelled(output, loopCount, cacheHit, ctxErr, initialMessageCount)
-			return cancelled, types.NewCancellationError("agent run cancelled", ctxErr)
-		}
+	executor := &agentToolExecutor{agent: a}
 
-		loopCount++
+	var cacheKey string
+	var cacheHit bool
+	turn := 0
 
+	// Cache lookup before runner (old code did cache check in loop)
+	if a.cacheEnabled {
 		messages := a.Memory.GetMessages(a.UserID)
 		if currentInstructions != a.Instructions && currentInstructions != "" {
 			messages = a.updateSystemMessage(messages, currentInstructions)
 		}
-
-		req := &models.InvokeRequest{Messages: messages}
-		if len(a.Toolkits) > 0 {
-			req.Tools = toolkit.ToModelToolDefinitions(a.Toolkits)
-		}
+		req := &models.InvokeRequest{Messages: messages, Tools: tools}
 		attachRunContextToRequest(ctx, req)
 
-		var (
-			resp      *types.ModelResponse
-			invokeErr error
-			fromCache bool
-			cacheKey  string
-		)
-
-		if a.cacheEnabled {
-			cachedResp, key, ok, cacheErr := a.tryCacheGet(ctx, req)
-			cacheKey = key
-			if cacheErr != nil {
-				a.logger.Warn("cache lookup failed", "error", cacheErr)
-			} else if ok {
-				resp = cachedResp
-				fromCache = true
-				cacheHit = true
+		cachedResp, key, ok, cacheErr := a.tryCacheGet(ctx, req)
+		cacheKey = key
+		if cacheErr != nil {
+			a.logger.Warn("cache lookup failed", "error", cacheErr)
+		} else if ok {
+			// Cache hit: write cached response to Memory and return immediately
+			reasoningContent := a.extractReasoning(ctx, cachedResp)
+			assistantMsg := &types.Message{
+				Role:             types.RoleAssistant,
+				Content:          cachedResp.Content,
+				ToolCalls:        cachedResp.ToolCalls,
+				ReasoningContent: reasoningContent,
 			}
-		}
+			a.Memory.Add(assistantMsg, a.UserID)
+			cacheHit = true
 
-		if !fromCache {
-			resp, invokeErr = a.Model.Invoke(ctx, req)
-			if invokeErr != nil {
-				if errors.Is(invokeErr, context.Canceled) || errors.Is(invokeErr, context.DeadlineExceeded) || ctx.Err() != nil {
-					cancelled := a.markRunCancelled(output, loopCount, cacheHit, invokeErr, initialMessageCount)
-					return cancelled, types.NewCancellationError("agent run cancelled", invokeErr)
-				}
-				a.logger.Error("model invocation failed", "error", invokeErr)
-				return nil, types.NewAPIError("model invocation failed", invokeErr)
-			}
-			if a.cacheEnabled {
-				if cacheKey == "" {
-					cacheKey = a.buildCacheKey(req)
-				}
-			}
-		}
+			output.Status = RunStatusCompleted
+			output.CompletedAt = time.Now().UTC()
+			output.Content = cachedResp.Content
+			output.Messages = a.Memory.GetMessages(a.UserID)
+			output.StopReason = string(runner.StopNoToolCalls)
+			output.Metadata["loops"] = 0
+			output.Metadata["usage"] = cachedResp.Usage
+			output.Metadata["cache_hit"] = true
+			addRunContextMetadata(output, runCtx)
 
-		reasoningContent := a.extractReasoning(ctx, resp)
-		assistantMsg := &types.Message{
-			Role:             types.RoleAssistant,
-			Content:          resp.Content,
-			ToolCalls:        resp.ToolCalls,
-			ReasoningContent: reasoningContent,
-		}
-		a.Memory.Add(assistantMsg, a.UserID)
-
-		if !resp.HasToolCalls() {
-			if a.cacheEnabled && !fromCache {
-				a.tryCacheSet(ctx, cacheKey, resp)
+			if cachedResp.Content != "" {
+				output.appendEvent(run.NewRunContentEvent(runID, a.ID, string(types.RoleAssistant), cachedResp.Content, 0))
 			}
-			finalResponse = resp
-			break
-		}
+			output.appendEvent(run.NewRunCompletedEvent(runID, a.ID, "", string(output.Status), cachedResp.Content))
 
-		a.logger.Info("executing tool calls", "count", len(resp.ToolCalls))
-		if err := a.executeToolCalls(ctx, resp.ToolCalls); err != nil {
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
-				cancelled := a.markRunCancelled(output, loopCount, cacheHit, err, initialMessageCount)
-				return cancelled, types.NewCancellationError("agent run cancelled", err)
-			}
-			a.logger.Error("tool execution failed", "error", err)
-			return nil, types.NewToolExecutionError("tool execution failed", err)
+			a.scrubRunOutputWithContext(output, initialMessageCount)
+			return output, nil
 		}
 	}
 
-	if finalResponse == nil {
-		if loopCount >= a.MaxLoops {
-			a.logger.Warn("max loops reached", "max_loops", a.MaxLoops)
-			return nil, types.NewError(types.ErrCodeUnknown, "max tool calling loops reached", nil)
+	r, err := runner.New(runner.Config{
+		Model:         a.Model,
+		Tools:         tools,
+		MaxTurns:      a.MaxLoops,
+		ToolCallLimit: a.ToolCallLimit,
+		MessageBuilder: &agentMessageBuilder{
+			agent:        a,
+			instructions: currentInstructions,
+			tools:        tools,
+		},
+		ToolExecutor: executor,
+		OnStep: func(evt runner.StepEvent) {
+			if evt.State == runner.StateAwaitModel {
+				turn = evt.Turn
+				reasoningContent := a.extractReasoning(ctx, evt.Response)
+				assistantMsg := &types.Message{
+					Role:             types.RoleAssistant,
+					Content:          evt.Response.Content,
+					ToolCalls:        evt.Response.ToolCalls,
+					ReasoningContent: reasoningContent,
+				}
+				a.Memory.Add(assistantMsg, a.UserID)
+
+				// Cache write: only if no tool calls and not from cache
+				if a.cacheEnabled && !evt.Response.HasToolCalls() && !cacheHit {
+					if cacheKey == "" {
+						messages := a.Memory.GetMessages(a.UserID)
+						if currentInstructions != a.Instructions && currentInstructions != "" {
+							messages = a.updateSystemMessage(messages, currentInstructions)
+						}
+						req := &models.InvokeRequest{Messages: messages, Tools: tools}
+						attachRunContextToRequest(ctx, req)
+						cacheKey = a.buildCacheKey(req)
+					}
+					a.tryCacheSet(ctx, cacheKey, evt.Response)
+				}
+			}
+		},
+		OnSkippedToolCalls: func(skipped []types.ToolCall) {
+			for _, c := range skipped {
+				msg := &types.Message{
+					Role:       types.RoleTool,
+					ToolCallID: c.ID,
+					Content:    "tool call limit reached; call not executed",
+				}
+				a.Memory.Add(msg, a.UserID)
+			}
+		},
+		Logger: a.logger,
+	})
+	if err != nil {
+		a.logger.Error("failed to create runner", "error", err)
+		return nil, types.NewError(types.ErrCodeUnknown, "failed to create runner", err)
+	}
+
+	messages := a.Memory.GetMessages(a.UserID)
+	finalResponse, _, stopReason, err := r.Run(ctx, messages)
+
+	if err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+			// 已经取消，标记后返回
+			a.markRunCancelled(output, 0, false, err, initialMessageCount)
+			return output, types.NewCancellationError("agent run cancelled", err)
 		}
+		a.logger.Error("runner execution failed", "error", err)
+		return nil, types.NewAPIError("runner execution failed", err)
+	}
+
+	if stopReason == runner.StopLimitReached && turn >= a.MaxLoops {
+		a.logger.Warn("max loops reached", "max_loops", a.MaxLoops)
+		return nil, types.NewError(types.ErrCodeUnknown, "max tool calling loops reached", nil)
+	}
+
+	if finalResponse == nil {
 		return nil, types.NewError(types.ErrCodeUnknown, "no response from model", nil)
 	}
 
@@ -167,7 +205,8 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 	output.CompletedAt = time.Now().UTC()
 	output.Content = finalResponse.Content
 	output.Messages = a.Memory.GetMessages(a.UserID)
-	output.Metadata["loops"] = loopCount
+	output.StopReason = string(stopReason)
+	output.Metadata["loops"] = turn
 	output.Metadata["usage"] = finalResponse.Usage
 	output.Metadata["cache_hit"] = cacheHit
 	addRunContextMetadata(output, runCtx)

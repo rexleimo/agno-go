@@ -28,20 +28,21 @@ const (
 
 // Agent represents an AI agent
 type Agent struct {
-	ID           string
-	Name         string
-	Model        models.Model
-	Toolkits     []toolkit.Toolkit
-	Memory       memory.Memory
-	Instructions string
-	MaxLoops     int          // Maximum tool calling loops
-	UserID       string       // User ID for multi-tenant memory isolation / 多租户内存隔离的用户ID
-	PreHooks     []hooks.Hook // Hooks executed before processing input
-	PostHooks    []hooks.Hook // Hooks executed after generating output
-	logger       *slog.Logger
-	cache        cache.Provider
-	cacheTTL     time.Duration
-	cacheEnabled bool
+	ID            string
+	Name          string
+	Model         models.Model
+	Toolkits      []toolkit.Toolkit
+	Memory        memory.Memory
+	Instructions  string
+	MaxLoops      int          // Maximum tool calling loops
+	ToolCallLimit int          // 工具调用次数上限（跨轮累计，0 = 不限）/ Tool call limit (cumulative, 0 = unlimited)
+	UserID        string       // User ID for multi-tenant memory isolation / 多租户内存隔离的用户ID
+	PreHooks      []hooks.Hook // Hooks executed before processing input
+	PostHooks     []hooks.Hook // Hooks executed after generating output
+	logger        *slog.Logger
+	cache         cache.Provider
+	cacheTTL      time.Duration
+	cacheEnabled  bool
 
 	// Storage control / 存储控制
 	storeToolMessages    bool // Whether to store tool messages in RunOutput / 是否在 RunOutput 中存储工具消息
@@ -71,6 +72,7 @@ type RunOutput struct {
 	Messages           []*types.Message       `json:"messages"`
 	Metadata           map[string]interface{} `json:"metadata,omitempty"`
 	Events             run.Events             `json:"events,omitempty"`
+	StopReason         string                 `json:"stop_reason,omitempty"` // 循环终止原因 / Reason the loop terminated
 }
 
 // RunStreamDone represents the terminal result of a streaming run.

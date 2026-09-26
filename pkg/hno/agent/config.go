@@ -23,6 +23,7 @@ type Config struct {
 	Memory        memory.Memory
 	Instructions  string
 	MaxLoops      int
+	ToolCallLimit int          // 工具调用次数上限（跨轮累计，0 = 不限）/ Tool call limit (cumulative, 0 = unlimited)
 	UserID        string       // User ID for multi-tenant scenarios / 多租户场景的用户ID
 	PreHooks      []hooks.Hook // Hooks to execute before processing input
 	PostHooks     []hooks.Hook // Hooks to execute after generating output
@@ -104,20 +105,21 @@ func New(config Config) (*Agent, error) {
 	}
 
 	agent := &Agent{
-		ID:           config.ID,
-		Name:         config.Name,
-		Model:        config.Model,
-		Toolkits:     config.Toolkits,
-		Memory:       config.Memory,
-		Instructions: config.Instructions,
-		MaxLoops:     config.MaxLoops,
-		UserID:       config.UserID,
-		PreHooks:     config.PreHooks,
-		PostHooks:    config.PostHooks,
-		logger:       config.Logger,
-		cache:        cacheProvider,
-		cacheTTL:     cacheTTL,
-		cacheEnabled: config.EnableCache && cacheProvider != nil,
+		ID:            config.ID,
+		Name:          config.Name,
+		Model:         config.Model,
+		Toolkits:      config.Toolkits,
+		Memory:        config.Memory,
+		Instructions:  config.Instructions,
+		MaxLoops:      config.MaxLoops,
+		ToolCallLimit: config.ToolCallLimit,
+		UserID:        config.UserID,
+		PreHooks:      config.PreHooks,
+		PostHooks:     config.PostHooks,
+		logger:        config.Logger,
+		cache:         cacheProvider,
+		cacheTTL:      cacheTTL,
+		cacheEnabled:  config.EnableCache && cacheProvider != nil,
 
 		// Storage control (default to true for backward compatibility) / 存储控制 (默认为 true 以保持向后兼容)
 		storeToolMessages:    boolOrDefault(config.StoreToolMessages, true),
