@@ -48,9 +48,22 @@
 
 **STD-4（`StopReason` 用 `string` 而非类型）** 明确不修：`RunOutput` 是对外 JSON 序列化的 DTO，字段带 `json:"stop_reason,omitempty"` 标签，用 `string` 是正确选择。改用类型反而会让 DTO 依赖内部包。已在 verdict 中保留记录以备后续争议。
 
-## 遗留未办（来自 test-diff 审查）
+## 遗留事项
 
-`artifact:docs/design/v3-p0b-test-diff-review.md` 用变异测试实证的两处断言缺口仍未补齐，应以**新增**方式并入 `work-p0`：
+**已补齐（2026-09-26）**：`artifact:docs/design/v3-p0b-test-diff-review.md` 用变异测试实证的三处断言缺口已全部关闭，既有断言零改动（纯追加），且用同一批变异重跑确认已被抓住：
 
-1. StopLoop 场景不验证工具结果保留
-2. SingleRound 不验证已执行调用（无法区分「执行了 2 个」与「一个都没执行」）
+- A `stopLoop` 丢弃工具结果 → 被抓（`p0b_red_test.go:292`）
+- B 3 条消息全变 skip 文案 → 被抓（SingleRound + MultiRound）
+- C 交换 `call1`/`call2` 结果（条数对、身份错）→ 被抓
+
+补写过程中发现一处**我自己的期望值错误**（非生产缺陷）：`toolkit.FormatResult` 对 handler 返回值做 `json.Marshal`，字符串带引号，故期望值应为 `"\"result1\""` 而非 `"result1"`。已在测试中加注说明。
+
+**仍未覆盖**：`v3-p0b-test-diff-review.md` 缺口 4 ——
+
+1. `StopLoop` 与 `ToolCallLimit` 同时触发时的优先级（`runner.go:294-301` 的 switch 顺序）
+2. 多个工具中仅一个声明 `StopLoop` 时，其余工具是否仍执行
+3. 工具未找到 / 参数非法 与 `ToolCallLimit` 的交互
+
+这三项建议并入 `work-p0` 收口项。
+
+**STD-2 / STD-3 仍未修**（判断性、非 blocking）：请求构造三处重复、`Run` 210 行职责过载，已并入 `work-p0` 前置考虑。
