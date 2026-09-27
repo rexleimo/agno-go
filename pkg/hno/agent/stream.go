@@ -2,40 +2,34 @@ package agent
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"time"
 
 	"github.com/rexleimo/agno-go/pkg/hno/hooks"
 	"github.com/rexleimo/agno-go/pkg/hno/models"
 	"github.com/rexleimo/agno-go/pkg/hno/run"
+	"github.com/rexleimo/agno-go/pkg/hno/runner"
 	"github.com/rexleimo/agno-go/pkg/hno/tools/toolkit"
 	"github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
-func singleDoneChannel(output *RunOutput, err error) <-chan RunStreamDone {
-	ch := make(chan RunStreamDone, 1)
-	ch <- RunStreamDone{
-		Output: output,
-		Err:    err,
-	}
-	return ch
-}
-
-// RunStream executes the agent using the model's streaming API and returns
-// a pair of channels: one for incremental content events and one that carries
-// the final RunOutput once aggregation completes.
+// RunStream executes the agent through the same runner kernel as Run, driving
+// each model turn through the model's streaming API and returning a pair of
+// channels: one for incremental content events and one that carries the final
+// RunOutput once aggregation completes.
 //
-// Unlike the initial single-pass implementation, the streaming path now runs
-// the full tool-call loop: tool calls returned by the model are executed and
-// their results are fed back into the conversation before the next streaming
-// round, mirroring the synchronous Run behaviour.
-// RunStream 使用模型的流式 API 执行 agent，并返回一对通道：
-// 一个用于增量内容事件，一个在聚合完成后携带最终的 RunOutput。
+// The tool-call loop itself lives in pkg/hno/runner; this function only decides
+// how a single turn is invoked (stream, fan chunks out as content events,
+// aggregate them) and how the kernel's verdict is reported back to the caller.
+// RunStream 通过与 Run 相同的 runner 内核执行 agent，每次模型回合走模型的流式 API，
+// 并返回一对通道：一个用于增量内容事件，一个在聚合完成后携带最终的 RunOutput。
 //
-// 与最初的单遍实现不同，流式路径现在运行完整的工具调用循环：
-// 模型返回的工具调用会被执行，其结果在下一轮流式调用前回填到对话中，
-// 与同步 Run 的行为保持一致。
+// tool 循环本身住在 pkg/hno/runner；本函数只决定单次回合怎么调用（流式、把分块扇出为
+// 内容事件、聚合它们），以及内核的判定怎么回报给调用方。
+//
+// Cache is bypassed for streaming runs: a streamed turn is never looked up in
+// nor written back to the response cache.
+// 流式运行绕过缓存：流式回合既不查缓存，也不回写缓存。
 func (a *Agent) RunStream(ctx context.Context, input string) (*RunStreamResult, error) {
 	defer a.ClearTempInstructions()
 
@@ -76,103 +70,75 @@ func (a *Agent) RunStream(ctx context.Context, input string) (*RunStreamResult, 
 		Metadata:  map[string]interface{}{},
 	}
 
+	var tools []models.ToolDefinition
+	if len(a.Toolkits) > 0 {
+		tools = toolkit.ToModelToolDefinitions(a.Toolkits)
+	}
+
 	eventsCh := make(chan run.BaseRunOutputEvent)
 	doneCh := make(chan RunStreamDone, 1)
+	result := &RunStreamResult{
+		Events: eventsCh,
+		Done:   doneCh,
+	}
+
+	state := &kernelState{}
+	sequence := 0
 
 	go func() {
 		defer close(eventsCh)
 
-		var finalResponse *types.ModelResponse
-		loopCount := 0
-		sequence := 0
-
-		for loopCount < a.MaxLoops {
-			if ctxErr := ctx.Err(); ctxErr != nil {
-				cancelled := a.markRunCancelled(output, loopCount, false, ctxErr, initialMessageCount)
-				doneCh <- RunStreamDone{
-					Output: cancelled,
-					Err:    types.NewCancellationError("agent run cancelled", ctxErr),
-				}
-				return
-			}
-
-			loopCount++
-
-			// Prepare messages and request for this streaming round.
-			// 为本轮流式调用准备消息与请求。
-			messages := a.Memory.GetMessages(a.UserID)
-			if currentInstructions != a.Instructions && currentInstructions != "" {
-				messages = a.updateSystemMessage(messages, currentInstructions)
-			}
-
-			req := &models.InvokeRequest{Messages: messages}
-			if len(a.Toolkits) > 0 {
-				req.Tools = toolkit.ToModelToolDefinitions(a.Toolkits)
-			}
-			attachRunContextToRequest(ctx, req)
-
-			resp, err := a.streamOnce(ctx, req, eventsCh, output, &sequence)
-			if err != nil {
-				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
-					cancelled := a.markRunCancelled(output, loopCount, false, err, initialMessageCount)
-					doneCh <- RunStreamDone{
-						Output: cancelled,
-						Err:    types.NewCancellationError("agent run cancelled", err),
-					}
-					return
-				}
-				a.logger.Error("model streaming invocation failed", "error", err)
-				doneCh <- RunStreamDone{
-					Output: nil,
-					Err:    types.NewAPIError("model streaming invocation failed", err),
-				}
-				return
-			}
-
-			// Store the assistant turn (content + tool calls + reasoning).
-			// 存储助手回合（内容 + 工具调用 + 推理）。
-			reasoningContent := a.extractReasoning(ctx, resp)
-			assistantMsg := &types.Message{
-				Role:             types.RoleAssistant,
-				Content:          resp.Content,
-				ToolCalls:        resp.ToolCalls,
-				ReasoningContent: reasoningContent,
-			}
-			a.Memory.Add(assistantMsg, a.UserID)
-
-			if !resp.HasToolCalls() {
-				finalResponse = resp
-				break
-			}
-
-			// Execute tool calls; results are appended to memory so the next
-			// streaming round sees them.
-			// 执行工具调用；结果追加到 memory，使下一轮流式调用能看到它们。
-			a.logger.Info("executing tool calls (stream)", "count", len(resp.ToolCalls))
-			if err := a.executeToolCalls(ctx, resp.ToolCalls); err != nil {
-				if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
-					cancelled := a.markRunCancelled(output, loopCount, false, err, initialMessageCount)
-					doneCh <- RunStreamDone{
-						Output: cancelled,
-						Err:    types.NewCancellationError("agent run cancelled", err),
-					}
-					return
-				}
-				a.logger.Error("tool execution failed (stream)", "error", err)
-				doneCh <- RunStreamDone{
-					Output: nil,
-					Err:    types.NewToolExecutionError("tool execution failed", err),
-				}
-				return
+		// sendDone publishes the kernel's verdict: the reason is stored before
+		// the value goes out, so RunStreamResult.StopReason is race-free.
+		// sendDone 发布内核的判定：先写入原因再发送终值，使 StopReason 无竞态。
+		sendDone := func(final *RunOutput, runErr error, reason runner.StopReason) {
+			result.setStopReason(reason.String())
+			doneCh <- RunStreamDone{
+				Output:     final,
+				Err:        runErr,
+				StopReason: reason.String(),
 			}
 		}
 
-		if finalResponse == nil {
-			a.logger.Warn("max loops reached (stream)", "max_loops", a.MaxLoops)
-			doneCh <- RunStreamDone{
-				Output: nil,
-				Err:    types.NewError(types.ErrCodeUnknown, "max tool calling loops reached", nil),
+		invoker := runner.TurnInvokerFunc(func(turnCtx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error) {
+			return a.streamOnce(turnCtx, req, eventsCh, output, &sequence)
+		})
+
+		r, err := a.newKernel(ctx, tools, currentInstructions, state, invoker, nil)
+		if err != nil {
+			a.logger.Error("failed to create runner (stream)", "error", err)
+			// The loop never started, so there is no stage to blame; the error
+			// carries the detail. 循环从未开始，没有阶段可归因，细节由错误本身携带。
+			sendDone(nil, types.NewError(types.ErrCodeUnknown, "failed to create runner", err), runner.StopReason(""))
+			return
+		}
+
+		finalResponse, _, stopReason, err := r.Run(ctx, a.Memory.GetMessages(a.UserID))
+		if err != nil {
+			switch stopReason {
+			case runner.StopCancelled:
+				cancelled := a.markRunCancelled(output, state.turn, false, err, initialMessageCount)
+				a.logger.Info("agent run (stream) cancelled", "error", err)
+				sendDone(cancelled, types.NewCancellationError("agent run cancelled", err), stopReason)
+			case runner.StopToolFailure:
+				a.logger.Error("tool execution failed (stream)", "error", err)
+				sendDone(nil, types.NewToolExecutionError("tool execution failed", err), stopReason)
+			default:
+				a.logger.Error("model streaming invocation failed", "error", err)
+				sendDone(nil, types.NewAPIError("model streaming invocation failed", err), stopReason)
 			}
+			return
+		}
+
+		if maxLoopsExceeded(stopReason, state.turn, a.MaxLoops) {
+			a.logger.Warn("max loops reached (stream)", "max_loops", a.MaxLoops)
+			sendDone(nil, types.NewError(types.ErrCodeUnknown, "max tool calling loops reached", nil), stopReason)
+			return
+		}
+
+		if finalResponse == nil {
+			a.logger.Error("no response from model (stream)")
+			sendDone(nil, types.NewError(types.ErrCodeUnknown, "no response from model", nil), stopReason)
 			return
 		}
 
@@ -185,10 +151,7 @@ func (a *Agent) RunStream(ctx context.Context, input string) (*RunStreamResult, 
 
 			if err := hooks.ExecuteHooks(ctx, a.PostHooks, hookInput); err != nil {
 				a.logger.Error("post-hook failed (stream)", "error", err)
-				doneCh <- RunStreamDone{
-					Output: nil,
-					Err:    types.NewOutputCheckError("post-hook validation failed", err),
-				}
+				sendDone(nil, types.NewOutputCheckError("post-hook validation failed", err), stopReason)
 				return
 			}
 		}
@@ -199,7 +162,8 @@ func (a *Agent) RunStream(ctx context.Context, input string) (*RunStreamResult, 
 		output.CompletedAt = time.Now().UTC()
 		output.Content = finalResponse.Content
 		output.Messages = a.Memory.GetMessages(a.UserID)
-		output.Metadata["loops"] = loopCount
+		output.StopReason = stopReason.String()
+		output.Metadata["loops"] = state.turn
 		output.Metadata["usage"] = finalResponse.Usage
 		output.Metadata["cache_hit"] = false
 		addRunContextMetadata(output, runCtx)
@@ -209,16 +173,10 @@ func (a *Agent) RunStream(ctx context.Context, input string) (*RunStreamResult, 
 
 		a.scrubRunOutputWithContext(output, initialMessageCount)
 
-		doneCh <- RunStreamDone{
-			Output: output,
-			Err:    nil,
-		}
+		sendDone(output, nil, stopReason)
 	}()
 
-	return &RunStreamResult{
-		Events: eventsCh,
-		Done:   doneCh,
-	}, nil
+	return result, nil
 }
 
 // streamOnce consumes a single streaming model invocation: it fans chunks out

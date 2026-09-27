@@ -260,10 +260,13 @@ func TestRunnerToolCallLimit(t *testing.T) {
 	if len(exec.calls) != 4 {
 		t.Errorf("expected exactly 4 tool executions, got %d", len(exec.calls))
 	}
-	// 4 executed tool messages + user + 4 assistant (with tool calls) + 1 final assistant = 10
-	// 4 条已执行工具消息 + 用户 + 4 条带工具调用的助手消息 + 1 条最终助手消息 = 10
-	if len(msgs) != 10 {
-		t.Errorf("expected 10 messages, got %d", len(msgs))
+	// user + 5 assistant turns + 4 executed tool messages + 1 paired skip message = 11
+	// The fifth round asks for a call after the limit is spent; that call must still
+	// come back paired, otherwise history keeps an unanswered tool call.
+	// 用户 + 5 条助手回合 + 4 条已执行工具消息 + 1 条配对跳过消息 = 11。
+	// 第五轮在上限已用尽后仍请求了调用；该调用必须带回配对消息，否则历史里会留下无人应答的 tool call。
+	if len(msgs) != 11 {
+		t.Errorf("expected 11 messages, got %d", len(msgs))
 	}
 }
 

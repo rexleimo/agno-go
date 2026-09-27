@@ -14,8 +14,9 @@ const (
 	// DefaultMaxTurns is the default hard cap on model calls per run.
 	// DefaultMaxTurns 是每次运行模型调用的默认硬上限。
 	DefaultMaxTurns = 10
-	// DefaultToolCallLimit is the default cap on tool executions per run (0 = unlimited).
-	// DefaultToolCallLimit 是每次运行工具执行的默认上限（0 = 不限）。
+	// DefaultToolCallLimit is the default cap on tool calls consumed per run
+	// (0 = unlimited).
+	// DefaultToolCallLimit 是每次运行消耗的工具调用默认上限（0 = 不限）。
 	DefaultToolCallLimit = 0
 )
 
@@ -53,6 +54,26 @@ func (f ToolExecutorFunc) Execute(ctx context.Context, calls []types.ToolCall) (
 	return f(ctx, calls)
 }
 
+// TurnInvoker performs one model turn and returns the aggregated response.
+// The kernel owns the loop and every loop policy; the invoker only decides how
+// a single turn is called — a synchronous invoke, or a streamed invoke whose
+// chunks the caller aggregates.
+// TurnInvoker 执行一次模型回合并返回聚合响应。
+// 循环及其全部策略归内核所有；invoker 只决定单次回合怎么调用——同步调用，
+// 或由调用方聚合分块的流式调用。
+type TurnInvoker interface {
+	InvokeTurn(ctx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error)
+}
+
+// TurnInvokerFunc adapts a function to the TurnInvoker interface.
+// TurnInvokerFunc 将函数适配为 TurnInvoker 接口。
+type TurnInvokerFunc func(ctx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error)
+
+// InvokeTurn implements TurnInvoker.
+func (f TurnInvokerFunc) InvokeTurn(ctx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error) {
+	return f(ctx, req)
+}
+
 // MessageBuilder builds the invoke request for a loop iteration.
 // MessageBuilder 为每次循环迭代构建调用请求。
 type MessageBuilder interface {
@@ -82,17 +103,25 @@ type StepEvent struct {
 // Config configures the Runner.
 // Config 配置 Runner。
 type Config struct {
-	// Model is the LLM provider adapter (single-shot invoke only).
-	// Model 是 LLM 提供商适配器（仅单次调用）。
+	// Model is the LLM provider adapter (used to build the default invoker).
+	// Model 是 LLM 提供商适配器（用于构造默认 invoker）。
 	Model models.Model
+	// Invoker performs each model turn (optional; defaults to Model.Invoke).
+	// A streaming caller supplies an invoker that streams and aggregates.
+	// Invoker 执行每次模型回合（可选；默认 Model.Invoke）。
+	// 流式调用方提供自行聚合分块的 invoker。
+	Invoker TurnInvoker
 	// Tools are the tool definitions sent to the model each turn.
 	// Tools 是每轮发送给模型的工具定义。
 	Tools []models.ToolDefinition
 	// MaxTurns caps model calls per run (default DefaultMaxTurns).
 	// MaxTurns 限制每次运行的模型调用次数（默认 DefaultMaxTurns）。
 	MaxTurns int
-	// ToolCallLimit caps tool executions per run (default DefaultToolCallLimit = unlimited).
-	// ToolCallLimit 限制每次运行的工具执行次数（默认 DefaultToolCallLimit = 不限）。
+	// ToolCallLimit caps the tool calls consumed per run — executed plus the ones
+	// the limit truncated — and never charges calls left over from previous runs
+	// (default DefaultToolCallLimit = unlimited).
+	// ToolCallLimit 限制本次运行消耗的工具调用数——已执行的加上被上限截断的——
+	// 历史运行留下的调用不计费（默认 DefaultToolCallLimit = 不限）。
 	ToolCallLimit int
 	// MessageBuilder assembles InvokeRequests (default: plain builder).
 	// MessageBuilder 组装 InvokeRequest（默认：普通构建器）。
@@ -116,7 +145,7 @@ type Config struct {
 // Runner 以显式状态机实现代理工具调用循环。
 // 该循环是同步与流式运行共享的唯一事实来源。
 type Runner struct {
-	model              models.Model
+	invoker            TurnInvoker
 	tools              []models.ToolDefinition
 	maxTurns           int
 	toolCallLimit      int
@@ -129,6 +158,13 @@ type Runner struct {
 
 // New creates a Runner with defaults applied.
 // New 创建 Runner 并应用默认值。
+//
+// Model is required. Invoker is an optional override of how a single turn is
+// invoked — a streaming caller injects its own turn semantics while keeping the
+// kernel's loop, limit and stop decisions. When Invoker is nil the runner falls
+// back to Model.Invoke.
+// Model 必填。Invoker 是可选的单回合调用方式覆盖：流式调用方注入自己的回合语义，
+// 循环、上限与停止判定仍由内核决定。Invoker 为空时回退到 Model.Invoke。
 func New(cfg Config) (*Runner, error) {
 	if cfg.Model == nil {
 		return nil, errors.New("runner: model is required")
@@ -151,13 +187,21 @@ func New(cfg Config) (*Runner, error) {
 		messageBuilder = MessageBuilderFunc(defaultMessageBuilder)
 	}
 
+	invoker := cfg.Invoker
+	if invoker == nil {
+		model := cfg.Model
+		invoker = TurnInvokerFunc(func(ctx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error) {
+			return model.Invoke(ctx, req)
+		})
+	}
+
 	logger := cfg.Logger
 	if logger == nil {
 		logger = slog.Default()
 	}
 
 	return &Runner{
-		model:              cfg.Model,
+		invoker:            invoker,
 		tools:              cfg.Tools,
 		maxTurns:           maxTurns,
 		toolCallLimit:      toolCallLimit,
@@ -182,6 +226,7 @@ func (r *Runner) Run(ctx context.Context, messages []*types.Message) (*types.Mod
 	allMessages = cloneMessages(messages)
 
 	turn := 0
+	executed := 0
 	for {
 		if err := ctx.Err(); err != nil {
 			return nil, allMessages, StopCancelled, fmt.Errorf("runner: %w", err)
@@ -192,12 +237,13 @@ func (r *Runner) Run(ctx context.Context, messages []*types.Message) (*types.Mod
 			turn++ // count model calls, not loop iterations / 计数模型调用而非循环迭代
 			req, err := r.messageBuilder.Build(ctx, allMessages, r.tools)
 			if err != nil {
-				return nil, allMessages, StopCancelled, fmt.Errorf("runner: build request: %w", err)
+				return nil, allMessages, failureReason(ctx, StopModelFailure), fmt.Errorf("runner: build request: %w", err)
 			}
 
-			resp, err := r.model.Invoke(ctx, req)
+			resp, err := r.invoker.InvokeTurn(ctx, req)
 			if err != nil {
-				return nil, allMessages, StopCancelled, fmt.Errorf("runner: model invoke: %w", err)
+				reason := failureReason(ctx, StopModelFailure)
+				return nil, allMessages, reason, fmt.Errorf("runner: model invoke: %w", err)
 			}
 			response = resp
 
@@ -232,29 +278,19 @@ func (r *Runner) Run(ctx context.Context, messages []*types.Message) (*types.Mod
 				break
 			}
 
-			executed := countToolMessages(allMessages)
-
 			// Determine how many calls we may run this round.
+			// Calls consumed by this run are tracked in `executed`, so tool
+			// messages carried in from a previous run never spend the limit.
 			// 确定本轮可以运行多少个调用。
-			callsToRun := response.ToolCalls
-			limitHit := false
-			if r.toolCallLimit > 0 {
-				remaining := r.toolCallLimit - executed
-				if remaining <= 0 {
-					reason = StopLimitReached
-					state = StateDone
-					break
-				}
-				if len(callsToRun) > remaining {
-					callsToRun = callsToRun[:remaining]
-					limitHit = true
-				}
-			}
+			// 本次运行消耗的调用记录在 executed 中，历史工具消息不会占用上限。
+			callsToRun, skipped, limitHit := decideToolBatch(executed, r.toolCallLimit, response.ToolCalls)
 
 			outcomes, err := r.toolExecutor.Execute(ctx, callsToRun)
 			if err != nil {
-				return nil, allMessages, StopCancelled, fmt.Errorf("runner: execute tools: %w", err)
+				failure := failureReason(ctx, StopToolFailure)
+				return nil, allMessages, failure, fmt.Errorf("runner: execute tools: %w", err)
 			}
+			executed += len(callsToRun) + len(skipped)
 
 			stopLoop := false
 			hitlBlocked := false
@@ -273,16 +309,11 @@ func (r *Runner) Run(ctx context.Context, messages []*types.Message) (*types.Mod
 			// Report skipped calls when the limit cut the batch short.
 			// 当上限截断了批次时，报告被跳过的调用。
 			if limitHit {
-				skipped := response.ToolCalls[len(callsToRun):]
 				if r.onSkippedToolCalls != nil {
 					r.onSkippedToolCalls(skipped)
 				}
 				for _, c := range skipped {
-					allMessages = append(allMessages, &types.Message{
-						Role:       types.RoleTool,
-						ToolCallID: c.ID,
-						Content:    "tool call limit reached; call not executed",
-					})
+					allMessages = append(allMessages, NewToolCallLimitMessage(c))
 				}
 			}
 
@@ -330,14 +361,15 @@ func cloneMessages(messages []*types.Message) []*types.Message {
 	return out
 }
 
-// countToolMessages counts tool-role messages in the slice.
-// countToolMessages 统计切片中工具角色的消息数量。
-func countToolMessages(messages []*types.Message) int {
-	n := 0
-	for _, m := range messages {
-		if m != nil && m.Role == types.RoleTool {
-			n++
-		}
+// failureReason reports cancellation only when the run's own context is done;
+// an error that merely wraps context.Canceled while the run context is alive is
+// the failing stage's fault, not the caller's cancellation.
+// failureReason 仅当本次运行自己的上下文已结束才上报 cancelled；
+// 运行上下文仍存活时，只是包着 context.Canceled 的错误属于失败所在阶段，
+// 而不是调用方取消。
+func failureReason(ctx context.Context, stage StopReason) StopReason {
+	if ctx.Err() != nil {
+		return StopCancelled
 	}
-	return n
+	return stage
 }

@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"github.com/rexleimo/agno-go/pkg/hno/hooks"
@@ -13,6 +12,8 @@ import (
 	"github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
+// Run executes the agent with the given input and returns the finished output.
+// Run 用给定输入执行 agent，返回完成后的输出。
 func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 	defer a.ClearTempInstructions()
 
@@ -58,11 +59,9 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 		tools = toolkit.ToModelToolDefinitions(a.Toolkits)
 	}
 
-	executor := &agentToolExecutor{agent: a}
-
 	var cacheKey string
 	var cacheHit bool
-	turn := 0
+	state := &kernelState{}
 
 	// Cache lookup before runner (old code did cache check in loop)
 	if a.cacheEnabled {
@@ -109,55 +108,20 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 		}
 	}
 
-	r, err := runner.New(runner.Config{
-		Model:         a.Model,
-		Tools:         tools,
-		MaxTurns:      a.MaxLoops,
-		ToolCallLimit: a.ToolCallLimit,
-		MessageBuilder: &agentMessageBuilder{
-			agent:        a,
-			instructions: currentInstructions,
-			tools:        tools,
-		},
-		ToolExecutor: executor,
-		OnStep: func(evt runner.StepEvent) {
-			if evt.State == runner.StateAwaitModel {
-				turn = evt.Turn
-				reasoningContent := a.extractReasoning(ctx, evt.Response)
-				assistantMsg := &types.Message{
-					Role:             types.RoleAssistant,
-					Content:          evt.Response.Content,
-					ToolCalls:        evt.Response.ToolCalls,
-					ReasoningContent: reasoningContent,
-				}
-				a.Memory.Add(assistantMsg, a.UserID)
-
-				// Cache write: only if no tool calls and not from cache
-				if a.cacheEnabled && !evt.Response.HasToolCalls() && !cacheHit {
-					if cacheKey == "" {
-						messages := a.Memory.GetMessages(a.UserID)
-						if currentInstructions != a.Instructions && currentInstructions != "" {
-							messages = a.updateSystemMessage(messages, currentInstructions)
-						}
-						req := &models.InvokeRequest{Messages: messages, Tools: tools}
-						attachRunContextToRequest(ctx, req)
-						cacheKey = a.buildCacheKey(req)
-					}
-					a.tryCacheSet(ctx, cacheKey, evt.Response)
-				}
+	r, err := a.newKernel(ctx, tools, currentInstructions, state, nil, func(resp *types.ModelResponse) {
+		if !a.cacheEnabled || resp.HasToolCalls() || cacheHit {
+			return
+		}
+		if cacheKey == "" {
+			messages := a.Memory.GetMessages(a.UserID)
+			if currentInstructions != a.Instructions && currentInstructions != "" {
+				messages = a.updateSystemMessage(messages, currentInstructions)
 			}
-		},
-		OnSkippedToolCalls: func(skipped []types.ToolCall) {
-			for _, c := range skipped {
-				msg := &types.Message{
-					Role:       types.RoleTool,
-					ToolCallID: c.ID,
-					Content:    "tool call limit reached; call not executed",
-				}
-				a.Memory.Add(msg, a.UserID)
-			}
-		},
-		Logger: a.logger,
+			req := &models.InvokeRequest{Messages: messages, Tools: tools}
+			attachRunContextToRequest(ctx, req)
+			cacheKey = a.buildCacheKey(req)
+		}
+		a.tryCacheSet(ctx, cacheKey, resp)
 	})
 	if err != nil {
 		a.logger.Error("failed to create runner", "error", err)
@@ -168,16 +132,19 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 	finalResponse, _, stopReason, err := r.Run(ctx, messages)
 
 	if err != nil {
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) || ctx.Err() != nil {
+		// The kernel classifies the stage it failed in; the agent only maps that
+		// verdict to an error. Streaming does the same, so both paths agree.
+		// 失败阶段由内核判定，agent 只做映射；流式路径同构，两条路径口径一致。
+		if stopReason == runner.StopCancelled {
 			// 已经取消，标记后返回
-			a.markRunCancelled(output, 0, false, err, initialMessageCount)
+			a.markRunCancelled(output, state.turn, false, err, initialMessageCount)
 			return output, types.NewCancellationError("agent run cancelled", err)
 		}
 		a.logger.Error("runner execution failed", "error", err)
 		return nil, types.NewAPIError("runner execution failed", err)
 	}
 
-	if stopReason == runner.StopLimitReached && turn >= a.MaxLoops {
+	if maxLoopsExceeded(stopReason, state.turn, a.MaxLoops) {
 		a.logger.Warn("max loops reached", "max_loops", a.MaxLoops)
 		return nil, types.NewError(types.ErrCodeUnknown, "max tool calling loops reached", nil)
 	}
@@ -206,7 +173,7 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 	output.Content = finalResponse.Content
 	output.Messages = a.Memory.GetMessages(a.UserID)
 	output.StopReason = string(stopReason)
-	output.Metadata["loops"] = turn
+	output.Metadata["loops"] = state.turn
 	output.Metadata["usage"] = finalResponse.Usage
 	output.Metadata["cache_hit"] = cacheHit
 	addRunContextMetadata(output, runCtx)

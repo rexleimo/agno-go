@@ -20,6 +20,11 @@
 | observability 有零件未接线 | retry/breaker/ratelimit 在业务侧零调用 |
 | 契约测试是硬约束 | `internal/session/contract` 9 个测试，Go↔Python fixture 对齐 |
 
+> **基线时效（2026-09-27 回写）**：上表是 v3 规划起点的快照，其中两行已随 P0 / P0b / P0-stream 落地而失效——
+> `pkg/hno/runner` 不再是死代码（agent 的同步与流式两条路径都经 `agent/kernel.go` 驱动它），
+> 循环实现已从 4 份降为 2 份（`runner` 内核 + team 使用的 `run.Loop`）。
+> 原文保留以供追溯，后续读者请以当前代码为准，勿据这两行推断。
+
 **结论：当前最大的风险不是缺功能，而是「半迁移状态」——一半代码按旧路径（agent 内部循环），一半按新路径（runner 死代码）。**
 
 ### 0.2 本次推翻的决策

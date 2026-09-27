@@ -1,0 +1,18 @@
+{
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:testability-decision:p0stream-loop-consolidation",
+  "redCandidate": {
+    "publicEntry": "(*agent.Agent).RunStream(ctx, string) (*agent.RunStreamResult, error)。断言落在 RunStreamDone.Output.Messages 中 RoleTool 消息的 ToolCallID 与 Content、RunStreamDone.Err、以及 fake models.Model 的 InvokeStream 调用次数上；不引用尚未存在的 RunStreamDone.StopReason，不使用 runner 私有字段或内部状态机。",
+    "setup": "干净工作树，仅新增 pkg/hno/agent/p0stream_red_test.go，未修改任何非测试生产代码与任何既有测试（git status 中 pkg/ 下仅该新增文件）。测试在 agent 包内自建流式 fake（p0sModel / p0sToolkit，类型名避开既有 streamMockModel / echoToolkit），照既有 stream_tool_loop_test.go 的形状：InvokeStream 返回 channel，goroutine 内分块推送 types.ResponseChunk。场景可清理：全部内存 fake，无网络、无云凭据、无跨用例共享状态。gofmt -l pkg/hno/agent 无输出。既有 TestRunStreamExecutesToolCalls 与 TestRunStreamCancellation 仍全绿。",
+    "command": {
+      "executable": "go",
+      "args": ["test", "./pkg/hno/agent/...", "-run", "P0S", "-count=1"],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "退出码非 0，且为行为级断言失败（非 build failed / undefined）。四项能力缺口应各自表现为：流式 ToolCallLimit 未截断（3 个 call 全部执行、无 skipped 消息）、跨轮累计未生效、StopLoop 未生效（仍回调模型第二轮）、sync 与 stream 消息序列不一致。",
+    "observed": "退出码 1，FAIL github.com/rexleimo/agno-go/pkg/hno/agent，输出为纯断言失败，无任何编译错误。逐条：p0stream_red_test.go:156 工具调用 c3 期望 \"tool call limit reached; call not executed\"，实际 \"\\\"A\\\"\"；:180 期望恰好 2 条 RoleTool 消息，实际 3；:192 期望 InvokeStream 调用 3 次，实际 4；:212 期望 InvokeStream 只调用 1 次，实际 2；:256 同步与流式工具消息不一致，期望 [c1→\"\\\"A\\\"\", c2→\"\\\"B\\\"\", c3→跳过文案]，实际 [c1→\"\\\"A\\\"\", c2→\"\\\"B\\\"\", c3→\"\\\"A\\\"\"]。4 个测试全部 FAIL。",
+    "receiptRef": "receipt:090fdbf3-650d-49cf-875f-2c56ce101f00",
+    "failureReason": "本周期为新增用户可观察行为。RunStream 当前使用 stream.go:89 的自有循环，对 ToolCallLimit、StopLoop 完全无感知，也无可观察的终止原因，故四项断言全部真实失败。刻意只写 ToolCallLimit/StopLoop/对照三类断言而暂不引用 RunStreamDone.StopReason，使 RED 保持为行为级失败而非编译级失败——Config.ToolCallLimit 与 toolkit.Function.StopLoop 在 P0b 已存在，可直接编译，失败原因精确落在缺失的行为上。P0b 阶段的教训是伪造夹具（编造 toolkit.Function.Metadata）会被判为非法 RED；本次期望值全部取自既有 handler 返回值经 toolkit.FormatResult 的 json.Marshal 结果（故字符串带引号）与 runner 既有文案，且既有 stream 测试零改动。",
+    "notes": "子 Agent 曾以 go build ./... 报告本机 clang 链接器不识别 SDK .tbd 的 arm64e.x1 架构；经复核该现象与本次改动无关（CGO_ENABLED=0 下通过），不影响 agent/runner 包测试与本次 RED 判定。"
+  }
+}

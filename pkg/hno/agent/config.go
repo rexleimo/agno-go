@@ -23,7 +23,7 @@ type Config struct {
 	Memory        memory.Memory
 	Instructions  string
 	MaxLoops      int
-	ToolCallLimit int          // 工具调用次数上限（跨轮累计，0 = 不限）/ Tool call limit (cumulative, 0 = unlimited)
+	ToolCallLimit int          // 工具调用次数上限（本次运行累计，0 = 不限）/ Tool call limit (per run, 0 = unlimited)
 	UserID        string       // User ID for multi-tenant scenarios / 多租户场景的用户ID
 	PreHooks      []hooks.Hook // Hooks to execute before processing input
 	PostHooks     []hooks.Hook // Hooks to execute after generating output

@@ -35,7 +35,7 @@ type Agent struct {
 	Memory        memory.Memory
 	Instructions  string
 	MaxLoops      int          // Maximum tool calling loops
-	ToolCallLimit int          // 工具调用次数上限（跨轮累计，0 = 不限）/ Tool call limit (cumulative, 0 = unlimited)
+	ToolCallLimit int          // 工具调用次数上限（本次运行累计，0 = 不限）/ Tool call limit (per run, 0 = unlimited)
 	UserID        string       // User ID for multi-tenant memory isolation / 多租户内存隔离的用户ID
 	PreHooks      []hooks.Hook // Hooks executed before processing input
 	PostHooks     []hooks.Hook // Hooks executed after generating output
@@ -78,8 +78,9 @@ type RunOutput struct {
 // RunStreamDone represents the terminal result of a streaming run.
 // It always carries either a non-nil Output or a non-nil Err.
 type RunStreamDone struct {
-	Output *RunOutput
-	Err    error
+	Output     *RunOutput
+	Err        error
+	StopReason string
 }
 
 // RunStreamResult groups the channels produced by a streaming run.
@@ -88,15 +89,29 @@ type RunStreamDone struct {
 type RunStreamResult struct {
 	Events <-chan run.BaseRunOutputEvent
 	Done   <-chan RunStreamDone
+
+	// stopReasonMu guards stopReason, which the run goroutine writes before it
+	// sends on Done.
+	// stopReasonMu 保护 stopReason；运行协程在发送 Done 之前写入该值。
+	stopReasonMu sync.Mutex
+	stopReason   string
 }
 
-// singleDoneChannel constructs a buffered Done channel carrying a single value.
+// StopReason reports why the loop terminated. Read it after receiving the
+// terminal value from Done; before that it is empty.
+// StopReason 报告循环终止原因。请在收到 Done 的终值后读取；在此之前它为空。
+func (r *RunStreamResult) StopReason() string {
+	r.stopReasonMu.Lock()
+	defer r.stopReasonMu.Unlock()
+	return r.stopReason
+}
 
-// Run executes the agent with the given input
+func (r *RunStreamResult) setStopReason(reason string) {
+	r.stopReasonMu.Lock()
+	r.stopReason = reason
+	r.stopReasonMu.Unlock()
+}
 
-// - Cache is bypassed for streaming runs.
-
-// executeToolCalls executes all tool calls and adds results to memory
 // ClearMemory 清除此用户的Agent对话历史
 func (a *Agent) ClearMemory() {
 	a.Memory.Clear(a.UserID)

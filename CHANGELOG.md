@@ -5,6 +5,17 @@ All notable changes to Agno-Go will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### 🛠️ Changed
+- `Agent.ToolCallLimit` now counts tool calls **per run** instead of accumulating across the stored conversation history. A run that starts with tool messages already in memory gets its full budget again. 行为变更：工具调用上限改为按本次运行计数。
+- Failing runs now carry a distinct stop reason: model-invocation failures report `model_failure` and tool-execution failures report `tool_failure`, instead of both being reported as `cancelled`.
+- When the tool-call limit is already exhausted at the start of a round, the model's newly requested calls are no longer silently dropped: each is answered with a paired tool message, so memory never keeps an unanswered tool call.
+
+### ✨ Added
+- `RunStreamResult.StopReason()` exposes why a streaming loop terminated (read it after receiving the terminal value on `Done`).
+- `Agent.RunStream` now executes through the same `pkg/hno/runner` loop as `Agent.Run`, so truncation, stop-loop and limit policy cannot drift between the two paths.
+
 ## [1.2.9] - 2025-11-14
 
 ### ✨ Added

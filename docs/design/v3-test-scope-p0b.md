@@ -63,6 +63,12 @@
 - 被跳过的每个调用追加 `{Role: RoleTool, ToolCallID: <原ID>, Content: "tool call limit reached; call not executed"}`
 - 终止原因 `StopLimitReached`（值 `"limit_reached"`）
 
+> **口径回写（2026-09-27，P0-stream 收口轮）**：上面两条期望值已被取代，实现里已不存在
+> `countToolMessages`。当前口径见 `docs/design/v3-test-scope-p0stream-v2.md` §4：
+> 计数改为**本次运行累计**（历史 tool 消息不占额度），且 `remaining <= 0` 时**不再静默丢弃**——
+> 模型本轮请求的每个调用都按 `limitHit` 语义回注配对的 tool 消息，避免历史里留下无人应答的 tool call。
+> 本节原文保留，作为该能力首次落地时的实测记录。
+
 ## 4. 范围外行为
 
 - `work-p5` 的持久化 HITL interrupt/resume / schema 校验 / 幂等恢复

@@ -1,0 +1,357 @@
+{
+  "kind": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p0-stream-loop-consolidation-v2",
+  "activationId": "7ecc1c2e-adc5-47f1-af2d-b67589677225",
+  "fixedPoint": {
+    "ref": "9854ce35d142f17cde0c2b647ff9bf06af78c3e1",
+    "resolved": true,
+    "verification": "git rev-parse HEAD 成功；本轮改动全部未提交，故审查差异为工作树相对该 fixed-point 的 delta（三点式 git diff <fp>...HEAD 为空属预期，已按工作树差异替代并在 diff.command 中记录）。"
+  },
+  "diff": {
+    "command": "git diff HEAD -- pkg/ ; 另含未跟踪新文件 pkg/hno/agent/kernel.go、pkg/hno/runner/tool_batch.go 全文",
+    "capturedAt": "/tmp/p0stream-v2-review/diff.txt (748 lines)",
+    "nonEmpty": true,
+    "stat": "6 files changed, 179 insertions(+), 213 deletions(-)",
+    "tracked": [
+      "pkg/hno/agent/agent.go",
+      "pkg/hno/agent/config.go",
+      "pkg/hno/agent/run.go",
+      "pkg/hno/agent/stream.go",
+      "pkg/hno/runner/runner.go",
+      "pkg/hno/runner/stop.go"
+    ],
+    "untracked": [
+      "pkg/hno/agent/kernel.go",
+      "pkg/hno/runner/tool_batch.go",
+      "pkg/hno/agent/p0stream_red_test.go",
+      "pkg/hno/agent/p0stream_v2_red_test.go"
+    ],
+    "untouchedProof": {
+      "stream_aggregator.go": "git diff HEAD --stat -- pkg/hno/agent/stream_aggregator.go 为空；git log -1 = 8614accef06ccd9100350b17f2578a65c2b3c899",
+      "existingTests": "git diff HEAD --name-only -- '*_test.go' 为空：无既有测试被修改、删除或跳过"
+    },
+    "snapshotScope": "tracked/untracked/untouchedProof 均为审查时刻（第一轮开工前）的工作树快照，保持不变以保留判定语境。",
+    "postClosureDelta": {
+      "note": "闭包两轮在此快照之上追加的改动。",
+      "addedFiles": [
+        "pkg/hno/runner/tool_limit_run_test.go",
+        "pkg/hno/agent/stream_doubles_test.go"
+      ],
+      "existingTestsChanged": "三处断言计数因缺陷修复各 +1（runner_test.go 10→11、p0b_red_test.go 2→3、p0stream_red_test.go 2→3），并各自补身份/文案断言；未删除、未跳过、未放宽任何期望，回退修复后三处全部变红。stream_aggregator.go 在两轮闭包后仍未被触及。"
+    }
+  },
+  "specSources": [
+    "docs/design/v3-delivery-ticket.json#work-p0-stream-loop-consolidation（outcome + 5 条 completionCriteria + 3 条 verification）",
+    "docs/design/v3-test-scope-p0stream-v2.md（本轮治理契约；§0 显式取代 v1 契约 §2 N2 / §7 C8 / §9.6）",
+    "docs/design/v3-testability-decision-p0stream-v2.json",
+    "docs/design/v3-p0b-review-verdict.json#SPEC-1（上一轮被拒根因）"
+  ],
+  "claimsToVerify": [
+    "docs/design/v3-p0stream-green-v2.md",
+    "docs/design/v3-p0stream-v2-test-diff-review.md"
+  ],
+  "standardsSource": "AGENTS.md（Coding Style & Naming Conventions / Testing Guidelines / Build-Test-Development Commands）+ Fowler 12 项 smell 基线；gofmt -l pkg/hno/agent pkg/hno/runner 无输出、go vet 净，工具已覆盖项不逐行重审。",
+  "axes": {
+    "standards": {
+      "findings": [
+        {
+          "id": "STD-1",
+          "location": "pkg/hno/runner/runner_test.go:290,304",
+          "evidence": "规则原文「add regression tests for every behavior change」。行为已变两处：失败终止原因由 HEAD 的 StopCancelled 改为 StopModelFailure/StopToolFailure（runner.go:234,284），工具上限计数由历史累计改为本次运行累计（runner.go:218,287）。但 TestRunnerModelError 与 TestRunnerToolExecutorError 仍只有 `if err == nil { t.Fatal }`，不断言 reason；grep 全包确认 `Invoker`、`TurnInvokerFunc`、`DecideToolBatch`、per-run 计数在 pkg/hno/runner/*_test.go 零命中。agent 公共缝确有测试（p0stream_v2_red_test.go、p0b_red_test.go），故属内核层未闭环而非完全无测试。",
+          "severity": "hard",
+          "fix": "新增 pkg/hno/runner/tool_limit_run_test.go（契约 §5 本轮允许清单已点名该文件）：表驱动断言 reason==StopModelFailure / StopToolFailure / StopCancelled 三分支；预置 RoleTool 历史仍足额执行以钉 per-run；注入计数型 TurnInvoker 钉接缝被调用。"
+        },
+        {
+          "id": "STD-2",
+          "location": "pkg/hno/runner/tool_batch.go:5,8",
+          "evidence": "规则「Document exported symbols with GoDoc comments」。`// DecideToolBatch determines which calls may execute in the current round.` 未写明 (nil,nil,true) 与 limit<=0 的返回契约，而 runner.go:276 的 break 守卫完全依赖该契约；常量 toolCallLimitMessage 无注释；本包同批新增符号（TurnInvoker、failureReason）均为双语注释，此文件破例。",
+          "severity": "judgement",
+          "fix": "补齐返回值与边界契约注释，并与本包双语风格对齐。"
+        },
+        {
+          "id": "STD-3",
+          "location": "pkg/hno/agent/p0stream_v2_red_test.go ↔ p0stream_red_test.go:14,54,74",
+          "evidence": "规则「Keep tests table-driven and colocated」。v2 用例引用定义在 v1 文件中的 p0sStreamModel / p0sToolCall / p0sToolkits（v2 内 14 处引用），删除 v1 文件即编译失败；文件名把 TDD 阶段 _red_ 固化为永久测试名。",
+          "severity": "judgement",
+          "fix": "共享 double 移入新建 stream_helpers_test.go（新增文件，不动既有测试），或让 v2 自带所需 double；文件按行为而非阶段命名。"
+        },
+        {
+          "id": "STD-4",
+          "location": "pkg/hno/agent/agent.go:115-119",
+          "evidence": "ClearMemory 上方堆叠三条孤儿注释：`// Run executes the agent with the given input`、`// - Cache is bypassed for streaming runs.`、`// executeToolCalls executes all tool calls and adds results to memory`。父侧核对 git show HEAD:pkg/hno/agent/agent.go 证实该注释堆在 HEAD 已存在，本 diff 只删除了其中 `// singleDoneChannel ...` 一条 → 归属为 HEAD 既有技术债，非本轮引入；但第三条因本轮流式改道 agentToolExecutor 而进一步失真。",
+          "severity": "judgement",
+          "fix": "随下一轮清理或迁回各自函数上方；本轮不扩大 diff。"
+        }
+      ],
+      "smellBaseline": {
+        "Mysterious Name": "kernel.go:13 kernelState{turn} 实为「OnStep 最近一次回合号」；同一概念在 kernel / Runner / run.Loop 三名并存（kernel.go:17-26）。judgement → 改名 turnTracker.lastTurn，注释统一称 runner 内核。",
+        "Duplicated Code": "run.go:81-87 缓存命中路径手搓 assistant 消息，与 kernel.go:68-75 的 assistantMessage 同形；终止原因三处携带（agent.go:83 RunStreamDone.StopReason、agent.go:103 访问器、RunOutput.StopReason）。judgement → 缓存路径复用 assistantMessage；原因保留单一载体。",
+        "Feature Envy": "后果最重。kernel.go:81-82 maxLoopsExceeded 在 agent 侧用 reason==StopLimitReached && turn>=maxLoops 重做内核已知的区分，而 runner.go:256 与 runner.go:276/325 都返回 StopLimitReached，故 turn==MaxLoops 时工具上限会被报成 \"max tool calling loops reached\"。核对：该条件 HEAD run.go:180 已存在（非回归），但本轮首次让流式路径也能触发工具上限，因而首次真正可达。judgement → 内核新增 StopMaxTurnsReached / StopToolCallLimit 枚举，agent 只做 reason→错误码映射，kernelState.turn 回传随之可删。",
+        "Data Clumps": "tools+instructions 恒同行：kernel.go:27-34 六枚参数、agentMessageBuilder{instructions,tools}、run.go:71 与 run.go:119。judgement → 收为 kernelSpec{tools,instructions,state}。",
+        "Primitive Obsession": "内核类型化 runner.StopReason 越过 agent 公共边界后退化为 string（agent.go:83,103；stream.go:90），测试只能写字面量（p0stream_v2_red_test.go:286）。judgement → 公共 API 直接用 runner.StopReason（agent 包已依赖 runner）。",
+        "Repeated Switches": "失败分类写两遍且机制不同：run.go:134 用 errors.Is(err, context.Canceled)…，stream.go:112-123 用 switch stopReason；同一 limitHit 判定在 runner.go:276 与 runner.go:325 各一次。副作用：sync 工具失败报 NewAPIError、stream 报 NewToolExecutionError。judgement → 两路径共享一张 reason→error 映射表。",
+        "Shotgun Surgery": "未见。per-run 语义变更在 pkg/ 与 website/ 内无散落残留，仅 agent.go:38 与 config.go:26 保存同一句字段注释（同一原因、同一批变更）。",
+        "Divergent Change": "run.go 仍因内核接线 / 缓存键与读写 / 取消标记 / 事件拼装四类原因而变；run.go:136 传 markRunCancelled(output, 0, …) 丢弃手头 state.turn，而 stream.go:114 传 state.turn，两条路径取消元数据不一致。judgement → 缓存块下沉 cache.go；取消计数统一用 state.turn。",
+        "Speculative Generality": "tool_batch.go:8 DecideToolBatch 导出但包外零调用者（grep -rn DecideToolBatch --include='*.go' . 仅命中 runner.go:275 与自身）；kernel.go:36-37 同时传 Model 与 Invoker，流式下 Model 被静默忽略；runner.go:158-160 New 守卫放宽为「Model 或 Invoker」而 Invoker-only 无使用者。judgement → 降为包内私有 decideToolBatch；Invoker 非空时不再传 Model。",
+        "Message Chains": "未见。最长为 a.Memory.GetMessages(a.UserID)（两层），kernel.go 与 stream.go 全文已读。",
+        "Middle Man": "未见。TurnInvokerFunc（runner.go:72-74）与既有 ToolExecutorFunc / MessageBuilderFunc 同构，是必要适配；newKernel 除转发外承担 OnStep / OnSkippedToolCalls 真实接线。",
+        "Refused Bequest": "未见。无继承；Runner.model 字段与 countToolMessages 已彻底移除（grep 零命中），无残留转发壳。"
+      }
+    },
+    "spec": {
+      "criteria": [
+        {
+          "criterion": "Agent.RunStream 内部改走 pkg/hno/runner，不再使用 stream.go:89 的 for loopCount < a.MaxLoops 自有循环",
+          "verdict": "满足",
+          "evidence": "git show HEAD 核对后确认该循环已删，grep -c 'for loopCount' 为 0；stream.go:103 a.newKernel(...) 与 stream.go:110 r.Run 与 run.go:110 同一入口；stream.go 仅剩 streamOnce 的单回合分块泵 for {（:211，HEAD 即存在且未被 diff 触及）。全仓生产代码 InvokeStream 调用点仅 stream.go:182。审查方独立变异 M-D（把 invoker 换成 a.Model.Invoke）→ TestRunStreamExecutesToolCalls 与 TestAgent_RunStream_Basic 立即失败，证明收口被真实钉住。"
+        },
+        {
+          "criterion": "流式支持 ToolCallLimit 截断并回注与 sync 一致的 skipped tool 消息（含 ToolCallID 配对）",
+          "verdict": "满足",
+          "evidence": "截断只在内核 runner.go:275（DecideToolBatch），回注经 runner.go:310 + kernel.go:57-61 走 runner.NewToolCallLimitMessage（tool_batch.go:24 → types.NewToolMessage(call.ID, …) 保持配对）。per-run 口径四处一致：agent.go:38 / config.go:26 注释、runner.go:218,271-274,287 实现、p0stream_v2_red_test.go:61,104 预置历史用例。审查方变异 M-C（改回按历史计数）→ 两条路径用例双双失败；M-A（删回注）→ p0stream_red_test.go:143 失败。"
+        },
+        {
+          "criterion": "流式支持工具 StopLoop，且 RunStreamResult 暴露 StopReason",
+          "verdict": "满足",
+          "evidence": "StopLoop 判定唯一在内核 runner.go:289-324，工具侧经共享 runner_adapter.go:73；p0stream_red_test.go:196-223 以 invocations==1 钉住「停止后不再回调模型」。竞态核对：agent.go:88-96 stopReasonMu 保护字段，stream.go:90-97 中 setStopReason 先于唯一的 doneCh <- 发送点执行，happens-before 成立；go test -race ./pkg/hno/agent/... 实跑 exit 0。空值语义（Done 前为空）已在 agent.go:100-102 文档化。"
+        },
+        {
+          "criterion": "stream_aggregator 增量聚合语义与既有 stream 测试逐字不变",
+          "verdict": "满足",
+          "evidence": "git diff HEAD --name-only 仅 6 个生产文件；git diff HEAD --stat -- stream_aggregator.go 为空，git log -1 仍为 8614accef；git diff HEAD --name-only -- '*_test.go' 为空（零既有测试改动/删除/跳过）；streamOnce 未被 diff 触及，事件顺序与分块边界保持。票面 verification 全部实跑 exit 0：go build ./...、go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1、go test -race ./pkg/hno/agent/...。"
+        },
+        {
+          "criterion": "sync 与 stream 对同一场景产出的消息序列完全一致（须有对照测试钉住）",
+          "verdict": "部分满足",
+          "evidence": "对照测试确实比较完整有序序列（角色 + ToolCallID + Content + toolCalls ID，p0stream_v2_red_test.go:163-173,249-252，含 skipped 消息），三场景与契约 §6 B6 对齐；但该断言是纯等式，v2 文件内的绝对字面量期望只有 :286（no_tool_calls），limit_reached / stop_after_tool_call 的流式绝对期望仅存在于未跟踪的 v1 遗留文件 p0stream_red_test.go:149-158,179-193。详见 SPEC-1。"
+        }
+      ],
+      "findings": [
+        {
+          "id": "SPEC-1",
+          "location": "pkg/hno/agent/p0stream_v2_red_test.go:249-256（绝对期望缺失处）",
+          "evidence": "判据 5 要求「完全一致须钉住」+ 契约 §9.4 反假通过。作者自证并已记录：同时把两条路径写坏（变异 M-A 删 skipped 回注）时 P0SV2 子集仍 exit 0（receipt:b78d1964-e2d1-487b-801d-f87701358253），仅加上 v1 用例后由 TestP0S_ToolCallLimitTruncatesInStream 检出 exit 1（receipt:f11cdb63-356a-404f-b830-d7c431507f80，命令 go test ./pkg/hno/agent/... -run 'P0SV2|P0S' -count=1）。当前绝对担保依赖一个属于「被判定不合格的第一轮」的未跟踪文件。",
+          "severity": "hard",
+          "fix": "在 v2 文件内为 truncated-batch / limit-exhausted-across-rounds / stop-loop 三场景各补一份字面 want 序列（含 skipped 文案字面量与 StopReason 字面量），使绝对期望与等式对照同文件共存，不再依赖 v1 文件存活。"
+        },
+        {
+          "id": "SPEC-2",
+          "location": "docs/design/v3-p0stream-green-v2.md:62 与 pkg/hno/runner/（缺 tool_limit_run_test.go）",
+          "evidence": "契约 §5 允许清单写明「pkg/hno/runner/ 下新增测试文件（本轮：tool_limit_run_test.go）」，该文件不存在；契约 C6 原文为「grep -rn 'tool call limit reached' pkg/hno/ 仅命中 runner/tool_batch.go 与其测试」，实际命中 tool_batch.go:5 + p0stream_red_test.go:152 + p0stream_v2_red_test.go:16 + p0b_red_test.go:121,159。GREEN 文档对 C6 的 ✅ 按「非测试代码仅命中 tool_batch.go」口径陈述，窄于契约原文。同时须指出：契约 C6 原文本身不可达成——测试若改为引用实现常量，则该断言失去检错力（改文案不会被发现），测试侧保留字面量是正确做法。",
+          "severity": "hard",
+          "fix": "两件事：(a) 补 pkg/hno/runner 内核测试（与 STD-1 同一修复）；(b) 修正 v3-p0stream-green-v2.md:62 的 C6 陈述，把「非测试代码」限定与契约原文的不可达成性写清，并修订契约 C6 文案为「实现侧唯一来源」。契约修正需在下一轮 rex-test-design Command 下做，不得由实现反向改写。"
+        },
+        {
+          "id": "SPEC-3",
+          "location": "pkg/hno/runner/runner.go:229",
+          "evidence": "契约 §4 规定「模型失败→model_failure、工具失败→tool_failure、取消→cancelled」。messageBuilder 失败分支仍返回 StopCancelled，与同函数 :234（StopModelFailure）、:284（StopToolFailure）口径不一致。HEAD 既有，但本轮引入 failureReason 辅助函数时未一并收口，属同批变更的收口遗漏。",
+          "severity": "judgement",
+          "fix": "该分支改用 failureReason(ctx, err, StopModelFailure)，并在内核测试里钉住三分支（与 STD-1 合并）。"
+        },
+        {
+          "id": "SPEC-4",
+          "location": "pkg/hno/runner/runner.go:158-160",
+          "evidence": "规格未要求：New 的守卫由「Model 必填」放宽为「Model 与 Invoker 同时为空才报错」，错误文案亦变更为 \"runner: model or invoker is required\"。包内与 agent 侧（kernel.go:36-37 恒传 Model）均无 Invoker-only 使用者。",
+          "severity": "judgement",
+          "fix": "要么回收放宽（Model 保持必填），要么在契约增补清单中显式记账该公共契约变更；同时按 Speculative Generality 项让 kernel 在 Invoker 非空时不再冗余传 Model。"
+        },
+        {
+          "id": "SPEC-5",
+          "location": "pkg/hno/agent/stream.go:106",
+          "evidence": "把 newKernel 构造失败归因为 StopModelFailure，规格未要求且该分支在 agent 侧不可达（runner.New 仅在 Model 与 Invoker 皆空时报错，此处恒非空）。归因失真。",
+          "severity": "judgement",
+          "fix": "保留分支但归为中性原因（或沿用错误本身而不设阶段原因），避免把构造期缺陷伪装成模型故障。"
+        },
+        {
+          "id": "SPEC-6",
+          "location": "pkg/hno/agent/tool_executor.go:36",
+          "evidence": "判据 1 收口后 executeToolCalls 的生产调用点归零（grep 仅剩 tool_executor_test.go:72,95,115,139），agent.go:119 仍留其注释副本（见 STD-4）。本轮契约禁止改动既有测试，故不能顺手删除。",
+          "severity": "judgement",
+          "fix": "登记为后续清理项：连同其 4 处测试用例一并移除，或显式标注为仅供测试的历史入口。不得在本轮通过改测试来达成。"
+        },
+        {
+          "id": "SPEC-7",
+          "location": "docs/design/v3-test-scope-p0b.md:60；CHANGELOG.md",
+          "evidence": "该文档仍描述已被删除的实现：`executed := countToolMessages(allMessages)` —— **跨轮累计**，不是单轮计数。per-run 语义为用户明确授权的行为变更，但无 CHANGELOG 条目（CHANGELOG.md 最新条为 1.2.9，不含 ToolCallLimit），且 runner.go:119-121 注释「caps tool executions per run」与实际口径「执行数 + 被跳过数」（契约 §4）不精确一致。",
+          "severity": "judgement",
+          "fix": "文档标注其口径已被 v2 契约 §0 取代；注释补「含被跳过」；提交前补 CHANGELOG 条目。另登记：票面判据 1 的 verification 代理指标 `grep -c 'for {'` 与「tool 循环为零」不等价（streamOnce 的分块泵 for { 合法存在），v3-platform.md 红线 2「删除 pkg/hno/runner」已过期。"
+        },
+        {
+          "id": "SPEC-8",
+          "location": "pkg/hno/runner/runner.go:235；pkg/hno/agent/stream.go:122",
+          "evidence": "备案（非违规）：流式模型失败的 cause 文本新增 `runner: model invoke:` 前缀，外层仍为 NewAPIError(\"model streaming invocation failed\", …)，错误码与形状未变，契约 §3 N5 未破。同步路径除被授权的 per-run 计数外，未发现其他未公告的可观察变更（OnStep 顺序、缓存条件、metadata[\"loops\"]、取消与错误分支逐条比对 HEAD 一致）。新公共面 RunStreamResult.StopReason()、TurnInvoker / TurnInvokerFunc / Config.Invoker、StopModelFailure / StopToolFailure 两枚举均由 v2 契约 B1/B5/§1 明示授权。",
+          "severity": "judgement",
+          "fix": "无需修复；保留为规格授权与错误文本漂移的记账证据。"
+        }
+      ]
+    }
+  },
+  "verdict": {
+    "status": "request-changes",
+    "blocking": [
+      "SPEC-1（对照测试的绝对期望依赖 v1 遗留文件，两路同坏可绕过）",
+      "SPEC-2 + STD-1（pkg/hno/runner 内核层零测试：新停止原因三分支、TurnInvoker 接缝、per-run 计数在内核包内无回归测试；GREEN 文档 C6 陈述口径需修正）"
+    ],
+    "recordedNonBlocking": [
+      "STD-2, STD-3, STD-4",
+      "Feature Envy（maxLoopsExceeded 语义混淆，需内核新增枚举，超本轮票面）",
+      "Primitive Obsession、Repeated Switches、Divergent Change、Data Clumps、Mysterious Name、Speculative Generality",
+      "SPEC-3, SPEC-4, SPEC-5, SPEC-6, SPEC-7"
+    ],
+    "passing": [
+      "票面判据 1、2、3、4 满足（各带 file:LINE 证据与独立变异验证）",
+      "stream_aggregator 与全部既有测试零改动",
+      "票面 3 条 verification 命令全部 exit 0，含 -race",
+      "第一轮的根因（保留自有循环、把能力外挂）已真实消除"
+    ],
+    "summary": "Standards 轴 4 项文档/测试标准发现（1 hard）+ 12 项 smell 逐条核查（9 项有发现、3 项未见）；Spec 轴 5 条判据中 4 满足 1 部分满足、8 项发现（2 hard）。最严重：SPEC-1/SPEC-2 同源——本轮的行为担保仍部分依赖第一轮的遗留测试文件与更窄的口径陈述，而内核包自身没有测试。"
+  },
+  "closure": {
+    "status": "blocking-closed",
+    "closedAt": "2026-09-27",
+    "scope": "第一轮：仅关闭 verdict.blocking 两项（SPEC-1、SPEC-2+STD-1）及其直接连带项；登记为 non-blocking 的发现见 closureRound2。",
+    "defectFoundDuringClosure": {
+      "summary": "绝对断言暴露既存内核缺陷：本轮开始前上限已用尽时，decideToolBatch 返回 (nil,nil,true)，模型新请求的调用被整批丢弃且不生成配对 tool 消息，记忆里留下无人应答的 assistant tool_call。同步与流式同病，P0b 起即存在，等式型 parity 断言无法发现。",
+      "specConflict": "违反交付票 work-p0b-runner-capability-adoption 判据「达到上限时未执行的调用按 runner 语义回注 tool 错误消息且不丢 ToolCallID 配对」",
+      "fix": "pkg/hno/runner/tool_batch.go exhausted 分支改为把全部调用作为 skipped 返回；删除 runner.go 中因此不可达的提前 break",
+      "redReceipt": "receipt:d731a7ca-8341-4f2b-9567-56913fbe5974",
+      "mutationKilledBy": "receipt:0cd29d20-1fea-4c7c-85f3-c3e94c8a6efa"
+    },
+    "existingTestsRelaxed": "无。三处既有断言计数因缺陷修复而 +1（runner_test.go:264 10→11、p0b_red_test.go:213 2→3、p0stream_red_test.go:180 2→3），并各自新增身份/文案断言；回退修复后三处全部变红。",
+    "closedFindings": [
+      "SPEC-1：v2 三场景各带绝对 wantSequence / wantReason（含 limit_reached、stop_after_tool_call 字面量），模型失败断言升级为 == model_failure；M-A 由存活体转为被杀（receipt:5e11f95e-ee26-4801-a566-99a9a440238f）",
+      "SPEC-2 + STD-1：新增 pkg/hno/runner/tool_limit_run_test.go（decideToolBatch 契约表、per-run vs per-history、exhausted 配对、四类终止原因、TurnInvoker 优先级），runner 覆盖率 81.4% → 88.6%",
+      "SPEC-3：messageBuilder 失败改用 failureReason(ctx, err, StopModelFailure)（receipt:4e850639-3429-44db-a5b0-d16c9fcad152）",
+      "STD-2 + Speculative Generality：DecideToolBatch 降为包内私有并补齐契约注释"
+    ],
+    "deferredToFollowUp": [
+      "STD-3",
+      "STD-4",
+      "SPEC-4",
+      "SPEC-5",
+      "SPEC-6",
+      "SPEC-7",
+      "Feature Envy（需内核新增 StopMaxTurnsReached / StopToolCallLimit 枚举）",
+      "Primitive Obsession",
+      "Repeated Switches",
+      "Divergent Change",
+      "Data Clumps",
+      "Mysterious Name",
+      "契约 C6 文案回写（现写法不可达成）与交付票判据 1 的 grep 形式代理指标"
+    ],
+    "deferredDisposition": "上述登记项中除 SPEC-6、Feature Envy、Primitive Obsession、Divergent Change、Data Clumps、Mysterious Name、契约 C6/代理指标回写、CHANGELOG 外，均已在第二轮闭环，逐项处置见 closureRound2。",
+    "verification": [
+      "go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1 → receipt:5aa42fb7-b945-4261-8e60-4cdbb8ecbd26 exit 0",
+      "go test -race ./pkg/hno/agent/... -count=1 → receipt:0f3ce5d7-108e-4be8-af22-af8237dd2b12 exit 0",
+      "gofmt -l / go vet 均净；每轮变异后按 sha256 比对确认逐字节还原",
+      "已知无关红：pkg/hno/tools/pubmed 打真实 PubMed API，本机当次返回空集，该包不在本轮 diff 内"
+    ]
+  },
+  "closureRound2": {
+    "status": "non-blocking-closed-with-second-defect-fix",
+    "closedAt": "2026-09-27",
+    "detailRef": "docs/design/v3-p0stream-green-v2.md#8-后续项处理第二轮review-登记的-judgement-类发现",
+    "secondDefectFoundDuringClosure": {
+      "summary": "内核 failureReason 由错误的包装链反推取消：只要 err 里包着 context.Canceled 就上报 cancelled，即使本次运行的 context 完全存活。后果是上游连接被对端关闭这类模型故障被报成 RUN_CANCELLED，且同步路径还带回一个 Status=cancelled 的半成品 Output，而流式路径只发错误——判据 5 要求的两路一致在错误码上分叉。该缺陷 HEAD 即存在（HEAD runner.go 用 `errors.Is(err, context.Canceled) || ctx.Err() != nil` 一类判定），本轮把同步路径收敛到内核 verdict 后由新增公共缝断言暴露。",
+      "fixLocation": "pkg/hno/runner/runner.go failureReason(ctx, stage)",
+      "fix": "取消判定只看 ctx.Err()；上下文存活时按失败阶段上报 StopModelFailure / StopToolFailure。builder / model / tool 三处调用点统一，去掉 errors 参数。",
+      "testSeam": "pkg/hno/agent/p0stream_v2_red_test.go TestP0SV2_CancelWrappedModelFailureIsNotReportedAsCancellation（同步与流式双向断言 Code != RUN_CANCELLED、done.StopReason == model_failure、同步路径 output 为 nil）+ pkg/hno/runner/tool_limit_run_test.go TestFailureReasonClassification 四类终止原因表",
+      "authorizedBehaviorChange": "同步路径可观察变化（票面未点名，显式记账）：上下文存活时模型返回 cancel 包装错误，由「RUN_CANCELLED + Status=cancelled 的 Output」改为「nil, API_ERROR」。这是判据 5 一致性的必要条件。"
+    },
+    "closedFindings": [
+      "STD-3：共用流式夹具（p0sStreamModel / p0sToolCall / p0sThreeCallChunks / p0sToolkits）移入新建 pkg/hno/agent/stream_doubles_test.go，v1 与 v2 测试文件互不依赖对方存活；文件按职责而非 TDD 阶段命名",
+      "STD-4：agent.go 三条孤儿注释删除，Run 的双语 GoDoc 迁回 run.go，「流式绕过缓存」经 grep cacheEnabled 核实后写入 RunStream 文档",
+      "SPEC-4：runner.New 守卫收回为 Model 必填，Invoker 明确为可选的每回合覆盖并在注释写明关系；冗余的 Model+Invoker 双传按 Speculative Generality 建议消除",
+      "SPEC-5：流式 newKernel 失败改传空 StopReason（循环从未开始，无阶段可归因），细节由 ErrCodeUnknown 错误携带，不再伪装成 model_failure",
+      "SPEC-7：v3-test-scope-p0b.md N1 加口径回写注记（countToolMessages 已不存在、per-run 计数、exhausted 情形回注配对消息）；v3-platform.md §0.1 加基线时效注记（runner 非死代码、循环 4→2）；runner.Config.ToolCallLimit 与 DefaultToolCallLimit 注释改为「本次运行消耗：已执行 + 被截断；历史运行不计费」",
+      "Repeated Switches（取消分类写两遍）：同步路径改按 stopReason 分派，与流式同构，errors 手工分类删除"
+    ],
+    "mutations": [
+      {
+        "id": "C1",
+        "mutation": "内核把所有失败一律报成 cancelled",
+        "result": "新用例 + 模型失败用例 + 内核分类表红",
+        "receipt": "receipt:55ed3570-0cdc-476e-9696-a00418aa096e exit 1"
+      },
+      {
+        "id": "C2",
+        "mutation": "同步路径回退为按错误包装链猜取消",
+        "result": "TestP0SV2_CancelWrappedModelFailureIsNotReportedAsCancellation 红",
+        "receipt": "receipt:8be153f0-13d3-4294-8335-7c01d98b37da exit 1"
+      }
+    ],
+    "restoredAfterMutation": "变异后按 sha256 比对确认逐字节还原，工作树与还原清单一致。",
+    "explicitlyStillOpen": [
+      "SPEC-6：executeToolCalls 生产零调用，但其唯一使用者是既有跟踪测试 tool_executor_test.go（HITL / stop-loop 覆盖），删除需另立工作项决定",
+      "Feature Envy：maxLoopsExceeded 需内核拆出 StopMaxTurnsReached / StopToolCallLimit 才能精确区分，会改变用户可见的 limit_reached 字符串",
+      "Primitive Obsession：StopReason 以 string 越过 agent 公共边界，与 HEAD 已有的 RunOutput.StopReason 同形，属公共 API 决策",
+      "Divergent Change / Data Clumps / Mysterious Name：run.go 职责拆分、kernelSpec 收参、kernelState 改名",
+      "工具执行错误码在两路间不一致（同步 API_ERROR vs 流式 TOOL_ERROR），统一会改动同步路径错误码，未获授权",
+      "契约 C6 文案回写与交付票判据 1 的 grep -c 'for {' 代理指标（须由 rex-test-design 下一轮处理，不得由实现反向改写契约）",
+      "CHANGELOG.md 条目按仓库习惯留到 work-p9-release 统一回写"
+    ],
+    "verification": [
+      "go test ./pkg/hno/agent/... ./pkg/hno/runner/... ./internal/session/contract/... -count=1 → receipt:22963419-8189-4eab-b093-6ad3e543e8e5 exit 0",
+      "go test -race ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1 → receipt:794c17d7-667f-4dd9-afb7-93410fc2cebb exit 0",
+      "gofmt -l pkg/hno/agent pkg/hno/runner 无输出；go vet 净；coverage runner 88.6% / agent 80.2%",
+      "gofmt -l pkg/ 仍列出 pkg/agentos/events.go、pkg/agentos/team_registry.go、pkg/hno/debug/debug.go —— 均不在本轮 diff 内（git status 未修改），HEAD 既有格式债，未顺手改动以免混入无关 diff"
+    ]
+  },
+  "evidenceRefs": [
+    "artifact:/tmp/p0stream-v2-review/diff.txt",
+    "artifact:docs/design/v3-test-scope-p0stream-v2.md",
+    "artifact:docs/design/v3-delivery-ticket.json#work-p0-stream-loop-consolidation",
+    "receipt:2ddfc18c-f0ca-4a86-a652-ba7042c008df",
+    "receipt:b78d1964-e2d1-487b-801d-f87701358253",
+    "receipt:f11cdb63-356a-404f-b830-d7c431507f80",
+    "receipt:d731a7ca-8341-4f2b-9567-56913fbe5974",
+    "receipt:0cd29d20-1fea-4c7c-85f3-c3e94c8a6efa",
+    "receipt:5e11f95e-ee26-4801-a566-99a9a440238f",
+    "receipt:cba7894a-f3c8-4b14-8388-cad7fe0aff01",
+    "receipt:4e850639-3429-44db-a5b0-d16c9fcad152",
+    "receipt:a1bd9c48-2ebf-4820-ba6f-465ae4d538a8",
+    "receipt:55ed3570-0cdc-476e-9696-a00418aa096e",
+    "receipt:8be153f0-13d3-4294-8335-7c01d98b37da",
+    "receipt:22963419-8189-4eab-b093-6ad3e543e8e5",
+    "receipt:794c17d7-667f-4dd9-afb7-93410fc2cebb",
+    "receipt:b3ff2d5e-08a1-4d34-b52c-d8f21a5dca96",
+    "receipt:abb15332-ac46-4557-b4c6-3702a823d826",
+    "receipt:66455df2-fa95-459a-876a-3d0ccdcaacf9",
+    "receipt:e6c394af-72b1-4a98-b83a-01c9220e4c80",
+    "receipt:3c7601e1-e3f0-46de-b749-ec3381b45bb7"
+  ],
+  "closureRound3": {
+    "at": "2026-09-27",
+    "purpose": "提交前的检错力复核：确认「两条路径共享同一内核」不是口头声明，并记录一条对断言分层的诚实限定。",
+    "mutation": {
+      "name": "MUTANT-1（内核级：截断后不再回注被跳过的 tool 消息）",
+      "edit": "pkg/hno/runner/runner.go 的 `if limitHit {…}` 守卫改为 `if false && limitHit {…}`，使 onSkippedToolCalls 与 NewToolCallLimitMessage 均不触发。",
+      "killedBy": [
+        "TestRunnerToolCallLimit (pkg/hno/runner)",
+        "TestExhaustedLimitStillPairsSkippedCalls (pkg/hno/runner/tool_limit_run_test.go)",
+        "TestP0B_ToolCallLimitTruncatesBatch_SingleRound (pkg/hno/agent/p0b_red_test.go)",
+        "TestP0B_ToolCallLimitTruncatesBatch_MultiRound (pkg/hno/agent/p0b_red_test.go)",
+        "TestP0S_ToolCallLimitTruncatesInStream (pkg/hno/agent/p0stream_red_test.go)",
+        "TestP0S_ToolCallLimitExhaustedAcrossRounds (pkg/hno/agent/p0stream_red_test.go)"
+      ],
+      "receipt": "kill: receipt:3c7601e1-e3f0-46de-b749-ec3381b45bb7 (`go test ./pkg/hno/runner/... ./pkg/hno/agent/... -run Limit -count=1`) exit 1，上述 6 条用例 FAIL；同变异下 parity 用例单独运行 receipt:b3ff2d5e-08a1-4d34-b52c-d8f21a5dca96 exit 0",
+      "restored": "cp /tmp/mut_runner.bak 还原，sha256 前后一致：5127565b7a517d720baf259df1d1ef2ea3faa62369cbad48bd3b0ab6ae8690f0"
+    },
+    "assertionLayeringLimit": {
+      "fact": "同一变异下，TestP0B_ToolCallLimitStreamAndSyncParity 仍然通过（receipt:b3ff2d5e-08a1-4d34-b52c-d8f21a5dca96 exit 0）。",
+      "reading": "这不是缺陷而是断言分层的必然结果：parity 测试是「漂移探测器」，两条路径同坏时等式仍成立；绝对字面量期望（p0b_red_test.go 与 p0stream_red_test.go 的 wantSequence/StopReason 字面量）才是「绝对担保」。二者必须同时存在，任何一侧被删都会失去一类检错力。",
+      "action": "无需修复；作为契约 §9.4 反假通过条款的实现说明保留。"
+    },
+    "structuralCheck": {
+      "sharedKernel": "pkg/hno/agent 内非测试代码对 InvokeStream 的调用点只剩 stream.go:182（位于 streamOnce，HEAD 即存在的单回合分块泵）；run.go:111 与 stream.go:105 均经 a.newKernel → runner.New → r.Run，循环策略（MaxTurns/ToolCallLimit/StopLoop/截断回注）只在 kernel.go 接线一处。",
+      "stepsParameter": "newKernel 已不再接收历史步数偏移（`grep -rn 'a\\.Steps' pkg/hno/agent/` 在非测试代码零命中）：per-run 计数完全由内核的 executed 承担，历史 tool 消息不参与限流，消除了「把历史长度当作已执行数」这一类口径混淆。"
+    },
+    "verification": [
+      "go build ./... → exit 0",
+      "go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1 → receipt:abb15332-ac46-4557-b4c6-3702a823d826 exit 0",
+      "go test -race ./pkg/hno/agent/... -count=1 → receipt:66455df2-fa95-459a-876a-3d0ccdcaacf9 exit 0",
+      "go test ./pkg/hno/... ./internal/... -count=1 → 唯一失败 pkg/hno/tools/pubmed（打真实 PubMed API，本机当次返回空集），该包不在本 diff 内且无改动",
+      "gofmt -l pkg/hno/agent pkg/hno/runner 无输出；go vet ./pkg/hno/agent/... ./pkg/hno/runner/... → receipt:e6c394af-72b1-4a98-b83a-01c9220e4c80 exit 0"
+    ]
+  }
+}

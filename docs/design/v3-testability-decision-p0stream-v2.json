@@ -1,0 +1,17 @@
+{
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:testability-decision:p0stream-loop-consolidation-v2",
+  "redCandidate": {
+    "publicEntry": "(*agent.Agent).RunStream(ctx, string) (*agent.RunStreamResult, error) 与 (*agent.Agent).Run(ctx, string) (*agent.RunOutput, error)。断言落在 RunStreamDone.Output.Messages 中 c1 对应 RoleTool 消息的 Content、RunOutput.Content、fake models.Model 的 InvokeStream 调用次数、RunStreamDone.Err 与 RunStreamDone.StopReason 上。不引用 runner 私有字段、不引用状态机内部变量、不断言 goroutine/channel 时序；本条 RED 刻意不调用尚未存在的 RunStreamResult.StopReason() 方法，使失败落在行为而非编译上。",
+    "setup": "工作树含 v1 未提交实现（pkg/hno/agent/{agent,stream,tool_executor}.go 与 pkg/hno/runner/{runner,tool_batch}.go）。本轮仅新增 pkg/hno/agent/p0stream_v2_red_test.go，未修改任何既有测试。场景全部为内存 fake，无网络、无凭据、无跨用例共享状态，可独立清理。三个用例：(1) 流式 ToolCallLimit=1 且事先向 Memory 预置 2 条 RoleTool 历史消息，fake 第 1 轮流式返回 tool call c1、第 2 轮返回文本 final；(2) 同一场景走同步 Run；(3) fake 的 InvokeStream 返回 errors.New(\"api down\")。执行前 gofmt -l pkg/hno/agent 无输出；既有 11 个 runner 测试与既有 agent 测试仍全绿（go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1 = ok）。",
+    "command": {
+      "executable": "go",
+      "args": ["test", "./pkg/hno/agent/...", "-run", "P0SV2", "-count=1"],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "退出码非 0，且为行为级断言失败（非 build failed / undefined）。三条期望：(1)(2) 中 c1 必须得到经 toolkit.FormatResult 序列化的执行结果 \"\\\"A\\\"\"，并跑到第 2 轮拿到最终内容 final，即 ToolCallLimit 只按本次运行计数；(3) 模型调用失败路径的 StopReason 必须如实上报失败阶段 model_failure，不得为 no_tool_calls 或空串。",
+    "observed": "退出码 1，FAIL github.com/rexleimo/agno-go/pkg/hno/agent，输出为纯断言失败，无任何编译错误。逐条：p0stream_v2_red_test.go:91 c1 期望 \"\\\"A\\\"\" 实际 \"\"（消息根本不存在）、:94 期望最终内容 final 实际 \"\"、:97 期望 InvokeStream 调用 2 次实际 1 次；p0stream_v2_red_test.go:125 c1 期望 \"\\\"A\\\"\" 实际 \"\"、:128 期望 final 实际 \"\"；p0stream_v2_red_test.go:156 模型失败路径 StopReason = \"no_tool_calls\"。三个用例全部 FAIL。",
+    "receiptRef": "receipt:0c869738-faea-47aa-888b-cc764e8bba1e",
+    "failureReason": "本轮含真实新增/变更的用户可观察行为，且 v1 实现的缺陷恰好落在这些行为上。(a) ToolCallLimit 计数口径：内核 runner.go:235 与流式 stream.go:154 都从**整个消息历史**里数 RoleTool 消息，预置 2 条历史使 remaining<=0，两条路径都在执行任何工具前终止，因此 c1 无结果消息、第 2 轮不再发生、最终内容为空——这正是 v1 §3 把「跨轮累计」写成含历史所遗留的缺陷，本轮改为 per-run。(b) 失败路径终止原因：stream.go:87 把 stopReason 初始化为 no_tool_calls 并在模型调用失败的 doneCh 发送点（stream.go:129-134）原样上报，把「API 调用失败」谎报为「模型没有请求工具」——这是 v1 保留 stream.go:91 自有循环、逐处手工填字段造成的，只有把循环收进内核才能根治，故本轮要求内核按阶段返回 model_failure/tool_failure。(c) 循环唯一性（票面判据 1）无法单独用行为断言观察，由 B1 的结构判据（grep -c 'for loopCount' 归零）与 B6 的完整消息序列 parity 共同钉住；v1 的教训是只比 RoleTool 子集的 parity 测不出这些分叉，本条 RED 即是证据。禁止项自查：未删除/跳过/放宽任何既有断言；未修改 stream_aggregator；未复用零退出基线充当 RED；期望值取自既有 handler 返回值经 FormatResult 的 json.Marshal 结果与内核既有文案，非把断言写成当前输出。"
+  }
+}

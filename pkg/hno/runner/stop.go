@@ -23,6 +23,12 @@ const (
 	// StopCancelled: context was cancelled during the loop.
 	// StopCancelled: 循环期间上下文被取消。
 	StopCancelled StopReason = "cancelled"
+	// StopModelFailure: the model call failed, so the loop never terminated by policy.
+	// StopModelFailure: 模型调用失败，循环并非按策略终止。
+	StopModelFailure StopReason = "model_failure"
+	// StopToolFailure: tool execution failed, so the loop never terminated by policy.
+	// StopToolFailure: 工具执行失败，循环并非按策略终止。
+	StopToolFailure StopReason = "tool_failure"
 )
 
 // String returns a human-readable stop reason.

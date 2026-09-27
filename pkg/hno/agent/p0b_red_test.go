@@ -202,7 +202,10 @@ func TestP0B_ToolCallLimitTruncatesBatch_MultiRound(t *testing.T) {
 		t.Fatalf("Run failed: %v", err)
 	}
 
-	// Should have exactly 2 tool messages (limit reached before third)
+	// The limit stops the loop before call3 runs, but call3 was still requested
+	// by the model, so it must come back paired with a tool message.
+	// 上限在 call3 执行前终止了循环，但 call3 仍是模型请求过的调用，
+	// 因此它必须带回一条配对的 tool 消息。
 	toolMessages := 0
 	for _, msg := range output.Messages {
 		if msg.Role == types.RoleTool {
@@ -210,8 +213,8 @@ func TestP0B_ToolCallLimitTruncatesBatch_MultiRound(t *testing.T) {
 		}
 	}
 
-	if toolMessages != 2 {
-		t.Errorf("Expected exactly 2 tool messages (limit exhausted), got %d", toolMessages)
+	if toolMessages != 3 {
+		t.Errorf("Expected exactly 3 tool messages (2 executed + 1 paired skip), got %d", toolMessages)
 	}
 
 	if output.StopReason != "limit_reached" {
@@ -223,16 +226,21 @@ func TestP0B_ToolCallLimitTruncatesBatch_MultiRound(t *testing.T) {
 		t.Errorf("Expected model called 3 times, got %d", model.index)
 	}
 
-	// 跨轮消耗掉的两条调用应分别是 call1、call2。
+	// 跨轮消耗掉的两条调用是 call1、call2，第三条必须是被截断后的配对文案。
 	// 只数条数会漏掉「数量对、身份错」的情况。
-	// The two calls consumed across rounds must be call1 and call2 specifically.
+	// The two calls consumed across rounds must be call1 and call2, and call3 must
+	// carry the paired truncation message. A bare count misses "right size, wrong identity".
 	gotRound := map[string]string{}
 	for _, m := range output.Messages {
 		if m.Role == types.RoleTool {
 			gotRound[m.ToolCallID] = m.Content
 		}
 	}
-	for id, w := range map[string]string{"call1": "\"result1\"", "call2": "\"result2\""} {
+	for id, w := range map[string]string{
+		"call1": "\"result1\"",
+		"call2": "\"result2\"",
+		"call3": "tool call limit reached; call not executed",
+	} {
 		if gotRound[id] != w {
 			t.Errorf("call %s: expected %q, got %q", id, w, gotRound[id])
 		}
