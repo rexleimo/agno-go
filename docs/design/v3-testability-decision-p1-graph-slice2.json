@@ -1,0 +1,25 @@
+{
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:testability-decision:p1-graph-engine-slice2",
+  "redCandidate": {
+    "publicEntry": "pkg/hno/graph 导出 API（package graph_test 外部观察）：(*Graph).Validate() error 的返回值与其错误文本是否指名问题节点，以及 (*Graph).Run(ctx, in) (*Result, error) 对同一非法图的拒绝。断言不引用 nodes/edges 等未导出字段，不断言错误具体类型（只要求可定位文本），因此不锁死实现。",
+    "setup": "工作树含切片 1 的实现（graph.go 的 builder + scheduler.go 的单消费者调度器）。本切片只向 pkg/hno/graph/graph_test.go 追加 TestP1G_ValidateRejectsDanglingEdge，含两个子用例：(1) 节点 a 存在、出边 a→ghost（ghost 未注册）、entry/output 均为 a；(2) 合法两节点线性图 a→b 作为反向对照，防止「一律报错」的假实现。内存节点函数，无网络、无凭据、无跨用例共享状态。执行前 gofmt -l pkg/hno/graph 无输出。",
+    "command": {
+      "executable": "go",
+      "args": [
+        "test",
+        "./pkg/hno/graph/...",
+        "-run",
+        "P1G",
+        "-count=1"
+      ],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "退出码非 0，且为行为级断言失败。目标行为：悬空边必须被 Validate 判为非法且错误文本指名 offending 节点名 ghost，Run 必须以错误拒绝执行该图（绝不启动节点 goroutine）；合法图必须 Validate 返回 nil 且 Run 正常产出 Output。",
+    "observed": "exit 1，且失败形态正是被指控的缺陷本身：子用例 (1) 中 Validate 返回的是夹具占位错误（不含 \"ghost\"），断言继续走到 Run，进程以 SIGSEGV 崩溃 —— panic: runtime error: invalid memory address or nil pointer dereference / graph.(*scheduler).start.func1() scheduler.go:83 / created by graph.(*scheduler).start in goroutine 25 / FAIL github.com/rexleimo/agno-go/pkg/hno/graph 0.419s。崩溃使子用例 (2) 未及执行。这是真实缺失行为（构建期拒绝与 fail-closed 执行均不存在），非编译或环境问题：同一命令在切片 1 曾以 exit 0 通过。",
+    "failureReason": "缺失目标行为有两层：(1) Validate 仍是 RED 夹具占位，不检查任何 §3.5 项，因此悬空边不被识别、错误也不可定位；(2) Run 不执行任何前置校验，直接把未知节点名交给调度器，scheduler.go:83 的 map 查表得到 nil 接口并对其调用 Run，触发进程级空指针崩溃。审查轴的同一缺陷已独立取证（receipt:fea0030e-136a-4c56-bf8a-89cf6965cd3f），本条为其行为化回归测试。",
+    "receiptRef": "receipt:cdd74aec-d8fe-4456-958f-64db50973d9a"
+  },
+  "sliceJustification": "构建期拒绝 + fail-closed 执行是其余全部图行为的承载前提：只要未知节点名还能崩进程，并行/Join/环/取消的测试就都可能在崩溃而不是断言上结束，红绿信号不可信。修它同时消除审查阻断项 SPEC-1（SIGSEGV）与 SPEC-4（Run 未复查 Validate），且不引入任何新的公共 API。",
+  "nonGoals": "本切片不实现 §3.5 其余 6 项校验、不实现无条件环检测（B5）、不实现 Warnings（B7）、不落实 stepLimit 默认 1000（B4）、不加并发上限（B8）、不实现条件边/Join/Default 路由（B2/B3）。AddConditional/AddDefault/AddJoin 仍会静默丢弃声明 —— 该项已由审查轴 SPEC-2 登记为阻断，须由其自身的 RED 关闭，不在本切片顺带处理。"
+}

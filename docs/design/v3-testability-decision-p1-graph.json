@@ -1,0 +1,25 @@
+{
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:testability-decision:p1-graph-engine",
+  "redCandidate": {
+    "publicEntry": "pkg/hno/graph 的导出 API（外部测试包 package graph_test 观察）：graph.New() → AddNode/AddEdge/SetEntry/SetOutput 链式构造 → (*Graph).Run(ctx, in) 返回 *Result，断言落在 Result.Output()、Result.Value(name)、Result.Completed() 与节点自身记录的执行轨迹上。不引用 scheduler 字段、不引用 channel、不断言并行分支间时序。本轮 RED 只引用已存在的签名，使失败落在行为断言而非编译上。",
+    "setup": "新增包 pkg/hno/graph：graph.go 为 RED 夹具骨架（仅 §1 导出签名 + Node/NodeFunc/Predicate/Option/Result 类型 + Run/Validate 返回 errNotImplemented 的占位体；无调度、无路由、无校验逻辑，已在契约 §5 显式记账）；graph_test.go 新增 TestP1G_LinearDagRunsChain，两节点线性图 entry→out，entry 返回 \"seed:\"+in，out 返回 \"final<-\"+in，无网络、无凭据、无共享状态，可独立清理。执行前 gofmt -l pkg/hno/graph 无输出、go build ./pkg/hno/graph/... 成功，其余包未被触碰。",
+    "command": {
+      "executable": "go",
+      "args": [
+        "test",
+        "./pkg/hno/graph/...",
+        "-run",
+        "P1G",
+        "-count=1"
+      ],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "退出码非 0，且为行为级断言失败（非 build failed / undefined / 环境错误）。具体缺失行为：Run 必须驱动 entry 再以 entry 输出驱动 out，返回 *Result 使 Output()==\"final<-seed:x\"、Value(\"entry\")==\"seed:x\"、Completed()==[\"entry\",\"out\"]、节点轨迹==[\"entry\",\"out\"]。",
+    "observed": "go build ./pkg/hno/graph/... 通过（包存在、签名存在，排除基础设施失败）；测试以断言失败退出：--- FAIL: TestP1G_LinearDagRunsChain (0.00s) graph_test.go:35: Run 未产出结果: graph: not implemented / FAIL github.com/rexleimo/agno-go/pkg/hno/graph 0.323s，exit 1。即包编译通过但无人驱动图：夹具的 Run 直接返回占位错误，Output/Value/Completed 全部无值可断。",
+    "failureReason": "缺失目标行为：pkg/hno/graph 尚无单消费者调度器——没有从入口激活节点、没有把前驱输出作为后继输入投递、没有完成事件聚合与输出节点值投影。夹具的 Run/Validate 是显式占位（返回 errNotImplemented），因此观察到的失败正是「图未被执行」这一条用户可观察行为，而非编译、夹具或依赖问题。",
+    "receiptRef": "receipt:4778df82-267b-4289-b486-9c4b1958bbf2"
+  },
+  "sliceJustification": "线性 DAG 是其余四类图（并行/汇聚/条件/环）的退化形态，而它一旦成立就必须同时具备「消费者唯一读取完成事件」「激活后继」「前驱输出→后继输入」「输出投影」四件事，这正是 §3.3 零锁模型与 §3.4 findSuccessors 的风险中心；后续切片在同一骨架上增量，不再引入新的并发不变式。",
+  "nonGoals": "本轮不实现 WithRetry/WithCache/WithDurability/WithStreamMode（P2 G3）、Send 动态扇出（P3）、StreamMode（P4）、事件化与 HITL resume（P5）、Store（P8）、workflow 迁移（P6）、agent 侧实现 graph.Node、schema 校验（v3.1），也不顺带改动 P0 登记的 runner 停止原因枚举与 StopReason 类型化两项 judgement 遗留。"
+}
