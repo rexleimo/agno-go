@@ -317,24 +317,14 @@
   "frontier": {
     "ready": [
       "work-p0-loop-consolidation",
-      "work-p8-store",
-      "work-p0-stream-loop-consolidation"
+      "work-p0b-runner-capability-adoption",
+      "work-p0-stream-loop-consolidation",
+      "work-p1-graph-engine",
+      "work-p4-streammode",
+      "work-p7-observability",
+      "work-p8-store"
     ],
     "blocked": [
-      {
-        "workItemId": "work-p0b-runner-capability-adoption",
-        "reason": "依赖 work-p0-loop-consolidation 未完成：必须在收口后的单一循环内核上新增能力，不得在两套循环上并行开发。",
-        "evidenceRefs": [
-          "artifact:docs/design/v3-test-scope-p0.md"
-        ]
-      },
-      {
-        "workItemId": "work-p1-graph-engine",
-        "reason": "依赖 work-p0-loop-consolidation 未完成：图节点需以收口后的 runner 为 Node 实现基础，先收口可避免在两套循环上并行开发。",
-        "evidenceRefs": [
-          "artifact:docs/design/v3-baseline-evidence.md#2"
-        ]
-      },
       {
         "workItemId": "work-p2-node-policies",
         "reason": "依赖 work-p1-graph-engine 未完成：节点策略需挂载在已存在的 Node 契约与 scheduler 上。",
@@ -350,15 +340,8 @@
         ]
       },
       {
-        "workItemId": "work-p4-streammode",
-        "reason": "依赖 work-p0-loop-consolidation 未完成：七模式统一流式必须建立在 sync/stream 共享同一循环内核之上，否则仍是两份实现各自扩展。 现另依赖 work-p0-stream-loop-consolidation：必须先消除流式自有循环，否则七模式会继续在两套内核上扩展。",
-        "evidenceRefs": [
-          "artifact:docs/design/v3-baseline-evidence.md#2"
-        ]
-      },
-      {
         "workItemId": "work-p5-event-hitl",
-        "reason": "依赖 work-p0-loop-consolidation 与 work-p1-graph-engine 未完成：事件化需稳定的循环内核产出事件，Resume 需图引擎的节点状态机支撑。",
+        "reason": "依赖 work-p1-graph-engine 未完成：事件化需稳定的循环内核产出事件，Resume 需图引擎的节点状态机支撑。",
         "evidenceRefs": [
           "artifact:docs/design/v3-platform.md#9"
         ]
@@ -368,13 +351,6 @@
         "reason": "依赖 work-p1/p2/p3/p4 未完成：迁移目标必须是功能完整的引擎，否则需要二次迁移。",
         "evidenceRefs": [
           "artifact:docs/design/v3-platform.md#10"
-        ]
-      },
-      {
-        "workItemId": "work-p7-observability",
-        "reason": "依赖 work-p0-loop-consolidation 未完成：观测要挂在收口后的唯一循环上，挂在旧路径上会随 P0 一起作废。",
-        "evidenceRefs": [
-          "artifact:docs/design/v3-baseline-evidence.md#3"
         ]
       },
       {
