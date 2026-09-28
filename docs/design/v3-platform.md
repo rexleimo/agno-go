@@ -447,6 +447,15 @@ v1 语义：控制 `graph` 在每个节点完成后向 `Session` 存储提交事
 > 与 `knowledge` 重叠实测为零（该包只有 Loader/Chunker 摄取面）、与 `memory.Memory` 结构性不可互换、
 > `embeddings` 三个 provider 已是现成的 `vectordb.EmbeddingFunction` 注入件（草图「需 Embedder」不自建抽象）。
 > 契约：`docs/design/v3-test-scope-p8-g8-store.json`（切片 29）。
+> ✅ **D2 的六项形状取舍已于 2026-09-28 一次性放行（包 A,A,A,A,B,B，负责人）**：
+> 落位 `pkg/hno/store` 且 `internal/session/store` **不改名**（同名异义作为已接受代价，internal 不可 import）；
+> namespace **精确匹配**（段规则：非空 + UTF-8 + 禁 U+001F + 段长 ≤128/深度 ≤16），前缀检索留 v3.1；
+> `List` 签名不动、**全量不截断**（任何实现不得静默截断，分页 v3.1 以末位 variadic 新增）；
+> `Value []byte` **允许任意字节**，检索只对合法 UTF-8 打分；
+> **草图下面的接口由此扩为七方法**——加 `SearchScored(ctx, ns, query, k) ([]SearchHit, error)`（分数必须回传，
+> 否则调用方看不见上一条的非文本剔除、v3.1 上 pgvector 也无距离回传通道）与
+> `PutMany(ctx, items []*Item) error`（一次 `Embed` 整批：逐条嵌入等于导入 5,000 条 = 5,000 次真 provider 调用；
+> 派生的「批量部分失败」语义按 D5 同族裁为**整批原子**）。下方五方法草图作为裁决原文保留，扩面已登记在契约 D1。
 
 ```go
 package store

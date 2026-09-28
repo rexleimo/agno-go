@@ -240,6 +240,31 @@ B12/B13（§1 的结构命令输出，切片 19 后重测仍为 0 / 838）。
     `blocked` 只剩 `work-p9-release`（前置 P6/P7/P8 尚未交付）。`node scripts/validate-delivery-ticket.mjs`
     判 **VALID**（`frontier.ready` 11 / `blocked` 1 / 12 workItems / 七组并行组），
     回执 `receipt:b7ed56ca-5143-49c6-89d0-823fe1d6fc10`（exit 0）。
+4y. **G8 六项形状已放行并回填契约（2026-09-28，负责人一次性放行包 A,A,A,A,B,B）**：
+    `docs/design/v3-test-scope-p8-g8-store.json` 新增 `adjudicationRuling`（逐条记录裁决与理由），
+    D 行由 11 条扩到 **13 条**——D1 形状锚从「恰五方法」改为**七方法**（草图五 + `SearchScored` + `PutMany`，
+    登记为对母约 §8 草图的一次**显式扩面**，草图原文保留作裁决出处），新增 D12（`SearchScored` 与 `Search`
+    同集合同序只差分数 + 非文本剔除必须经分数通道可见）与 D13（`PutMany` 嵌入调用数与条数解耦、**整批原子**）；
+    explicitNonGoals 第 10 条由「不加批量面」改写为「扩面只放行这两处 + 禁把 `PutMany` 写成逐条 Embed 的语法糖」。
+    **派生子决定一条并如实登记**：ADJ-6/B 原文把「批量部分失败」列为待裁，负责人按包放行未逐条表决，
+    该子决定由主代理按 D5 同族（单条 Put 已承诺「失败不留半截行」）裁为**整批原子**，写在 D13 的
+    `independentlyFailable` 里可测；改意的成本是换 D13 一处断言。母约 §8 已同步写回。
+    **G8 实现片因此解冻**，但按 §4b 串行纪律仍排在 R17（切片 30）与 G4 生产者（切片 31）之后。
+4z. **G10 范围摸底材料已落地（第三次派发，37 次工具调用收在 45 硬预算内）**：
+    `docs/design/v3-adjudication-p6-g10-scope.md`。关键实测：workflow 的**唯一线性内核**是
+    `executeSteps`（`executor.go:27`，跑在 `run.Loop` 上，全仓仅 `workflow.go:222` 一处调用），
+    condition/loop/router/parallel 各自递归；workflow 与 graph 双向零 import；
+    基线 `go test ./pkg/hno/workflow/... -count=1 -v` = **131 PASS / 0 FAIL**（`receipt:312de106-ff8e-4006-8918-8b0720d2d824`）、
+    两个示例编译（`receipt:d52c41ef-2953-4e31-a569-5bb0686e4203`）、34 项字节锚（`receipt:61e7faf5-4b46-4db5-b791-9d15cb887ae0`）；
+    窄探针（`/tmp/g10probe/cmd/linprobe`）证链式图与旧核**输出逐字相同、resume 相同**，适配器净 78 行（入库估 120–180），
+    而 β（控制流全换）外推 **1,800–2,900 行**，两值都不是母约 :88 的 ~1,200。材料推荐 **OPT-α**（只换线性链）。
+  - **本材料带回一条必须升格的发现（不只是 G10 的事）**：探针在扇出形状上 `-race` **实测 DATA RACE**
+    （`receipt:7e8029a8-5ad6-4ce7-8de3-c4f3fb5c10a8` exit 1），根因是把**同一个可变 `*ExecutionContext`**
+    交给并发节点，与 §5 挂着未裁的 **`S19-STD-1`**（引擎交出的是调度器继续写入的那个累加器 map 本体）同源。
+    另有两处真实行为差：错误串丢 `[UNKNOWN] ` 前缀且报的是最后一个成功步、同名 step ID 被 `Validate` 拒绝
+    （切片 21 的重复名拒绝行与 workflow 的 step 命名习惯相冲）。**读法**：OPT-α 只换线性链故不引并发，
+    这两条在 α 下不成为缺陷；一旦走 β，`S19-STD-1` 就从「未裁的引擎内部取舍」变成「用户可见的数据竞争」。
+    因此 `S19-STD-1` 的裁决时机应提前到 G10 范围裁定同一轮，不排到它后面。
 
 ## 5. 本片仍带着的未裁决项（沿用，不借本审计变成已决）
 
