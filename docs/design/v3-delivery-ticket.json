@@ -320,39 +320,15 @@
       "work-p0b-runner-capability-adoption",
       "work-p0-stream-loop-consolidation",
       "work-p1-graph-engine",
+      "work-p2-node-policies",
+      "work-p3-send-durability",
       "work-p4-streammode",
+      "work-p5-event-hitl",
+      "work-p6-workflow-migration",
       "work-p7-observability",
       "work-p8-store"
     ],
     "blocked": [
-      {
-        "workItemId": "work-p2-node-policies",
-        "reason": "依赖 work-p1-graph-engine 未完成：节点策略需挂载在已存在的 Node 契约与 scheduler 上。",
-        "evidenceRefs": [
-          "artifact:docs/design/v3-platform.md#4"
-        ]
-      },
-      {
-        "workItemId": "work-p3-send-durability",
-        "reason": "依赖 work-p1-graph-engine 未完成：Send 派发与 Durality 均作用于 scheduler 调度路径。",
-        "evidenceRefs": [
-          "artifact:docs/design/v3-platform.md#6"
-        ]
-      },
-      {
-        "workItemId": "work-p5-event-hitl",
-        "reason": "依赖 work-p1-graph-engine 未完成：事件化需稳定的循环内核产出事件，Resume 需图引擎的节点状态机支撑。",
-        "evidenceRefs": [
-          "artifact:docs/design/v3-platform.md#9"
-        ]
-      },
-      {
-        "workItemId": "work-p6-workflow-migration",
-        "reason": "依赖 work-p1/p2/p3/p4 未完成：迁移目标必须是功能完整的引擎，否则需要二次迁移。",
-        "evidenceRefs": [
-          "artifact:docs/design/v3-platform.md#10"
-        ]
-      },
       {
         "workItemId": "work-p9-release",
         "reason": "依赖 work-p6/work-p7/work-p8 全部完成，v3.0.0 为收敛发布。",

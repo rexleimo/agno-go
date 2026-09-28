@@ -1,0 +1,497 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p8-store",
+  "activationId": "pending",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-28T07:52:00Z",
+  "contractRef": "docs/design/v3-test-scope-p8-g8-store.json",
+  "slice": 29,
+  "series": "P8 第 1 片（G8 Store 最小核，D2=OPT-a1 落地，2026-09-28 裁决关闭）",
+  "userGoal": "把 D2 裁决（OPT-a1：G8 Store 进 v3.0，收窄为「最小核 + 单一持久后端」）变成可运行的长期记忆存储能力：母约 §8 草图逐字落地为公共接口——Item{Key,Namespace []string,Value []byte,CreatedAt,UpdatedAt} 五字段不加不减、Store 五方法（Get/Put/Delete/List/Search）签名不变；(ns,key) 是存储唯一身份（同名 Key 跨 namespace 必须各自存在，对照裁决材料 §1.4 [A4] 在 vectordb.Document.ID 上的后写覆盖事故）；语义检索不自建任何 embedder 抽象，只**注入仓库现成的 vectordb.EmbeddingFunction**（pkg/hno/vectordb/base.go:59-65 的 Embed/EmbedSingle），且向量只能是「写入期算出的后端物理列」而不是 Item 的新字段；两个后端——内存实现 + 一个 Postgres 实现（对齐 pkg/hno/session/db/postgres 的**模式**，不复用它的代码、不 import session 类型）；Get/Delete 未命中沿用仓库既有 ErrNotFound 分类学并保证后端翻译驱动错误后 errors.Is 仍可归因；持久后端的 Search 在 v1 明确是「一次取行 + 应用层线性打分」，pgvector 留 v3.1 且以「迁移不得改变接口与 Item 形状」为可测判据；整片对存量的爆炸半径为零（Store 今日全仓零消费方，实测 0 处引用），裁决材料 §3 的七条边界一律钉成反向锚行。",
+  "whyThisSlice": "母约 §10 P8 行（docs/design/v3-platform.md:579）的验收是「长期记忆 + 与 knowledge/vectordb 分工清晰」，前置「决策 D2」已由负责人于 2026-09-28 裁 OPT-a1（材料 §4 登记），本片即其落地。为什么是最小核而不是母约全量（a2 的 vectordb 适配层）：裁决材料 §1.4 已把四包与草图的重叠面逐包对账——与 pkg/hno/knowledge 重叠**为零**（它只有 Loader/Chunker 摄取面，无存储无检索，本契约 M1 再次实测其 22 个顶层声明全是摄取面），与 pkg/hno/memory.Memory 结构性不可互换（无 context、无 error 返回、键是单个 userID、值是 *types.Message），pkg/hno/embeddings 三个 provider 全是现成的 EmbeddingFunction 注入件（只被用，不该被重造），真正相邻的只有 pkg/hno/vectordb 一个，而它的映射带四个表示损失点 + 一个身份冲突。把这些有损映射固化成公共承诺正是 §3 明令排除的。母约 :444「破坏性最强」按 M2 的零引用实测不成立，所以本片把「破坏性」的判据从**接口能否共存**改写成**边界有没有被顺手写进来**——由 D10（字节锚）+ D11（依赖与导出面的分工）两行反向锚担保。",
+  "measuredBeforeDesign": [
+    {
+      "id": "M1-相邻四包 + session/db 的导出面、量级与今日基线（仓库只读）",
+      "scene": "仓库 /Users/rex/codes/agno-go；测试只跑 pkg/hno/knowledge/... pkg/hno/vectordb/... pkg/hno/memory/... pkg/hno/embeddings/... pkg/hno/session/db/...，**绝未对 pkg/hno/graph 执行任何 test/build**（兄弟片在途领地，且其 TestP1R17_* 高负载偶发红不计入本片）；覆盖 profile 写在 /tmp/g8cover.out，不落仓库",
+      "commands": [
+        "go test ./pkg/hno/knowledge/... ./pkg/hno/vectordb/... ./pkg/hno/memory/... ./pkg/hno/embeddings/... ./pkg/hno/session/db/... -count=1",
+        "go test ./pkg/hno/knowledge/... ./pkg/hno/vectordb/... ./pkg/hno/memory/... ./pkg/hno/embeddings/... -count=1 -v",
+        "go test ./pkg/hno/knowledge/... ./pkg/hno/vectordb/... ./pkg/hno/memory/... ./pkg/hno/embeddings/... -count=1 -coverprofile=/tmp/g8cover.out",
+        "go vet ./pkg/hno/knowledge/... ./pkg/hno/vectordb/... ./pkg/hno/memory/... ./pkg/hno/embeddings/... ./pkg/hno/session/db/...",
+        "go doc -all ./pkg/hno/vectordb | ./pkg/hno/memory | ./pkg/hno/knowledge | ./pkg/hno/embeddings/openai",
+        "find pkg/hno/knowledge pkg/hno/vectordb pkg/hno/memory pkg/hno/embeddings pkg/hno/session/db/postgres -name '*.go' -not -name '*_test.go' | xargs wc -l"
+      ],
+      "observations": [
+        "基线绿：允许包 -count=1 全 exit 0（receipt:9006e3c6-7d92-4c1a-a948-9f84f5e83c8b）、-v exit 0（receipt:6a8079ed-c593-48c3-9f02-6e7be514eb14）、go vet 干净（receipt:fcb582b4-a6f3-44c7-87f6-bd59f64ada29）、-cover 总覆盖 48.3%（receipt:ef808fde-7135-409b-a0df-5bcce1696c0c，与裁决材料 §1.2 今日同值）。",
+        "量级（非测试行 / 测试行，receipt:23731552-929d-49d6-acbb-6355c7740973、af082c72-2d51-44d1-ba9f-2d86eb755080）：knowledge 529/303、vectordb 1064/581（base.go 87 行纯接口 + chromadb 706 + redisdb 271）、memory 168/239、embeddings 414/461、pkg/hno/session/db/postgres 482/226。四包非测试行合计 2,175——这是本片 LOC 的参照系。",
+        "导出面（receipt:7bba887e-efdf-452b-8e7b-7a0737a81f68、47d2799e-b82c-4328-b2bc-67c56b0e835a、98d7b32c-8523-46b7-a521-212de66741bc、bdea134a-c7e6-428d-b55d-8b720bfafb97）：vectordb 7 个顶层声明（VectorDB 10 方法、EmbeddingFunction 2 方法 Embed(ctx,[]string)/EmbedSingle(ctx,string)、Document/SearchResult/DistanceFunction/CollectionMetadata）；memory 8 个（Memory 4 方法 + InMemory + NewInMemory + 方法）；knowledge 22 个，**全部是摄取面**（Loader.Load() ([]Document,error) @document.go:29、Chunker.Chunk(Document) ([]Chunk,error) @chunker.go:13 + 5 个具体类型），无存储、无检索、无 KV；embeddings/openai 7 个（Config/OpenAIEmbedding/New/Embed/EmbedSingle/GetDimensions/GetModel）。三个 provider 都实现 vectordb.EmbeddingFunction（sentencetransformer.go:70 有显式 var _ 断言）→ 注入件成立，Store 无理由另起抽象。",
+        "仓库里现存的 RAG 检索服务不在 pkg/hno，而在 pkg/agentos.KnowledgeService（knowledge_handlers.go:23 持 embeddingFunc vectordb.EmbeddingFunction、:97 NewKnowledgeService(vdb VectorDB, embFunc EmbeddingFunction, config)）→ 「Store 也做检索服务」就是把这一层再写一遍，属本片禁区。",
+        "诚实读数 ①（继承并今日复核、并修正口径）：48.3% 里含假绿。原始 -v 输出实测 **31 个顶层 --- PASS + 15 个子测试 PASS + 7 个 --- SKIP**（receipt:1036715e-1ebd-4a4c-ad26-deaeb23cfa09 逐包：knowledge 9/0、chromadb 4/6、memory 9/0、openai 6/1、sentencetransformer 1/0、vllm 2/0），7 个 skip 恰等于 chromadb_test.go:113/147/227/295/366/444 的 6 处 t.Skip(Requires running ChromaDB instance) + openai_test.go:282 的 OPENAI_API_KEY 门控（receipt:4d4378fb-04c9-4e34-bf57-8615094d1ef5 的同类实测）。口径差异登记：裁决材料 §1.2 的「30 个测试通过」是回执工具按测试名**去重**后的计数（TestNew 在 chromadb 与 openai 各一次，被并为一条），原始顶层计数是 31——两者不矛盾，本契约以原始计数为准。",
+        "诚实读数 ②：pkg/hno/vectordb/redisdb 的 redis.go:1 与 redis_test.go:1 **都**挂 //go:build redis（receipt:4d4378fb-04c9-4e34-bf57-8615094d1ef5 实测），上述基线根本没编译它。结论落进契约：本片任何「与向量库互操作」的断言在仓库内不可测，故 a2 适配层不进 v3.0（explicitNonGoals 第 2 条），且本片后端测试一律不依赖真服务。"
+      ]
+    },
+    {
+      "id": "M2-零消费方与包名占位的独立复核（本片对存量字节是否零破坏的前提）",
+      "scene": "仓库只读 grep + go build + 邻近包测试",
+      "commands": [
+        "grep -rn hno/store --include=*.go pkg internal cmd examples benchmarks | wc -l",
+        "ls -d pkg/hno/store",
+        "grep -rn '^package store' --include=*.go pkg internal cmd",
+        "go build ./...",
+        "go test ./pkg/hno/agent/... ./pkg/agentos/... -count=1",
+        "grep -n 'memory\\.' pkg/hno/agent/agent.go pkg/hno/agent/config.go"
+      ],
+      "observations": [
+        "对 pkg/hno/store 的引用实测 **0 处**、目录不存在（receipt:1260d167-c67b-4916-b626-929220beb403）→ 「Store 是全新包、对存量零破坏」今日复核成立（裁决材料 §1.3 的结论未被后续切片改变）。go build ./... exit 0（receipt:61ab16d3-ffaf-40b1-9e9a-e327e1fcbb2c）、pkg/hno/agent 与 pkg/agentos 测试 exit 0（receipt:423e9511-a5e0-4c92-9465-ad03c67d9c68）→ 反向锚的今日基线成立。",
+        "agent 的 Memory 面今日逐字仍在原位：pkg/hno/agent/agent.go:37 「Memory memory.Memory」、config.go:23 同名字段、config.go:71 「config.Memory = memory.NewInMemory(100)」（实测 grep 行号与裁决材料 :37/:23/:71 完全一致）→ 「Store 不自动接线 agent」是一条**有具体行号可锚**的禁令，不是空话。",
+        "但 package store 已被占用：全仓唯一一处是 internal/session/store/store.go:1，且它自带同名 Store 接口（UpsertSession/ListSessions/GetSession/DeleteSession/RenameSession，:26-32）与同名 ErrNotFound（:9）（receipt:1260d167-c67b-4916-b626-929220beb403）。Go 允许同短名异路径共存（internal/ 在 module 外不可 import，无编译冲突），但 cmd/agentos-session/main.go:16-17 已经在同一 import 块里并存 store 与 postgresstore 两个 store——再加第三个，「看名字猜不出是哪个 store」会成为常态。→ 包名/落位本身是**待裁决项 ADJ-1**，本契约不自拍（designConsequence 第 1 条只登记未裁前的暂记默认）。"
+      ]
+    },
+    {
+      "id": "M3-「模式对齐 pkg/hno/session/db/postgres」到底指什么（读码 + 它的测试实跑）",
+      "scene": "读 pkg/hno/session/db/{postgres,sqlite} 与 internal/session/store/postgres 的既有 schema/连接/迁移约定，并实跑其测试",
+      "commands": [
+        "go test ./pkg/hno/session/db/postgres -count=1 -v",
+        "go test -race ./pkg/hno/session/db/postgres -count=1",
+        "go test -race ./internal/session/store/postgres -count=1",
+        "grep -rn 'CREATE TABLE' scripts deploy pkg/hno/session internal --include=*.sql --include=*.go | grep -v _test.go",
+        "grep -n 'jackc/pgx' internal/session/store/postgres/store.go ; grep -n 'database/sql' pkg/hno/session/db/postgres/storage.go ; grep -n 'lib/pq|jackc/pgx|go-sqlmock' go.mod"
+      ],
+      "observations": [
+        "仓库里有**两套** Postgres 持久化模式，必须先选边（receipt:13b63823-9087-4ab6-832f-c33ae45089b1）：① pkg/hno/session/db/postgres 用 database/sql + 调用方注入 *sql.DB（storage.go:63 字段、:76-129 NewStorage(db *sql.DB, opts ...Option)）；② internal/session/store/postgres 用 pgx/v5 + pgxpool + DSN 解析（store.go:11-13 import、:43-53 pgxpool.ParseConfig/NewWithConfig、:343/:390 pgx.ErrNoRows 翻译）。母约 :476 说的是「复用现有 session/db 的 5 种后端之一（建议 Postgres）」= ①。",
+        "决定性实测差异（可测性）：go test -race ./pkg/hno/session/db/postgres **ok**（receipt:2a18c289-121b-4a11-a595-e155939ce777）；go test -race ./internal/session/store/postgres 本机 **build failed**（pgx→net→cgo，Security.tbd 链接错误，exit 1，receipt:8aa037da-fc0f-426f-834d-3fa5dd66f8ca——与切片 28 契约 notes 登记的环境事实同因，本片独立复现）。→ 选 ① 的直接后果是**本片的 -race 能做硬门禁**，选 pgx 侧模式则继承一条环境性红。",
+        "「模式复用」的可抄清单（逐条 file:line 实测，共 8 条）：Config + 函数式选项 WithSchema/WithTable（:20-59）；identifierPattern ^[a-zA-Z0-9_]+$ 校验后拼带引号的 qualified name（:18、:432-448——表名走 fmt.Sprintf 进 SQL，这条校验是唯一注入防线，必须照抄）；显式列名串 + $n 占位符生成器（:95-109、:424-430）；ON CONFLICT DO UPDATE 且 created_at = COALESCE(旧, EXCLUDED)、updated_at = EXCLUDED（:277-298）；驱动错误翻译为**包内哨兵**（errors.Is(err, sql.ErrNoRows) → session.ErrSessionNotFound，:149-151；RowsAffected()==0 → 同款，:184-187）；可空/JSON 列用 sql.NullString + decodeJSON + bytesOrNull（:343-422）；Close() 用 errors.Join 归并 writer 与 db 的错误（:232-245）；测试用 github.com/DATA-DOG/go-sqlmock（storage_test.go:11）。",
+        "「模式复用 ≠ 代码复用」的实测边界：session.Session 是 13 列行状 JSONB（postgres/storage.go:95-109 列清单）、batch.BatchWriter 服务的是 BulkUpsertSessions 迁移通道（:248-257）、session.Storage 是会话作用域接口——三者与 (ns,key) 条状长期记忆不同构；import 它们就是把 §1.5 第 6 条说的「误把模式当代码」写进依赖图。session/db 五后端（postgres 482 / sqlite 487 / mongo 400 / surreal 569 / batch 372 非测试行）也**不选第二个**——母约只要求「之一」，OPT-a1 取 Postgres。",
+        "DDL/迁移的既有约定（决定 Store 建表落在哪）：Postgres 侧**不在代码里跑迁移**，CREATE TABLE 只双份维护在 scripts/migrations/001_agentos_sessions.sql 与 deploy/helm/agno-agentos/files/001_agentos_sessions.sql（列 + 5 个索引 + IF NOT EXISTS）；in-code 建表只有 sqlite 的 ensureSchema（sqlite/storage.go:321-341）一处（receipt:10378233-592a-4104-a2c5-914390b16a50）。→ Store 的表定义按同样双份落（scripts/migrations/00N_agentos_store.sql + helm 镜像），sqlite 式 in-code 建表不跟。",
+        "可测性实测：go test ./pkg/hno/session/db/postgres -count=1 -v 是 **8 个 --- PASS、0 个 skip**（receipt:d9b4440e-e0e1-4298-8168-ee18bdcb6d92，含 TestGet_NotFound 这条未命中翻译的先例）→ sqlmock 路线能在无 Docker/无 live PG 的环境把持久后端测到 code-organization.md §7 要求的覆盖率（对照 M1 的 chromadb 11.8% 是怎么来的：7 个 skip）。"
+      ]
+    },
+    {
+      "id": "M4-可行性与量级实验：§8 草图逐字落进 /tmp/g8probe（仓库字节只读）",
+      "scene": "/tmp/g8probe（module g8probe + replace github.com/rexleimo/agno-go => /Users/rex/codes/agno-go）：store/item.go 逐字抄 §8 的 Item/Store、store/errors.go 7 个哨兵、store/namespace.go 校验与规范编码、store/memory.go 内存后端（含写入期嵌入）；假嵌入件实现**仓库真实接口** vectordb.EmbeddingFunction；cmd/probe 36 个观察面 + 3 组量级读数；store/store_test.go 11 个 Test 预演 D 行形状",
+      "commands": [
+        "go -C /tmp/g8probe vet ./...",
+        "go -C /tmp/g8probe test ./store -count=1",
+        "go -C /tmp/g8probe test ./store -count=1 -race",
+        "go -C /tmp/g8probe run ./cmd/probe"
+      ],
+      "observations": [
+        "草图可落地且可测：vet 干净（receipt:5decb9b2-f17d-4c02-b4e6-a053ef458bce）、测试 exit 0（receipt:9bf3df34-a2a2-4c2d-88d7-8595855a3a15）、**-race exit 0 无 DATA RACE**（receipt:a84deaf4-11e3-4e08-aadb-649647089b82）、探针 **36 个观察面全绿 0 红 + 3 组量级读数**（receipt:29c9d946-2a19-492d-b6ed-f617a2aabf86；[ok] 计数 36、[FAIL] 0，receipt:e8a17302-b84c-4949-ae44-59e1a8fa1990）。",
+        "[A1] 注入真实接口跑通五方法：var emb vectordb.EmbeddingFunction = &Fake{} → Put/Get/List/Search/Delete 全链路往返，Get 回来的 Value 字节与写入一致；var _ Store = (*MemoryStore)(nil) 编译期成立。",
+        "[A3] 母约 §1.5 第 1 条的定形依据：反射实测 Store 方法数 == 5；embedder 传 nil 时 Get/Put/Delete/List 照常工作、**Search 返回 ErrNoEmbedder（fail-closed）**——即「需 Embedder」这句注释在接口形状里装不下，唯一诚实的落点是构造器注入 + 缺件时点名报错。",
+        "[A2] 错误分类学可用：Get/Delete 未命中都是 errors.Is(err, ErrNotFound)；后端包装串（fmt.Errorf(postgres: query: %w)）后 errors.Is 仍可归因；与 pkg/hno/session/db/postgres/storage.go:149 的 sql.ErrNoRows→哨兵翻译同构（M3）。",
+        "[A4] 身份语义实测：同一 Key likes 在 (users,alice) 与 (users,bob) 下各自独立存在（List 各返 1 条）——对照裁决材料 §1.4 [A4] 在 vectordb.Document.ID 上的后写覆盖（Count=1）；而 strings.Join(ns,\".\") 压平会把 [a.b,c] 与 [a,b.c] 撞成同一个 a.b.c（实测打印），长度前缀 + 保留分隔符（U+001F）编码不撞 → **规范编码与 (ns,key) 身份是契约语义，不是实现细节**。",
+        "[A5] upsert 时间戳实测：二次 Put 同 (ns,key) 行数仍 1、CreatedAt 逐值不变、UpdatedAt 刷新、Value 覆盖——与 session/db/postgres:288/:294 的 COALESCE/EXCLUDED 语义同值（M3 抄的就是它）。[A13] 嵌入件失败的 Put 上交错误且**不留半截行**（Get 仍 ErrNotFound）。",
+        "[A6]/[A7] 检索面两处矛盾可观测：Search 命中按相似度降序（实测 0.5345 > 0.5000）、top-k 长度 == min(k,命中数)、k<=0 报 ErrInvalidSearch、k>命中数返全部；但母约签名 []*Item 里**没有 score**，调用方看得到排序看不到相似度（发现项 ADJ-5）。非法 UTF-8 的 Value 能字节恒等往返，嵌入对它无意义——得分 0 却**仍占 top-k 名额**，且不返回分数就无法识别 → §1.5 第 5 条（文本 vs 二进制）不是措辞洁癖，是行为差异（挂 ADJ-4）。",
+        "[A8] List 无分页是真问题：一次 List 实测返回全量 500 条（142.334µs、全量物化、且接口不承诺顺序时调用方还得自己排）；把上限设为 100（对齐 agentos KnowledgeServiceConfig.MaxLimit=100 的先例）则**静默**截断为 100——返回值里没有任何「还有更多」的信号 → §1.5 第 4 条挂 ADJ-3，且三候选一律排除「静默截断」。",
+        "[A9] 嵌入调用数（本契约最重要的一条量级实测）：写入期派生向量的实现 = 200 条 Put 触发 200 次调用、随后 10 次 Search 只多 **10** 次（查询嵌入 O(1)，与存量行数无关）；读取期逐条重嵌的对照实现 = 同样 10 次 Search 触发 **2010** 次调用（10×(1+200)）。→ 持久后端 v1 只有一种诚实形状：**向量是 Put 时算出的物理列，Item 不加字段**（钉成 D7 的可测判据，不是备注）。",
+        "[A10] 换嵌入件（维度 32→16）后 Search 报 ErrDimensionMismatch，不静默返回乱序——「一个 Store 实例绑一个 EmbeddingFunction」是运行期可守的边界。[A11] 线性打分地面真值（1536 维 = KnowledgeServiceConfig.EmbeddingDimensions 默认，5 次取 min/median）：**N=1,000 → best 3.146ms / median 3.657ms（3.66µs/条）；N=5,000 → 10.615/10.832ms（2.17µs/条）；N=10,000 → 24.109/24.705ms（2.47µs/条）、堆占用 69MB（其中向量字节 ≈61MB）** → D9 的 pgvector 立项判据按这条实测写。[A12] 层级语义同签名两答案：List([users,alice]) 精确匹配返 1 条、前缀匹配返 2 条（挂 ADJ-2）；空 namespace 可作根层，空段拒绝。",
+        "结构量级实测（receipt:7815d128-62b1-4768-9863-2d9c29f5822e、33c9d168-f2ec-468d-ac0e-101aa93bdc53）：产品形状 = **376 非测试行 / 约 20 个导出名**（item.go 30 + errors.go 14 + namespace.go 100 + memory.go 产品段 232；探针专用对照面另 96 行不入库：ReadTimeEmbedStore/ListAll/ListPrefix/SetEmbedder/SetMaxResults/ScoredSearch/MethodCount），D 行测试预演 233 行 / 11 个 Test。→ LOC 校准：内存面 376 + Postgres 后端（482 行 session 侧收窄：13 列→6 列、无 batch writer、无 ListByXxx 变体）250–350 + 测试（仓库配比 memory 168:239≈1:1.42、探针实测 376:233）450–600 = **合计 ≈1,080–1,330 行**，与母约 :86 的 ~1,200、材料 §2 的 1,000–1,300 同区间（上沿 30 行差额来自材料未单列的 namespace 校验面）。",
+        "既有硬工程规则对本片的两处直接约束（实测自 docs/design/code-organization.md §3/§5/§7，非本片新造）：① 单文件 ≤500 行 → 包必须分文件（探针按 30/14/100/232 分四文件已合规）；② 规则 7「隐式 LLM 调用禁止；可选项显式开启且可观测」→ **每条 Put 都是一次真实模型调用**（草图只有单条 Put、无批量面；[A9] 实测 200 条 = 200 次调用），而仓库既有的向量库写入面是整批一次 Embed（chromadb/chromadb.go:217）→ 批量面是否进 v3.0 是**发现项 ADJ-6**，本契约不自拍，但把它做成可测代价（D7 的调用数断言）而不是不可见的实现细节。",
+        "过程披露（无一条静默丢弃）：① [A9] 第一版把 100 条上限留在了对照实现的 List 上，会把读取期重嵌误测为 10×(1+100)=1010 而非 2010——发现后给两个实现同时解除上限（SetMaxResults(0)）才拿到上表数字；这是本探针唯一一次自我纠错，发生在取回执之前，故未留下红回执。② lessDeterministic 早期版按 Namespace[0] 排序，根层（空 namespace）条目会越界 panic——**静态发现**并改为定长段比较 + Key 兜底，未取到 panic 回执（诚实归类：改在首跑之前，不是观察到的失败）。③ 首稿 [A10]/[A13] 引用了当时还不存在的探针辅助（RowsFor/rowErr），在编译前重写为「换嵌入件 + 维度断言」的真实形状，未产生失败回执。④ 探针全程不改仓库字节：go mod tidy 只写 /tmp/g8probe/go.sum，覆盖 profile 写 /tmp；结束前 git status --porcelain 自证（见 notes）。⑤ 未跑 pkg/hno/graph 的任何 test/build（红线）。"
+      ]
+    }
+  ],
+  "designConsequence": "七条语义在本片定形（除点名挂裁决者外，M4 探针已按此实现并实测）：（1）**落位与命名（暂记，随 ADJ-1 回填）**：公共面落 pkg/hno/store（包名 store，与 internal/session/store 同短名异路径——M2 实测它带同名 Store 接口与同名 ErrNotFound，Go 层合法、阅读层有代价）；后端子包 pkg/hno/store/postgres（对齐 session/db/postgres 的分层）；构造器按 code-organization.md §5 与仓库先例：NewMemoryStore(emb vectordb.EmbeddingFunction) *MemoryStore、NewStorage(db *sql.DB, emb vectordb.EmbeddingFunction, opts ...Option) (*Storage, error)（参数数 3，规则 2/3 合规）；Item 与 Store 的字面逐字取母约 :450–465，**不加字段、不加方法、不改签名**（D1 形状锚）。（2）**嵌入注入面**：只认 vectordb.EmbeddingFunction（base.go:59-65），包内不得声明任何 embedder/向量/相似度类型；嵌入只发生在两处——Put（写入期，每条目一次）与 Search（查询一次，[A9] 实测 O(1) 于存量行数）；nil 注入时四个非检索方法照常、Search fail-closed 报 ErrNoEmbedder（[A3]）；向量是后端物理列（Postgres 侧 BYTEA/JSON 数值数组，非 pgvector），**不进 Item**。（3）**身份与错误**：(ns,key) 是唯一身份，规范编码必须无碰撞（长度前缀或段内保留分隔符 U+001F），naive '.' 压平禁用（[A4]）；错误分三类且互相可区分——未命中 ErrNotFound（包内哨兵，落 internal/session/store/store.go:9 的先例）、参数非法 ErrInvalidNamespace/ErrInvalidKey/ErrInvalidItem、检索请求非法 ErrInvalidSearch/ErrNoEmbedder/ErrDimensionMismatch；后端实现必须把驱动错误翻译成包内哨兵（sql.ErrNoRows→ErrNotFound、RowsAffected()==0→ErrNotFound，逐字对齐 pkg/hno/session/db/postgres/storage.go:149/:184），且包装后 errors.Is 仍可达（[A2]）；Delete 未命中**上报** ErrNotFound（不静默 no-op，同 :184-187 先例）。namespace 的取值细节（合法字符集/深度/空段）与层级匹配语义（精确 vs 前缀）挂 **ADJ-2**，未裁前 D4 只钉「跨 ns 同名共存 + 编码无碰撞 + 三类错误可区分 + 空段拒绝 + 根层合法」这五件在所有候选下都成立的事。（4）**值语义**：Value []byte 逐字保留（母约字面），字节恒等往返是硬判据（[A7]）；非 UTF-8 值在检索中的处置挂 **ADJ-4**；母约 Item 的注释写「带元数据」而结构体里没有 Metadata 字段——这是草图自身的第二处自相矛盾（第一处是 §1.5 第 5 条的 Value），v1 以**结构体字面为准、不加字段**，措辞不一致进 writeBackOwed 请母约修文案。（5）**写入语义**：Put = upsert（CreatedAt 写一次、UpdatedAt 每次刷新、Value 覆盖，[A5]），无 Update（草图没有，upsert 已覆盖）、无 CAS/版本/条件写、无 TTL（并发写同一 (ns,key) 的胜者由后端决定，本片不承诺解决策略，见 observabilityLimit）；嵌入或后端失败时不得留下半截行（[A13]）。（6）**检索与列取形状**：Search 钉死为「按相似度降序、top-k = min(k,命中数)、k<=0 报 ErrInvalidSearch 而非返回全量、两次同输入序一致」（[A6]/[A8]）；List 的「无分页/无过滤」是**已知缺陷而非本片承诺**——契约只钉跨候选恒成立的三件（同输入两次调用序一致、返回集 = 按裁定语义匹配的集合、**不得静默截断而不留信号**），分页/上限形状挂 **ADJ-3**，是否回传相似度分数挂 **ADJ-5**；批量写入面挂 **ADJ-6**（它直接冲撞「五方法」这条形状锚）。（7）**持久后端 v1 形状与 pgvector 的位置**：Postgres 后端照 M3 的 8 条模式清单实现，**不 import** pkg/hno/session、pkg/hno/session/db/*、internal/session/*，DDL 走 scripts/migrations/00N_*.sql + deploy/helm/*/files/ 双份（既有约定），测试走 go-sqlmock（M3 实测该路线 8 PASS / 0 SKIP 且 -race 可链接，故选 database/sql 而非 pgx——pgx 侧在本机 -race 直接 build failed）；Search 在 v1 = 一次 SELECT 取 ns 内 (key,value,vector) + 应用层余弦（[A9] 的 O(1) 调用数担保「不做读取期重嵌」、[A11] 的量级担保「线性打分什么时候不够」），**pgvector 不建**，且 v3.1 加向量索引时不得改变 Store/Item 形状（D9 写成可测判据）。分工表以实测改写后进 D11：knowledge 没有存储能力，真正与 Store 分地盘的是 vectordb（底座）与 agentos.KnowledgeService（检索服务面），母约 :473 那行「knowledge 是非结构化文档」对的是一个没有存储面的包。",
+  "redProtocol": "两段制。第一段落公共面（pkg/hno/store 的 Item/Store/7 个哨兵/NewMemoryStore/MemoryStore 五方法 + namespace 校验与规范编码），D1–D7、D11 按今天的形状**真实判红**：今天 pkg/hno/store 目录不存在、全仓 0 处引用（M2 receipt:1260d167），未命中无从发生、(ns,key) 共存无从发生、打分往返无从发生，全部是行为红而非编译红（唯一允许的编译红是新包落地前的引用错，落地后立即转行为红）；D10（字节锚 + 零接线）与 D8/D9 的反向半边（不 import session、不建 pgvector）是不变量/反向锚行，两段都应绿，其牙齿由变异矩阵提供。第二段落持久后端（pkg/hno/store/postgres 的 sqlmock 面 + DDL 双份文件 + Search 的「取出+线性打分」）转绿：D8/D9 在 mock 驱动下第一段就能建立并判红（mock 未命中不翻译哨兵、读取期重嵌、把向量塞进 Item、DDL 未双份落 都是行为红）。两段各自留 receipt，两段之间测试文件零改动。M4 探针即第一段落全部行 + 第二段落形状（线性打分量级、调用数判据）的完整预演。",
+  "acceptanceMapping": [
+    {
+      "row": "D1",
+      "behavior": "母约 §8 草图形状恒等（OPT-a1 的「最小核」字面）：Item 恰五字段 Key/Namespace []string/Value []byte/CreatedAt/UpdatedAt（无 Metadata、无 Embedding、无 Score、无 Revision）；Store 恰五方法且五个签名逐字不变；两个后端（内存 / Postgres）各在编译期断言 var _ Store = ...；任何 v3.1 扩展（pgvector、分页、批量、分数返回）**不得**以改这个形状的方式落地",
+      "publicEntry": "反射 + 编译期断言 + 结构体字段名/类型串比对（go doc -all ./pkg/hno/store 的导出面）",
+      "assertion": "reflect.TypeOf((*Store)(nil)).Elem().NumMethod()==5 且五个方法签名串 == 草图字面；Item 字段数==5 且 Value 的 reflect.Kind==Slice/Uint8（探针 M4 [A3] 实测方法数 5 即此判据的可行性担保）；实现前此行为不存在（包不存在）→ 红",
+      "independentlyFailable": "对给 Item 加 Embedding/Metadata 字段、把方法改名或加参数、加第 6 个方法（批量 Put 即 ADJ-6）却未走契约变更的实现判红——ADJ-2/3/5/6 任一裁定要扩面时，必须先在写回里把本行改成裁定后的字面并登记为「对母约草图的一次显式变更」"
+    },
+    {
+      "row": "D2",
+      "behavior": "嵌入件是注入的仓库现成抽象，不是新造的：构造器收 vectordb.EmbeddingFunction（base.go:59-65）；缺件（nil）时 Get/Put/Delete/List 照常、Search fail-closed 返 ErrNoEmbedder；包内不声明任何 embedder/向量/相似度类型；三个既有 provider（openai/sentencetransformer/vllm）不改一行即可注入",
+      "publicEntry": "NewMemoryStore(emb)/NewStorage(db, emb, opts...) × 假实现 × 编译期 var _ vectordb.EmbeddingFunction 断言",
+      "assertion": "探针同款：var _ vectordb.EmbeddingFunction = fake{} 编译通过 + [A1] 五方法往返 + [A3] 无 embedder 时 Search 的 errors.Is(ErrNoEmbedder) 为真、其余四方法 nil 注入照常（实现前必红）",
+      "independentlyFailable": "对自建 Embedder/Embedding 接口（第二个嵌入抽象）、把 embedder 做成可写字段以便运行期偷换、或 nil 时 Search 静默返回空集的实现判红"
+    },
+    {
+      "row": "D3",
+      "behavior": "错误分类学（§1.5 第 3 条定形）：Get/Delete 未命中 → 包内哨兵 ErrNotFound；参数非法 → ErrInvalidNamespace/ErrInvalidKey；检索请求非法 → ErrInvalidSearch；三者互不可混淆；后端必须翻译驱动错误（sql.ErrNoRows / RowsAffected()==0 → ErrNotFound），包装后 errors.Is 仍可归因；后端自身故障不被伪装成未命中",
+      "publicEntry": "Store 接口 × errors.Is × sqlmock（期望查询返回 ErrNoRows 与期望 Exec 失败两夹具）",
+      "assertion": "errors.Is(Get(missing), ErrNotFound) && errors.Is(Delete(missing), ErrNotFound) && !errors.Is(err, ErrInvalidNamespace)（分类互斥）；mock 后端错误路径上 Is(后端错误) 且非 ErrNotFound（实现前必红；M3 实测 session 侧同款翻译先例 storage.go:149/:184 与 TestGet_NotFound 通过，故 mock 夹具够用）",
+      "independentlyFailable": "对未命中返回 (nil,nil)、把未命中伪装成非法参数、把驱动/网络错误翻译成 ErrNotFound、或裸传 driver.ErrBadConn 的实现判红"
+    },
+    {
+      "row": "D4",
+      "behavior": "(ns,key) 复合身份与 namespace 规范编码（§1.5 第 2 条的可裁无关子集）：同一 Key 在不同 namespace 下各自独立存在，Put/Get/Delete/List/Search 一律按 (ns,key) 精确寻址；规范编码无碰撞（长度前缀或段内保留分隔符 U+001F），naive '.' 压平禁用；空段/超深/超长/含保留符 → ErrInvalidNamespace；空 namespace（根层）合法可读写",
+      "publicEntry": "Store 接口 + 导出的规范编码/校验面（探针 Composite/ValidateNamespace 同形）",
+      "assertion": "探针实测：users/alice/likes 与 users/bob/likes 共存（List 各 1 条、值不互覆）+ Composite([a.b,c],k) != Composite([a,b.c],k) + JoinedNaive 两者相等（反向证明压平必撞）+ 空段 Put 返回 Is(ErrInvalidNamespace) + 根层 Put/Get 往返成功（实现前必红）。对照裁决材料 §1.4 [A4]（vectordb.Document.ID 上后写覆盖、Count=1）——那条事故正是**不**钉本行的后果",
+      "independentlyFailable": "对只按 Key 寻址（跨 ns 相互覆盖）、把 ns 用 '.'/':' 裸拼成键、或静默丢弃空段/超长段的实现判红；层级匹配语义（精确 vs 前缀）本身不属本行，挂 ADJ-2"
+    },
+    {
+      "row": "D5",
+      "behavior": "Put 的 upsert 与时间戳语义：同 (ns,key) 二次 Put 不新增行、CreatedAt 写一次保持、UpdatedAt 刷新、Value 覆盖；Value 字节恒等往返（含非法 UTF-8）；嵌入或后端写入失败时不留半截行且错误上交",
+      "publicEntry": "Store.Put/Get/List × 时间戳读数 × 失败注入夹具（假 embedder 报错 + sqlmock 期望 Exec 失败）",
+      "assertion": "List 计数==1 && got.CreatedAt 两次逐值相等 && second.UpdatedAt.After(first.UpdatedAt) && string(got.Value)==原字节（[A5]/[A7] 实测全绿）；失败注入后 Get 仍 Is(ErrNotFound)（[A13]）。不断言墙钟具体值，只断「写一次 / 刷新 / 单调」",
+      "independentlyFailable": "对二次 Put 追加新行、每次 Put 重打 CreatedAt（丢历史）、把调用方传入的零值时间戳当成有效值存下、或失败时留下空行的实现判红"
+    },
+    {
+      "row": "D6",
+      "behavior": "Search 打分往返与 k 语义：注入嵌入件后按相似度降序返回、top-k 长度 == min(k, 命中数)、k<=0 报 ErrInvalidSearch（不静默返回全量）、k>命中数返回全部、两次同输入序完全一致（确定性）、Search 只读（不写任何状态、不改 UpdatedAt）",
+      "publicEntry": "Store.Search × 假嵌入件（确定性词袋）× 语义可判别的夹具集合",
+      "assertion": "语义断言：查 coffee espresso 时 coffee 类事实排在 running/jazz 之前（[A6] 实测 keys=f4,f1）；k=0/负 → Is(ErrInvalidSearch)；k=999 → 命中全部 4 条；同参数两次调用返回的 Key 序列逐位相等；Search 后再 Get，UpdatedAt 不变（实现前必红）",
+      "independentlyFailable": "对用 map 迭代序返回、把 k<=0 当「返回全部」、按关键词字符串匹配（LIKE/strings.Contains）冒充语义打分、或 Search 顺带刷 UpdatedAt/写回向量的实现判红"
+    },
+    {
+      "row": "D7",
+      "behavior": "向量是写入期派生物理列，不是 Item 字段，且**查询代价与存量行数无关**（§1.5 第 1/5 条与 [A9] 的合流）：每次 Search 恰触发 1 次嵌入调用（只嵌 query），调用数不随 namespace 内行数增长；实现不得在读取期逐条重嵌 Value；维度不一致 → ErrDimensionMismatch 上交（不静默乱序）；本行不规定单条 Put 的调用数期望（那随 ADJ-6 裁定变），只钉「1 次/条目」为 ADJ-6 未裁前的实测值",
+      "publicEntry": "计数型嵌入件夹具（calls/texts 计数器）× Put 循环 × Search × 换维度夹具",
+      "assertion": "判据可测：m=200 条存量 + 10 次 Search 的嵌入调用数 == 200 + 10（写入期形状，探针 [A9] 实测）；对照实现（读取期重嵌）同参数得 2010 —— **该对照实现被本行判红**（探针里以 ReadTimeEmbedStore 真实存在并跑出 2010，不是推演）；调用数对 m 做二倍（200→400）时 Search 侧增量恒为 0；换 16 维件后 Search 返回 Is(ErrDimensionMismatch)（[A10]）",
+      "independentlyFailable": "对读取期重嵌（O(m) 模型调用/查）、把向量塞进 Item 或导出 Embedding 字段、维度不一致时静默按短向量截断比较、以及「Search 内部偷偷再嵌入条目」的实现判红"
+    },
+    {
+      "row": "D8",
+      "behavior": "Postgres 后端只复用模式不复用代码（§1.5 第 6 条定形 + M3 的 8 条清单）：database/sql 的 *sql.DB 由调用方注入（不走 pgx、不解析 DSN）；Config + WithSchema/WithTable 函数式选项；标识符走 ^[a-zA-Z0-9_]+$ 校验后拼带引号 qualified name（表名进 SQL 的唯一注入防线）；显式列名 + $n 占位符；ON CONFLICT DO UPDATE 且 created_at = COALESCE(旧, EXCLUDED)/updated_at = EXCLUDED；驱动错误翻译为包内哨兵；Close() 用 errors.Join 归并；DDL 落 scripts/migrations/00N_*.sql 并在 deploy/helm/*/files/ 镜像（不在代码里跑迁移）；不 import pkg/hno/session*、internal/session*、pkg/hno/vectordb 的 VectorDB",
+      "publicEntry": "go-sqlmock 夹具（同 pkg/hno/session/db/postgres/storage_test.go 的做法）× Store 接口全五方法 × import 与 grep 判据",
+      "assertion": "sqlmock 下五方法往返 + 未命中翻译 + 注入型非法表名被拒（非法 schema/table 报点名错误）；go test ./pkg/hno/store/postgres -count=1 -race exit 0 且 **0 个 skip**（M3 实测同路线 8 PASS/0 SKIP，故可达）；grep 判据：pkg/hno/store 下 pgx/pgxpool/DSN import == 0、session 类型 import == 0（实现前必红：后端尚不存在）",
+      "independentlyFailable": "对改用 pgx/pgxpool（继承本机 -race build failed 的环境性红，M3 receipt:8aa037da）、把表名裸拼进 SQL 绕过标识符校验、在代码里 CREATE TABLE（跟 sqlite 的 ensureSchema 而不是 migrations 双份）、或复用 batch.BatchWriter/session.Storage 的实现判红"
+    },
+    {
+      "row": "D9",
+      "behavior": "Search 在持久后端的 v1 形状 = 「一次取行 + 应用层线性打分」，pgvector 是 v3.1 的事且以本行为立项门槛（判据，不是备注）：① v1 每次 Search 对 DB 的读取往返 ≤1 次 SELECT 取 ns 内 (key,value,vector) 行（不做逐行 SELECT、不做读取期重嵌，与 D7 合流）；② 本片**不建** pgvector 列/扩展/相似度索引；③ 形状不变量：v3.1 引入原生向量索引（pgvector 或等价）时，Store 接口与 Item 结构**逐字不变**（迁移只动后端内部 + DDL），因此 D1 是本行的前置锚；④ 立项触发条件明写：当单个 namespace 行数进入 10^4 量级（M4 实测地面真值：1536 维线性打分 median 24.7ms、需把 ≈61MB 向量字节移入进程、堆占用 69MB；N=1,000 median 3.7ms、N=5,000 10.8ms）即视为越过阈值，pgvector 从 explicitNonGoal 升级为必须并另立契约",
+      "publicEntry": "sqlmock 期望的查询次数/行数 × go doc 的导出面 × 锚点 grep（CREATE EXTENSION/vector 列名）× 探针量级读数",
+      "assertion": "mock 断言一次 Search 只发生一次 rows 查询；grep 判据：pkg/hno/store/** 与 scripts/migrations/00N_*.sql 中 'vector(' / 'CREATE EXTENSION' / '<=>' / 'ivfflat' / 'hnsw' 命中 0；D1 的形状反射断言在实现前后同值（迁移不变量的今日基线）；量级读数不进断言、进 observabilityLimit（[A11]）",
+      "independentlyFailable": "对偷偷预置 pgvector 依赖（越界做 v3.1）、用 SQL 关键词匹配（ILIKE/to_tsquery）冒充语义检索、把打分下推成未裁决的数据库扩展、或为了「性能」改 Search 签名带回距离（同时撞 D1 与 ADJ-5）的实现判红"
+    },
+    {
+      "row": "D10",
+      "behavior": "零破坏边界（裁决材料 §3 七条边界的字节面，母约 :444「破坏性最强」的实测反驳）：agent 的 Memory 面原样、Store 不自动接线 agent；knowledge/vectordb/memory/session/agentos 五个相邻面零改动；Store 不被 import 进任何存量包",
+      "publicEntry": "git hash-object --no-filters <12 锚文件> × go test ./pkg/hno/agent/... ./pkg/agentos/... -count=1 × 反向 grep",
+      "assertion": "12 个锚文件（8 个主锚 + 4 个扩展锚）实现后与开工快照逐字节全同（快照 receipt:926bb754、90d43e3f）；邻近包测试 exit 0（今日基线 receipt:423e9511）；grep 判据：pkg/hno/agent、pkg/hno/session、internal/session、pkg/agentos 下 'hno/store' 命中 0（今日实测全仓 0，receipt:1260d167）；实现前后都应绿，锚哈希变动即本行红",
+      "independentlyFailable": "对「顺手给 Agent/Config 加一个 Store 字段并默认接线」「给 knowledge 补一个 Store 后端」「给 agentos 加记忆 HTTP 端点」的实现判红——它们各自撞一条 §3 边界与一组字节锚"
+    },
+    {
+      "row": "D11",
+      "behavior": "P8 验收「与 knowledge/vectordb 分工清晰」的正面可测形式（分工表以实测改写后钉死）：Store 只做跨会话结构化事实的存/取/列/检索；不出现文档摄取面（Loader/Chunker/Document→knowledge 的职责）、不出现集合管理与 VectorDB 十方法（vectordb 底座的职责）、不出现 *types.Message 与对话历史（memory 的职责）、不出现会话作用域键与 Session 类型（session.State 的职责）、不出现检索服务/HTTP 面（agentos.KnowledgeService 的职责）",
+      "publicEntry": "go doc -all ./pkg/hno/store 的导出符号全集 × 包内 import 清单 × grep",
+      "assertion": "导出符号集合 == 契约钉的清单（Item/Store/7 个哨兵/两个构造器 + 后端类型与选项），导出名数 ≤20（M4 实测探针产品面约 20）且不含任何 Loader/Chunk/Document/Collection/VectorDB/Message/Session 命名的符号；grep 判据：pkg/hno/store/** 里 'pkg/hno/knowledge'、'pkg/hno/vectordb/chromadb'、'vectordb.VectorDB'、'types.Message'、'pkg/hno/session'、'internal/session' 命中 0，'vectordb.EmbeddingFunction' 命中 ≥2（构造器与字段）——即 vectordb 只以嵌入件出现，不以库面出现",
+      "independentlyFailable": "对引入 vectordb.VectorDB 依赖（= 已排除的 OPT-a2 适配层）、把 Loader/Chunker 拉进来做「一条命令入库」、或把 KnowledgeService 的检索逻辑抄进 Store 的实现判红"
+    }
+  ],
+  "minimalVerticalSlice": "D1 + D2 + D4 + D6 + D7 五行。理由：D1 是裁决本体（OPT-a1 的「最小核」就是母约草图的字面，形状一扩面就不是 a1）；D2 是「不自建 embedder 抽象、只注入现成件」这条唯一能被违反的边界，也是本片与母约 §1.5 第 1 条的合流点；D4 是身份地基——材料 §1.4 [A4] 的实测事故（跨 namespace 同名 Key 后写覆盖）只有 D4 能防，它一旦破了整包语义即坏；D6 是「能记住并能按语义找回一条用户事实」这条用户目标的最小完整纵向（Put→Search 往返、k 语义、确定性序），直接对母约 :579 的「长期记忆」半句；D7 是持久后端 v1 形状的**代价判据**（查询调用数与行数无关，[A9] 实测 10 vs 2010），它决定了本片能不能长成第二个 RAG 栈。D3/D5 是分类学与写入语义补强（都在 M3/M4 有实测先例，红得干净）；D8/D9 属第二段落（sqlmock 后端与线性打分形状）；D10/D11 是反向锚/分工验收面，两段都应绿，牙齿由变异矩阵与 grep 提供。",
+  "allowedTestSeam": {
+    "add": [
+      "pkg/hno/store/store_test.go（package store_test，外部包，只用导出 API；TestP8G8_* 命名；覆盖 D1 形状反射锚、D2 注入与 nil fail-closed、D3 分类学、D4 身份与编码、D5 upsert 时间戳、D6 打分与 k 语义、D7 调用数判据、D11 导出面）",
+      "pkg/hno/store/internal_shapes_test.go 或同包夹具（计数型 vectordb.EmbeddingFunction 假实现 + 失败注入假实现 + 变维假实现——**实现接口即夹具，互斥锁属夹具不属产品**；探针 store/fake.go 95 行是这份夹具的形状与量级参照）",
+      "pkg/hno/store/postgres/postgres_test.go（package postgres_test，go-sqlmock；同 pkg/hno/session/db/postgres/storage_test.go 的做法：mock 期望 + 0 skip + -race 可链接）",
+      "scripts/mutation/p8g8-store.mjs（变异矩阵，至少 10 条：见 completionCriteria 第 2 项）",
+      "scripts/migrations/00N_agentos_store.sql + deploy/helm/agno-agentos/files/00N_agentos_store.sql（DDL 双份落，M3 实测的既有约定）"
+    ],
+    "modify": [
+      "无。既有全部测试文件一份都不许动——M1/M2/M3 已证允许包与探针均可在零改动下成立；knowledge_test.go 本身就在 baselineBytes 锚清单里。"
+    ],
+    "retires": [],
+    "sourceSeam": "新包 pkg/hno/store/{item.go,errors.go,namespace.go,memory.go}（探针实测 30/14/100/232 行，四文件切分即满足 code-organization §3 规则 1 的单文件 ≤500）+ 新包 pkg/hno/store/postgres/postgres.go（M3 八条模式清单，250–350 行）+ 上述 DDL 两份。存量包预期零改动文件（D10）。量级实测：探针产品面 376 非测试行 / 约 20 个导出名 / 测试 233 行；本片预估非测试 626–726 行、含测试 1,080–1,330 行（母约 :86 估 ~1,200）。"
+  },
+  "forbiddenObservations": [
+    "内存后端内部（map 形状、RWMutex、键拼接实现）——唯一观察面是 Store 接口返回值、导出校验/编码函数的可观察行为、以及注入型嵌入件的**调用计数**（D7 的判据面）",
+    "后端 SQL 字面文本与 DDL 文本（sqlmock 期望用模式匹配即可）；契约判据锁的是行为与结构（往返次数、未命中翻译、标识符校验），不是某条 SQL 的拼写",
+    "墙钟值：CreatedAt/UpdatedAt 不断言具体时刻，只断「写一次 / 刷新 / 两次之间单调」；禁止用 time.Sleep 给 Search/List 定序",
+    "相似度分数的具体数值不属公共契约（假嵌入件的 0.5345/0.5000 是探针产物）——只断「降序」「语义可判别的相关性排序」「两次同输入序一致」",
+    "真服务依赖：live Postgres / ChromaDB / Redis 一律不跑（M1 实测 chromadb 6 个 skip、redisdb 整包在 //go:build redis 后根本没编译；M3 实测 sqlmock 路线 8 PASS/0 SKIP）——本片判据不得建立在任何 skip 绿上",
+    "graph/runner/observability 的在途状态（兄弟片领地；本片不跑其测试、不引其类型）",
+    "为测试而导出后端内部态、namespace 编码的内部变体、或任何 embedding 缓存字段"
+  ],
+  "baselineBytes": {
+    "note": "锚清单 = 任务规定的 8 个主锚（agent 两处 + knowledge 全包 3 文件含测试 + vectordb/base.go + memory/memory.go + session/session.go）+ 4 个扩展锚（本契约按裁决材料 §3 的七条边界追加：agentos 检索服务面、被对齐的 session 侧 postgres 模式源、占位的 internal store 名、vectordb 唯一实现）。实现片必须逐字节全同（D10）。pkg/hno/store 与 pkg/hno/store/postgres 是新包，不在锚内。交叉验证：pkg/hno/session/session.go 的哈希与切片 28 契约 baselineBytes 同文件值一致（e991a2ba…），证明两片的锚取法同源同法。",
+    "anchorsCommand": "git hash-object --no-filters pkg/hno/agent/agent.go pkg/hno/agent/config.go pkg/hno/knowledge/chunker.go pkg/hno/knowledge/document.go pkg/hno/knowledge/knowledge_test.go pkg/hno/vectordb/base.go pkg/hno/memory/memory.go pkg/hno/session/session.go",
+    "extensionAnchorsCommand": "git hash-object --no-filters pkg/agentos/knowledge_handlers.go pkg/hno/session/db/postgres/storage.go internal/session/store/store.go pkg/hno/vectordb/chromadb/chromadb.go",
+    "anchors": {
+      "pkg/hno/agent/agent.go": "9813b86af2e7c455dec6c7c36f187f0bf7627da0",
+      "pkg/hno/agent/config.go": "6c538fe4a498f5eaef7b75697b19d0c7fc93de1f",
+      "pkg/hno/knowledge/chunker.go": "8bc1573269676168afb0feea0dc92a0b6393ba8e",
+      "pkg/hno/knowledge/document.go": "d85612310684c42c9a56b7c08bacccec9cf5e78f",
+      "pkg/hno/knowledge/knowledge_test.go": "0987221c8a14568b8d6e9b7084a281669ed1477e",
+      "pkg/hno/vectordb/base.go": "dade3a042139ae190aae9458b9b26d3512d902be",
+      "pkg/hno/memory/memory.go": "9d157b0241b65c4f71371a78d742d2aae96ee09b",
+      "pkg/hno/session/session.go": "e991a2ba10b5022c32c4763b8f38679a01a2bca1",
+      "pkg/agentos/knowledge_handlers.go": "5da6d71788d2e0dabdd46a55421724d6fb535b63",
+      "pkg/hno/session/db/postgres/storage.go": "e308988072cf2eb6832ee43832a834c71426803b",
+      "internal/session/store/store.go": "84767e061a7a92025e2158b7b766c750a05f465c",
+      "pkg/hno/vectordb/chromadb/chromadb.go": "6f4ec7279c5942eebef69927c08c875bbe5325dc"
+    },
+    "counters": {
+      "adjacentPackagesNontestLoc": 2175,
+      "sessionDbPostgresNontestLoc": 482,
+      "sessionDbPostgresTestLoc": 226,
+      "probeProductSurfaceLoc": 376,
+      "probeProductTestsLoc": 233,
+      "probeExportedNamesApprox": 20,
+      "expectedNontestLocRange": "626-726（内存面 376 + Postgres 后端 250-350）",
+      "expectedTotalLocRange": "1080-1330（含测试 450-600）；母约 :86 估 ~1,200，材料 §2 估 1,000-1,300",
+      "expectedStoreExportedSymbolsMax": 20,
+      "expectedPostgresExportedSymbolsMax": 8,
+      "maxFileLines": 500,
+      "anchorFiles": 12,
+      "boundaryModifiedFiles": 0,
+      "expectedSkipsInBoundCommand": 0
+    },
+    "rebaselineCommand": "git hash-object --no-filters pkg/hno/agent/agent.go pkg/hno/agent/config.go pkg/hno/knowledge/chunker.go pkg/hno/knowledge/document.go pkg/hno/knowledge/knowledge_test.go pkg/hno/vectordb/base.go pkg/hno/memory/memory.go pkg/hno/session/session.go pkg/agentos/knowledge_handlers.go pkg/hno/session/db/postgres/storage.go internal/session/store/store.go pkg/hno/vectordb/chromadb/chromadb.go"
+  },
+  "carriedItems": [
+    {
+      "id": "D2-裁决",
+      "ref": "artifact:docs/design/v3-adjudication-d2-store.md §2/§3/§4",
+      "carriedIntoDesign": "OPT-a1 已裁决关闭（2026-09-28，负责人）：进 v3.0，收窄为最小核 + 单一持久后端。本片即其落地——注入 vectordb.EmbeddingFunction、内存 + 一个 Postgres、Search v1 取出+线性打分、pgvector 留 v3.1（D7/D8/D9）；§3 末尾七条边界逐条进 explicitNonGoals；a2 的 vectordb 适配层明确不进（第 2 条）。"
+    },
+    {
+      "id": "裁决材料 §1.4-身份冲突",
+      "ref": "artifact:docs/design/v3-adjudication-d2-store.md §1.4 [A4]",
+      "carriedIntoDesign": "「跨 namespace 同名 Key 在 vectordb.Document.ID 上后写覆盖」这条实测事故被转成两处：正向判据 D4（Store 自己的 (ns,key) 必须共存、编码无碰撞，M4 [A4] 已实测跑通），反向边界 explicitNonGoals 第 2 条（不把 Store 架上 vectordb——那些损失点在裁完之前不固化为公共语义）。"
+    },
+    {
+      "id": "母约行号漂移",
+      "ref": "artifact:docs/design/v3-platform.md §8:442-476、§10:579、§12:604、§2.1:86",
+      "carriedIntoDesign": "材料 §1.1 引 :425–459/:541/:566，今日实测 §8 标题在 :442、警示行 :444、草图代码块 :446–466、分工表 :470–474、后端行 :476，P8 行 :579，D2 行 :604（§2.1 G8 行仍在 :86）。材料已预告「以章节号为准」，本契约按今日行号引用并同时给章节号；母约由主代理独占写回，本片不改。"
+    },
+    {
+      "id": "切片28-环境事实",
+      "ref": "docs/design/v3-test-scope-p1-graph-slice28.json（notes + measuredBeforeDesign M1）",
+      "carriedIntoDesign": "切片 28 登记过 pgx 侧（internal/session/store/postgres）的 -race 测试二进制在本机无法链接（net→cgo、SDK .tbd 损坏）。本片 M3 独立复现（receipt:8aa037da exit 1）并把它变成一条设计选择：持久后端走 pkg/hno/session/db/postgres 的 database/sql + sqlmock 模式（同命令 -race ok，receipt:2a18c289），于是本片的 -race 可以是硬门禁而非「按可链接包面枚举」。"
+    },
+    {
+      "id": "既有工程硬规则",
+      "ref": "artifact:docs/design/code-organization.md §3 规则 1/2/3/4/7、§5 命名规范、§7 测试规范；AGENTS.md 测试段",
+      "carriedIntoDesign": "本片必须服从的存量纪律：单文件 ≤500 行（包分四文件）、构造器 New/WithXxx/TypeConfig、签名参数 ≤5（Search(ctx,ns,query,k)=4 合规，扩面时同判据复看）、公共 API 禁 map[string]any（故 metadata 类扩面不靠 map 偷渡）、**规则 7 隐式 LLM 调用禁止且须可观测**（→ 每条 Put 是一次真实模型调用，M4 [A9] 实测 200/200；批量面挂 ADJ-6，调用数在 D7 里做成可测判据）、错误 fmt.Errorf(context: %w) 小写不跨层裸传（→ D3 的翻译方向）、核心包覆盖率取严 ≥75%（AGENTS.md 写 ≥70%、code-organization §7 写 ≥75%，本片按 75% 钉且 M3 已证 sqlmock 路线可达）。"
+    },
+    {
+      "id": "P8-验收面",
+      "ref": "artifact:docs/design/v3-platform.md §10 :579（验收：长期记忆 + 与 knowledge/vectordb 分工清晰）",
+      "carriedIntoDesign": "「长期记忆」由 D4/D5/D6/D7 的端到端往返担保；「分工清晰」不再写成文案对照，改写成 D11 的可测判据（导出符号白名单 + import/grep 计数）——分工表以 M1 实测改写：与 knowledge 重叠为零（它无存储无检索），真正的相邻者是 vectordb（底座）与 agentos.KnowledgeService（检索服务面），母约 :473 那行对的是一个没有存储能力的包。"
+    }
+  ],
+  "explicitNonGoals": [
+    "1. Store **不自建** embedder 抽象：只注入 vectordb.EmbeddingFunction（base.go:59-65）；包内不声明任何 Embedder/Embedding/Vector/Similarity 类型（D2/D11 的 grep 判据）。",
+    "2. v3.0 **不做** vectordb / chromadb / redisdb 适配层（OPT-a2 不进）：裁决材料 §1.4 的四个表示损失点（Value→Content、层级→压平过滤键、时间戳→Metadata、无按过滤键列出通道）+ [A4] 的身份冲突 + 「一实例一 collection」的租户隔离，逐条未裁完之前不把有损映射固化为公共承诺；pkg/hno/store 不得 import vectordb.VectorDB（D11）。",
+    "3. **不动** agent.Memory 面：pkg/hno/agent/agent.go:37、config.go:23、config.go:71（memory.NewInMemory(100) 默认注入）原样保留，**Store 不自动接线 agent**、不新增 Agent/Config 字段（D10 字节锚）。",
+    "4. **不动** knowledge / vectordb / agentos.KnowledgeService 的 RAG 职责：knowledge 仍是纯摄取面（Loader/Chunker，无存储无检索），vectordb 仍是底座，仓库唯一的检索服务面仍是 pkg/agentos/knowledge_handlers.go:97 的 KnowledgeService——Store 不抢检索服务、不做入库管线、不加 HTTP 端点（D10/D11）。",
+    "5. **不迁移** session.State 与 session 存储：会话级 KV（session.go:28 的 State map[string]interface{}）与跨会话 Store 分治；不做 State→Store 的搬迁工具、不改 session/db 任何一行、不复用 session.Storage/batch.BatchWriter（D8）。",
+    "6. 包名/落位**先裁决**再收口：internal/session/store/store.go:1 已占用 package store 并自带同名 Store 接口与同名 ErrNotFound（M2 实测）——本契约按 ADJ-1 挂裁决，未裁前 D10/D11 的 grep 判据同时覆盖 internal 侧零渗透。",
+    "7. §1.5 的七处草图未指明处**逐条入契约或挂裁决，不得默认**：注入点（定形：构造器注入 + nil fail-closed）、错误分类学（定形：包内 ErrNotFound + 后端翻译）、后端复用口径（定形：M3 八条模式清单，模式复用 ≠ 代码复用）、namespace 语法与层级语义（挂 ADJ-2）、List 分页/上限（挂 ADJ-3）、Value 文本/二进制（挂 ADJ-4）。",
+    "8. **不改 Item 结构**：不加 Metadata/Tags、不加 Embedding/Vector、不加 Score、不加 Revision/Etag；母约 :450 的注释「带元数据」与草图结构不符（第二处自相矛盾，第一处是 Value 的文本/二进制），v1 以结构体字面为准，文案修正请母约（writeBackOwed）。",
+    "9. **不建 pgvector**（也不建任何原生向量列/扩展/相似度索引）：本片向量列是 BYTEA/JSON 数值数组，打分在应用层；pgvector 属 v3.1，且其立项判据与「迁移不得改变接口形状」的不变量都在 D9。",
+    "10. **不加批量写入面**（ADJ-6 未裁前）：Store 保持五方法，不做 PutMany/BulkPut；批量导入的调用数代价（M4 [A9] 实测 1 次/条目）作为可测事实登记，不藏进实现。",
+    "11. 不做 TTL/GC/配额/加密/静态脱敏/多租户鉴权、不做跨后端同步或双写、不做 Store 的 AgentOS HTTP 面上浮、不做 Go↔Python 契约层（fixture）新增——这些各属独立票面。",
+    "12. 不做二级索引/按 Value 过滤/结构化查询（List 只有 namespace 维度 + 裁定后的分页形状）、不做 namespace 重命名/移动、不做 revision history 与 time-travel（母约 §2.2 已排除 checkpoint time-travel，同族）。",
+    "13. 不做「Store 与 memory.Memory 的兼容垫片」：M1/材料 §1.4 双重实测二者结构性不可互换（无 context、无 error、单 userID 键、值是 *types.Message），垫片只会把两种语义搅浑。",
+    "14. 不承诺并发写解决策略（last-write-wins vs CAS）与「多实例同写一 namespace」的一致性模型——登记进 observabilityLimit，不在本片定形。"
+  ],
+  "completionCriteria": [
+    "1. redProtocol 两段各自留 receipt：第一段落公共面落地后 D1–D7、D11 行为红转绿、D8/D9/D10 的反向半边全程绿；第二段落 Postgres 后端（sqlmock）与 DDL 双份转绿；两段之间测试文件零改动。",
+    "2. 每行牙齿由变异证明（scripts/mutation/p8g8-store.mjs，至少 10 杀且红得各不相同）：① Key 裸用作身份（跨 ns 相互覆盖 → D4 破）；② namespace 用 '.' 压平成键（碰撞 → D4 破）；③ 未命中返回 (nil,nil) 或把 sql.ErrNoRows 裸传（D3 破）；④ 每次 Put 重打 CreatedAt（D5 破）；⑤ 读取期逐条重嵌 Value（D7 的调用数从 10 变 2010 → 破）；⑥ 把向量加进 Item 字段（D1/D7 破）；⑦ 包内自建 Embedder 接口 / Search 忽略 nil 注入静默返回空集（D2 破）；⑧ 表名不走 identifierPattern 校验裸拼（D8 破）；⑨ 代码里 CREATE TABLE / import session 类型 / 改投 pgx（D8 破）；⑩ Search 用 ILIKE 关键词匹配或预置 pgvector 依赖（D6/D9 破）；⑪ 给 Agent 加 Store 字段接线（D10 锚哈希破）；⑫ 用 map 迭代序返回 List/Search（D6 确定性破）。等价变异与不杀红者如实登记，不静默删除。",
+    "3. 既有全部测试文件零改动；12 个锚文件 git hash-object 与开工快照逐字节全同（D10）；rebaseline 后若任一锚变化，必须写明是哪条 §3 边界被有意改动并回到负责人，不得自批。",
+    "4. 门禁全 exit 0：绑定命令（-race -v）；go build ./...；go test ./pkg/hno/store/... -count=1 与 -race；go test ./pkg/hno/knowledge/... ./pkg/hno/vectordb/... ./pkg/hno/memory/... ./pkg/hno/embeddings/... ./pkg/hno/session/db/... -count=1（相邻包基线零改动全绿，今日快照 receipt:9006e3c6）；go test ./pkg/hno/agent/... ./pkg/agentos/... -count=1（今日快照 receipt:423e9511）；go vet 新包；gofmt -l 新包目录为空。**绝不跑 pkg/hno/graph 的测试**（兄弟片在途领地，其 TestP1R17_* 高负载偶发红不计入本片）。",
+    "5. 覆盖率判据：go test ./pkg/hno/store/... -cover 的语句覆盖 ≥75%（code-organization §7 取严），且**不含任何 skip**（M1 的诚实读数：chromadb 48.3% 大盘里 11.8% 是 6 个 skip 撑出来的；本片一律 sqlmock/假件，expectedSkipsInBoundCommand == 0）。",
+    "6. 结构判据：新包非测试 LOC 626–726、含测试 1,080–1,330（M4 探针实测产品面 376 / 测试 233 为地面真值）；单文件 ≤500 行；pkg/hno/store 导出名 ≤20、pkg/hno/store/postgres 导出名 ≤8；boundaryModifiedFiles == 0；D11 的 import/grep 判据全部命中 0（除 'vectordb.EmbeddingFunction' ≥2）。",
+    "7. 绑定命令在最终字节重跑取新回执（回执 ID 现取现贴，不沿用本契约的设计期回执）；-race 无 DATA RACE；防碰巧绿：-count=30 -race 一次 exit 0。",
+    "8. 写回：母约 §8 增「D2 已裁 OPT-a1 + 本片交付块」（含分工表按 M1 实测的改写、Item 注释文案修正、§1.5 五处的定形/裁定结果）、§10 P8 行标交付、§12 D2 行标「已裁决关闭（OPT-a1，2026-09-28）」、§2.1 G8 行的 ~1,200 LOC 用实测回填；D2 裁决材料 §4 追加落地指针一行（不代改裁决本文）；状态文档由编排方收口。母约与状态文档由主代理独占写回。"
+  ],
+  "forbiddenShortcuts": [
+    "把向量、分数、metadata、revision 塞进 Item（改草图形状 = 把未裁的 ADJ-4/5/6 偷偷变成既成事实；D1 判红）。",
+    "用关键词/字符串匹配（ILIKE、strings.Contains、to_tsquery）冒充语义检索，或为省调用数干脆不做嵌入打分（D6/D7/D9 三处判红）。",
+    "读取期逐条重嵌 Value（[A9] 实测 2010 vs 10 的代价；D7 判红），或反过来在 Search 里偷偷写回缓存向量（Search 必须只读，D6）。",
+    "自建 Embedder/Embedding 抽象，或把 EmbeddingFunction 做成运行期可换字段（§3 第 1 条边界；D2 判红）。",
+    "把 Store 架在 vectordb.VectorDB / chromadb / redisdb 上（OPT-a2 侧门，四个损失点未裁；D11 判红）。",
+    "顺手给 Agent/Config 加 Store 字段或默认接线以「证明 Store 有用」（§3 第 3 条边界；D10 锚哈希判红）。",
+    "复用 session.Storage / batch.BatchWriter / session.Session，或在 Store 里读 State（把 §1.5 第 6 条的「模式复用」误读成「代码复用」；D8 判红）。",
+    "未命中返回 (nil,nil)、把未命中与非法参数混成一个错误、或把驱动/网络错误伪装成 ErrNotFound（D3 判红）。",
+    "用真服务（live PG / ChromaDB / Redis）当担保，或用 t.Skip 让门禁「绿」——本片绑定命令的 skip 数必须为 0（M1 的 48.3% 假绿是前车之鉴）。",
+    "用 time.Sleep 定序、断言墙钟值、或断言假嵌入件的分数数值；用 map 迭代序当返回顺序（D5/D6 判红）。",
+    "为测试导出后端内部态、namespace 编码的内部变体或 embedder 缓存字段（forbiddenObservations）。",
+    "在 v1 里预置 pgvector 依赖 / CREATE EXTENSION / 相似度算子（越界做 v3.1 的事；D9 判红）。",
+    "借本片顺手改 knowledge/vectordb/memory/session/agentos 任何一行，或动 internal/session 的 Go↔Python fixture 面（§3 边界 + D10）。"
+  ],
+  "observabilityLimit": [
+    "内存实现不承诺持久性（进程崩即失，设计如此）；持久性由 Postgres 后端满足同一接口，本片以「接口 + 后端可替换 + DDL 落文件」证明形状可持久，不以内存实现冒充持久担保。",
+    "量级读数（[A9] 调用数、[A11] 线性打分 3.66/2.17/2.47µs 每条、median 3.7/10.8/24.7ms、堆 69MB）来自**内存 + 确定性假嵌入件**，不是 Postgres + 真 provider：每查询的 DB 往返延迟、网络字节、连接池占用、真 provider 的嵌入计费与限流均**未测**（本机无 live Postgres；pgx 侧连 -race 都链接不上，M3 实测）。因此 D9 的 10^4 行触发条件是**量级判据**而非 SLO，真数字要 v3.1 立项片在真库上重取。",
+    "相似度分数的语义取决于注入的 EmbeddingFunction（openai/sentencetransformer/vllm 三者向量空间互不兼容）：契约只钉「降序 + 确定性 + 查询调用数与存量无关 + 维度不一致上报」，不承诺任何 provider 的检索质量，也不承诺跨模型可比的分数。",
+    "D8/D9 在 sqlmock 下担保的是**行为与查询形状**，不担保真实 schema 语义（索引是否被用、列类型是否够用、ON CONFLICT 目标是否命中真实约束）——DDL 未在真库跑过是本片的环境性上限，与 M3 实测「8 个 sqlmock 测试 0 skip」是同一枚硬币的两面。",
+    "与向量库互操作的一切断言在仓库内不可测（redisdb 整包在 //go:build redis 后未编译、chromadb 6 用例 skip），所以本片不做适配层；这不是「已验证不需要」，而是「不可验证故不承诺」。",
+    "并发语义未担保：多 goroutine/多实例同写一个 namespace 的胜者（last-write-wins vs CAS）、List/Search 与并发 Put 之间的快照一致性、以及 -race 覆盖不到的跨进程竞争，均属本片之外（MemoryStore 内部有锁只保证不炸，不承诺序列化语义）。",
+    "Delete 未命中上报 ErrNotFound 是照抄仓库先例（storage.go:184-187）的选择，不是母约指示；若负责人在 ADJ 轮里想要幂等 no-op，只需改 D3 的一个断言方向，不牵动其他行。",
+    "探针 /tmp/g8probe 不入库、其 96 行对照面（ReadTimeEmbedStore/ListAll/ListPrefix/SetEmbedder/SetMaxResults/ScoredSearch/MethodCount）与 95 行假件属测量脚手架；376/233 是形状量级校准，不是对实现片行数的承诺。"
+  ],
+  "verificationCommands": [
+    "go test ./pkg/hno/store/... -run TestP8G8_ -count=1 -race -v   # 本片唯一绑定场景命令（cwd 仓库根；包在实现时落地；期望 0 skip）",
+    "go build ./... ; go vet ./pkg/hno/store/... ; gofmt -l pkg/hno/store ; go test ./pkg/hno/store/... -count=1 -cover   # 覆盖 ≥75%（code-organization §7 取严）",
+    "go test ./pkg/hno/knowledge/... ./pkg/hno/vectordb/... ./pkg/hno/memory/... ./pkg/hno/embeddings/... ./pkg/hno/session/db/... -count=1 ; go test ./pkg/hno/agent/... ./pkg/agentos/... -count=1   # 相邻包基线零改动全绿（今日快照 receipt:9006e3c6 / receipt:423e9511）",
+    "git hash-object --no-filters pkg/hno/agent/agent.go pkg/hno/agent/config.go pkg/hno/knowledge/chunker.go pkg/hno/knowledge/document.go pkg/hno/knowledge/knowledge_test.go pkg/hno/vectordb/base.go pkg/hno/memory/memory.go pkg/hno/session/session.go pkg/agentos/knowledge_handlers.go pkg/hno/session/db/postgres/storage.go internal/session/store/store.go pkg/hno/vectordb/chromadb/chromadb.go   # 必须与 baselineBytes.anchors 12 项逐字节全同",
+    "find pkg/hno/store -name '*.go' -not -name '*_test.go' | xargs wc -l   # 非测试面必须落在 626-726；且单个文件 ≤500 行（code-organization §3 规则 1）",
+    "grep -rn \"hno/store\" pkg/hno/agent pkg/hno/session internal/session pkg/agentos | wc -l   # 必须 0（Store 不接线、不反向渗透；今日全仓实测 0，receipt:1260d167）",
+    "grep -rnE \"vectordb\\.(VectorDB|Document|SearchResult)|pkg/hno/knowledge|types\\.Message|pkg/hno/session|internal/session|pgx|BatchWriter\" pkg/hno/store | wc -l   # D11/D8：必须 0",
+    "grep -rnE \"vectordb\\.EmbeddingFunction\" pkg/hno/store/*.go | wc -l   # D2/D11：必须 ≥2（构造器参数 + 后端字段）",
+    "grep -rniE \"pgvector|CREATE EXTENSION|vector\\(|<=>|ivfflat|hnsw\" pkg/hno/store scripts/migrations deploy | wc -l   # D9 半边：本片必须 0",
+    "go doc -all ./pkg/hno/store | grep -cE '^(func|type|var|const) '   # D11 导出面白名单核对（≤20 个导出名，且无 Loader/Chunk/Collection/Message/Session 命名的符号）"
+  ],
+  "writeBackOwed": [
+    "母约 §8（v3-platform.md:442-476，主代理独占写回）：① 增「✅ D2 已裁 OPT-a1、本片交付」块，钉死形状（Item 五字段 / Store 五方法 / 注入 vectordb.EmbeddingFunction / 内存 + 一个 Postgres / Search v1 = 取出+线性打分）；② 分工表 :470-474 按 M1 实测改写——把「knowledge 是非结构化文档」这行改成「knowledge 只有 Loader/Chunker 摄取面（无存储无检索）；真正相邻的是 vectordb（底座）与 agentos.KnowledgeService（检索服务面）」；③ 修正 :450 注释「带元数据」与 Item 结构不符的文案；④ 把 §1.5 七处的定形/裁定结果回填（namespace 语法、分页形状、Value 文本性、包名落位、分数返回、批量面）。",
+    "母约 §10 P8 行（:579）：标第 1 片交付（最小核 + 内存 + Postgres 后端），验收两半的落位（长期记忆 = D4/D5/D6/D7；分工清晰 = D11）；§12 D2 行（:604）标「已裁决关闭（OPT-a1，2026-09-28），落地见切片 29」；§2.1 G8 行（:86）的 ~1,200 LOC 用实测（非测试 626-726 / 含测试 1,080-1,330）回填。以上均由主代理执笔，本契约不代改母约。",
+    "D2 裁决材料（v3-adjudication-d2-store.md §4）：追加落地指针一行（OPT-a1 由切片 29 落地；材料 §1.5 的 1/3/6 三条已定形、2/4/5 三条转为本契约 ADJ-2/3/4；不代改裁决本文）。",
+    "状态文档（v3-p1-graph-status.md §4/§5）：由编排方收口切片 29 的登记与本契约的 ADJ 清单。",
+    "ADJ-1..6 的裁定结果回填本契约：若实现片开工前某项未裁，实现只能落「该题的候选无关公共子集」（D4/D6 已按此写），其余形状待裁后另片补；任何扩面（第 6 方法、Item 加字段、签名变更）都必须在写回里登记为「对母约 §8 草图的一次显式变更」并重取 D1 的形状锚。",
+    "若实现选择把 package store 与 internal/session/store 的同名问题一并解决（ADJ-1/OPT-B），则切片 28 契约的 baselineBytes（其 8 锚含 internal/session/store/postgres/store.go）必须按其 rebaselineCommand 重取并登记——本契约不自批那次改动。"
+  ],
+  "adjudicationOptions": [
+    {
+      "id": "ADJ-1/OPT-A",
+      "shape": "包名与落位（§1.5 第 7 条）：公共面落 pkg/hno/store，包名 store，与 internal/session/store 同短名异路径共存（internal 在 module 外不可 import，无编译冲突）。",
+      "cost": "阅读层同名异义长期存在（M2 实测 internal 侧自带同名 Store 接口与同名 ErrNotFound；cmd/agentos-session/main.go:16-17 已是 store + postgresstore 两个 store，再加第三个，别名会成惯例）。",
+      "gain": "与母约 :447 的 package store 字面零偏差；存量代码零触碰（D10 保持 12 锚全同）。"
+    },
+    {
+      "id": "ADJ-1/OPT-B",
+      "shape": "同时把 internal/session/store 改名（sessionstore / internal/session/persist），pkg/hno/store 独占 store 这个短名。",
+      "cost": "触碰 4 处 import（实测：cmd/agentos-session/main.go:16-17、internal/http/router/router.go:15、internal/session/service/service.go:14、internal/session/store/postgres/store.go:16）+ 破坏切片 28 的 8 锚字节恒等承诺（其锚含 internal/session/store/postgres/store.go），需切片 28 再基线并授权。",
+      "gain": "一次性消除同名异义，公共/internal 两侧命名都干净，ErrNotFound 不再有两个含义。"
+    },
+    {
+      "id": "ADJ-1/OPT-C",
+      "shape": "Store 换名落位（pkg/hno/longtermmemory 或 pkg/hno/facts），不动 internal 侧。",
+      "cost": "与母约 :447 草图的 package store 字面不符，须在 §8 记一次显式改名；文档/示例里「Store 长期记忆」与包名不再同名。",
+      "gain": "零同名歧义、零存量触碰、不需要切片 28 再基线。"
+    },
+    {
+      "id": "ADJ-2/OPT-A",
+      "shape": "namespace 语义（§1.5 第 2 条 + 探针 [A12]）：List/Search 只按 namespace **精确匹配**；段规则取「非空 + 合法 UTF-8 + 不含保留分隔符 U+001F + 长度/深度上限（探针取值 128/16）」。",
+      "cost": "「取 users 下所有子层」做不到——草图没有列子 namespace 的方法，调用方必须自己枚举子 ns；深度/长度上限属探针取值，非实测必然。",
+      "gain": "语义最小、零隐藏歧义；v3.1 加前缀检索是纯新增（不动 D1/D4/D6）。"
+    },
+    {
+      "id": "ADJ-2/OPT-B",
+      "shape": "List/Search 按 **前缀匹配**（LangGraph namespace_prefix 式）：List([users,alice]) 返回该层及其下所有层级的条目。",
+      "cost": "空 namespace 变成「全库扫描」——持久后端上是无界 SELECT（[A8] 实测内存 500 条全量 142µs 是最好情况的错觉），必须与 ADJ-3 的分页同时裁，否则 List 成为 DoS 面。",
+      "gain": "层级真正有检索意义，「按用户取全部画像」一次调用完成，与母约 :452 注释「层级命名空间」的直觉一致。"
+    },
+    {
+      "id": "ADJ-2/OPT-C",
+      "shape": "精确匹配 + 段字符集白名单 ^[A-Za-z0-9_][A-Za-z0-9_.-]{0,127}$、段数 ≤8：把 namespace 变成可直接做索引键/分区键的东西。",
+      "cost": "真实用户/租户 ID（邮箱、中文、含 @ 与冒号的复合键）被拒，调用方须自行转义——把负担推给 agentos/示例；与「Store 是通用长期记忆」的定位有张力。",
+      "gain": "物理设计最简（前缀索引/BTREE 直接可用），保留字符问题一次消除。"
+    },
+    {
+      "id": "ADJ-3/OPT-A",
+      "shape": "List 分页形状（§1.5 第 4 条 + 探针 [A8]）：v1 签名不动、返回全量不截断、顺序确定；分页留 v3.1 以 variadic 参数（List(ctx, ns, opts ...ListOption)）新增。",
+      "cost": "大 namespace 下单次调用返回数万条（全量物化 + 调用方自行排序）；「全量返回」一旦成为公共承诺就难撤回。",
+      "gain": "与草图字面零偏差、v1 最快落地；variadic 加在末位不破坏既有调用点（探针实测两处调用不受影响）。"
+    },
+    {
+      "id": "ADJ-3/OPT-B",
+      "shape": "v1 即引入 ListOptions{Limit/Offset/Order}，签名改 List(ctx, ns, opts)——照抄仓库已有的 ListSessionsOptions{Limit,Page,SortBy,SortOrder} 先例（internal/session/store/store.go:13-23，同包 ListSessions 还返回 total int）。",
+      "cost": "破坏 §8 草图的 4 参签名：D1 形状锚须按裁定重取并在写回里登记为一次草图变更。",
+      "gain": "一次做对，避免「无界 List」；分页/排序语义有仓库先例可循，测试形状与 fixture 对齐成本低。"
+    },
+    {
+      "id": "ADJ-3/OPT-C",
+      "shape": "签名不动，加第二个方法 ListPage(ctx, ns, opts)（Store 变 6 方法）。",
+      "cost": "接口膨胀（D1 的方法数==5 判据须改写）+ 与 ADJ-3/OPT-B 功能重叠，等于同时维护两条路径。",
+      "gain": "既有签名与既有调用点零变更，分页是纯新增。"
+    },
+    {
+      "id": "ADJ-3/NOTE",
+      "shape": "三候选共同下限（本契约已钉，不在裁决范围）：任何实现都不得**静默截断**——[A8] 实测截断到 100 条时返回值里没有任何「还有更多」的信号；agentos KnowledgeServiceConfig.MaxLimit=100 的先例是显式请求参数，不是无通告丢数据。",
+      "cost": "若实现选择内部上限，必须同时给出可见信号（返回计数或错误），否则 D6/D4 判红。",
+      "gain": "无论 ADJ-3 怎么裁，调用方都不会拿到被悄悄削短的集合。"
+    },
+    {
+      "id": "ADJ-4/OPT-A",
+      "shape": "Value 文本/二进制（§1.5 第 5 条 + 探针 [A7]）：保留 Value []byte 且允许任意字节（Get 逐字节恒等），Search 只对合法 UTF-8 的条目打分，非文本条目从候选集剔除。",
+      "cost": "同一 namespace 内并存「可检/不可检」两类条目，而接口不返回分数也不返回被剔除的计数（撞 ADJ-5），调用方看不见这个决定。",
+      "gain": "母约字面不动；Store 仍可作二进制小对象容器；检索集不被垃圾条目污染（探针实测 0 分二进制条目会占掉 top-k 名额）。"
+    },
+    {
+      "id": "ADJ-4/OPT-B",
+      "shape": "保留 []byte，但写入期拒绝非法 UTF-8（Put 返回 ErrInvalidItem）——Store 在 v1 明确退化为「文本事实 KV + 检索」。",
+      "cost": "与 []byte 的存在意义冲突（真要存二进制得另找容器）；「字节恒等往返」这条判据要加例外；对既有 []byte 直觉的调用方是意外的硬失败。",
+      "gain": "检索语义最干净：可检性 == 可存性，无 0 分占位、无不可见剔除。"
+    },
+    {
+      "id": "ADJ-4/OPT-C",
+      "shape": "把草图的 Value []byte 改成 Value string（v1 就承认「这是文本」）。",
+      "cost": "一次显式的母约草图变更（D1 形状锚重取，且与「草图逐字落地」的口径冲突需说明）；Go 里 string 装任意字节同样合法，矛盾只是被挪到边界上。",
+      "gain": "§1.5 第 5 条的自相矛盾一次消除，Search 与 Value 同型；未来 pgvector 迁移（文本列 + 向量列）面最小。"
+    },
+    {
+      "id": "ADJ-5/OPT-A",
+      "shape": "Search 返回形状（M4 [A6] 发现项，§1.5 未列）：逐字保留 ([]*Item, error)，不回传相似度。",
+      "cost": "调用方无法做阈值截断（「只要相似度 > x」）、无法解释排序、无法察觉非文本条目占位（[A7]）；v3.1 上 pgvector 后原生索引只给距离，不给回传通道就是能力倒退。",
+      "gain": "与草图零偏差，D1 不动。"
+    },
+    {
+      "id": "ADJ-5/OPT-B",
+      "shape": "加第二个方法 SearchScored(ctx, ns, query, k) ([]SearchHit, error)（新导出类型 SearchHit{Item,Score}），草图的 Search 保留并委托它。",
+      "cost": "Store 变 6 方法（与 D1 冲突，形状锚重取）+ 一个导出类型；两个检索方法的语义必须写成「同序同集，只差分数」，否则出现两条会漂移的排序路径。",
+      "gain": "一次解决「排序无分数」与 v3.1 距离回传两件事，且草图签名仍可原样保留（向后兼容最好）。"
+    },
+    {
+      "id": "ADJ-5/OPT-C",
+      "shape": "改 Search 签名为 ([]*Item, []float32, error)（平行切片带分数）。",
+      "cost": "破坏草图签名；平行切片是仓库里少见的返回形状（长度一致性、nil 语义都要额外钉），且调用方极易只看第一个返回值。",
+      "gain": "不新增导出类型、不新增方法，接口仍 5 个方法。"
+    },
+    {
+      "id": "ADJ-6/OPT-A",
+      "shape": "批量写入面（发现项：code-organization §3 规则 7「隐式 LLM 调用禁止且须可观测」× 草图只有单条 Put）：v1 不加批量面，接受「每条 Put 一次嵌入调用」。",
+      "cost": "[A9] 实测 200 条 Put = 200 次调用；导入 5,000 条 = 5,000 次真 provider 调用（HTTP + 计费 + 限流）；规则 7 的「可观测」要靠调用数断言补。",
+      "gain": "接口零膨胀（5 方法保持），最快落地；调用数判据在 D7 里已经钉好，将来换成批量只改期望值。"
+    },
+    {
+      "id": "ADJ-6/OPT-B",
+      "shape": "加 PutMany(ctx, items []*Item) error（第 6 方法），后端一次 EmbeddingFunction.Embed(ctx, texts) 整批嵌入——照抄仓库既有的向量库写入做法（chromadb.go:207-228 一次 Embed 处理整批）。",
+      "cost": "Store 变 6 方法（撞 D1 形状锚）+ 必须新裁「批量部分失败」语义（整批原子 or 尽力写并点名失败项）；测试面加一批夹具。",
+      "gain": "调用数从 O(条数) 降到 O(1)，与仓库既有写入模式一致；导入场景不再隐含 5,000 次模型调用。"
+    },
+    {
+      "id": "ADJ-6/OPT-C",
+      "shape": "不加方法，实现内部攒批异步 flush（Put 立刻返回，向量后台补齐，Search 前补齐）。",
+      "cost": "违反「Put 返回即已落」的直觉语义（D5 的时间戳与「不留半截行」判据要重写成最终一致）；且把规则 7 要求的显式性变成隐式行为——正是规则 7 禁止的那一类。",
+      "gain": "公共接口完全不动，写入吞吐最好。"
+    }
+  ],
+  "notes": "本契约由测试设计代理写成：M1/M2/M3 全在仓库只读实测（测试面仅 knowledge/vectordb/memory/embeddings/session-db/agent/agentos，**绝未对 pkg/hno/graph 执行任何 test 或 build**；覆盖 profile 写在 /tmp），M4 全程在 /tmp/g8probe（module replace 指向仓库字节、仓库零写入，go mod tidy 只写 /tmp/g8probe/go.sum），结束前 git status --porcelain 自证。回执 ID 全部现取现贴（本契约 30 条设计期回执，均已逐条抽查 .rex-harness/receipts/<uuid>.json 落盘存在；其中一条为写回前的锚点无漂移复核：12 个 baselineBytes 锚点重跑 git hash-object --no-filters 与表内值全部一致，receipt:e430f206-e18d-4ca0-9823-1e5c75cec7f0，因本片起草期间兄弟片仍在提交存量，实现片开工时应以同一命令复核一次而非默认沿用；实现片必须重跑取新回执，不得沿用本契约回执）。\n\n七处草图未指明处的处置（对账裁决材料 §1.5）：第 1 条（注入点不存在）→ 定形（构造器注入 + nil fail-closed，[A3] 担保）；第 3 条（错误分类学）→ 定形（包内 ErrNotFound + 后端翻译，internal/session/store/store.go:9 与 pkg/hno/session/db/postgres/storage.go:149/:184 双先例）；第 6 条（后端复用口径）→ 定形（M3 的 8 条模式清单，明确「模式复用 ≠ 代码复用」，并给出选 database/sql 而非 pgx 的实测理由）；第 2/4/5/7 条 → 挂裁决（ADJ-2/3/4/1）。另登记三处 §1.5 未列的**发现项**：Search 无分数返回（ADJ-5）、无批量写入面与规则 7 的冲突（ADJ-6）、母约 :450 注释「带元数据」与 Item 结构不符（以结构体字面为准，请母约改文案）。所有 ADJ 项的本契约判据都写成「候选无关的子集」，未裁也能开工不返工。\n\n中途失败与不丢弃登记：① 本探针唯一一次测量错误是 [A9] 第一版给对照实现留了 100 条上限（会把读取期重嵌误测为 1010 而非 2010），解除上限后重跑取数，该错误发生在取回执之前故无红回执可贴，已在 M4 过程披露如实写出；② lessDeterministic 的根层（空 namespace）越界风险是**静态发现**、改在首跑之前，如实归类为「未观察到的失败」；③ 首稿 [A10]/[A13] 引用了当时还不存在的探针辅助，编译前重写为真实形状，未产生失败回执；④ 环境性红一条：go test -race ./internal/session/store/postgres 本机 build failed（exit 1，receipt:8aa037da，pgx→net→cgo / SDK .tbd 损坏），本片据此改选 database/sql 模式使 -race 可做硬门禁，与切片 28 登记的同因事实互不重复计账；⑤ 48.3% 覆盖率含假绿（7 个 skip，M1 读数 ①），且「30 个测试通过」这一继承数字的口径已修正为「原始 31 个顶层 PASS、去重后 30 个名字」——材料 §1.2 的数字没有被推翻，只是工具输出口径需要写明；⑥ 开工前工作树即存在 ` M yarn.lock`（本轮第一条 git status 于任何 go 命令之前就已如此，且 .gitignore:62 已把 .rex-harness/ 排除），非本代理所改，本契约结束时该状态与开工时一致。\n\n母约与状态文档由主代理独占写回，裁决材料是裁决记录、本代理不代改（本文件是本轮唯一仓库写入）。activationId 待派发回填。slice=29 取 v3 全局单调计数（状态文档现存最大为切片 28，M 段实测），series 按本阶段内部计数记「P8 第 1 片」，与切片 28 的「P5 第 2 片 / slice 28」双计数惯例同构。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-platform.md#8",
+    "artifact:docs/design/v3-platform.md#10",
+    "artifact:docs/design/v3-platform.md#12",
+    "artifact:docs/design/v3-adjudication-d2-store.md",
+    "artifact:docs/design/code-organization.md",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice28.json",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice26.json",
+    "receipt:9006e3c6-7d92-4c1a-a948-9f84f5e83c8b",
+    "receipt:6a8079ed-c593-48c3-9f02-6e7be514eb14",
+    "receipt:ef808fde-7135-409b-a0df-5bcce1696c0c",
+    "receipt:fcb582b4-a6f3-44c7-87f6-bd59f64ada29",
+    "receipt:1036715e-1ebd-4a4c-ad26-deaeb23cfa09",
+    "receipt:4d4378fb-04c9-4e34-bf57-8615094d1ef5",
+    "receipt:7bba887e-efdf-452b-8e7b-7a0737a81f68",
+    "receipt:47d2799e-b82c-4328-b2bc-67c56b0e835a",
+    "receipt:98d7b32c-8523-46b7-a521-212de66741bc",
+    "receipt:bdea134a-c7e6-428d-b55d-8b720bfafb97",
+    "receipt:23731552-929d-49d6-acbb-6355c7740973",
+    "receipt:af082c72-2d51-44d1-ba9f-2d86eb755080",
+    "receipt:1260d167-c67b-4916-b626-929220beb403",
+    "receipt:61ab16d3-ffaf-40b1-9e9a-e327e1fcbb2c",
+    "receipt:423e9511-a5e0-4c92-9465-ad03c67d9c68",
+    "receipt:926bb754-4636-446b-a732-fbeaf416f249",
+    "receipt:90d43e3f-913f-4a33-9442-170d2032ba48",
+    "receipt:d9b4440e-e0e1-4298-8168-ee18bdcb6d92",
+    "receipt:10378233-592a-4104-a2c5-914390b16a50",
+    "receipt:2a18c289-121b-4a11-a595-e155939ce777",
+    "receipt:8aa037da-fc0f-426f-834d-3fa5dd66f8ca",
+    "receipt:13b63823-9087-4ab6-832f-c33ae45089b1",
+    "receipt:29c9d946-2a19-492d-b6ed-f617a2aabf86",
+    "receipt:9bf3df34-a2a2-4c2d-88d7-8595855a3a15",
+    "receipt:a84deaf4-11e3-4e08-aadb-649647089b82",
+    "receipt:5decb9b2-f17d-4c02-b4e6-a053ef458bce",
+    "receipt:7815d128-62b1-4768-9863-2d9c29f5822e",
+    "receipt:e8a17302-b84c-4949-ae44-59e1a8fa1990",
+    "receipt:33c9d168-f2ec-468d-ac0e-101aa93bdc53",
+    "receipt:e430f206-e18d-4ca0-9823-1e5c75cec7f0"
+  ]
+}

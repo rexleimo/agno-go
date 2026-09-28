@@ -83,7 +83,7 @@ v2 设计文档 §4 的两条否决被推翻：
 | G5 | 动态扇出 `Send` + map-reduce | LangGraph | ~500 |
 | G6 | Durability 三档 + recursion_limit | LangGraph | ~400 |
 | G7 | 会话事件化 + HITL interrupt/resume | adk | ~1,500 |
-| G8 | `Store` 长期记忆（层级 namespace + 向量） | LangGraph | ~1,200 |
+| G8 | `Store` 长期记忆（层级 namespace + 向量）**——D2 已裁 OPT-a1：收窄为最小核， vectordb 适配层不进 v3.0** | LangGraph | ~1,200 |
 | G9 | 观测接线（现有零件接进 G1）**——第 1 片已交付（切片 25：runner 模型路径 retry/breaker + model 级 span）** | 自有 | ~600 |
 | G10 | workflow 迁移到图，公共 API 不变 | — | ~1,200 |
 | | **合计** | | **~9,500** |
@@ -441,7 +441,12 @@ v1 语义：控制 `graph` 在每个节点完成后向 `Session` 存储提交事
 
 ## 8. G8 Store 长期记忆
 
-> ⚠️ **此项引入全新概念，是 v3 中范围最大、破坏性最强的一块。建议单独决策（见 §12 决策点 D2）。**
+> ⚠️ ~~此项引入全新概念，是 v3 中范围最大、破坏性最强的一块。建议单独决策（见 §12 决策点 D2）。~~
+> **D2 已裁决（2026-09-28，OPT-a1 最小核）**，下方草图随之收窄。警示按实测修正：Store 今天在全仓库
+> **零消费方**，故爆炸半径为零，「破坏性最强」不成立（`v3-adjudication-d2-store.md` §1.3/§3）；
+> 与 `knowledge` 重叠实测为零（该包只有 Loader/Chunker 摄取面）、与 `memory.Memory` 结构性不可互换、
+> `embeddings` 三个 provider 已是现成的 `vectordb.EmbeddingFunction` 注入件（草图「需 Embedder」不自建抽象）。
+> 契约：`docs/design/v3-test-scope-p8-g8-store.json`（切片 29）。
 
 ```go
 package store
@@ -576,7 +581,7 @@ func (g *Graph) Resume(ctx context.Context, responses map[string]any) (*Result, 
 | **P5** | G7 事件化 + HITL | ~~P0 + 决策 D1~~ **全清（切片 27 引擎核心 + 28 侧车/跨进程恢复）** | 事件存储 + Resume **全部交付（27：引擎核心；28：`pkg/hno/session/sidecar` + `internal/hitlbridge` + `graph/restore.go`，D1–D10 + 10 杀红变异）** | 审批场景跨进程恢复**实测达成（双档端到端）**；重复 Resume 幂等**实测达成（跨重启）**；**契约测试绿（8 边界锚逐字节）** |
 | **P6** | G10 workflow 迁移 | P1–P4 | 线性 []Step 编译为链式图 | **现有用户零改动**；`make test` 绿 |
 | **P7** | G9 观测接线 | P0 | retry/breaker 接进 runner **模型阶段已交付（切片 25，D1–D13 + 9 杀红变异矩阵）**；run/agent 级 span 待第 2 片（S25-DEFER-1） | span 覆盖状态表：**model=已接于 runner**（每尝试 chat span + usage 归集）；**tool=已在 agent 既有**（execute_tool）；**run/agent=待 P7 第 2 片**（pkg/hno/agent） |
-| **P8** | G8 Store | 决策 D2 | 长期记忆 | 与 knowledge/vectordb 分工清晰 |
+| **P8** | G8 Store | ~~决策 D2~~ **已裁决（OPT-a1，2026-09-28）** | 长期记忆最小核：接口 + namespace + 内存与单一 Postgres 后端（契约 `v3-test-scope-p8-g8-store.json` 切片 29 已起草，D1–D11） | 与 knowledge/vectordb 分工清晰（契约以导出白名单验收）；ADJ-1…ADJ-6 待落裁后开工 |
 
 **关键路径**：P0 → P1 → (P2/P3/P4 并行) → P6
 
@@ -601,7 +606,7 @@ func (g *Graph) Resume(ctx context.Context, responses map[string]any) (*Result, 
 | # | 决策 | 选项 | 我的倾向 |
 |---|---|---|---|
 | **D1** | 会话事件化是否改动 `Session` 对外 JSON？ | (a) 不改，事件为内部存储+派生视图（安全，但契约层无感）<br>(b) 改，同步更新 Python fixture（暴露能力，但可能破坏互操作） | **已裁决（2026-09-28）：(a)**，实测材料见 `v3-adjudication-d1-session-events.md` |
-| **D2** | G8 Store 是否进 v3.0？ | (a) 进（+1,200 LOC，全新概念，范围最大）<br>(b) 延到 v3.1 | **(a) 进** —— 「能记住用户」是产品差异化，但需先定与 knowledge 的边界 |
+| **D2** | G8 Store 是否进 v3.0？ | (a) 进（+1,200 LOC，全新概念，范围最大）<br>(b) 延到 v3.1 | **已裁决（2026-09-28）：(a) 进，收窄为 OPT-a1 最小核**（接口 + namespace + `ErrNotFound` + 注入 `vectordb.EmbeddingFunction` + 内存后端 + 单一 Postgres 后端，≈1,000–1,300 行；**vectordb/chromadb/redisdb 适配层不进 v3.0**）。「破坏性最强」经实测修正为不成立（Store 今天零消费方），真实风险在边界文案。实测材料 `v3-adjudication-d2-store.md`；契约 `v3-test-scope-p8-g8-store.json`（切片 29，D1–D11 + 14 条 explicitNonGoals），其 ADJ-1…ADJ-6 六项形状取舍待负责人落裁 |
 | **D3** | `graph.Node` 用 `any` 还是泛型？ | (a) `any` + `Typed[TIn,TOut]` 包装<br>(b) 纯泛型 | **(a)** —— 引擎需要异构节点，纯泛型会锁死组合性 |
 | **D4** | P0 是否要先合入主干？ | (a) 是，单独发一个 minor<br>(b) 全部做完一起发 major | **(a)** —— 死代码与 4 份循环是持续风险，不应压到 major 发布 |
 

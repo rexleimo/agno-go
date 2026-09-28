@@ -200,8 +200,47 @@ B12/B13（§1 的结构命令输出，切片 19 后重测仍为 0 / 838）。
    `-count=30`/整包 `-count=5 -race` 防碰巧绿全过。母约 §9/§10 P5 行标注全清，D1 材料补落地指针。
    **P5（G7 事件化+HITL）关闭：审批场景跨进程恢复、重复 Resume 幂等、契约测试绿三条验收实测达成。**
    过程披露与 salvage 纪律见 `v3-red-observation-p5s28.md` §1、`v3-p5-s28-refactor.md` §4。
+4u. **提交授权落地 —— 未提交序列入库（2026-09-28，负责人「你来推进一下」）**：此前 201 个路径（179 未跟踪 +
+    22 修改）悬在工作树里，`S18-SPEC-2` 的「无提交授权」已由切片 21 的 `git checkout` 事故升级为实测风险。
+    现按包逻辑分七片本地提交（**未 push**）：`0da4013` graph（P1/P2/P3/P5 全部引擎字节 + R13–R21/P2G3/P3G5/P3G6/P5G7
+    测试）、`f8e6e04` run（G4 协议层）、`28f2c92` runner（G9 观测缝）、`cf1e247` session 侧车 + hitlbridge、
+    `f7a57dd` 变异执行体入库（S19-STD-6 的「未接进 make」仍开着）、`2c7718a` docs/design 证据链、`17f6845` website。
+    提交前门禁实测：`go build ./...` exit 0、`go vet ./pkg/hno/... ./internal/...` exit 0、
+    `gofmt -l` 对**本次触及的包**零输出（全仓 30 个 gofmt-dirty 文件均为存量、本片一字未动）、
+    受影响 12 包 `go test -count=1` 全 `ok`。新字节做了 secret 抽查（API key/AKIA/私钥/密码模式）零命中。
+    **`yarn.lock` 故意不提交**：其 11 行改动是 win32-x64 → darwin-arm64 的平台二进制翻转（本机装 docs 依赖所致），
+    提交会把 CI 侧的期望平台条目改掉。自此刻起，任何变异/实验脚本对仓库字段的恢复都有了真实 HEAD 可退。
+4v. **D2 已裁 + G8 契约（切片 29）已起草（2026-09-28）**：负责人选 **OPT-a1**（进 v3.0，收窄为最小核 +
+    单一 Postgres 后端，vectordb 适配层不进 v3.0）。契约 `docs/design/v3-test-scope-p8-g8-store.json`
+    （`work-p8-store`，30 键与 slice26/28 键序逐位一致）：D1–D11（草图逐字形状/Embedder 注入 fail-closed/
+    错误分类学/(ns,key) 复合身份防 [A4] 后写覆盖/upsert 字节恒等/Search 排名与确定性序/向量为写入期派生列/
+    Postgres 八项模式清单 + 禁 import session·pgx/线性打分 v1 形状 + 禁 pgvector/十二锚点字节恒等 + 零接线/
+    分工表以导出白名单验收）+ 14 条 explicitNonGoals（承接裁决材料 §3 的七条边界）。
+    **回执纪律已复核**：契约引用 30 条唯一 receipt，逐条对 `.rex-harness/receipts/` 存在性校验 **0 缺失**
+    （起草者自报曾有一条 UUID 中段写错并已按真实文件修正——与 §4l/§6 同源教训第三次出现，本次被自查拦下）。
+    母约 §8 警示行、§2.1 G8 行、§10 P8 行、§12 D2 行均已按裁决写回。**待落裁**：契约的 ADJ-1…ADJ-6
+    （包落位与 `internal/session/store` 重名、namespace 语法、`List` 分页、`Value` 文本/二进制、
+    Search 是否回 score、批量写入面）——**这六项未裁前 G8 实现不得开工**。
+    另两条实测披露：① 相邻四包基线的 48.3% 覆盖含水分（chromadb + openai 共 7 个 skip 假绿，redisdb 整包挂 build tag 根本没编译）；
+    ② 本机 `-race` 下 pgx 链不上，故 D8/D9 的真 Postgres 行为只能由 sqlmock 面证明，CI 侧需补真库跑。
+4w. **G10（P6）两次派发未跑完 → 收窄为范围摸底材料（第三次派发，在途）**：第一次被系统取消，第二次子代理
+    烧到 150 轮上限**未落盘任何文件**，其最后动作是「在 /tmp 副本里加两套内核的逐字段差分测试」——把实现期
+    验证手段当成了契约前置，是本轮要纠正的形状。我实测的张力：`pkg/hno/workflow` 153 导出符号 / 3,263 非测试行 /
+    5,373 测试行，而母约给 G10 估 ~1,200；workflow 与 graph **今天零耦合**（grep 零命中），workflow 的仓库内消费者
+    只有 `cmd/examples/workflow_demo`、`workflow_history`。故第三轮改为交付一份有界材料
+    `docs/design/v3-adjudication-p6-g10-scope.md`（体裁照 D1/D2 成功先例），并下**≤45 次工具调用**硬线 +
+    明禁差分测试台，把「第一片换哪条执行路径 / 哪些 workflow 能力图侧今天表达不了 / 是否会长出双内核语义」
+    三问量清楚再立契约。同期在途（均为 docs-only 并行，不改仓库代码）：R17 负载加固契约、G4 生产者接线契约。
+    串行纪律不变（§4b）：同一时刻只允许一个代理改仓库代码，本文件由主代理独占维护。
+4x. **交付前沿同步（2026-09-28）**：`docs/design/v3-delivery-ticket.json` 的 `work-p2-node-policies`、
+    `work-p3-send-durability`、`work-p5-event-hitl`、`work-p6-workflow-migration` 四条阻塞理由写的是
+    「依赖 work-p1-graph-engine 未完成」，随 P1–P5 收口已全部过期，故移入 `frontier.ready`，
+    `blocked` 只剩 `work-p9-release`（前置 P6/P7/P8 尚未交付）。`node scripts/validate-delivery-ticket.mjs`
+    判 **VALID**（`frontier.ready` 11 / `blocked` 1 / 12 workItems / 七组并行组），
+    回执 `receipt:b7ed56ca-5143-49c6-89d0-823fe1d6fc10`（exit 0）。
 
 ## 5. 本片仍带着的未裁决项（沿用，不借本审计变成已决）
+
 
 - **`S19-STD-1`（本片新增，已从静态读代码升级为实测）**：运行期交给激活的聚合 map，与调度器
   继续写入的那个累加器是**同一个对象**（`scheduler.go:220` 写、:224 交出）。探针实测：前驱因条件环
@@ -233,7 +272,8 @@ B12/B13（§1 的结构命令输出，切片 19 后重测仍为 0 / 838）。
   （`b7790b9f…` 复核全同）。`S18-SPEC-2` 的「无提交授权」单拷贝风险由口头变成了实测事故；
   在拿到提交授权之前，任何变异/实验脚本都不得对本仓工作树执行 git 破坏性命令。
 - 沿用：`R18-Q1`（是否新增导出小类型/哨兵承载归因）、`R18-Q2`（`Typed(name,nil)` 是否升级为构建期拒绝）、
-  `S18-SPEC-2`（HEAD `0387000` 只含首片存根，切片 2–19 未提交；**无提交授权**）、
+  `S18-SPEC-2`（HEAD `0387000` 只含首片存根，切片 2–19 未提交；**无提交授权**）**已关闭（2026-09-28，见 §4u：
+  七片本地提交 `0da4013`…`17f6845`，未 push）**、
   `R17-GAP-1/2/3`、`R18-GAP-1`、`S17-SPEC-3`/`R17-UNADJ-1`、`S17-STD-5`+`S18-STD-6`
   （`struct.sh`、前两片的 `mutants.mjs`、本审计的 `/tmp/p1-audit` 仍在 /tmp，未入库）。
 
