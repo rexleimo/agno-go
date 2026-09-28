@@ -8,6 +8,8 @@
 
 **Workflow** 提供确定性的、基于步骤的编排,用于构建可控的 AI Agent 流程。与 Team(自主式)不同,Workflow 让您完全控制执行流程。
 
+> **Workflow 与图引擎是两套 API。** 本页描述的是 `pkg/hno/workflow` —— v1 基于步骤的编排器。v3 线还提供零锁图引擎(`pkg/hno/graph`),具备 DAG 路由、汇聚屏障、节点策略、持久化与运行期动态扇出(`Send`)。两套 API 今天并存,一条流水线只选一个包、不要混用。后续里程碑(G10)计划把 Workflow 编译到图上,公共 API 不变 —— 见[图引擎指南](/zh/guide/graph-engine)。
+
 ### 核心特性
 
 - **5 种原语**: Step、Condition、Loop、Parallel、Router

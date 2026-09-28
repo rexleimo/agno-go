@@ -23,13 +23,18 @@ HNO includes **AgentOS**, an HTTP server with:
 
 ### 🧩 Flexible Architecture
 
-Three core abstractions for different use cases:
+Core abstractions for different use cases:
 
 1. **Agent** - Autonomous AI agents with tool support and memory
 2. **Team** - Multi-agent collaboration with 4 coordination modes
    - Sequential, Parallel, Leader-Follower, Consensus
 3. **Workflow** - Step-based orchestration with 5 primitives
    - Step, Condition, Loop, Parallel, Router
+4. **Graph Engine** - Zero-lock control-flow graphs (`pkg/hno/graph`)
+   - DAG routing, join barriers, node policies, durability, runtime fan-out (`Send`)
+   - A separate API that coexists with Workflow; G10 plans to compile
+     Workflow onto the graph with the public API unchanged
+   - See the [Graph Engine guide](/guide/graph-engine)
 
 ### 🔌 Multi-Model Support
 

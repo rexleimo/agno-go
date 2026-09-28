@@ -23,6 +23,26 @@ head:
 
 ## 文章列表
 
+### 在 Go 里造一个 LangGraph：一个零锁图引擎的设计与实证
+
+[阅读完整文章](/zh/blog/zero-lock-graph-engine)
+
+HNO v3 图执行器如何在不加一把锁的前提下跑 DAG、条件路由与汇聚屏障 —— 以及让
+这个断言可审计的构建期校验清单、运行期护栏与变异矩阵。
+
+- **分类：**Go engineering
+- **标签：**Go、并发、图引擎、LangGraph、DAG、Agent 框架
+
+### 节点策略四合一：Retry/Timeout/Cache/Trace 的一次 variadic 设计
+
+[阅读完整文章](/zh/blog/node-option-variadic-design)
+
+用一条变参 `AddNode` 选项缝把重试、超时、缓存、追踪挂到图节点上：零值即语
+义、fail-closed 缓存、零锁调度器里的串行 trace hook。
+
+- **分类：**API design
+- **标签：**Go、API 设计、重试、缓存、超时、可观测性
+
 ### 一次性代码沙盒：无惧运行 LLM 生成的代码
 
 [阅读完整文章](/zh/blog/code-execution-sandbox)

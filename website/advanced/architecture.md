@@ -326,6 +326,17 @@ workflow.NewParallel("tasks", []Primitive{
 })
 ```
 
+### Graph Engine: Zero-Lock Single-Consumer Model
+
+The v3 graph engine (`pkg/hno/graph`) runs its scheduler without a single
+lock. Each node activation executes on a producer goroutine that only sends
+one completion item on a channel; the goroutine that called `Run` is the
+single consumer and the only writer of all mutable state (queue, pending
+list, results, step accounting). State touched by one goroutine needs no
+lock: `grep -o 'sync\.'` across the engine sources counts 0, and the suite
+passes under `-race`. See the [Graph Engine guide](/guide/graph-engine) for
+the model and its build-time and runtime guardrails.
+
 ## Extensibility Points
 
 ### 1. Custom Models

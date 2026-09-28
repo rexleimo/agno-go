@@ -278,6 +278,15 @@ workflow.NewParallel("tasks", []Primitive{
 })
 ```
 
+### 图引擎:零锁单消费者模型 / Graph Engine: Zero-Lock Single-Consumer Model
+
+v3 图引擎(`pkg/hno/graph`)的调度器一把锁都没有。每个节点激活跑在生产者
+goroutine 上,只向 channel 发送一条完成项;调用 `Run` 的那个 goroutine 是唯一
+消费者,也是全部可变状态(队列、pending 列表、结果、步数账本)的唯一写者。
+只有一个 goroutine 触碰的状态不需要锁:引擎源码 `grep -o 'sync\.'` 计数为 0,
+整包测试在 `-race` 下全绿。模型与构建期/运行期护栏见
+[图引擎指南](/zh/guide/graph-engine)。
+
 ## 扩展点 / Extensibility Points
 
 ### 1. 自定义模型 / Custom Models

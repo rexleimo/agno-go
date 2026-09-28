@@ -8,6 +8,14 @@ Build complex, controlled multi-step processes with 5 powerful primitives.
 
 A **Workflow** provides deterministic, step-based orchestration for building controlled AI agent processes. Unlike Teams (autonomous), Workflows give you full control over execution flow.
 
+> **Workflow and the Graph Engine are two APIs.** This page documents
+> `pkg/hno/workflow`, the v1 step-based orchestrator. The v3 line also ships a
+> zero-lock graph engine (`pkg/hno/graph`) with DAG routing, join barriers,
+> node policies, durability, and runtime fan-out (`Send`). The two coexist
+> today; pick one package per pipeline and do not mix them. A later milestone
+> (G10) plans to compile Workflow onto the graph without changing this public
+> API — see the [Graph Engine guide](/guide/graph-engine).
+
 ```mermaid
 flowchart LR
     S[Start] --> ST1[Step 1]

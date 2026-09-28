@@ -59,6 +59,8 @@ export default defineConfig({
                 { text: 'Team', link: '/guide/team' },
                 { text: 'Workflow', link: '/guide/workflow' },
                 { text: 'Workflow History', link: '/guide/workflow-history' },
+                { text: 'Graph Engine', link: '/guide/graph-engine' },
+                { text: 'Node Policies', link: '/guide/node-policies' },
                 { text: 'Models', link: '/guide/models' },
                 { text: 'Embeddings', link: '/guide/embeddings' },
                 { text: 'Tools', link: '/guide/tools' },
@@ -79,6 +81,8 @@ export default defineConfig({
                 { text: 'Agent', link: '/api/agent' },
                 { text: 'Team', link: '/api/team' },
                 { text: 'Workflow', link: '/api/workflow' },
+                { text: 'Graph', link: '/api/graph' },
+                { text: 'Run Events & Stream Modes', link: '/api/run-events' },
                 { text: 'Models', link: '/api/models' },
                 { text: 'Tools', link: '/api/tools' },
                 { text: 'Memory', link: '/api/memory' },
@@ -94,6 +98,7 @@ export default defineConfig({
               text: 'Advanced Topics',
               items: [
                 { text: 'Architecture', link: '/advanced/architecture' },
+                { text: 'Graph Durability', link: '/advanced/graph-durability' },
                 { text: 'Performance', link: '/advanced/performance' },
                 { text: 'System Overhead Matrix', link: '/advanced/system-overhead' },
                 { text: 'Deployment', link: '/advanced/deployment' },
@@ -126,6 +131,8 @@ export default defineConfig({
               text: 'Blog',
               items: [
                 { text: 'Latest article', link: '/blog/' },
+                { text: 'Zero-lock graph engine', link: '/blog/zero-lock-graph-engine' },
+                { text: 'Node policies variadic design', link: '/blog/node-option-variadic-design' },
                 { text: 'Sandboxed file I/O', link: '/blog/sandboxed-file-io' },
                 { text: 'Disposable code sandboxes', link: '/blog/code-execution-sandbox' },
                 { text: 'AI Agent runtime benchmark', link: '/blog/ai-agent-runtime-benchmark' }
@@ -179,6 +186,8 @@ export default defineConfig({
                 { text: 'Team 团队', link: '/zh/guide/team' },
                 { text: 'Workflow 工作流', link: '/zh/guide/workflow' },
                 { text: 'Workflow 历史管理', link: '/zh/guide/workflow-history' },
+                { text: 'Graph Engine 图引擎', link: '/zh/guide/graph-engine' },
+                { text: 'Node Policies 节点策略', link: '/zh/guide/node-policies' },
                 { text: 'Models 模型', link: '/zh/guide/models' },
                 { text: 'Embeddings 嵌入', link: '/zh/guide/embeddings' },
                 { text: 'Tools 工具', link: '/zh/guide/tools' },
@@ -199,6 +208,8 @@ export default defineConfig({
                 { text: 'Agent', link: '/zh/api/agent' },
                 { text: 'Team', link: '/zh/api/team' },
                 { text: 'Workflow', link: '/zh/api/workflow' },
+                { text: 'Graph 图引擎', link: '/zh/api/graph' },
+                { text: 'Run Events 流事件', link: '/zh/api/run-events' },
                 { text: 'Models', link: '/zh/api/models' },
                 { text: 'Tools', link: '/zh/api/tools' },
                 { text: 'Memory', link: '/zh/api/memory' },
@@ -214,6 +225,7 @@ export default defineConfig({
               text: '进阶主题',
               items: [
                 { text: '架构', link: '/zh/advanced/architecture' },
+                { text: '图持久化', link: '/zh/advanced/graph-durability' },
                 { text: '性能', link: '/zh/advanced/performance' },
                 { text: '系统开销矩阵', link: '/zh/advanced/system-overhead' },
                 { text: '部署', link: '/zh/advanced/deployment' },
@@ -246,6 +258,8 @@ export default defineConfig({
               text: '博客',
               items: [
                 { text: '最新文章', link: '/zh/blog/' },
+                { text: '零锁图引擎', link: '/zh/blog/zero-lock-graph-engine' },
+                { text: '节点策略 variadic 设计', link: '/zh/blog/node-option-variadic-design' },
                 { text: '沙盒化文件 I/O', link: '/zh/blog/sandboxed-file-io' },
                 { text: '一次性代码执行沙盒', link: '/zh/blog/code-execution-sandbox' },
                 { text: 'AI Agent 框架性能基准', link: '/zh/blog/ai-agent-runtime-benchmark' }

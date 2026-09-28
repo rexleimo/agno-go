@@ -23,13 +23,17 @@ HNO 包含 **AgentOS**,一个可部署的 HTTP 服务器:
 
 ### 🧩 灵活架构
 
-三种核心抽象适用于不同场景:
+核心抽象适用于不同场景:
 
 1. **Agent** - 具有工具支持和记忆的自主 AI Agent
 2. **Team** - 4 种协作模式的多 Agent 协作
    - Sequential(顺序)、Parallel(并行)、Leader-Follower(领导-跟随)、Consensus(共识)
 3. **Workflow** - 基于 5 种原语的步骤式编排
    - Step、Condition、Loop、Parallel、Router
+4. **图引擎** - 零锁控制流图(`pkg/hno/graph`)
+   - DAG 路由、汇聚屏障、节点策略、持久化、运行期动态扇出(`Send`)
+   - 与 Workflow 并存的另一套 API;G10 计划把 Workflow 编译到图上,公共 API 不变
+   - 见[图引擎指南](/zh/guide/graph-engine)
 
 ### 🔌 多模型支持
 

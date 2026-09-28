@@ -23,6 +23,28 @@ and the engineering ideas behind the news cycle.
 
 ## Articles
 
+### Building a LangGraph in Go: The Design and Evidence Behind a Zero-Lock Graph Engine
+
+[Read the article](/blog/zero-lock-graph-engine)
+
+How HNO's v3 graph executor runs DAGs, conditional routes, and join barriers
+without a single lock — with a build-time validation catalog, runtime
+guardrails, and a mutation-tested trust story.
+
+- **Category:** Go engineering
+- **Tags:** Go, concurrency, graph, DAG, LangGraph, agent framework
+
+### Four Node Policies, One Variadic Seam: A NodeOption Design Story
+
+[Read the article](/blog/node-option-variadic-design)
+
+Retry, Timeout, Cache, and Trace as variadic `AddNode` options: zero-value
+semantics, a fail-closed cache, and serial trace hooks inside a zero-lock
+scheduler.
+
+- **Category:** API design
+- **Tags:** Go, API design, retry, cache, timeout, observability
+
 ### Disposable Code Sandboxes: Running LLM-Generated Code Without Fear
 
 [Read the article](/blog/code-execution-sandbox)

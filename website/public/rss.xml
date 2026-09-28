@@ -7,17 +7,92 @@
     <language>en</language>
     <atom:link href="https://hno.rexai.top/rss.xml" rel="self" type="application/rss+xml" />
   <item>
-    <title>Agent 文件工具不能只靠路径前缀：HNO 如何用根句柄做沙盒</title>
-    <link>https://hno.rexai.top/zh/blog/sandboxed-file-io</link>
-    <guid isPermaLink="true">https://hno.rexai.top/zh/blog/sandboxed-file-io</guid>
-    <pubDate>Thu, 06 Aug 2026 00:00:00 GMT</pubDate>
+    <title>Building a LangGraph in Go: The Design and Evidence Behind a Zero-Lock Graph Engine</title>
+    <link>https://hno.rexai.top/blog/zero-lock-graph-engine</link>
+    <guid isPermaLink="true">https://hno.rexai.top/blog/zero-lock-graph-engine</guid>
+    <pubDate>Mon, 28 Sep 2026 00:00:00 GMT</pubDate>
+    <dc:language>en</dc:language>
+    <description></description>
+    <category>Go engineering</category>
+    <category>Go</category>
+    <category>concurrency</category>
+    <category>graph</category>
+    <category>DAG</category>
+    <category>LangGraph</category>
+    <category>agent framework</category>
+  </item>
+  <item>
+    <title>Four Node Policies, One Variadic Seam: A NodeOption Design Story</title>
+    <link>https://hno.rexai.top/blog/node-option-variadic-design</link>
+    <guid isPermaLink="true">https://hno.rexai.top/blog/node-option-variadic-design</guid>
+    <pubDate>Mon, 28 Sep 2026 00:00:00 GMT</pubDate>
+    <dc:language>en</dc:language>
+    <description>How HNO attaches Retry, Timeout, Cache, and Trace to graph nodes through one variadic AddNode option — with zero-value semantics, a fail-closed cache, and consumer-side trace hooks.</description>
+    <category>API design</category>
+    <category>Go</category>
+    <category>retry</category>
+    <category>cache</category>
+    <category>timeout</category>
+    <category>observability</category>
+  </item>
+  <item>
+    <title>在 Go 里造一个 LangGraph：一个零锁图引擎的设计与实证</title>
+    <link>https://hno.rexai.top/zh/blog/zero-lock-graph-engine</link>
+    <guid isPermaLink="true">https://hno.rexai.top/zh/blog/zero-lock-graph-engine</guid>
+    <pubDate>Mon, 28 Sep 2026 00:00:00 GMT</pubDate>
     <dc:language>zh-CN</dc:language>
-    <description>HNO 通过显式能力、Go root-bound 文件系统句柄、读写限额与独立部署隔离层，约束 Agent 的文件读写。</description>
+    <description>HNO v3 图执行器如何在不加一把锁的前提下跑 DAG、条件路由与汇聚屏障 —— 以及让这个断言可审计的构建期校验清单、运行期护栏与变异矩阵。</description>
+    <category>Go engineering</category>
+    <category>Go</category>
+    <category>并发</category>
+    <category>图引擎</category>
+    <category>LangGraph</category>
+    <category>DAG</category>
+    <category>Agent 框架</category>
+  </item>
+  <item>
+    <title>节点策略四合一：Retry/Timeout/Cache/Trace 的一次 variadic 设计</title>
+    <link>https://hno.rexai.top/zh/blog/node-option-variadic-design</link>
+    <guid isPermaLink="true">https://hno.rexai.top/zh/blog/node-option-variadic-design</guid>
+    <pubDate>Mon, 28 Sep 2026 00:00:00 GMT</pubDate>
+    <dc:language>zh-CN</dc:language>
+    <description>HNO 如何用一条变参 AddNode 选项缝把重试、超时、缓存、追踪挂到图节点上 —— 零值即语义、fail-closed 缓存、消费侧 trace hook。</description>
+    <category>API design</category>
+    <category>Go</category>
+    <category>API 设计</category>
+    <category>重试</category>
+    <category>缓存</category>
+    <category>超时</category>
+    <category>可观测性</category>
+  </item>
+  <item>
+    <title>Disposable Code Sandboxes: Running LLM-Generated Code Without Fear</title>
+    <link>https://hno.rexai.top/blog/code-execution-sandbox</link>
+    <guid isPermaLink="true">https://hno.rexai.top/blog/code-execution-sandbox</guid>
+    <pubDate>Tue, 11 Aug 2026 00:00:00 GMT</pubDate>
+    <dc:language>en</dc:language>
+    <description>HNO executes agent-generated code in disposable containers: no network, no capabilities, bounded resources, hard timeouts, and a language-agnostic template model.</description>
+    <category>Security engineering</category>
+    <category>AI agents</category>
+    <category>agent security</category>
+    <category>sandbox</category>
+    <category>code execution</category>
+    <category>podman</category>
+    <category>Go</category>
+  </item>
+  <item>
+    <title>一次性代码沙盒:无惧运行 LLM 生成的代码</title>
+    <link>https://hno.rexai.top/zh/blog/code-execution-sandbox</link>
+    <guid isPermaLink="true">https://hno.rexai.top/zh/blog/code-execution-sandbox</guid>
+    <pubDate>Tue, 11 Aug 2026 00:00:00 GMT</pubDate>
+    <dc:language>zh-CN</dc:language>
+    <description>HNO 在一次性容器中执行 agent 生成的代码:无网络、无特权、资源有界、硬超时,配合语言无关的模板模型。</description>
     <category>安全工程</category>
-    <category>AI Agent</category>
-    <category>Agent 安全</category>
+    <category>AI agents</category>
+    <category>agent 安全</category>
     <category>沙盒</category>
-    <category>文件 I/O</category>
+    <category>代码执行</category>
+    <category>podman</category>
     <category>Go</category>
   </item>
   <item>
@@ -35,19 +110,18 @@
     <category>Go</category>
   </item>
   <item>
-    <title>AI Agent 框架性能怎么测：为什么运行时开销比模型延迟更重要</title>
-    <link>https://hno.rexai.top/zh/blog/ai-agent-runtime-benchmark</link>
-    <guid isPermaLink="true">https://hno.rexai.top/zh/blog/ai-agent-runtime-benchmark</guid>
-    <pubDate>Wed, 05 Aug 2026 00:00:00 GMT</pubDate>
+    <title>Agent 文件工具不能只靠路径前缀：HNO 如何用根句柄做沙盒</title>
+    <link>https://hno.rexai.top/zh/blog/sandboxed-file-io</link>
+    <guid isPermaLink="true">https://hno.rexai.top/zh/blog/sandboxed-file-io</guid>
+    <pubDate>Thu, 06 Aug 2026 00:00:00 GMT</pubDate>
     <dc:language>zh-CN</dc:language>
-    <description>使用相同的本地 Stub，对 HNO、Agno 和 LangGraph 进行 100 次、并发度 1/8/32 的可复现对比。</description>
-    <category>性能基准</category>
+    <description>HNO 通过显式能力、Go root-bound 文件系统句柄、读写限额与独立部署隔离层，约束 Agent 的文件读写。</description>
+    <category>安全工程</category>
     <category>AI Agent</category>
-    <category>Agent 框架</category>
+    <category>Agent 安全</category>
+    <category>沙盒</category>
+    <category>文件 I/O</category>
     <category>Go</category>
-    <category>Python</category>
-    <category>LangGraph</category>
-    <category>Agno</category>
   </item>
   <item>
     <title>AI Agent Framework Benchmarks: Why Runtime Overhead Matters More Than Model Latency</title>
@@ -60,6 +134,21 @@
     <category>AI agents</category>
     <category>agent frameworks</category>
     <category>benchmark</category>
+    <category>Go</category>
+    <category>Python</category>
+    <category>LangGraph</category>
+    <category>Agno</category>
+  </item>
+  <item>
+    <title>AI Agent 框架性能怎么测：为什么运行时开销比模型延迟更重要</title>
+    <link>https://hno.rexai.top/zh/blog/ai-agent-runtime-benchmark</link>
+    <guid isPermaLink="true">https://hno.rexai.top/zh/blog/ai-agent-runtime-benchmark</guid>
+    <pubDate>Wed, 05 Aug 2026 00:00:00 GMT</pubDate>
+    <dc:language>zh-CN</dc:language>
+    <description>使用相同的本地 Stub，对 HNO、Agno 和 LangGraph 进行 100 次、并发度 1/8/32 的可复现对比。</description>
+    <category>性能基准</category>
+    <category>AI Agent</category>
+    <category>Agent 框架</category>
     <category>Go</category>
     <category>Python</category>
     <category>LangGraph</category>
