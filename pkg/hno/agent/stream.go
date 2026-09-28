@@ -13,16 +13,29 @@ import (
 	"github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
-// RunStream executes the agent through the same runner kernel as Run, driving
-// each model turn through the model's streaming API and returning a pair of
-// channels: one for incremental content events and one that carries the final
-// RunOutput once aggregation completes.
+// RunStream streams the agent run in the default StreamMessages mode. It is a
+// pure wrapper over RunStreamMode(ctx, input, run.StreamMessages) and keeps its
+// original signature and behavior; the mode selection (including the
+// fail-closed verdict for not-yet-wired modes) lives there.
+// RunStream 以默认的 StreamMessages 模式流式执行 agent。它是
+// RunStreamMode(ctx, input, run.StreamMessages) 的纯包装，签名与行为不变；
+// 模式选择（含未接线模式的 fail-closed 判定）住在 RunStreamMode。
+func (a *Agent) RunStream(ctx context.Context, input string) (*RunStreamResult, error) {
+	return a.RunStreamMode(ctx, input, run.StreamMessages)
+}
+
+// runStreamMessages is the StreamMessages producer: it executes the agent
+// through the same runner kernel as Run, driving each model turn through the
+// model's streaming API and returning a pair of channels: one for incremental
+// content events and one that carries the final RunOutput once aggregation
+// completes.
 //
 // The tool-call loop itself lives in pkg/hno/runner; this function only decides
 // how a single turn is invoked (stream, fan chunks out as content events,
 // aggregate them) and how the kernel's verdict is reported back to the caller.
-// RunStream 通过与 Run 相同的 runner 内核执行 agent，每次模型回合走模型的流式 API，
-// 并返回一对通道：一个用于增量内容事件，一个在聚合完成后携带最终的 RunOutput。
+// runStreamMessages 是 StreamMessages 的生产者：通过与 Run 相同的 runner 内核执行
+// agent，每次模型回合走模型的流式 API，并返回一对通道：一个用于增量内容事件，
+// 一个在聚合完成后携带最终的 RunOutput。
 //
 // tool 循环本身住在 pkg/hno/runner；本函数只决定单次回合怎么调用（流式、把分块扇出为
 // 内容事件、聚合它们），以及内核的判定怎么回报给调用方。
@@ -30,7 +43,7 @@ import (
 // Cache is bypassed for streaming runs: a streamed turn is never looked up in
 // nor written back to the response cache.
 // 流式运行绕过缓存：流式回合既不查缓存，也不回写缓存。
-func (a *Agent) RunStream(ctx context.Context, input string) (*RunStreamResult, error) {
+func (a *Agent) runStreamMessages(ctx context.Context, input string) (*RunStreamResult, error) {
 	defer a.ClearTempInstructions()
 
 	if strings.TrimSpace(input) == "" {

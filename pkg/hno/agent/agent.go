@@ -1,6 +1,8 @@
 package agent
 
 import (
+	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -110,6 +112,27 @@ func (r *RunStreamResult) setStopReason(reason string) {
 	r.stopReasonMu.Lock()
 	r.stopReason = reason
 	r.stopReasonMu.Unlock()
+}
+
+// RunStreamMode streams a run with an explicit stream-mode selection. With no
+// modes given it defaults to run.StreamMessages; with StreamMessages present it
+// produces exactly the RunStream event sequence. Any other mode has no wired
+// producer yet (slice 23 delivers the protocol layer only), so the call fails
+// closed with an error wrapping run.ErrUnsupportedStreamMode before any stream
+// is started — it never silently degrades into a zero-event stream.
+// RunStreamMode 以显式的流模式选择执行流式运行：不给模式默认 StreamMessages；
+// 出现其余任何模式时，在启动流之前 fail-closed 返回包装
+// run.ErrUnsupportedStreamMode 的错误，绝不静默降级为零事件流。
+func (a *Agent) RunStreamMode(ctx context.Context, input string, modes ...run.StreamMode) (*RunStreamResult, error) {
+	if len(modes) == 0 {
+		modes = []run.StreamMode{run.StreamMessages}
+	}
+	for _, mode := range modes {
+		if mode != run.StreamMessages {
+			return nil, fmt.Errorf("agent: stream mode %d has no wired producer: %w", int(mode), run.ErrUnsupportedStreamMode)
+		}
+	}
+	return a.runStreamMessages(ctx, input)
 }
 
 // ClearMemory 清除此用户的Agent对话历史

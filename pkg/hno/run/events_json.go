@@ -63,6 +63,45 @@ func decodeEvent(raw json.RawMessage) (BaseRunOutputEvent, error) {
 		kind = strings.ToLower(strings.TrimSpace(meta.EventType))
 	}
 	switch {
+	// 精确 canonical 名先于 contains 归一化求值（次序被 D12 钉死）：contains 是旧
+	// 载荷的宽容历史行为，不得再吞噬新的精确名 —— node_completed 含 completed
+	// 子串，若排在 contains 之后会被吃进 RunCompletedEvent（M2 实测缺陷二）。
+	case kind == EventTypeNodeStarted:
+		var evt NodeStartedEvent
+		if err := json.Unmarshal(raw, &evt); err != nil {
+			return nil, err
+		}
+		return &evt, nil
+	case kind == EventTypeNodeCompleted:
+		var evt NodeCompletedEvent
+		if err := json.Unmarshal(raw, &evt); err != nil {
+			return nil, err
+		}
+		return &evt, nil
+	case kind == EventTypeTaskError:
+		var evt TaskErrorEvent
+		if err := json.Unmarshal(raw, &evt); err != nil {
+			return nil, err
+		}
+		return &evt, nil
+	case kind == EventTypeCheckpoint:
+		var evt CheckpointEvent
+		if err := json.Unmarshal(raw, &evt); err != nil {
+			return nil, err
+		}
+		return &evt, nil
+	case kind == EventTypeStateUpdate:
+		var evt StateUpdateEvent
+		if err := json.Unmarshal(raw, &evt); err != nil {
+			return nil, err
+		}
+		return &evt, nil
+	case kind == EventTypeCustom:
+		var evt CustomEvent
+		if err := json.Unmarshal(raw, &evt); err != nil {
+			return nil, err
+		}
+		return &evt, nil
 	case kind == "" || strings.Contains(kind, "content"):
 		var evt RunContentEvent
 		if err := json.Unmarshal(raw, &evt); err != nil {
