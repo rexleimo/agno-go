@@ -1,0 +1,224 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p1-graph-r19-join-barrier",
+  "activationId": "2a4119c8-a2a4-431c-ac64-fff7d0cf6393",
+  "capabilityId": "software.review.standards-spec",
+  "stageId": "review",
+  "recordedAt": "2026-09-27T20:41:30Z",
+  "independenceDisclosure": "作者自查，非独立审查者。用户此前已拒绝对 P1 派发独立审查子代理（原话投影：「The user doesn't want to proceed with this tool use … Do not repeat this call; take a different approach」），因此本轮两轴都由实现者本人执行。后果如实写下：这类形态最容易漏的恰好是「自己写代码时没想到的形状」，本文件的 S19-STD-1 与 S19-SPEC-2 都应在独立复审时被重新质疑，而不是当作已定案。为弥补独立性缺口，本轮所有结论都尽量落在实测之上（§measuredDuringReview 与 scripts/mutation/p1r19-join-barrier.mjs 的 13 条变异矩阵），可复现命令逐字写出。",
+  "fixedPoint": {
+    "note": "本切片的 fixed point 是契约 baselineBytes，不是某个 commit。切片 2–18 的成果至今未提交（HEAD 仍是 0387000 那句「land zero-lock scheduler with build-time edge validation」，只含第一片的桩），且这些基线 blob 从未 `git hash-object -w` 入库，所以 `git diff <fixedPoint>...HEAD` 在本切片物理上不可得。",
+    "graphGo": "a8e46a3a2f0baaa699ae60f26498c6f5c1c851cb",
+    "schedulerGo": "0ce6c3b332ddc768c1c5a10d6c1591fc88d67a2a",
+    "graphTest": "425ea030de83ac19a3c66706993e33be92c0f00d",
+    "carriedFinding": "S18-SPEC-2（未提交）仍在，本轮再次实测确认"
+  },
+  "diffRef": {
+    "how": "逐文件 baseline→final 清单（见 docs/design/v3-p1-graph-r19-green.md §2 与 -refactor.md §1），非三点 git diff，理由见 fixedPoint.note",
+    "changedFiles": [
+      {
+        "path": "pkg/hno/graph/graph.go",
+        "before": "a8e46a3a2f0baaa699ae60f26498c6f5c1c851cb",
+        "afterGreen": "f113895a16e5276e77ba0dc26222c49647e02b18",
+        "afterRefactor": "18002942851225ac6c27a0a40b4e24086a6c144f",
+        "linesGreenToFinal": "514 -> 563 -> 553"
+      },
+      {
+        "path": "pkg/hno/graph/scheduler.go",
+        "before": "0ce6c3b332ddc768c1c5a10d6c1591fc88d67a2a",
+        "afterGreen": "de005da450c2f70e26e50b8801e4708a96e150c8",
+        "afterRefactor": "c878a6c74cad89bbdfc773c21c58952d3944630d",
+        "linesGreenToFinal": "215 -> 281 -> 281"
+      },
+      {
+        "path": "pkg/hno/graph/graph_test.go",
+        "before": "425ea030de83ac19a3c66706993e33be92c0f00d",
+        "afterRefactor": "624f19624c6f4fa3c04ee6619e722b03de83336c",
+        "scope": "只有 allowedTestSeam.retires 授权的那一格（join-only -> join-with-one-predecessor），反向对照子用例逐字保留"
+      },
+      {
+        "path": "pkg/hno/graph/p1r19_join_barrier_test.go",
+        "before": null,
+        "afterRefactor": "8b4b7234ce92df2f936a1544cf24545d65ce0a9b",
+        "scope": "本片新增，386 行，D1–D7"
+      },
+      {
+        "path": "scripts/mutation/p1r19-join-barrier.mjs",
+        "before": null,
+        "scope": "本片新增的变异执行体，13 条，落在仓库内（回应 S17-STD-5 / S18-STD-6）"
+      }
+    ],
+    "nonTestLoc": "基线 729 -> GREEN 844 -> 最终 834（判据 ≤1500）",
+    "exportedSymbols": "24 -> 24（本片零新增导出面）",
+    "syncCounter": "0 -> 0（B12 零锁模型未被放宽）"
+  },
+  "specSources": [
+    "docs/design/v3-test-scope-p1-graph.md :61（B2 汇聚屏障三条期望）",
+    "docs/design/v3-test-scope-p1-graph.md :65（B6 第 6 项：Join 前驱数 < 2 构建期拒绝）",
+    "docs/design/v3-test-scope-p1-graph.md :161-168（R1 fail-closed 不变式，永久成立）",
+    "docs/design/v3-test-scope-p1-graph.md :77（反例：等固定时长再聚合）",
+    "docs/design/v3-test-scope-p1-graph-slice19.json（本片契约 D1–D7、forbiddenShortcuts、completionCriteria）",
+    "docs/design/v3-testability-decision-p1r19.json（behavior-delta，已接受）",
+    "docs/design/v3-platform.md §3.4 规则 3 与 §3.5 第 6 项（母约）",
+    "docs/design/v3-red-observation-p1r19.md（RED 面，实现之前）"
+  ],
+  "standardsSources": [
+    "AGENTS.md（Coding Style & Naming Conventions、Testing Guidelines）",
+    "rex-code-review 的 12 条 smell 基线（始终生效）",
+    "仓库内既有同文件风格先例：graph.go/scheduler.go 的「每条判据写清它防住哪种写坏形态」注释体"
+  ],
+  "standards": {
+    "verdict": "1 条 hard + 5 条 judgement，hard 那条不阻塞收口但不能拖",
+    "findings": [
+      {
+        "id": "S19-STD-1",
+        "severity": "hard",
+        "location": "pkg/hno/graph/scheduler.go:212-227（joinReady）与 :194-202（complete）",
+        "smellOrRule": "封装边界 / 别名可变性（AGENTS.md「文档化导出符号的语义」的兑现面：AddJoin 的文档承诺输入是 map[string]any，但没有承诺所有权）",
+        "evidence": "joinReady 把内部累加器 collected（即 s.joinCollected[target]）本身作为 activation.in 交给节点（:224），而消费者在之后的每个完成事件里仍会往同一个 map 写（:220）；屏障再次凑齐时（前驱因环重跑）交出的还是同一个实例。于是节点若把自己的 in 存下来跨执行或跨 goroutine 读，会看到引擎事后改写它——引擎交出去的状态仍在自己手里被写。",
+        "suggestedFix": "激活时交出快照而不是活对象：把 :224 改成复制一份 map（Go 1.24 可用 maps.Clone(collected)，或手写 3 行），内部累加器不外泄。导出面、锁计数、24 个符号都不受影响。",
+        "whyNotFixedThisTurn": "契约 D1–D7 没有任何一行观察「fire 之后的变异」（实测：矩阵 m1/m3/m6/m7 都没有打中这条性质），所以现在改它取不到诚实 RED。按 harness 纪律它属于新的 work item（behavior-preserving-hardening 基线，或先补一条 behavior-delta 设计）。挂号，不静默改。",
+        "status": "open"
+      },
+      {
+        "id": "S19-STD-2",
+        "severity": "judgement",
+        "location": "pkg/hno/graph/scheduler.go:56-64（waits/feeds/joinCollected 三字段）+ graph.go joinBarriers",
+        "smellOrRule": "Data Clumps（相同的几个字段总一起出现，一个小类型想要诞生）",
+        "evidence": "三张表 + joinBarriers/joinReady 两个函数只围绕屏障记账一起出现，scheduler 的职责因此从「派发」扩到「屏障状态」。",
+        "suggestedFix": "若 P2 的 Send 也要屏障记账（同名前驱多次激活聚合，见 S19-SPEC-3），届时抽成 barrierTracker；现在抽属于为规格中不存在的需求做抽象（Speculative Generality 的另一侧），本轮不动。",
+        "status": "recorded-no-action"
+      },
+      {
+        "id": "S19-STD-3",
+        "severity": "judgement",
+        "location": "pkg/hno/graph/scheduler.go:212 joinReady",
+        "smellOrRule": "Mysterious Name",
+        "evidence": "名字读起来像谓词（join ready?），返回值其实是 []activation（该目标现在可激活的清单）。",
+        "suggestedFix": "barrierActivations 或 joinFired；纯改名收益有限且 AGENTS.md 要求「没有明确收益时保留简单实现」，本轮不改，留下记录。",
+        "status": "recorded-no-action"
+      },
+      {
+        "id": "S19-STD-4",
+        "severity": "judgement",
+        "location": "graph.go routable/label/requiresPredicate + scheduler.go joinBarriers/successors",
+        "smellOrRule": "Repeated Switches",
+        "evidence": "对 edgeKind 的分支散在五处，新增种类要五处表态。",
+        "suggestedFix": "4 个种类时表驱动/多态是过度设计。本片已在 successors 的注释里把「一侧收 edgeJoin、另一侧收其余三种」写成显式分工声明（scheduler.go:235-237），这是当前规模下能给的最好缓解。",
+        "status": "recorded-no-action"
+      },
+      {
+        "id": "S19-STD-5",
+        "severity": "judgement",
+        "location": "pkg/hno/graph/p1r19_join_barrier_test.go 全文（7 个 Test 各搭一遍 4 节点夹具）",
+        "smellOrRule": "Duplicated Code（测试侧）",
+        "evidence": "entry/a/b/join 的夹具重复出现五次。",
+        "suggestedFix": "刻意合并：契约判据 1 要求每行可独立失败，夹具共享的 helper 会把「哪一行了」重新耦合；且 D2/D3 的夹具各带自己的握手通道。保留重复。",
+        "status": "recorded-no-action"
+      },
+      {
+        "id": "S19-STD-6",
+        "severity": "hard",
+        "location": "scripts/mutation/p1r19-join-barrier.mjs（新入库）与仓库门禁",
+        "smellOrRule": "AGENTS.md「工具链自动化」/ Testing Guidelines（回归担保要可运行）",
+        "evidence": "变异执行体这轮进了仓库（前两轮 S17-STD-5/S18-STD-6 的教训），但没有任何 make 目标或文档行把它接上；golangci-lint / make lint 至今从未在本工作项里运行过（GREEN/refactor 两份文档都记了这条欠项）。",
+        "suggestedFix": "加一条 `make mutation-p1r19`（或一个通用的 mutation-<slice> 形）并在 AGENTS.md 的 Testing Guidelines 里补一句它的用法；lint 欠项单独收口。",
+        "status": "open"
+      },
+      {
+        "id": "S19-STD-CHECKED-NONE",
+        "severity": "note",
+        "location": "smell 基线余下条目",
+        "evidence": "Feature Envy 未见（joinReady 只读自己的三张表）；Primitive Obsession 未见（屏障用 map[string]map[string]bool 而非字符串编码）；Shotgun Surgery 已在 REFACTOR 阶段消除（「哪些前驱算一个屏障」原本两处各数一遍，合并为 joinBarriers 一处）；Speculative Generality 未见（无新增导出符号、无 fired 守卫、无未需求参数）；Message Chains 未见；Middle Man 未见；Refused Bequest 未见；Mysterious Name 见 S19-STD-3；Duplicated Code 见 S19-STD-2/5 与已消除的那处。",
+        "status": "informational"
+      }
+    ]
+  },
+  "spec": {
+    "verdict": "D1–D7 全部按票面交付且各有杀手；另有 2 条 hard 冲突需要裁决（都不是「实现错了」，而是「契约与母约彼此不同意」）",
+    "findings": [
+      {
+        "id": "S19-SPEC-1",
+        "severity": "note",
+        "requirement": "票面 :61 三条：恰好一次 / 输入按前驱名键控 / a、b 先于 join",
+        "status": "delivered",
+        "evidence": "docs/design/v3-p1-graph-r19-refactor.md §2 矩阵：D1←{m1,m3,m6,m7,m10}、D2←{m1,m2(solo),m3,m6,m7,m10}、D3←{m1,m3,m6,m7,m10}；receipt:8a55bd2f-41e3-4c6d-bd26-654fd539b359 exit 0。票面 :77 的反例族（把 Join 当无条件边、以及屏障算完不交出去）分别由 m6、m7 打红。",
+        "note": "「等固定时长再聚合」这条反例另有担保：新测试文件里 time.Sleep 与 t.Skip 均 0 命中，唯一的 time. 调用是 10s 停摆上界阀（:43）。"
+      },
+      {
+        "id": "S19-SPEC-2",
+        "severity": "hard",
+        "requirement": "票面 :161-168 R1 fail-closed：非法/不受支持的声明不得静默放行，尤其不得出现 err==nil 且 Output()==nil",
+        "status": "gap-needs-adjudication",
+        "evidence": "最终字节实测（仓库外独立 module，只调公共 API）：声明过的汇聚前驱本次没执行、且图上再无待派激活时，`err=<nil> resNil=false output=<nil> completed=[a entry] Value(join)=<nil>(ok=false)`。形状出自 scheduler.go:105-110 的成功分支（running==0 即收敛）叠加 joinReady 永不凑齐。",
+        "whyNotAsserted": "契约 D7 钉的是「图还在往前走 ⇒ 安全阀」，片内不得自行加断言（forbiddenShortcuts 与 stage 边界）。",
+        "suggestedFix": "需要一次显式裁决：屏障没凑齐是否算「未收敛」。若算，成功分支要能看见「有声明过的屏障仍欠前驱」这一事实；若不算，票面 :161-168 要写下这条例外。登记为 R19-Q1。",
+        "refs": "docs/design/v3-p1-graph-r19-green.md §6.2、docs/design/v3-p1-graph-r19-refactor.md §5"
+      },
+      {
+        "id": "S19-SPEC-3",
+        "severity": "hard",
+        "requirement": "母约 docs/design/v3-platform.md:341 的 map-reduce 示例 vs 票面 :65「Join 前驱数 < 2 构建期拒绝」",
+        "status": "conflict-needs-adjudication",
+        "evidence": "示例写的是 AddJoin([]string{\"summarize\"}, \"reduce\") —— 单个前驱名、靠 Send 运行时扇出多次来聚合；而 :65 的「前驱数」在构建期唯一可数的就是「声明的去重前驱节点数」。本片的 rejectUnderfedJoinTargets 按 :65 落地，于是母约那句示例现在会被自己的 Validate 拒（同形输入实测：`graph: join target \"join\" must declare at least 2 distinct predecessors, got 1`）。",
+        "suggestedFix": "二选一，且必须由设计阶段定：改示例（让汇聚目标声明两个以上不同节点），或给 Send 那一片引入「同一前驱的多次激活也是聚合对象」的第二种屏障语义。本片未动母约示例。登记为 R19-Q2。",
+        "refs": "docs/design/v3-p1-graph-r19-green.md §6.3"
+      },
+      {
+        "id": "S19-SPEC-4",
+        "severity": "judgement",
+        "requirement": "§3.5 第 7 项环检查与汇聚边种类的关系（票面 B5 明写本切片不做）",
+        "status": "limit-closed-by-measurement",
+        "evidence": "alwaysTakenAdjacency（graph.go:416 的 keep 判据）只收无条件边与「无条件兜底边」，join 边按可断开处理，因此 a/b 互相汇聚的图在 Join 落地后首次成为可构建、可执行的形状。最终字节实测：该形状以 `graph: step limit 6 reached before the graph converged`（errors.Is(ErrStepLimitExceeded)=true、res==nil）结束，15s 内交出结论，不静默也不挂死。",
+        "suggestedFix": "§15 回写时把这条写成限制（连同「join 环由安全阀兜住」），不要留成读者的意外。",
+        "status": "recorded"
+      },
+      {
+        "id": "S19-SPEC-5",
+        "severity": "judgement",
+        "requirement": "AddJoin 新文档的每句都要在最终字节上为真",
+        "status": "one-clause-too-broad",
+        "evidence": "文档里「凑不齐的屏障不会把已完成的这些当成结论交出去，未收敛的图由 WithStepLimit 的安全阀结束」只对「图上仍有待派激活」的形状成立；S19-SPEC-2 实测的形状里既没有安全阀也没有结论。",
+        "suggestedFix": "§15 回写时给这句加限定（或在 S19-SPEC-2 裁决后改写）。本轮不动注释，避免在裁决前把未定语义写死。",
+        "status": "open"
+      },
+      {
+        "id": "S19-SPEC-6",
+        "severity": "note",
+        "requirement": "scope creep 检查",
+        "status": "none-found",
+        "evidence": "导出符号 24→24；未实现 Send、未实现 InputSchema/OutputSchema（票面 :212 划给 v3.1）；未新增 fired 守卫；未动 graph_test.go 除授权那一格之外的任何断言（其余 7 份测试文件逐字节哈希与契约 baselineBytes 相同）。"
+      }
+    ]
+  },
+  "measuredDuringReview": [
+    "node scripts/mutation/p1r19-join-barrier.mjs → 13 行，全部 restored=true，finalCheck identical=true（/tmp 副本：/tmp/p1r19-matrix.out.txt）",
+    "go test ./pkg/hno/graph -run TestP1R19_ -count=1 -race -v → exit 0（receipt:8a55bd2f-41e3-4c6d-bd26-654fd539b359）",
+    "go build ./... / go vet ./pkg/hno/graph/... / go test ./pkg/hno/graph/... -count=1 -race / gofmt -l pkg/hno/graph scripts → 全 exit 0、gofmt 无输出",
+    "go test ./pkg/hno/agent/... ./pkg/hno/runner/... ./internal/session/contract/... -count=1 → 三包全 ok",
+    "grep -c 'sync\\.' 两份非测试文件 → 0；非测试 LOC → 834；go doc -all 导出符号 → 24",
+    "屏障在 -count=30 -race 与整包 -count=5 -race 下稳定全绿",
+    "R19-Q1、R19-Q2（同形输入）、S19-SPEC-4 三处形状各在仓库外独立 module 里实测过一句真实输出"
+  ],
+  "verdict": {
+    "overall": "pass-with-findings",
+    "statement": "切片 19 的契约面（D1–D7 + 被退役的 R1 格）已交付且每行都有变异担保，零锁模型与导出面未放宽；本轮不能算「票面 B2 完全收口」，因为 2 条 hard 规格冲突（S19-SPEC-2/3）与 2 条 open 工程项（S19-STD-1/6）留在案上。它们都需要 rex-test-design 或用户的裁决，不得由实现阶段顺手改。",
+    "blockingForWriteBack": [
+      "S19-SPEC-4 与 S19-SPEC-5 要在票面 §15 回写里落成文字",
+      "S19-STD-1 要作为挂号项出现在状态文档里"
+    ],
+    "openFindings": ["S19-STD-1", "S19-STD-6", "S19-SPEC-2", "S19-SPEC-3", "S19-SPEC-5"],
+    "adjudicationNeededFromUserOrDesign": ["R19-Q1（S19-SPEC-2）", "R19-Q2（S19-SPEC-3）"]
+  },
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-r19-green.md",
+    "artifact:docs/design/v3-p1-graph-r19-refactor.md",
+    "artifact:scripts/mutation/p1r19-join-barrier.mjs",
+    "receipt:8a55bd2f-41e3-4c6d-bd26-654fd539b359",
+    "receipt:03c4c832-faed-4e90-bdc7-bfd6788d979d",
+    "receipt:ebd73748-a3ba-4e30-99e1-73ae95452fbb",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice19.json"
+  ],
+  "postAcceptanceAmendments": []
+}

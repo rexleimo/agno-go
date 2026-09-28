@@ -1,0 +1,77 @@
+{
+  "schema": "rex.testability-decision.v1",
+  "workItemKey": "work-p1-graph-engine-r10-cycle-termination",
+  "activationId": "986e6818-d428-476d-b77a-78e260b2b05b",
+  "stageId": "decide-testability",
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:docs/design/v3-testability-decision-p1-graph-slice10.json#decision",
+  "contractRef": "artifact:docs/design/v3-test-scope-p1-graph-slice10.json#userGoal",
+
+  "redCandidate": {
+    "publicEntry": "github.com/rexleimo/agno-go/pkg/hno/graph：Graph.Validate() 与 Graph.Run(ctx, in) 的返回值、Result.Completed()/Output()，外加节点体内一次自增的执行计数（测试文件属外部包 graph_test，只用导出面）",
+    "setup": "五条非法行各自只含一种缺陷：self-loop=AddEdge(\"a\",\"a\")；two-node=a→b 与 b→a；three-node=a→b→c→a；with-always-true-exit=前两行之外再挂一条恒真条件边 b→exit；default-edge-without-alternative=a→b 无条件 + AddDefault(\"b\",\"a\") 且 b 无条件边替代。每行都以 SetEntry/SetOutput 收尾，使「成环」是图里唯一的缺陷。三条对照行（谓词会转假的条件环、有条件替代的兜底回环、无环图）全部是 slice10 基线里实测今天就能结束的图。所有 Run 调用都包在 goroutine + 1s 期限 + cancel 里，期限到即判红，因此测试自身不可能挂死。",
+    "command": {
+      "executable": "go",
+      "args": [
+        "test",
+        "./pkg/hno/graph/...",
+        "-run",
+        "TestP1G_ValidateRejectsUnconditionalCycle",
+        "-count=1",
+        "-timeout",
+        "25s",
+        "-v"
+      ],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "契约 slice10 的 A1–A4：五种不可断开的环全部被 Validate 拒绝，错误同时含 graph: unconditional cycle 与被点名的成环节点；Run 传达同一错误、res==nil、且拒绝前执行计数为 0。A5：三条对照行保持成功且能结束，条件环的 Completed() 恰为 [a a b b end]。",
+    "observed": "五条非法行同一位点判红（pkg/hno/graph/graph_test.go:711「不可断开的环被 Validate 判为合法，调用方只能拿到一个永不返回的 Run」，五条子测试 FAIL、包级 FAIL、exitCode 1）；三条对照行 PASS；整条命令 0.160s 正常跑完测试二进制，不是超时 panic、不是编译错误、不是环境失败。",
+    "failureReason": "Validate 的函数体只做「入口存在 + 输出存在 + 每条边两端存在 + 条件边有谓词 + 边种类可路由」，从头到尾没有任何环相关的分支（pkg/hno/graph/graph.go:223-245）；调度器的消费循环也不计步数（pkg/hno/graph/scheduler.go:76-95 的 for 循环（:78）没有 steps 判据，s.stepLimit 在 pkg/hno/graph 内除 config 字段外无人读）。于是环上没有任何可断开的边时，Run 只会自旋：包外测量给出 1.5s 内 1,108,628–3,366,710 次节点执行（/tmp/p1-r10-probe，五条无条件环形状全部 HUNG）。测试红的正是这条缺失的构建期检查。",
+    "receiptRef": "receipt:8fd753a3-0eb7-4428-b6b0-8aad1db7eae7"
+  },
+
+  "summary": "存在诚实 RED：新行为（不可断开的环在构建期被拒、Run 传达同一拒绝且零副作用）已能通过稳定公共入口真实复现为失败，非零退出回执已取得，且 RED 以断言失败而非挂死呈现。因此选 behavior-delta 走 TDD，不选加固——本轮要改变调用方可观察的拒绝集合，不存在「行为不变的加固」。",
+  "redIndependence": "五条非法行各自独立可失败：判 from==to 的只查自环实现会红在后四行；只查大环的实现会红在 self-loop 行；把兜底边一律当可断开的实现会红在 default-edge-without-alternative 行。三条对照行今天就绿，不参与本次红，只承担「实现不得过度收紧」的边界。",
+  "baselineEvidence": {
+    "probe": "/tmp/p1-r10-probe（仓库外模块，replace 指向本仓库，只用公共入口，每个 Run 独立 goroutine + 1.5s 期限）",
+    "keyRows": [
+      "uncond-self-loop：validate=<nil>，HUNG，1.5s 内 3,175,697 次节点执行",
+      "uncond-two-node：validate=<nil>，HUNG，3,366,710 次",
+      "uncond-three-node：validate=<nil>，HUNG，2,356,461 次",
+      "uncond-cycle-w-cond-exit：validate=<nil>，HUNG，1,108,628 次（恒真条件出口不豁免，调度器是扇出）",
+      "default-loop-no-alt：validate=<nil>，HUNG，1,287,530 次",
+      "stepLimit3-uncond-cycle：New(WithStepLimit(3)) 后依然 HUNG，821,456 次 —— WithStepLimit 被证成无效 API 而非静态推断",
+      "cond-cycle-never-breaks：条件环谓词永不转假，HUNG，1,228,674 次 —— 本轮残留风险，属 G6/P3",
+      "cond-cycle-that-breaks / default-loop-w-cond-alt：RETURNED，Completed=[a a b b end]，各 5 次执行 —— 合法环的形状与重访语义",
+      "join-back-edge：已被既有检查拒绝（graph: join edge from \"b\" to \"a\" ... not routable），executed=0 —— 新拒绝复用「检查前置于副作用」样板",
+      "acyclic-control：RETURNED，executed=2"
+    ],
+    "measurementHygiene": "第一版探针用共享执行计数器，被前一个 HUNG 案例遗留的自旋 goroutine 污染（把后续行抬到 166）；改为逐案例独立计数器后复测，得上面各行。"
+  },
+  "scopeDiscipline": {
+    "inThisSlice": "Validate 增加「不可断开的环」检查（自环、多节点无条件环、无条件边 + 无条件替代的兜底边环），Run 随 Validate 一致拒绝且零节点执行；合法环对照保持。",
+    "explicitlyNot": "WithStepLimit 生效（NG1，属 P3/G6，条件环谓词永不转假的残留非终止因此仍在，已实测并挂号）；§3.5 第 8 项与 Warnings()（NG2，母约自相矛盾条款）；Join 路由（NG3）；空节点名与重名注册（NG4，下一切片）；结构化拒绝错误与检查次序重构（NG5）；graph 包之外的任何改动（NG7）。",
+    "ambiguityResolvedInContract": "AR1：无条件环按「不可断开」判据实现，而非按 §3.5 字面「环上边必须全为条件边」。理由是字面读法会拒绝掉实测今天可结束的 retry-with-escape 形状（default-loop-w-cond-alt），用一次误杀换一个真缺陷；取舍与证据写死在 v3-test-scope-p1-graph-slice10.json#ambiguityResolutions。"
+  },
+  "notChosen": {
+    "behavior-preserving-hardening": "不选：今天的五种形状一律放行、之后一律拒绝，用户可观察的拒绝集合发生变化，且已有真实非零退出回执，无需伪造成「无行为差异」。",
+    "blocked": "不选：验收条件全部可经公共入口观察，合法对照面也已实测能结束。"
+  },
+  "greenObligations": [
+    "GREEN 必须让 receipt:8fd753a3 同一条命令零退出，且不得改动本 RED 的任何断言（含五条非法行的文案锚点与三条对照行的精确 Completed 期望）。",
+    "单点变异归因至少三条：①去掉环检查（应红在全部五行）；②只判自环 from==to（应红在后四行）；③过度收紧成「任何环都拒」（应红在两条合法环对照）。杀伤不唯一时如实标注。",
+    "邻居回归：pkg/hno/graph 全包 -race、pkg/hno/agent、pkg/hno/runner 不得新增失败；既有 9 个测试函数不得被削弱。",
+    "包外场景模块 /tmp/p1-invariants-r10 需从公共入口复现：五种不可断开环被拒且零节点执行，合法条件环照常结束，并显式保留 cond-cycle-never-breaks 作为已测得的 GAP 行而不是断言它已被修好。"
+  ],
+  "blockedConditions": [
+    "若 GREEN 需要新增导出 API（例如为拿到环路径而暴露调度器内部）才能通过，判为缝选错，停下报告而不是加 test-only 出口。",
+    "若任一对照行在实现后失败，说明拒绝集合扩大到「不可断开」之外，回退实现而不是放宽断言。",
+    "若 RED 需要靠 go test 的 -timeout panic 才能失败（即测试自身挂死），本轮判为不合法 RED，停在设计阶段修测试构造。"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-testability-decision-p1-graph-slice10.json#decision",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice10.json#acceptanceMapping",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice10.json#measuredBaseline",
+    "receipt:8fd753a3-0eb7-4428-b6b0-8aad1db7eae7"
+  ]
+}

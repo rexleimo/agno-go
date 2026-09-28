@@ -1,0 +1,36 @@
+{
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:testability-decision:p1-graph-engine-slice3-r1",
+  "workItemKey": "work-p1-graph-engine",
+  "cycle": 3,
+  "contractRef": "artifact:docs/design/v3-test-scope-p1-graph.md#12.1",
+  "redCandidate": {
+    "publicEntry": "pkg/hno/graph 导出 API（package graph_test 外部观察）：(*Graph).AddJoin(from []string, to string) *Graph 声明之后，(*Graph).Validate() error 是否返回可定位的非 nil，以及 (*Graph).Run(ctx, in) (*Result, error) 是否以错误拒绝执行。断言只要求错误文本包含 offending 节点名，不断言错误类型、不引用 nodes/edges/条件边表等未导出字段，因此不锁死「如何记录声明」的实现选择。",
+    "setup": "工作树含切片 1（线性 DAG 执行）与切片 2（入口/悬空边的构建期拒绝）的已绿实现。本切片只向 pkg/hno/graph/graph_test.go 追加 TestP1G_UnsupportedEdgeDeclarationsAreRejected：注册 a/b/c/j 四个内存 identity 节点，entry=a、output=b，仅通过 AddJoin([a b], j) 声明一条汇聚边；反向对照子用例用同一批节点构造纯无条件线性图 a→b，防止「Validate 一律报错」的假实现同时骗过两条断言。无网络、无凭据、无跨用例共享状态；执行前 gofmt -l pkg/hno/graph 无输出、go vet ./pkg/hno/graph/... 净。",
+    "command": {
+      "executable": "go",
+      "args": [
+        "test",
+        "./pkg/hno/graph/...",
+        "-run",
+        "P1G",
+        "-count=1"
+      ],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "退出码非 0 且为行为级断言失败。目标行为：声明了引擎尚未路由的边类型时，Validate() 必须返回指名 offending 节点（此处为 join 目标 j）的错误，Run 必须以非 nil 错误拒绝该图，绝不允许出现「校验通过 + err==nil + Output()==nil」的静默空结果；同时只使用已实现边类型的合法图必须继续 Validate 返回 nil 且 Run 产出正确 Output。",
+    "observed": "exit 1。失败形态正是被指控的缺陷：--- FAIL: TestP1G_UnsupportedEdgeDeclarationsAreRejected/join-only，graph_test.go:86: 声明了引擎未路由的边，Validate 却判定合法。反向对照子用例与切片 1、切片 2 的全部子用例在同一命令下继续 PASS（--- PASS: TestP1G_LinearDagRunsChain、TestP1G_ValidateRejectsDanglingEdge 及其两个子用例、.../只使用已实现边类型的图仍然合法），最终 FAIL github.com/rexleimo/agno-go/pkg/hno/graph 1.246s。属真实缺失行为而非编译/环境问题：同一命令在加入本测试前以 exit 0 通过（receipt:3c591d82-c834-4bcb-ae7e-f9cde591d64f）。",
+    "failureReason": "AddConditional/AddDefault/AddJoin 三个 builder 目前只返回自身、不记录任何声明（graph.go:126-132），而调度器的 successors 只扫无条件边表（scheduler.go:107-115）；切片 2 落地的 Validate 也只检查入口存在与边的两端存在（graph.go:150-163），看不到这类声明。于是通过 §3.2 公共面写了 Join 的图会被判合法、被执行、并返回一个 Output 为 nil 的空 Result —— cycle-2 审查把它记为最高严重级阻断项 C2-SPEC-1，其实测探针为 Validate()=<nil>、Run err=<nil>、Output=<nil>、Completed=[a]。",
+    "receiptRef": "receipt:efa81bd9-dcc0-4c4d-bc17-b6fafcdf4369"
+  },
+  "sliceJustification": "「声明要么被路由、要么被拒绝」这条 fail-closed 不变式是其余路由工作的安全网：一旦它成立，任何尚未实现的边类型都不可能再产出静默错误结果，后续 R2（条件边 + Default 路由）与 B2（Join 路由）可以在绿的基础上逐类替换拒绝而不是逐类新增风险。它同时直接关闭 cycle-2 的 C2-SPEC-1，且不引入 §1 之外的任何公共 API。切片内被拒绝的集合会随实现收缩，因此本测试表刻意只列 Join 一类——条件边/Default 将在 R2 被真实路由，若在本切片断言它们被拒绝，就会与 R2 的期望互相拆台。",
+  "nonGoals": "本切片不实现条件边与 Default 的路由（由 R2 关闭）、不实现 Join 的汇聚语义（B2）、不做无条件边环检测（B5）、不做 §3.5 余下 4 项校验（重复名 / 不可达 / 非输出汇点 / Join 前驱数）、不做 Warnings（B7）与 stepLimit 安全阀（B4）、不做并发上限 FIFO（B8）、不做取消归一化（B9）、不做节点 panic 转错误（B10）、不做 Typed 断言（B11），也不触碰契约 §3 的任何非目标。",
+  "remainingRedOrder": [
+    "R2 条件边 + Default 路由（契约 §12.1 R2，五场景表驱动，每子用例可独立失败）",
+    "B5 无条件边成环的构建期拒绝（审查建议自 §11.3 前移，理由见 §12 追加说明）",
+    "B6 余下校验：重复节点名 / 不可达节点 / 非输出汇点 / Join 前驱数 < 2",
+    "B2 并行扇出 + Join 汇聚屏障（完成后 R1 的表须移除 join-only 项）",
+    "B4 stepLimit 计数与默认 1000 + B7 缺失告警",
+    "B8 并发上限 FIFO、B9 取消、B10 panic 转错误、B11 Typed"
+  ]
+}

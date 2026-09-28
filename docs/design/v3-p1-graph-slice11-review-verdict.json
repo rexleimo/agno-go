@@ -1,0 +1,207 @@
+{
+  "schema": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p1-graph-engine-r11-reachability",
+  "workflowActivationId": "745a9caf-71a7-41ba-9bc1-db887602191e",
+  "activationId": "bd2ded0d-7217-41e3-8eb4-b17364b7e277",
+  "capabilityId": "software.review.standards-spec",
+  "stage": "review",
+  "measuredAt": "2026-09-27T11:35:00Z",
+
+  "fixedPoint": {
+    "requested": "0387000（本工作项开工时的 HEAD）",
+    "resolvable": true,
+    "threeDotDiffIsEmpty": true,
+    "threeDotDiffCommand": "git diff 0387000...HEAD -- pkg/hno/graph",
+    "threeDotDiffLines": 0,
+    "boundaryUsedInstead": "工作树 + 文件哈希链。切片 10 收尾字节留在 /tmp/p1-cycle10/graph.go.postref=e790d40c5e7a05b76c0f39134b91678a593c2220，切片 11 收尾字节 pkg/hno/graph/graph.go=e75d58d529af2dad7e7f3cbc25ffdff8129f802b；生产代码差异 = /tmp/p1-cycle11/graph-go-slice10-to-11-final.diff（72 行变更，git diff 之外的真实比对）。测试文件本轮字节 d60690eb8d606b116ba4f6898b06555f9edd0289、RED 时字节 8b48c5cb9137a66a3ec61baddff4cf229d7a61a8、切片 10 时字节 a14299e6af6d98b93094bffbbf21696acda0c1f1，但切片 10/RED 的测试字节没有留下文件备份，所以测试侧只能按「新增函数全文 + 邻居夹具 1 行修复」来审，不能给逐字节 diff——这是本次审查边界的已知缺口。",
+    "diffNonEmpty": true,
+    "disclosure": "三点差分为空不是「没有改动」，而是 P1 全部改动未提交（HEAD 仍是 0387000，工作树里躺着切片 1–11）。审查照旧进行，但任何以 git 三点得分为准的判据在这里都不成立。"
+  },
+
+  "specSource": {
+    "mother": "docs/design/v3-platform.md:210-221 §3.5 构建期校验；第 4 项原文「不可达节点（从入口 BFS 不可达 → 报错而非静默）」，前言原文「`Validate()` 必查项（全部在 `Add*` 时增量检查，`Run` 前全量复查）」",
+    "sliceContract": "docs/design/v3-test-scope-p1-graph-slice11.json（A1/A2/A3/A4/A5/A6/A7 行为映射与完成判据）",
+    "testabilityDecision": "docs/design/v3-testability-decision-p1-graph-slice11.json（behavior-delta + contractAmendment：一次只点字典序第一个名字）"
+  },
+
+  "standardsSource": {
+    "repo": "AGENTS.md（Coding Style & Naming Conventions / Testing Guidelines / Security & Configuration Tips）",
+    "smellBaseline": "Fowler Refactoring ch.3 十二条，全部逐条查过",
+    "toolingCovered": "gofmt -l 无输出、go vet 零退出、golangci-lint 未在本阶段重跑（仓库 make lint 覆盖）"
+  },
+
+  "axes": {
+    "standards": {
+      "findings": [
+        {
+          "id": "S11-STD-1",
+          "smell": "Mysterious Name / 参数语义被稀释",
+          "location": "pkg/hno/graph/graph.go:264",
+          "evidence": "succ := g.adjacency(func(edgeDecl) bool { return true })",
+          "severity": "judgement",
+          "why": "共用骨架是对的，但「保留所有边」用恒真谓词表达，读的人要先证明这个闭包不滤掉任何东西才知道这里判的是无约束可达性；同一个参数在另一个调用点（graph.go:314）承担的是实质筛选。",
+          "fix": "给恒真调用一个名字：加一个 `g.allAdjacency()`（或直接让 adjacency 无谓词、由 alwaysTakenAdjacency 自己过滤），使「这条边算不算数」在调用点一眼可判。改动属于行为不变整理，需要重跑同一矩阵确认 MU7 仍判红。"
+        },
+        {
+          "id": "S11-STD-2",
+          "smell": "同一短语重复（诊断文案自指）",
+          "location": "pkg/hno/graph/graph.go:288",
+          "evidence": "graph: unreachable node %q: not reachable from entry %q through any declared edge",
+          "severity": "judgement",
+          "why": "前半句已说 unreachable，后半句再说 not reachable，同一信息两遍；AGENTS.md 要求错误消息保持小写简洁。",
+          "fix": "候选 `graph: node %q is not reachable from entry %q`。注意这不是免费的：`graph: unreachable node` 这个子串已经是测试锚（graph_test.go:1047 起 anchors 用它），改文案必须走新的 RED 并同步契约 amendment，不能顺手改。"
+        },
+        {
+          "id": "S11-STD-3",
+          "smell": "注释引用任务上下文（会腐烂）",
+          "location": "pkg/hno/graph/graph_test.go:1053-1055",
+          "evidence": "「不钉这一条就等于把「报哪个名字」交给运行期随机（变异矩阵里唯一存活的那个变异正是…见 slice11 GREEN 账本）」",
+          "severity": "judgement",
+          "why": "AGENTS.md 的注释标准是「只在说明新逻辑时写注释」；这里引用了一次性的变异矩阵编号和一个账本文件名，属于任务过程记录，随切片推进会失真，而测试自己要表达的不变量一句话就够。",
+          "fix": "留「同一条缺陷重复校验必须给出同一份文案（不可达集合来自 map 遍历，不钉即把报出的名字交给随机）」，删掉变异编号与账本路径——那两处信息已经在 docs/design/v3-p1-graph-slice11-refactor.json#mutationRecheckAfterRefactor 里。"
+        },
+        {
+          "id": "S11-STD-4",
+          "smell": "Divergent Change（观察项，暂不判为发现）",
+          "location": "pkg/hno/graph/graph.go 全文 399 行",
+          "evidence": "构建器（New/Add*/declare）、校验（Validate + 6 个 reject*）、诊断文案（cycleOf）同址。",
+          "severity": "judgement",
+          "why": "本轮又加了一个 reject*，同一个文件因「构建 API 演进」和「校验规则演进」两个不同原因被改。目前 399 行、内聚尚可接受。",
+          "fix": "等 §3.5 剩余项（2/5/6/8）落地后再评估拆 `validate.go`；现在拆会把切片 10/11 的哈希链切断在一个没有收益的时点。记为观察，不记为必须修。"
+        },
+        {
+          "id": "S11-STD-5",
+          "smell": "测试重复（未命中）",
+          "location": "pkg/hno/graph/graph_test.go:1000-1160",
+          "evidence": "新测试复用既有 looping/passthrough/runWithinLimit/noCount 与逐行 build 闭包，没有另起一套 harness。",
+          "severity": "judgement",
+          "why": "查过 Duplicated Code：未新增重复结构。",
+          "fix": "无需修复。"
+        },
+        {
+          "id": "S11-STD-6",
+          "smell": "确定性循环的取样面",
+          "location": "pkg/hno/graph/graph_test.go:1056-1065",
+          "evidence": "first := err.Error()；循环里用 tc.build(noCount).Validate() 重新建图再比。",
+          "severity": "judgement",
+          "why": "16 次都是「新实例 vs 首个实例」，同一个实例重复调用 Validate 的稳定性没有被单独钉住——今天两者等价（没有缓存），将来若加了校验缓存就会不同。",
+          "fix": "同一行内先对 `g` 自身再 Validate 一次并入比较，成本一行。"
+        }
+      ],
+      "smellChecklist": {
+        "Mysterious Name": "S11-STD-1",
+        "Duplicated Code": "未见（S11-STD-5：RF1 反而消除了两处重复的邻接表构造）",
+        "Feature Envy": "未见（rejectUnreachableNodes/adjacency 都只读 Graph 自己的字段）",
+        "Data Clumps": "未见（没有新增成组出现的参数；adjacency 只有一个谓词参数）",
+        "Primitive Obsession": "未见（错误仍是 fmt.Errorf 叶子错误，没有用字符串承载可判别的领域概念）",
+        "Repeated Switches": "未见（没有新增对 edgeKind 的 if 级联；kind 判定仍集中在 edgeKind 方法上）",
+        "Shotgun Surgery": "未见（本切片只落 1 个生产文件，插入点 1 处）",
+        "Divergent Change": "S11-STD-4（观察项）",
+        "Speculative Generality": "未见（没有新增导出符号、配置项或钩子；aggregate 诊断明确没做）",
+        "Message Chains": "未见（最长链是 g.adjacency(...)[name]）",
+        "Middle Man": "未见（Validate 只是编排，不转发）",
+        "Refused Bequest": "不适用（无继承/接口实现新增）"
+      },
+      "repoStandardCompliance": {
+        "goDocOnExports": "合规（SetOutput/Validate 文档随行为更新，新私有函数带 doc）",
+        "errorWrapping": "合规（无新错误链需要 %w）",
+        "lowercaseMessages": "合规",
+        "tabsAndFormatting": "合规（gofmt -l 空输出）",
+        "coverageAtLeast70": "合规：go test ./pkg/hno/graph/ -count=1 -cover → coverage: 91.1% of statements",
+        "tableDrivenColocated": "合规（新测试是表驱动行 + 对照子测试，与代码同目录）",
+        "noSecretsNoManifestEdits": "合规（本阶段没有触碰凭据、manifest 或 env 文件）"
+      }
+    },
+
+    "spec": {
+      "findings": [
+        {
+          "id": "F11-SPEC-1",
+          "type": "已实现但没被钉住（断言牙齿缺口）",
+          "severity": "blocking",
+          "requirement": "docs/design/v3-testability-decision-p1-graph-slice11.json#contractAmendment：一次只点一个节点名，取字典序第一个；docs/design/v3-p1-graph-slice11-green.json#implementationDiffRecorded 同口径。",
+          "location": "pkg/hno/graph/graph_test.go:1047 anchors 只含 `graph: unreachable node` + wantNodes",
+          "evidence": "实测变异 MU9（把 missing 全部拼进同一条消息：`graph: unreachable node \"alpha\", \"beta\", \"gamma\", \"delta\": …`）在重构后的字节上两次运行 exit=0 / 0 条 FAIL —— 聚合式实现完全通过现有测试。对照：同一批里 MU10（把「有任意相连边」当作可达）被 4 行判红（:1051/:1131/:1134）。",
+          "impact": "契约里「只点一个名字」目前只是文档，不是担保。任何人把它改成聚合输出、或改成一次报多个名字，本轮的矩阵不会拦住。",
+          "fix": "在每条非法行加两面：(1) 消息里 %q 出现的节点名恰好一个（例如断言不点名该图里其它不可达名字：unreachable-many 必须不含 \"beta\"/\"gamma\"/\"delta\"）；(2) 用整条文案的精确形状而不是子串（含 `through any declared edge` 收尾，只匹配一次）。改完必须重跑 MU1–MU8 + MU9，确认 MU9 判红。"
+        },
+        {
+          "id": "F11-SPEC-2",
+          "type": "规格要求但缺失（延续 S10-SPEC-1）",
+          "severity": "hard",
+          "requirement": "docs/design/v3-platform.md:214 「全部在 `Add*` 时增量检查，`Run` 前全量复查」",
+          "location": "pkg/hno/graph/graph.go:263-289（只在 Validate 路径上被调用）",
+          "evidence": "AddNode/declare 里没有可达性调用：`AddNode(orphan)` 之后直到 Validate/Run 都没有反馈。切片 10 已为同类问题挂号（S10-SPEC-1），本轮新增的 rejectUnreachableNodes（graph.go:263）同样只在 Validate 路径上被调用（graph.go:248 是唯一调用点）。",
+          "impact": "母约的增量语义对第 4 项同样未满足。更麻烦的是：可达性在增量时点本质上算不全（图还没连完），这是需要先做决策（wayfinding）而不是直接实现的分歧。",
+          "fix": "开一个 wayfinding 工作项裁定 `Add*` 增量的定义域（声明级可判项 vs 需要全图的项），再决定第 4/7 项是否属于后者并把母约写回成可执行判据；母约文件 docs/design/v3-platform.md 目前被治理门（rex-self-sediment-gate）挡住，写回需要新授权。"
+        },
+        {
+          "id": "F11-SPEC-3",
+          "type": "规格不完整（跨项交互未定义）",
+          "severity": "judgement",
+          "requirement": "§3.5 第 4 项与第 5 项（无出口：无出边的非输出节点）、第 6 项（Join 前驱数 < 2）",
+          "location": "pkg/hno/graph/graph.go:265（可达只看正向边）",
+          "evidence": "场景实测 B9-sink-not-output 仍然 validate=nil（/tmp/p1-r11-probe out-green.txt），说明第 5 项没落地；而 join 节点若另一条前驱链不可达，本检查仍判它可达（正向 BFS 不要求前驱全部可达）。",
+          "impact": "第 4 项与第 6 项的合取语义没有裁定：一个「静态可达但因前驱不可达而永不齐步」的 join 节点，现在会被放行。这不是本轮实现错误，但契约没有覆盖它。",
+          "fix": "在 §3.5 第 6 项的切片里显式裁定 join 可达性语义，并给它自己的非法行 + 对照行；本轮不扩范围。"
+        },
+        {
+          "id": "F11-SPEC-4",
+          "type": "未被规格要求的行为（跨切片改动，已核实为行为不变）",
+          "severity": "judgement",
+          "requirement": "切片 11 契约只要求第 4 项；RF1/RF2 同时改了切片 10 的 alwaysTakenAdjacency（pkg/hno/graph/graph.go:314）",
+          "location": "/tmp/p1-cycle11/graph-go-refactor.diff",
+          "evidence": "行为不变有实测支撑：场景模块 10 个形状输出逐字节相同（receipt:57bb0fcb），切片 10 的 AR1 判据在变异 MU8 下仍由 graph_test.go:784 判红，8 条子测试逐条仍在（receipt:e1db08ce 整包 -race exit 0）。",
+          "impact": "如果只做静态读，这是越界；做了行为担保后属 REFACTOR 阶段授权范围。",
+          "fix": "无需改代码。后续切片凡跨切片改私有函数，都要像这样附一条「上一片判据仍判红」的变异证据，而不是只附整包通过。"
+        },
+        {
+          "id": "F11-SPEC-5",
+          "type": "阶段证据提交形状（流程观察，不是代码缺陷）",
+          "severity": "judgement",
+          "requirement": "rex-tdd Evidence Contract：命令型证据必须引用真实收据",
+          "location": "GREEN 阶段 3 次 blockedReason=evidence-invalid",
+          "evidence": "原因在 harness-cli 侧：validate-command-evidence.mjs:44 对同一证据项里的每个 receipt: 都执行 assertExecutionReceiptMatchesCommand，混入整包 -race 收据会让整条提交抛错，而运行时 `catch {}` 不返回原因；另有一次是沿用了压缩前的旧 executionToken（b6da3975，实际已轮换为 c7be38d7）。",
+          "impact": "不修就会在下一切片重复浪费阶段。",
+          "fix": "已沉淀为记忆条目 feedback-rex-evidence-receipt-scenario-bound.md：阶段证据只引用与场景命令 argv 一致的那条收据，其它收据留在 ledger artifact 里。"
+        }
+      ],
+      "implementedAsSpecified": [
+        "§3.5 第 4 项本体：正向 BFS + 报错而非静默，graph.go:263-289；非法形状 B1/B2/B4/B7 的节点执行计数实测全为 0（/tmp/p1-r11-probe out-green.txt），即 check-before-effect 在这一项上也成立。",
+        "S10-SPEC-3 的不自洽裁定：不可达的无条件环现在报可达性（B7/测试 :1131-:1134），可达的环文案一字未动（B8 整行与切片 10 逐字节相同，测试 :1147 起的对照仍在）。",
+        "A3 边界：条件边谓词运行期不命中仍算可达（测试 :1092-:1115，变异 MU2 判红 16 行）。",
+        "A7 次序：新检查没有抢走既有五项（:1150 之后的 4 条嵌套对照全绿，实测输出见 receipt:2c6eefed）。"
+      ],
+      "scopeCreepCheck": "没有新增导出 API、没有新增配置项、没有实现聚合诊断、没有顺手做第 2/5/6/8 项——这些都记在 notClaimed 里。"
+    }
+  },
+
+  "verdict": "有条件通过：§3.5 第 4 项的实现在行为面成立且有变异担保（8 个可编译单点变异全部判红、行集/站点已归因），但 F11-SPEC-1 是真实的断言牙齿缺口——契约的「一次只点一个节点名」在现有测试下可以被聚合式实现静默替换（MU9 exit=0 两次实测）。本工作项不闭结，缺口以单独 cycle 关闭。",
+  "blocking": ["F11-SPEC-1"],
+  "owedOrder": [
+    "F11-SPEC-1（同一条契约的牙齿补齐：精确形状断言 + 排除其它不可达名字，重跑 MU9 确认判红）",
+    "F11-SPEC-2 / S10-SPEC-1（Add* 增量语义需要 wayfinding）",
+    "S10-STD-4（死配置项处置 + 导出项守卫测试）",
+    "R9-SPEC-1（空节点名与「从未声明」同形）",
+    "R9-SPEC-2 / §3.5 第 2 项（重复节点名）",
+    "§3.5 第 5 项（无出口汇点，B9 实测仍放行）",
+    "F11-SPEC-3（join 可达性语义，随第 6 项一并裁定）",
+    "S10-STD-3（结构化拒绝错误）",
+    "母约写回（docs/design/v3-platform.md 被治理门阻挡，需显式授权）",
+    "G6/P3 WithStepLimit 兜底"
+  ],
+  "independence": "降级如实披露：本轮仍是作者自审。用户此前明确拒绝派发独立审查子代理（「The user doesn't want to proceed with this tool use」），因此 Standards/Spec 两轴的可信度依赖「每个发现都带可复现命令或实测变异」而不是依赖第三方视角；MU9/MU10 是在这次审查里新造的变异并真实跑出的结果，不是复述前阶段账本。",
+  "evidenceRefs": [
+    "receipt:2c6eefed-e642-4463-8e32-f3b64d612d89",
+    "receipt:ae43dcd6-e112-453b-8cb8-5518662fcb54",
+    "receipt:57bb0fcb-2612-4940-ab57-96d308a32a1e",
+    "receipt:e1db08ce-c472-4266-85d4-dfaee367b4b3",
+    "receipt:d612e2a8-473b-43f6-b9dc-8f8ce75461f1",
+    "artifact:docs/design/v3-p1-graph-slice11-green.json#mutationMatrix",
+    "artifact:docs/design/v3-p1-graph-slice11-refactor.json#mutationRecheckAfterRefactor",
+    "artifact:/tmp/p1-cycle11/graph-go-slice10-to-11-final.diff",
+    "artifact:/tmp/p1-cycle11/matrix3.txt",
+    "artifact:/tmp/p1-cycle11/matrix4.py",
+    "artifact:/tmp/p1-r11-probe/out-green.txt"
+  ]
+}

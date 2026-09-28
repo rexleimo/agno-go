@@ -1,0 +1,199 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p3-graph-g6-durability",
+  "activationId": "pending",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-28T00:00:00Z",
+  "contractRef": "docs/design/v3-test-scope-p1-graph-slice24.json",
+  "slice": 24,
+  "series": "P3 第 1 片（母约 §7 G6：Durability 持久化档位；StepLimit 部分切片 13 已交付）",
+  "userGoal": "把「图跑过的每一步可以按档位落盘」变成 pkg/hno/graph 的公共面能力：WithDurability 三档（Sync=下一步开始前同步落、Async=下一步执行时异步落、Exit=仅图退出时落）控制每个节点完成事件向 Checkpointer 提交的时机，默认 DurabilitySync（最安全）；条目流 Seq 从 1 连续递增、与 Result 对账（每完成节点恰一条、Node 集与 Completed() 一致、Output 同值）；sink 失败永不静默（fail-closed）；并与已交付的步数安全阀共存——撞 ErrStepLimitExceeded 的 Run 保留已提交条目、不给未运行的节点补条目。",
+  "whyThisSlice": "母约 §10 交付表把 P3 定为 G5 Send + G6 Durability/StepLimit 两半：StepLimit 半边已随切片 13 交付（defaultStepLimit=1000、WithStepLimit 构建期校验、ErrStepLimitExceeded 哨兵，p1r13_step_limit_test.go 8 个 Test 锚定）；G5 被 R19-Q2 的负责人裁决挡住（材料已单独登记 docs/design/v3-adjudication-r19-q2-send-join.md，裁决属负责人）。于是 P3 当前可开工的唯一前沿就是 Durability。它是 P5（G7 会话事件化 + Resume）的直接前置——没有逐节点的提交流，Resume 无物可续；切片 23 的协议层也已在 wire 上留了 checkpoint 事件名，graph 侧提交流是它的天然生产者。先立提交缝再接桥接，避免两片互相等。",
+  "measuredBeforeDesign": [
+    {
+      "id": "M1-今天的公共面形状（仓库外探针 + 结构扫描，引擎字节未动）",
+      "scene": "/tmp/g6m1（go.mod 为 module github.com/rexleimo/agno-go + go 1.24，pkg/hno/graph 为仓库 pkg/hno/graph/*.go 的逐字节副本——stdlib-only 包，cmd/probe 只调导出 API）",
+      "commands": [
+        "go -C /tmp/g6m1 run ./cmd/probe",
+        "go -C /tmp/g6m1 test ./pkg/hno/graph -count=1",
+        "go doc -all ./pkg/hno/graph | grep -icE 'durability|checkpoint|resume|checkpointer'",
+        "go doc -all ./pkg/hno/graph | grep -cE '^(func|type|var|const) '",
+        "find pkg/hno/graph -name '*.go' -not -name '*_test.go' | xargs wc -l"
+      ],
+      "observations": [
+        "SHAPE-1（安全阀已交付，复核仍成立）：条件自环图 WithStepLimit(50) 撞限，errors.Is(err, ErrStepLimitExceeded)=true、res=nil、节点恰被调 50 次后停（receipt:cc67e981-42e7-4009-ab2b-588e4454b9b7，exit 0）。",
+        "SHAPE-2（跨 Run 无持久产物）：同一张线性图第二次 Run 全部节点从头重跑（a=2,b=2,out=2），两次 Run 之间没有任何可恢复产物；探针只用导出 API 即可编译——公共面不存在任何接收检查点/恢复点的符号，「今天无法续跑」是真的（receipt 同上）。",
+        "SHAPE-3（只交最终 Result）：线性 Run 收敛后交出 Output()/Completed()/Value()，节点完成事件没有任何可挂接的存储 sink——WithTrace 的 Hook（切片 22）是内存回调，不是提交流，两者不互相冒充（receipt 同上）。",
+        "结构扫描：durability/checkpoint/resume/checkpointer 关键词在 go doc -all 命中 0；导出符号 35；非测试 LOC 1085；副本上既有 11 份测试文件全绿（receipt:70daa2a8-6b1d-44ca-964c-c5bb2eb6e9d6，exit 0）。"
+      ]
+    },
+    {
+      "id": "M2-可行性实验（候选缝整体落在仓库副本上，仓库字节未动）",
+      "scene": "/tmp/g6exp（M1 副本 + 新文件 durability.go：Durability 三常量/Checkpoint/Checkpointer/WithDurability/WithCheckpointer + beginCommits/record/finishCommits；graph.go config 加 durability/checkpointer 两字段；scheduler.go 消费者侧接线；cmd/probe 量九个观察面）",
+      "commands": [
+        "go -C /tmp/g6exp test ./pkg/hno/graph -count=1",
+        "go -C /tmp/g6exp test ./pkg/hno/graph -count=1 -race",
+        "go -C /tmp/g6exp run ./cmd/probe",
+        "go -C /tmp/g6exp run -race ./cmd/probe",
+        "go -C /tmp/g6exp doc -all ./pkg/hno/graph | grep -cE '^(func|type|var|const) '",
+        "find /tmp/g6exp/pkg/hno/graph -name '*.go' -not -name '*_test.go' | xargs wc -l"
+      ],
+      "observations": [
+        "带缝副本上既有全部测试（切片 13–22 的 11 份测试文件）0 判红：-count=1（receipt:483ee91f-5c23-455f-aa03-dd70bb3f3bf4）、-race（receipt:f292014a-3b5f-4b10-8af9-38c3dcd58700）均 exit 0 —— 缝对既有行为零扰动，源兼容无风险（Option 全新增，不动既有签名）。",
+        "九个观察面全绿（receipt:9deb910c-b28d-4569-92b4-a63a6c9fd458，exit 0；-race 复跑 receipt:8d0f01ed-10d6-439b-ab7d-46d0d177058e）：OBS-1 三常量 iota 序 Sync=0<Async=1<Exit=2 且零值即 Sync；OBS-2 默认档行为=Sync（后继节点体采样已见前驱条目 b-saw-1，条目 1:a,2:b,3:out）；OBS-3 显式 Sync 与默认档同形；OBS-4 Exit 运行中三个节点采样全零（a-saw-0 b-saw-0 out-saw-0）、Run 返回前 1:a,2:b,3:out 一次落齐；OBS-5 Async 返回前全部落齐且 Seq 序不乱（运行中采样 a-saw-0/b-saw-1 正是「不作 mid-run 承诺」的实测形状）；OBS-6 声明档位未挂 sink 零影响照常跑完；OBS-7/OBS-8 Sync/Exit 档 sink 失败后 Run 交出可 errors.Is 到夹具错误的失败、res=nil；OBS-9 WithStepLimit(1) 线性图撞阀 errors.Is=ErrStepLimitExceeded 且 sink 恰留 1:a（已提交不回滚、未跑不补条目）。",
+        "结构代价（副本实测）：go doc 计数 35 → 41（+3 类型 Durability/Checkpoint/Checkpointer + 2 个 Option + 1 个 const 块；导出符号清单实为 +8=3 类型+2 Option+3 常量——枚举成员在 const 块内缩进，不被 ^ 锚 grep 计入）；非测试 LOC 1085 → 1218（新文件 durability.go 114 行、scheduler.go +17、graph.go +2）；包内 sync. 计数仍 0——Async 冲刷器只共享 commits 通道，零锁模型未破；go vet 干净。",
+        "过程登记：第一版探针有夹具缺陷——sink 未经 WithCheckpointer 挂上即断言提交面，全部观察读空（receipt:6e92a918-5026-4f97-b2d5-62cfe5e6ba9a，exit 0 但观察作废）。修正夹具后重跑才取 9deb910c。教训与切片 20 §6 同源：观察面读空时先怀疑夹具接线再下结论。"
+      ]
+    }
+  ],
+  "designConsequence": "母约 §7 只给了 Durability 三档草图与「向 Session 存储提交事件的时机」一句话，Carrier/Store 形状留空。以下六条是本片补出的最小决策，实现前写明：（1）sink 声明在 graph 包内——Checkpointer 接口（Append(ctx, Checkpoint) error）+ Checkpoint 条目（Seq/Node/Output 三字段最小集），沿 CacheStore 先例，依赖方向单向不破：graph 不依赖 internal/session，母约「Session 存储」的适配留给调用方实现；（2）Seq 由消费者 goroutine 在提交时机盖章，从 1 连续递增，次序即本次 Run 的完成处理次序；条目流 append-only，无读回 API（读回=恢复，见第 6 条）；（3）三档时机的落点全在消费者侧：Sync 在 complete 之后、下一轮 dispatch 之前（「下一步开始前」的精确定位）；Async 交后台冲刷 goroutine（与引擎只共享 channel，零锁不破），Run 返回前冲刷完毕；Exit 只积累、退出一次落齐——Async 的可观察承诺只有「返回前落齐、不丢、Seq 序不乱」，不作 mid-run 可见性承诺；（4）失败路径语义：已完成节点的条目在失败/撞阀退出时也照常交付（持久化记的是发生过的完成）；sink 错误永不静默——Sync 即时使 Run 失败，Exit/Async 在退出收尾上交（errors.Is 可归因到 sink 交的那个错误），但失败路径上 sink 错误不掩盖运行本身的首要错误（runErr 优先，不变异成双重报错）；（5）默认档=DurabilitySync 由 iota 零值直接给出（母约「默认 Sync（最安全）」），不新增 Validate 行（guard 钳制先例）；声明了档位而未挂 sink = 不持久化、零影响，不报错——「何时落」由档位回答，「落不落」由 sink 的有无回答；（6）本片不交付：恢复/重放（从 Checkpointer 读回续跑需要 Run 的重入语义，新的公共面表达力，挂 P5 G7 门槛）、条目到 run.CheckpointEvent（切片 23 协议层）的生产者桥接、落盘格式/编码/TTL（Checkpointer 实现属调用方）。",
+  "redProtocol": "本片与切片 22/23 同构：新增公共面符号。第一段落 API 面（durability.go 的类型/常量/Option/sink 接口 + config 字段落位，调度器不消费），绑定命令可编译，D2–D7/D9 按今天的形状真实判红——sink 收不到任何条目、sink 错误无从传播、撞阀后条目面为空，全部是行为红而非编译红；D1 在 API 面落地前是本片唯一允许的编译红，落地后转绿；D8 反向对照两段都绿。第二段落 beginCommits/record/finishCommits 三段接线，D2–D7/D9 转绿。两段各自留 receipt，两段之间测试文件零改动。M2 副本即两段完整预演。",
+  "acceptanceMapping": [
+    { "row": "D1", "behavior": "Durability 三常量存在且 iota 序 Sync<Async<Exit，零值即 Sync；WithDurability/WithCheckpointer/Checkpointer/Checkpoint 符号存在", "publicEntry": "graph.Durability 常量族 + WithDurability/WithCheckpointer", "assertion": "序数断言（Sync<Async<Exit）与 Durability(0)==DurabilitySync；四个符号在实现前不存在，编译期即红——本片唯一允许的编译红（见 redProtocol 注）", "independentlyFailable": "对漏定义/乱序/默认档错位判红" },
+    { "row": "D2", "behavior": "默认档=DurabilitySync（行为钉，不读私有 config）：不声明 WithDurability、只挂 sink 的线性图，后继节点体执行时采样 sink 已见前驱条目", "publicEntry": "New() 无档位 Option + WithCheckpointer → Run → 后继节点体内采样夹具 sink", "assertion": "后继体采样计数 ≥1（已见前驱条目）且 Run 返回后条目序为 1:a,2:b,3:out（今天无 sink 缝可挂，API 面落地后调度器不消费 → 采样为 0，故两段间必红）", "independentlyFailable": "对默认档实现成 Exit/Async 的实现判红" },
+    { "row": "D3", "behavior": "Sync 档正例：WithDurability(DurabilitySync) 下，每个节点完成后、下一步开始前条目已落——后继体采样已见前驱条目，Run 返回后恰三条、Seq=1,2,3", "publicEntry": "WithDurability(DurabilitySync) + WithCheckpointer → Run", "assertion": "后继体采样 ≥1 且条目 Seq 序 [1,2,3]、Node 序 [a,b,out]（今天形状为空，实现前必红）", "independentlyFailable": "对「下一步开始前」定位错到 dispatch 之后的实现判红" },
+    { "row": "D4", "behavior": "Exit 档：运行中 sink 零条目（每个节点体采样皆空，尽管前驱已完成），Run 返回前全部条目一次落齐（3 条、Seq 序不乱）", "publicEntry": "WithDurability(DurabilityExit) + WithCheckpointer → Run", "assertion": "全部 mid-run 采样 == 0 且返回后恰 3 条、序 [1:a,2:b,3:out]（今天为空，实现前必红）", "independentlyFailable": "对「运行中就漏条目」或「退出不落齐」的两个方向都判红" },
+    { "row": "D5", "behavior": "Async 档：Run 返回前全部条目落齐（不丢）、Seq 序不乱（不乱）；不对 mid-run 可见性作承诺（承诺缺席的边界见 observabilityLimit）", "publicEntry": "WithDurability(DurabilityAsync) + WithCheckpointer → Run", "assertion": "返回后恰 3 条、Seq 序 [1,2,3]、Node 集与 Completed() 一致（今天为空，实现前必红）", "independentlyFailable": "对丢条目/乱序/退出不冲刷的实现判红（mid-run 采样值不作断言）" },
+    { "row": "D6", "behavior": "条目流与 Result 对账（三档共用）：每完成节点恰一条，Seq 从 1 连续递增无空洞，Node 集合 == Result.Completed()，各条目 Output == Result.Value(该节点)", "publicEntry": "Checkpointer 夹具收集的条目 × Result 公共读数", "assertion": "count==len(Completed())、Seq 连续、逐节点值相等（三档各一子用例；今天无从对账，实现前必红）", "independentlyFailable": "对多记/漏记/Seq 跳号/Output 记错的实现判红" },
+    { "row": "D7", "behavior": "sink 失败 fail-closed：Sync 档 sink 首次 Append 返回夹具错误 → Run 交出可 errors.Is 到该错误的非 nil 错误、res=nil；Exit 档同样在退出落齐时上交不被吞", "publicEntry": "WithDurability(...) + 返回错误的夹具 Checkpointer → Run", "assertion": "两档子用例 errors.Is(runErr, 夹具错误)==true 且 res==nil（今天无缝，sink 根本不会被调用 → errors.Is=false，实现前必红）", "independentlyFailable": "对吞错/只打日志/降级为零错误成功的实现判红" },
+    { "row": "D8", "behavior": "nil Checkpointer 零影响（反向锚）：声明 WithDurability 三档而未挂 sink（或完全不声明）→ 照常跑完、无 panic、无条目；引擎不存在全局默认 sink", "publicEntry": "WithDurability(三档) 各自无 WithCheckpointer → Run", "assertion": "三档子用例 err==nil、Output 正确（实现前后都绿）", "independentlyFailable": "对引入默认 sink、对 nil sink panic、或「没挂 sink 就报错」的实现判红" },
+    { "row": "D9", "behavior": "安全阀组合：WithStepLimit(1) 的线性两步图 + Sync → Run 交出可 errors.Is 到 ErrStepLimitExceeded 的错误，且 sink 恰含 entry(a)（Seq=1）——已提交条目不回滚，未运行的 b/out 不补条目", "publicEntry": "WithStepLimit × WithDurability(Sync) × WithCheckpointer 组合", "assertion": "errors.Is(ErrStepLimitExceeded) 且条目恰为 [1:a]（今天条目面为空，实现前必红）", "independentlyFailable": "对撞阀时清空条目、给未跑节点补条目、或安全阀路径丢提交流的实现判红" }
+  ],
+  "minimalVerticalSlice": "D2 + D3 + D4 + D5 + D7 + D9 六行：默认档语义、三档时机各一行、fail-closed、安全阀共存。理由：母约 §7 的全部新语义集中在「提交时机」一件事上，纵切必须把三档各自钉住（默认档是 Sync 的行为钉），再加两条边界——sink 失败不被吞、与已交付安全阀共存（这是 §7 自己把两者写进同一节的原因）。D1 是结构前提，D6 是三档共用的对账补强，D8 是反向锚。",
+  "allowedTestSeam": {
+    "add": [
+      "pkg/hno/graph/p3g6_durability_test.go（package graph_test，外部包，只用导出 API；TestP3G6_* 命名；夹具自备内存 Checkpointer——互斥锁属夹具不属引擎，Sync/Exit 的 Append 在消费者 goroutine、Async 在冲刷 goroutine、节点体采样在生产者 goroutine，夹具自己保证并发安全）"
+    ],
+    "modify": [
+      "无。既有 11 份测试文件一份都不许动 —— M2 已证带缝副本 0 判红；若实现迫使任何既有断言改写，那说明缝的形状错了，应回到本契约而不是改测试。"
+    ],
+    "retires": [],
+    "sourceSeam": "新文件 pkg/hno/graph/durability.go（Durability+三常量、Checkpoint、Checkpointer、WithDurability/WithCheckpointer、beginCommits/record/finishCommits）；pkg/hno/graph/graph.go（config 加 durability/checkpointer 两字段，共 2 行）；pkg/hno/graph/scheduler.go（scheduler 快照两字段、consume 成功路径调 record、Run 尾部 beginCommits/finishCommits）。policy.go 与全部既有测试文件零改动。"
+  },
+  "forbiddenObservations": [
+    "scheduler 内部字段（seq/commits/exitQueue/flushDone）、channel 容量、goroutine 数、私有类型断言——提交流的唯一观察面是夹具 sink 收到的条目（票面 :40 同族）",
+    "time.Sleep 定序；Async 的「下一步执行时」不要求证明冲刷与派发的并发重叠（无法无时钟证明），可断的只有返回前落齐/不丢/Seq 序不乱",
+    "断言跨并行分支的提交全局时序（无全局时序可断，沿用 Completed 字典序的同一取舍）；单链上的 Seq 单调可断",
+    "为测试导出提交侧内部状态或新增只服务测试的产品出口；把 record/finishCommits 的调用位置变成公共读数"
+  ],
+  "baselineBytes": {
+    "pkg/hno/graph/graph.go": "72974bf659b52e82ab12fe8fd5c6f6c2083df70a",
+    "pkg/hno/graph/scheduler.go": "873f4a828abdf78f01836734925cb9f9ebb71cd2",
+    "pkg/hno/graph/policy.go": "6d71fa47ba73c769c8e1bc7d697d39d355e5210f",
+    "pkg/hno/graph/graph_test.go": "624f19624c6f4fa3c04ee6619e722b03de83336c",
+    "pkg/hno/graph/p1r13_step_limit_test.go": "bc4ab8e71527809e23a12590a078add8f35d68d1",
+    "pkg/hno/graph/p1r14_panic_barrier_test.go": "0ed607dbc01955864276212fa61e0902577ce7b8",
+    "pkg/hno/graph/p1r15_warnings_test.go": "3ea06d27abd3994130e593d297951c895729a4dd",
+    "pkg/hno/graph/p1r15b_warning_text_test.go": "0285ab35729ed3d50359e0fd407edb2d8b1c1a2a",
+    "pkg/hno/graph/p1r16_max_concurrency_test.go": "6934a4f2ae9ed2d80a59a30ead56b3de6bcc4296",
+    "pkg/hno/graph/p1r17_cancel_normalization_test.go": "cbc8b692a84ed5ce23b461a8ed40b9ba3870d386",
+    "pkg/hno/graph/p1r18_typed_test.go": "10bce61bd70f2b78a968d585cc81919e8fe68293",
+    "pkg/hno/graph/p1r19_join_barrier_test.go": "8b4b7234ce92df2f936a1544cf24545d65ce0a9b",
+    "pkg/hno/graph/p1r21_duplicate_node_test.go": "a8a936ed101cbf3c2883205fc9ecd280826e7255",
+    "pkg/hno/graph/p2g3_policies_test.go": "ec390cc753924b0975f60994c880d6d78081d07d",
+    "counters": {
+      "exportedSymbols": 35,
+      "expectedFinalDocScanCount": 41,
+      "docScanDecomposition": "+3 类型（Durability/Checkpoint/Checkpointer）+2 Option（WithDurability/WithCheckpointer）+1 const 块；导出符号清单实为 +8（另含三常量，枚举成员在 const 块内缩进不被 ^ 锚 grep 计入）",
+      "locNontestWcL": 1085,
+      "expectedFinalLocNontestWcL": 1218,
+      "locCeiling": "非测试 wc -l ≤ 1500（切片 22 同一上限）",
+      "syncCount": 0
+    }
+  },
+  "carriedItems": [
+    {
+      "id": "R19-Q2",
+      "ref": "artifact:docs/design/v3-adjudication-r19-q2-send-join.md（本片同期已在册的裁决材料）",
+      "carriedIntoDesign": "G5 Send 的门槛，与本片（G6 Durability）无代码交点。交点只在排程上：P3 交付表行因它只能先记 Durability 半边，Send 部分待负责人裁决后由 G5 契约接走；G5 契约起草前必须先有负责人对该材料的裁决。"
+    },
+    {
+      "id": "R19-Q1",
+      "ref": "票面 §15.5 / 状态文档 §5",
+      "carriedIntoDesign": "屏障凑不齐且再无待派激活时 Run 交出 err==nil 而 Output()==nil 的形状仍未裁决。与持久化的交点：那次 Run 已完成的节点在三档下照常按档提交（条目记的是发生过的完成）；该未裁决形状不被本片改变，日后若裁决为 fail-closed 拒绝，条目流无需改动——在裁决文档里补，不在本片顺手做。"
+    },
+    {
+      "id": "S19-STD-1",
+      "ref": "状态文档 §5 / 票面 §15",
+      "carriedIntoDesign": "激活时交出的聚合 map 与调度器累加器同源（别名）仍未裁决。交点：join 目标的条目 Output 就是那个聚合 map 本身，checkpoint 流会把同一别名问题带进持久化面；修法（交快照）属 S19-STD-1 的独立裁决，本片不修、不为它设行，D6 的值对账对 join 输出按「同一对象」口径断。"
+    },
+    {
+      "id": "S24-SPEC-1",
+      "ref": "本契约 designConsequence 第 6 条",
+      "carriedIntoDesign": "恢复/重放语义（从 Checkpointer 读回并续跑一次中断的 Run）本片不交付，挂 P5 G7（会话事件化 + Resume）门槛；实现前需一次独立 rex-test-design（新的公共面表达力：Run 重入语义与幂等），不得借本片契约顺延。"
+    },
+    {
+      "id": "S24-STD-1",
+      "ref": "状态文档 §5",
+      "carriedIntoDesign": "切片 22 收口时登记过一次不可复现的裸 FAIL（refactor 文档 §2.1），仍在观察中。本片绑定命令若再现，按同一处置：先 -v 全量捕获与 goroutine 泄漏探针，再判形状。"
+    }
+  ],
+  "explicitNonGoals": [
+    "StepLimit 本身（切片 13 已交付：defaultStepLimit=1000、WithStepLimit 构建期校验、ErrStepLimitExceeded 哨兵，p1r13 8 个 Test 锚定）——本片只钉它与持久化的组合（D9），不新增任何步数语义。",
+    "G5 Send 与 R19-Q2 的裁决本身（材料已在册 docs/design/v3-adjudication-r19-q2-send-join.md，裁决属负责人；实现属 G5 那片）。",
+    "恢复/重放（Resume）：从 Checkpointer 读回续跑、Run 重入语义、重复 Resume 幂等（P5 G7 的门槛，S24-SPEC-1）。",
+    "Checkpoint 条目到 run 包 CheckpointEvent（切片 23 协议层）的生产者桥接（S23-SPEC-1 清单里的检查点生产者接线，属后续片）。",
+    "落盘格式/编码（JSON/gob…）、TTL、批量压缩、跨进程存储适配——Checkpointer 的实现属调用方（CacheStore 先例）；graph 不依赖 internal/session/internal/storage。",
+    "G8 Store 长期记忆（母约 §8）；G4 其余六模式的运行期语义。",
+    "为持久化配置新增 Validate 拒绝行（guard 钳制语义见 designConsequence 第 5 条；「声明档位没挂 sink」不是错误）。",
+    "会话事件化（BC-4/D1 决策）：本片条目只进调用方给的 Checkpointer，不触碰 Session 对外 JSON。"
+  ],
+  "completionCriteria": [
+    "1. redProtocol 两段各自留 receipt：第一段（API 面、调度器不消费）绑定命令可编译且 D2–D7/D9 按今天的形状判红、D1 转绿、D8 绿；第二段（接线）全绿。两段之间除实现字节外无测试改动。",
+    "2. 每行牙齿由变异证明，至少覆盖：Sync 提交点挪到下一轮 dispatch 之后（时序破坏）、Exit 的退出落齐整段摘掉（丢条目）、Async 的退出冲刷摘掉（丢条目）、sink 错误吞成 nil（fail-closed 破）、默认档改判 Exit（默认语义破）、安全阀路径清空已提交条目或给未跑节点补条目、Seq 盖章摘掉（对账破）。等价变异如实登记为观察上限。",
+    "3. 既有 11 份测试文件零改动，逐文件 git hash-object --no-filters 复核并登记（M2 已证带缝副本 0 判红可行）。",
+    "4. 门禁全 exit 0：go build ./...、go test ./pkg/hno/graph/... -count=1 与 -race、go vet ./pkg/hno/graph/...、gofmt -l pkg/hno/graph；邻近回归（agent/runner/session-contract）exit 0。",
+    "5. 结构判据：包内 sync. 计数仍 0（Async 冲刷器只共享 channel）；非测试 wc -l ≤ 1500（M2 副本实测 1218）；go doc 计数恰 41（分解见 baselineBytes.counters，多一个少一个都要在审查里解释）。",
+    "6. 绑定命令在最终字节上重跑并取新回执；-race 无 DATA RACE。",
+    "7. 完成后回写：母约 §7 标注 Durability 三档已交付（切片 24）并记录缝形状（Checkpointer/Checkpoint 声明在 graph 包内、三档时机语义、sink 失败 fail-closed、恢复未交付挂 P5），StepLimit 半句标注已随切片 13 交付；母约 §10 交付表 P3 行记本片（G6 Durability 部分，Send 待 R19-Q2 裁决）；状态文档 §4 加 P3 小节、§5 携带项更新（R19-Q1/S19-STD-1 交点 + S24-SPEC-1/S24-STD-1）。",
+    "8. 防碰巧绿：绑定命令 -count=30 -race 与整包 -count=5 -race 各一次 exit 0。"
+  ],
+  "forbiddenShortcuts": [
+    "把三档实现成同一时机（比如全做成都 Exit）再靠文案区分——三档的差别必须各自可观察（D2–D5 钉死）。",
+    "sink 错误静默吞掉、只打日志、或降级成 err==nil 的成功 Result（D7 钉死 fail-closed）。",
+    "撞安全阀时清空/回滚已提交条目，或给从未运行的节点补条目（D9 钉死）。",
+    "把提交做成每 Run 汇总一条——「仅图退出时落盘」只允许一次性落齐已积累的逐节点条目，条目粒度恒为节点完成事件（D6 的对账钉住）。",
+    "为 Async 引入互斥锁或共享可变状态（零锁模型；冲刷器与引擎只共享 channel，completion 计数 0 见 completionCriteria 第 5 条）。",
+    "把持久化做成读 TraceConfig.Hook 的旁路（Hook 是切片 22 的内存回调，不是 sink；两者不互相冒充）。",
+    "放宽或改写任何既有断言来给新缝让路（M2 证明不需要）。"
+  ],
+  "observabilityLimit": [
+    "Sync 与 Async 的差别只有 Sync 的正向担保可断（后继体可见前驱条目，D3）；Async 不作该承诺——「不作承诺」这个负命题没有不脆的断言形状（任何一次 mid-run 读到与否都不足证），由 D3 的正向行 + D5 的落齐行共同夹住，变异矩阵里登记为联合面。",
+    "失败路径与 sink 错误叠加时的掩蔽次序（runErr 优先）未单独立行：M2 只量了成功路径上的 sink 失败（OBS-7/8）；实现按 runErr 优先登记进 designConsequence 第 4 条，变异矩阵覆盖。",
+    "「取一次值」不变量（durability 进 Run 时从 builder 取一次）无法经公共面独立观察——Option 只能在 New 时施加，不存在 mid-run 变更通道；沿 stepLimit/maxConcurrency 同族不变量登记，不设行。",
+    "Checkpoint 条目只承诺 Seq/Node/Output 三字段最小集；join 目标的 Output 与激活输入同源别名（S19-STD-1 延伸），条目对大输出的保真度以「夹具可取回同值」为限，不钉深拷贝语义。",
+    "Async 冲刷器的调度延迟、提交吞吐、背压行为（慢 sink 会让消费者在 handoff 处等）不在公共面担保范围，不设行。"
+  ],
+  "verificationCommands": [
+    "go test ./pkg/hno/graph -run TestP3G6_ -count=1 -race -v   # 本片唯一绑定场景命令，所有 receipt 逐字用这条（cwd 仓库根，直接取，不得 sh -c 包装）",
+    "go build ./... ; go test ./pkg/hno/graph/... -count=1 ; go test -race ./pkg/hno/graph/... -count=1 ; go vet ./pkg/hno/graph/... ; gofmt -l pkg/hno/graph",
+    "go test ./pkg/hno/agent/... ./pkg/hno/runner/... ./internal/session/contract/... -count=1",
+    "grep -o 'sync\\.' pkg/hno/graph/graph.go pkg/hno/graph/scheduler.go pkg/hno/graph/policy.go pkg/hno/graph/durability.go | wc -l   # 必须 0",
+    "find pkg/hno/graph -name '*.go' -not -name '*_test.go' | xargs wc -l   # 必须 ≤ 1500（M2 副本实测 1218）",
+    "go doc -all ./pkg/hno/graph | grep -cE '^(func|type|var|const) '   # 必须恰为 41（const 块计 1，枚举成员缩进不计入）"
+  ],
+  "writeBackOwed": [
+    "母约 §7：标注 Durability 三档已交付（切片 24），记录缝形状（Checkpointer/Checkpoint 声明在 graph 包内、三档时机语义、sink 失败 fail-closed、恢复未交付挂 P5 G7）；StepLimit 半句标注已随切片 13 交付（引用 p1r13_step_limit_test.go）。",
+    "母约 §10 交付表：P3 行记本片（G6 Durability 持久化档位已交付；G5 Send 待 R19-Q2 裁决后另片）。",
+    "状态文档 §4：新增 P3 小节记录本片交付；§5 携带项更新（R19-Q1/S19-STD-1 的持久化交点、S24-SPEC-1 恢复语义门槛、S24-STD-1 裸 FAIL 观察）。",
+    "如票面（v3-test-scope-p1-graph.md）为 P3 扩节，则相应小节引用本契约；不扩则本契约自足。"
+  ],
+  "adjudicationOptions": [],
+  "notes": "本契约为 design-tests 阶段产物（activationId 待工作项派发后回填）。M1/M2 实验全程在 /tmp/g6m1、/tmp/g6exp 副本进行，仓库字节逐字节未动——收尾复核 graph.go 72974bf6…、scheduler.go 873f4a82…、policy.go 6d71fa47…、11 份测试文件与开工快照全同；工作树对 HEAD 的既有未提交态（S18-SPEC-2，无提交授权）原样未碰；未对工作树执行任何 git 写操作。实验过程自纠一处：第一版 M2 探针的夹具缺陷（sink 未挂上即断言提交面，receipt:6e92a918… 读空作废），修正后重跑（receipt:9deb910c…）方为有效观察，已登记进 measuredBeforeDesign.M2 末条。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-platform.md#7",
+    "artifact:docs/design/v3-platform.md#3",
+    "artifact:docs/design/v3-test-scope-p1-graph.md#15.5",
+    "artifact:docs/design/v3-p1-graph-status.md#4",
+    "artifact:docs/design/v3-adjudication-r19-q2-send-join.md",
+    "receipt:cc67e981-42e7-4009-ab2b-588e4454b9b7",
+    "receipt:70daa2a8-6b1d-44ca-964c-c5bb2eb6e9d6",
+    "receipt:483ee91f-5c23-455f-aa03-dd70bb3f3bf4",
+    "receipt:f292014a-3b5f-4b10-8af9-38c3dcd58700",
+    "receipt:6e92a918-5026-4f97-b2d5-62cfe5e6ba9a",
+    "receipt:9deb910c-b28d-4569-92b4-a63a6c9fd458",
+    "receipt:8d0f01ed-10d6-439b-ab7d-46d0d177058e"
+  ]
+}

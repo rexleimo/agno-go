@@ -1,0 +1,71 @@
+{
+  "schema": "rex.tdd-red.v1",
+  "workItemKey": "work-p1-graph-engine-r10-cycle-termination",
+  "activationId": "07778b0b-7ced-4322-b73c-f8fda7e33209",
+  "capabilityId": "software.testing.tdd",
+  "stageId": "red",
+  "contractRef": "artifact:docs/design/v3-test-scope-p1-graph-slice10.json#acceptanceMapping",
+  "decisionRef": "artifact:docs/design/v3-testability-decision-p1-graph-slice10.json#decision",
+
+  "behaviorUnderTest": "契约 slice10 A1–A4：由「必定被走」的边构成的环（自环、多节点无条件环、无条件边 + 无条件替代的兜底边）必须被 Validate 构建期拒绝，错误能定位到成环节点，Run 传达同一拒绝且拒绝前零节点执行。",
+  "redKind": "natural-red（测试先于实现，pkg/hno/graph 生产文件本轮未被改动）",
+
+  "treeStateAtRed": {
+    "pkg/hno/graph/graph.go": "b4e6051ec2448e3a93f528eae9153731b4406d4a（与 slice-9 GREEN+审查后修正态逐字节相同）",
+    "pkg/hno/graph/scheduler.go": "87854ffbb7629f9adeb2d45fbb74d91f2032b99d（自 slice-6 起未变）",
+    "pkg/hno/graph/graph_test.go": "2d0625d52b325c3320f52685d37bab407f86e5a9（新增 1 个测试函数 + 2 个包级辅助 + 1 个期限常量）",
+    "readOut": "生产哈希未变 ⇒ RED 完全由测试面产生，不存在「实现先行、事后补红」。"
+  },
+
+  "focusedCommand": {
+    "executable": "go",
+    "args": ["test", "./pkg/hno/graph/...", "-run", "TestP1G_ValidateRejectsUnconditionalCycle", "-count=1", "-timeout", "25s", "-v"],
+    "cwd": "/Users/rex/codes/agno-go"
+  },
+  "receipt": "receipt:bf8e84aa-00a0-4da9-884b-cd8c76b2ea89",
+  "exitCode": 1,
+  "wallClock": "0.160s（测试二进制正常跑完并给出包级 FAIL，不是 -timeout panic、不是编译/环境失败）",
+
+  "preconditions": "每条非法行只含一种缺陷：先注册该行所需节点（节点体是透传 + 自增计数），再声明环，最后 SetEntry/SetOutput 收尾。合法对照行（条件可断开的环、有条件替代的兜底回环、无环图）与 slice10 包外基线实测「今天就能结束」的三行逐字一致。",
+  "expectedObservable": "五条非法行：Validate 返回含 \"graph: unconditional cycle\" 且点名成环节点的错误；Run 返回同一错误、res==nil、执行计数为 0。三条对照行：Validate 返回 nil，Run 在期限内返回，条件环的 Completed() 精确等于 [a a b b end]。",
+  "observed": [
+    "FAIL self-loop / two-node / three-node / with-always-true-exit / default-edge-without-alternative —— 五条全部停在同一位点 graph_test.go:711：「不可断开的环被 Validate 判为合法，调用方只能拿到一个永不返回的 Run」",
+    "PASS 对照：谓词会转假的条件环合法且能结束",
+    "PASS 对照：有条件替代的兜底回环合法且能结束",
+    "PASS 对照：无环图不受影响",
+    "包级 FAIL，exitCode 1"
+  ],
+
+  "failureReason": "缺失的是构建期的环检查本身：Validate 函数体（pkg/hno/graph/graph.go:223-245）只有入口存在、输出存在、边两端存在、条件边有谓词、边种类可路由五项，无任何环相关分支；消费循环（pkg/hno/graph/scheduler.go:76-95）也不计步数，stepLimit 只在 WithStepLimit 里被写入 config（graph.go:66-67），全包无读者。因此环上没有可断开的边时 Run 只会自旋 —— 包外测量给出 1.5s 内 1,108,628–3,366,710 次节点执行。红的位点在 Validate 的第一条断言上，与契约 A1 缺失项一致，不在夹具、断言文案或环境上。",
+
+  "redLegitimacyChecks": {
+    "notASyntaxOrEnvFailure": "gofmt -l pkg/hno/graph 为空；go vet ./pkg/hno/graph/ 无输出；命令 0.160s 正常产出子测试级 FAIL 列表。",
+    "notAlreadyPassing": "五条非法行在生产代码未改的哈希态下判红，判红文案直指缺失的构建期拒绝。",
+    "notMockOnly": "断言全部落在 Validate/Run 的返回值、Result 的公共方法与节点体内计数（只用于「拒绝前零副作用」这一条用户可观察事实），无任何 mock/helper 返回值充当证明。",
+    "hangSafety": "RED 通过断言失败呈现而非超时 panic：所有 Run 走 goroutine + 1s 期限 + cancel（graph_test.go 的 runWithinLimit），聚焦命令另带 -timeout 25s 作第二层护栏。cycle-9 的挂死事故没有在本轮重演。"
+  },
+
+  "supersededAttempt": {
+    "receipt": "receipt:6f873686-05fd-456c-bfe6-c572c41bba99",
+    "why": "第一次取回执时，对照行「条件环能结束」里我把 Output() 的期望错写成节点名 \"end\"（节点体是透传，实际值是入口 \"seed\"），该行以一个与本轮行为无关的原因判红。按 RED 第 3 条这属夹具错误，不得计入合法 RED：先修测试期望（改断言的目标值是我读错语义所致，不是把期望改成当前错误输出——Completed 的精确期望未动），再取 receipt:8fd753a3（decide-testability）与本轮 receipt:bf8e84aa，两次都只剩五条非法行判红。",
+    "disclosed": "旧回执保留在账本里可核，不用它推进阶段。"
+  },
+
+  "assertionDelta": {
+    "method": "grep -c \"t\\.(Errorf|Fatal|Error|Fatalf)\" pkg/hno/graph/graph_test.go（按行计数）",
+    "before": 65,
+    "after": 82,
+    "added": "新测试族内 17 处（runWithinLimit 的期限判红 1 处 + 五条非法行 ×5 断言组 + 三条对照行 + looping 计数断言），测试删除行数 0，t.Skip 计数 0（grep -c \"t.Skip\" = 0）",
+    "comparabilityWarning": "slice-9 账本记的 58 用的是另一套正则口径，不能与本轮 65/82 直接相减；已在 cycle-9 的「指标口径漂移」债下追加一条：断言点计数必须随附口径定义。"
+  },
+
+  "independentFailureDesign": "五条非法行各自可独立判红：只判 from==to 的实现会红在后四行；只查大环的实现会红在 self-loop；把兜底边一律视为可断开的实现会红在 default-edge-without-alternative；恒真条件出口被当成豁免的实现会红在 with-always-true-exit。三条对照行今天就绿，专门用于捕获过度收紧。",
+
+  "nextStageCondition": "GREEN 只允许实现「不可断开环」的构建期检测（含 Run 复用同一拒绝、拒绝前零副作用），必须让 receipt:bf8e84aa 同一条命令零退出，且不得触碰本轮任何断言；同时不得顺手实现 WithStepLimit（NG1）或 §3.5 第 8 项（NG2）。",
+
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-slice10-red.json#observed",
+    "receipt:bf8e84aa-00a0-4da9-884b-cd8c76b2ea89",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice10.json#measuredBaseline"
+  ]
+}

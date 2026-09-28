@@ -1,0 +1,58 @@
+{
+  "kind": "rex.test-scope-contract.v1",
+  "decisionRef": "artifact:test-scope-contract:p1-graph-engine-slice4-r2",
+  "workItemKey": "work-p1-graph-engine-r2-routing",
+  "activationId": "e90b4321-e9dc-4e0c-971e-c609ff3d58eb",
+  "authority": "本节是 docs/design/v3-test-scope-p1-graph.md §12.1「R2」的落地细化，不新增也不删除 §4 的任何行为，不改 §1 的公共面。§12.1 的表头把场景 1 的第二条边写成「a --> c（Default 指向 c）」，本契约把它固定为 AddDefault(a,c)：若 a→c 是无条件边，则 c 必然激活，与该行的期望「只激活 b」自相矛盾。该澄清属测试设计职权内的歧义消除，不是目标变更。",
+  "gateNote": "docs/design/v3-*.md 已被 PreToolUse 写入闸门锁定，因此本周期契约以类型化 JSON 入册；与 .md 前序章节冲突时，以本文件的场景表为切片 4 的判据，前序章节继续生效于其自身切片。",
+  "userGoal": "让 pkg/hno/graph 的调度器按 §3.4 规则 1/2/4 真实路由：无条件边全部激活；条件边只在 Predicate(源节点本次输出)==true 时激活；只有当源节点没有任何具体边命中时才激活 Default 边。同时闭合并修正 cycle-3 审查的 C3-STD-1（三条 builder 的 GoDoc 与实际语义相反）与 C3-STD-2（conditional/default 的行为变更无测试担保）。",
+  "inScopeBehaviors": [
+    "S1 谓词命中：AddConditional(a,b,p=true) + AddDefault(a,c) ⇒ 只激活 b。Completed() 字典序 [a b]，不含 c；Output() 取 b 的返回。",
+    "S2 谓词不命中且无其它具体边：AddConditional(a,b,p=false) + AddDefault(a,c) ⇒ 只激活 c。Completed() [a c]，b 不执行。",
+    "S3 多条条件边同时命中：AddConditional(a,b,p1=true) + AddConditional(a,d,p2=true) ⇒ b 与 d 都激活（条件边之间是扇出，不互斥）。Completed() [a b d]。",
+    "S4 已有具体边命中时兜底不得触发：AddEdge(a,b) + AddConditional(a,x,p=false) + AddDefault(a,c) ⇒ 只有 a、b 执行；x 与 c 都不执行。Completed() [a b]。",
+    "S5 谓词实参：Predicate 收到的必须是源节点本次输出的值。断言谓词内记录的实参 == Result.Value(\"a\")，且不等于图入口输入、不等于节点名。",
+    "C1 规则 1 的反向对照（无条件扇出全部激活）：AddEdge(a,b) + AddEdge(a,c) ⇒ b、c 都激活。该行为在切片 1 已实现但零测试（cycle-1 STD-1 登记项），作为对照行入册：它今日即通过，若实现把无条件扇出改成择一激活则立刻判红。"
+  ],
+  "outOfScope": [
+    "B2 并行 + Join 汇聚屏障：AddJoin 的声明在本切片之后仍必须在构建期被拒绝，R1 的 join-only 拒绝行不得删除。出现任何 Join 路由实现即属超范围。",
+    "B5 无条件边成环的构建期拒绝、B6 余下 4 项校验（重复节点名 / 不可达 / 非输出汇点 / Join 前驱数）。",
+    "B4 stepLimit 安全阀与 B7 缺失告警：ErrStepLimitExceeded 仍不得被产生，Warnings() 仍返回 nil。",
+    "B8 并发上限 FIFO、B9 取消归一化、B10 panic 转错误、B11 Typed 的真实分支测试。",
+    "§3 全部非目标（G3/G4/G5/G7/G8/G10）不变。"
+  ],
+  "allowedTestSeam": "仅 pkg/hno/graph 的导出 API，测试文件保持 package graph_test（外部观察）：New / AddNode / NodeFunc / AddEdge / AddConditional / AddDefault / SetEntry / SetOutput / Validate / Run 与 Result 的 Output / Value / Completed。禁止断言：nodes、edges、unrouted、successors、scheduler、cfg 等未导出符号；禁止断言 goroutine 数、channel 收发次数、谓词被调用次数的绝对值（S5 只断言实参值，不断言调用次数），也禁止断言错误的具体类型（只要求可定位文本）。",
+  "whyThisSeamIsEnough": "路由的正确性本身就是调用方可观察的：哪些节点执行了（Completed）、拿到什么输入（谓词实参）、最终输出是什么（Output）。这三面都经公共入口暴露，因此不需要为路由细节开内部缝；把断言压在 Completed/Output 上还能迫使实现继续遵守 §3.3 单消费者模型。",
+  "sliceJustification": "R2 是余下全部图行为的依赖根：(a) §3.3 说「图有环就必须有」，而 B5 的合法环图只能用条件边收敛，没有 R2 就无法构造「必须被放行」的环对照组；(b) 规则 4 的兜底语义是 Join（B2）与 Default 路由共用的「具体边命中」判定基础；(c) 它同时消掉 cycle-3 的两条 hard 发现——本切片把 conditional/default 从「必然拒绝」翻正为「真实路由」，其拒绝态 GoDoc 与无担保分支随之被替换。",
+  "falsePassProhibitions": [
+    "把 Default 实现成「谓词为假就触发」而忽略「没有任何具体边命中」前提 ⇒ S4 判红。",
+    "把条件边实现成「命中第一条即停」的互斥选择 ⇒ S3 判红。",
+    "让 Predicate 收到图入口输入、节点名或整个 Result ⇒ S5 判红。",
+    "用 Validate() 一律返回错误来同时满足 R1 与「不静默出错」⇒ R1 的反向子用例与 S1–S5 全部判红。",
+    "为通过 R2 而顺带实现 Join 聚合 ⇒ 属超范围，即使测试变绿也算失败。",
+    "删除或弱化切片 1/2/3 的既有用例、把 Completed() 的期望改成「当前实现的实际输出」、或把全序断言降级为集合包含断言（因果确定的图必须保留全序断言）。",
+    "把 C1 对照行当装饰：它是唯一担保「无条件扇出全部激活」这条 §3.4 规则 1 的断言。"
+  ],
+  "redPlan": "向 pkg/hno/graph/graph_test.go 追加单个测试 TestP1G_ConditionalAndDefaultRouting，含 S1–S5 五个子用例与 C1 对照子用例；每个子用例自带断言，可独立失败（契约 §12.4）。今日实现下 S1–S5 全部因「conditional/default 声明被构建期拒绝」而 Run 返回错误而判红，C1 通过；该失败形态正是缺失行为本身，非编译或夹具问题。",
+  "focusedCommands": [
+    "go test ./pkg/hno/graph/... -run P1G -count=1",
+    "go test -race ./pkg/hno/graph/... -count=1",
+    "go vet ./pkg/hno/graph/...",
+    "gofmt -l pkg/hno/graph",
+    "grep -c 'sync\\.' pkg/hno/graph/graph.go pkg/hno/graph/scheduler.go",
+    "find pkg/hno/graph -name '*.go' -not -name '*_test.go' | xargs wc -l"
+  ],
+  "completionCriteria": [
+    "S1–S5 各有一条真实非零退出的 RED 回执（同一命令、失败点指名各子用例）与一条零退出的 GREEN 回执；C1 在同一命令下持续通过。",
+    "R1 的 join-only 拒绝行与切片 1/2 的全部既有用例在同一命令下仍为 PASS。",
+    "非测试 LOC ≤ 1500；grep -c 'sync\\.' 仍为 0/0；-race 绿；gofmt/vet 净。",
+    "至少两条变异被行为断言（非编译失败）杀掉：(a) 把「无条件边命中」判定去掉，使 Default 总是触发 ⇒ S4 判红；(b) 把条件边改成命中即返回 ⇒ S3 判红。每次变异后必须校验还原哈希逐字节一致。",
+    "AddConditional/AddDefault 的 GoDoc 改为描述真实路由语义；AddJoin 的 GoDoc 必须写明「当前在构建期被拒绝」，不得继续承诺未实现的汇聚语义（C3-STD-1）。"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-test-scope-p1-graph.md",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice4.json",
+    "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle3",
+    "artifact:docs/design/v3-platform.md"
+  ]
+}

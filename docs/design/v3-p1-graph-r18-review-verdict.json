@@ -1,0 +1,216 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p1-graph-r18-typed",
+  "activationId": "8c50d130-1d18-4975-b56e-7689063a04f8",
+  "capabilityId": "software.review.standards-spec",
+  "stageId": "review",
+  "recordedAt": "2026-09-27T19:50:00.000Z",
+  "independenceDisclosure": "本轮是**作者自查**，不是独立审查：用户此前已明确拒绝对 P1 派发独立审查子代理（该次拒绝仍生效），因此 Standards/Spec 两轴由写代码与写测试的同一个上下文完成。独立性降级带来的具体风险是「测试与实现同源偏差」——本片最可能的偏差形态（把断言写成匹配基线文案）已用契约 forbiddenShortcuts 第 1 条与 11 条变异反向检查过，但这不能替代第二双眼睛。结论措辞按此降级：只说「所声明差异的双轴审查已完成」，不说「已由独立方批准」。",
+  "fixedPoint": "契约 baselineBytes（docs/design/v3-test-scope-p1-graph-slice18.json）：pkg/hno/graph/graph.go dca23943fd9cade4766ceeffe43b47477b815a61、scheduler.go 0ce6c3b332ddc768c1c5a10d6c1591fc88d67a2a、graph_test.go 425ea0303e1d5c5c8e95bacf57663ae94a4309ee、p1r13 bc4ab8e7…、p1r14 0ed607db…、p1r15 3ea06d27…、p1r15b 0285ab35…、p1r16 6934a4f2…、p1r17 cbc8b692…。fixed-point 可 resolve 的方式不是 commit 而是 blob hash：由当前字节反向还原的 /tmp/p1-r18/baseline-graph.go 实测 `git hash-object --no-filters` = dca23943…（逐字节相同），因此本 verdict 审的确实是有边界的那一段。",
+  "diffRef": "非空差异三处：(1) pkg/hno/graph/graph.go dca23943… → a8e46a3a2f0baaa699ae60f26498c6f5c1c851cb，两个 hunk（import reflect + Typed/actualTypeLabel），逐字 diff 见 docs/design/v3-p1-graph-r18-green.md §1；(2) 新增 pkg/hno/graph/p1r18_typed_test.go（359 行，package graph_test，基线不存在）；(3) 新增三份证据文档（v3-red-observation-p1r18.md、v3-p1-graph-r18-green.md、v3-p1-graph-r18-refactor.md）与两份 JSON（slice18 契约、p1r18 决定）。pkg/hno/graph/scheduler.go 与既有 7 份测试文件哈希逐字不变。",
+  "specSources": [
+    "docs/design/v3-test-scope-p1-graph.md §4 :70（B11 票面原句）、§1（公共观察面）、:40（禁止观察面）、:75（sleep 不算证据）、§9（LOC ≤ 1500）、§11.1（错误文本含 offending 节点名这一先例）、§12.2（B11 曾被顺延）、§13（B9 已收口的取消边界，本片 D7 复用其反向牙齿）",
+    "docs/design/v3-platform.md §3.2/§3.4（跨节点值以 any 流动）",
+    "docs/design/v3-test-scope-p1-graph-slice18.json（验收行 D1–D8、completionCriteria 1–8、forbiddenShortcuts、explicitNonGoals）",
+    "docs/design/v3-testability-decision-p1r18.json（behavior-delta，红候选行 D2）"
+  ],
+  "standardsSources": [
+    "AGENTS.md：Coding Style（tabs、导出符号 GoDoc、错误用小写 + `fmt.Errorf(\"…: %w\", err)` 包装、无必要不加行内注释、`make fmt` 先于推送）",
+    "AGENTS.md：Testing Guidelines（核心包覆盖率 ≥ 70%、表驱动且与代码同址、每次行为变更都要有回归测试）",
+    "rex-code-review 的 smell 基线 12 条（Fowler ch.3），工具已覆盖的规则跳过"
+  ],
+  "standards": {
+    "summary": "生产侧差异极小：一个 import、一处错误构造、一个四行未导出助手，全部落在同一文件同一变化原因（类型不符的归因），未新增导出面、未新增文件、未引入锁，`go build ./...` 通过。仓库文档标准未见硬违规：gofmt 无输出、go vet 通过、覆盖率高于 70% 线、测试表驱动且同址、错误消息小写。判断性发现 6 条，都在「归因寄生在错误文本上」这一根因的不同投影上（Primitive Obsession / Data Clumps / Feature Envy 与两条测试脆弱性），加一条工具链债（golangci-lint 从未运行）。无一条改变对外行为，也不构成阻塞。",
+    "findings": [
+      {
+        "id": "S18-STD-1",
+        "title": "归因信息寄生在错误文本上：调用方只能 strings.Contains，无法 errors.Is 或取字段",
+        "location": "pkg/hno/graph/graph.go:502 与 pkg/hno/graph/p1r18_typed_test.go:210-216、:262",
+        "evidence": " smells: **Primitive Obsession** + **Data Clumps**。三个总是一起出现的值（offending 节点名、期望类型、实际类型）被拼成一条字符串交出；测试侧只能用 `strings.Contains(text, `\"b\"`)` 与正则去读它。仓库既有惯例支持这一形状（graph.go:255/:258/:262/:265/:268/:271/:328/:370 八处 `%q` 文案，票面 §11.1 把它确立为可定位判据），但票面 §1 把观察面冻结为「graph_test 外部包 + 导出 API」，本片也就被禁止新增导出哨兵——契约 explicitNonGoals 第 1 条已把这一约束写成 R18-Q1 而非静默扩面。",
+        "severity": "judgement（受契约冻结约束，非本片可修）",
+        "fix": "两条路选一，须由负责人裁决（R18-Q1）：(a) 引入一个小类型 `*graph.TypeMismatchError`（带 Node/Expected/Actual 三字段 + Error() 文本不变），D2–D5 改用字段断言，`exportedSymbols` 24→25 需同步改票面 §1；(b) 维持文本面，把 D8 的 `exportedSymbols=24` 写死为长期不变量。本片按 (b) 交付。"
+      },
+      {
+        "id": "S18-STD-2",
+        "title": "D6 的「不得被类型语义污染」断言与 D3/D5 不同形：大小写敏感且不剥离引号片段",
+        "location": "pkg/hno/graph/p1r18_typed_test.go:294",
+        "evidence": "`if strings.Contains(text, \"expected\") || strings.Contains(text, \"got\")`，而 D3（:176 用 `p1r18Labels`）与 D5（:265 用 `p1r18Labels(text)`）都走剥离引号片段的版本。当前夹具的节点名是 `\"fail\"`，不含这两个词，所以今天不误判；但同一文件 :45 的注释明确指出「节点名本身可能带类型词」这一风险，D6 却没用那道防线。若后续有人把哨兵节点改名成 `expected-cache` 或实现把名字放在标签之后，本行会假红。",
+        "severity": "judgement",
+        "fix": "改成 `labels := strings.ToLower(p1r18Labels(text))` 后判断 `strings.Contains(labels, \"expected\")` 与 `\"got\"`；与 D3/D5 用同一道剥离，判据强度不变（变异 lambda 仍能杀红，lambda 在剥离后的文本里同样留下这两个词）。"
+      },
+      {
+        "id": "S18-STD-3",
+        "title": "四条近镜像正则与两条同词检查构成形态重复",
+        "location": "pkg/hno/graph/p1r18_typed_test.go:47-52 与表项 :149、:156",
+        "evidence": "smell: **Duplicated Code**。`(?i)expected[^,]*string.*got[^,]*int` 与它的 int/string 镜像、`expected.*string.*got.*string` 与它的 int 镜像，四条只差两个词。经典解法是一张「期望类型↔实收类型」映射表加 `regexp.QuoteMeta(fmt.Sprintf(...))` 生成器，但 Go 的 RE2 不支持反向引用，同词检查无法写成一条带反向引用 \\1 的通用式，这正是它被拆成两条的直接原因。",
+        "severity": "judgement（当前两处即上限，未达「多处散射」）",
+        "fix": "暂不动。触发条件写明：若第三种类型形状（例如接口 `io.Reader` 也要进 D3 的镜像族）出现，就把四条正则收成一个 `pair(want, got string) (match, same *regexp.Regexp)` 生成器，避免第五、第六条散在同一个 var 块里。"
+      },
+      {
+        "id": "S18-STD-4",
+        "title": "D5 的接口形状夹具里有一段永不可执行的节点体",
+        "location": "pkg/hno/graph/p1r18_typed_test.go:240-242",
+        "evidence": "smell: **Speculative Generality**（边缘）。`Typed[io.Reader]string(\"needreader\")` 的 fn 体是 `return fmt.Sprintf(\"%T\", r), nil`，而 D5 的判据要求 `Run(ctx, nil)` 必须交出类型不符错误 ⇒ 该 fn 在本行里不可能被调用。它在契约 T-3 里承担过「证明 nil 接口值断言失败」的探针作用，搬进测试文件后成了死代码；若未来有人放开 nil 让 fn 真跑，这段体也不会给出任何信号。",
+        "severity": "judgement",
+        "fix": "把 fn 体换成自证式失败：`return \"\", errors.New(\"p1r18: nil 输入不应进入节点体\")`，并在注释里写明「本行故意让『被调用』成为可观察的错误」。这样同一夹具既保住 T-3 的形状，又不会留下无信号的分支。"
+      },
+      {
+        "id": "S18-STD-5",
+        "title": "`Typed` 想要完成归因，但它看不到图：点错名的形态在本包不可达",
+        "location": "pkg/hno/graph/graph.go:497-505（可归因信息只有 name/expected/in）↔ docs/design/v3-p1-graph-r18-refactor.md §3.1（R18-GAP-1）",
+        "evidence": "smell: **Feature Envy**。契约 completionCriteria 第 3 条 (a) 要的「把节点名写死为入口节点」这一写坏法需要读到图的 entry，而 `Typed` 只握有自己的 `name`，`NodeFunc` 也只接 `name`；唯一可达的「点错名」形态是包级共享状态（变异 theta）或名字槽被类型名顶掉（eta），两者都同时打红 D2，于是 D4 的两条反向断言（:213 不含 `\"a\"`、:216 不含 `\"seed\"`）至今没有 solo 杀手。",
+        "severity": "judgement（已登记为 R18-GAP-1，不是本片的实现缺陷）",
+        "fix": "两个方向，都不属于本片：把归因上移一层（由 `Graph.Run` 在类型不符错误外再包一层图侧信息），或让契约接受「D4 与 D2 共生死」。若选上移，须同批补一个能只打红 D4 的夹具，并把这条依赖写进票面 §4 的 B11 行。"
+      },
+      {
+        "id": "S18-STD-6",
+        "title": "`make lint`（golangci-lint）在本切片仍未运行",
+        "location": "AGENTS.md「Build, Test, and Development Commands」列出的 `make lint` ↔ docs/design/v3-p1-graph-r18-refactor.md §5 末段",
+        "evidence": "本片只跑了 `gofmt -l`（无输出）与 `go vet ./pkg/hno/graph/`（通过），`make lint` 依赖的工具链在本机未确认，仍未执行。这是切片 13–17 一路带下来的同一笔债（r17 verdict 的 S17-STD-* 同项），本轮继续在文档里如实登记而不是写成已过。",
+        "severity": "judgement（AGENTS.md 把 `make fmt` 列为推送前必需，`make lint` 列为可用命令；非硬违规，但交付证据链有缺口）",
+        "fix": "`make install-tools && make lint ./pkg/hno/graph/...` 跑一次并把输出并入交付证据；或在票面 §9 明示「lint 由 CI 承担，切片证据不含 lint」。同批处理 S17-STD-5（把结构判据脚本从 /tmp 搬进 `scripts/graph-structure-check.sh`），因为两条都是「判据可重放性」债。"
+      }
+    ],
+    "smellsChecked": {
+      "Mysterious Name": "未见（测试符号均带 p1r18 前缀；`p1r18Labels`/`actualTypeLabel` 名实相符）",
+      "Duplicated Code": "S18-STD-3",
+      "Feature Envy": "S18-STD-5",
+      "Data Clumps": "S18-STD-1（name/expected/actual 三元组总是一起出现）",
+      "Primitive Obsession": "S18-STD-1",
+      "Repeated Switches": "未见（本片无 switch/if 级联；`errors.Is` 判定只在 D7 出现一次）",
+      "Shotgun Surgery": "未见（一个原因只改一个文件一处；跨包 grep 证实无外部文本消费者）",
+      "Divergent Change": "未见（graph.go 本片的改动全部服务归因这一件事）",
+      "Speculative Generality": "S18-STD-4；另：未抽公共错误构造器（单点即不做，理由见 refactor §1）",
+      "Message Chains": "未见（最长链 `reflect.TypeOf((*TIn)(nil)).Elem()` 三步，且是一次性类型查询）",
+      "Middle Man": "未见（`actualTypeLabel` 不是转发：它有 nil 分支的真实职责）",
+      "Refused Bequest": "未见（本片无继承关系改动；Node 接口未被扩充）"
+    }
+  },
+  "spec": {
+    "summary": "规格来源已确认（票面 :70 + §1/:40/:75/§9/§11.1/§12.2 + 母约 §3.4 + 切片契约 D1–D8）。B11 两半的交付状态：后半句「错误类型输入→可判定错误而非 panic」由 D2–D5 四点红→四点绿并有 11 条变异担保；前半句「接到 TIn、返回 TOut」由 D1 钉运行后流动。无「实现与规格相反」的缺陷，无越出 explicitNonGoals 的夹带（导出面仍 24、scheduler 零改动、Validate 未动）。发现 6 条：一条票面文本尚未按交付精确化（契约自列的写回义务未执行，hard）、一条交付完整性事实（HEAD 与 Worktree 相差 17 个切片的字节，本 verdict 的 fixed-point 不是 commit）、两条牙齿/观察上限的账本更正、一条规格不可观察面、一条独立性降级披露。",
+    "findings": [
+      {
+        "id": "S18-SPEC-1",
+        "title": "票面 :70 仍写「可判定错误」，而本片交付并证明的是「可归因」三要素——写回义务未执行",
+        "location": "docs/design/v3-test-scope-p1-graph.md §4 :70 ↔ docs/design/v3-test-scope-p1-graph-slice18.json writeBackOwed",
+        "evidence": "票面原句：「`graph.Typed` 包装的节点接到 `TIn`、返回 `TOut`；对错误类型输入返回可判定错误而非 panic」。「可判定」在本片被 §11.1 先例精确化为「引号包裹的 offending 节点名 + expected/got 两个类型槽位 + nil 渲染为无值」，并由 D2/D3/D4/D5 实现。契约自己把这条列进 writeBackOwed，本轮审查时尚未回写；不回写，下一个读者会以为「任何非 panic 的错误都算 B11 完成」。",
+        "severity": "hard（契约自列义务未完成）",
+        "fix": "把 :70 改为「…返回**可归因**错误而非 panic：错误文本须点名 offending 节点（引号边界）并区分期望/实收类型，nil 须渲染为无值；见 §14」，并新增 §14 记录三要素与本片实测；同时补母约 §3.4 一句「跨节点值以 any 流动，类型不符的归因由包装层给出，调度器不参与」。回写完成后在本 verdict 的 postAcceptanceAmendments 里补记。"
+      },
+      {
+        "id": "S18-SPEC-2",
+        "title": "被审的不是任何 commit 里的字节：HEAD 只含切片 1 之前的桩，切片 2–18 全在工作树",
+        "location": "git 状态：`main…origin/main [ahead 9]`，HEAD 0387000「feat(graph): land zero-lock scheduler with build-time edge validation」内的 graph.go=02122d9（178 行）、scheduler.go=754496b8（115 行）；工作树 graph.go=a8e46a3a（514 行）",
+        "evidence": "本 verdict 的 fixedPoint 只能用 blob hash 表达（反向还原的基线实测 dca23943…），因为切片 2–17 的 1700+ 行从未提交，切片 18 又叠在其上。这意味着「已通过审查」目前只覆盖工作树，不覆盖任何已入库引用；而 commit 0387000 的信息（zero-lock scheduler + build-time edge validation）描述的是比它所含字节更远的状态。",
+        "severity": "hard（交付完整性，非本片代码缺陷）",
+        "fix": "由负责人决定是否提交（本轮未获提交授权，也未提交）。建议提交前把 0387000 的信息与它所含的桩对齐——例如新增一个 commit 承载切片 2–18 的真实字节并在信息里逐片列出票面行；不改写历史。"
+      },
+      {
+        "id": "S18-SPEC-3",
+        "title": "契约 completionCriteria 3(a) 的牙齿形态在 `Typed` 内不可达，D4 无 solo 杀手",
+        "location": "docs/design/v3-test-scope-p1-graph-slice18.json completionCriteria[2] ↔ docs/design/v3-p1-graph-r18-refactor.md §2（theta/eta 实跑）与 §3.1",
+        "evidence": "契约写「(a) 节点名写死为入口节点 → D4 红、D2 绿」。实跑：可达的最近形态 theta（包级记住第一个 Typed 节点名）与 eta（名字槽填类型名）都把 D2、D4、D5 一起打红；按文件顺序 D1 先构造 `Typed(\"len\")`，所以 theta 在 D2 的夹具里就已经点错名。`alpha/zeta/eta/theta` 四条都能打红 D4，但没有一条只打红 D4 ⇒ 票面 §11.1 想要的「归因错位」这一面目前靠与 D2 共生死担保。",
+        "severity": "judgement（账本更正，不推翻本片完成判据：criterion 1 的「D2/D3/D4 真实判红」仍满足）",
+        "fix": "下次 design 把 (a) 收窄为「点错名（可达形态）→ D2+D4+D5 共红」，并把 solo 隔离 D4 所需的夹具登记为 R18-GAP-1；或按 S18-STD-5 把归因上移后再补该夹具。"
+      },
+      {
+        "id": "S18-SPEC-4",
+        "title": "`kappa` 型等价变异：标签判据不区分 `string` 与 `*string`，属观察上限而非漏网形态",
+        "location": "docs/design/v3-p1-graph-r18-refactor.md §2（kappa：exit 0，红=[]）↔ pkg/hno/graph/p1r18_typed_test.go:47-48",
+        "evidence": "把 `expected := reflect.TypeOf((*TIn)(nil)).Elem()` 改成不带 `.Elem()` 后，错误文本变成 `expected *string, got int`，整族判绿：`(?i)expected[^,]*string.*got[^,]*int` 允许标签与类型词之间出现 `*`。也就是说本片证明了「文本里按序出现两个类型词」，没有证明「报的是值类型而不是其指针形式」。",
+        "severity": "judgement（与 r17 把 σ、ξ 移入观测上限同一处置）",
+        "fix": "保持不追加断言（要堵它就得钉死措辞，与 D2/D3「只钉可定位性质」的取舍冲突），把上限写进票面 §14；若采纳 S18-STD-1 的 (a) 方案，小类型字段可直接消掉这一上限。"
+      },
+      {
+        "id": "S18-SPEC-5",
+        "title": "票面 B11 前半句的「编译期类型安全」没有任何断言覆盖，且在本票观察面下不可覆盖",
+        "location": "docs/design/v3-test-scope-p1-graph.md §4 :70 前半句 ↔ docs/design/v3-red-observation-p1r18.md §3 判断 1",
+        "evidence": "「接到 TIn」的编译期保证发生在调用方的编译里；票面 §1 把观察面定为 graph_test 外部包 + 导出 API 的运行时行为，因此没有任何 Test 能复现它（D1 只钉 TOut 以具体 int 流到下游、`Value(\"len\")==int(4)`）。这不是缺口而是规格自身的观察边界，但必须写明，否则读 :70 的人会以为编译期安全已被测试担保。",
+        "severity": "judgement",
+        "fix": "票面 §14 补一句「B11 前半句的编译期性质由 Go 类型系统担保，P1 不以测试担保」；若负责人想要覆盖，另立切片用「构建失败夹具」（`go build` 一个负例包）并承担 §1 观察面变更的裁决。"
+      },
+      {
+        "id": "S18-SPEC-6",
+        "title": "本轮无独立审查方：两轴由作者自查，且变异脚本不在仓库内",
+        "location": "本文件的 independenceDisclosure ↔ /tmp/p1-r18/mutants.mjs、/tmp/p1-b9/struct.sh",
+        "evidence": "两条可重放性风险叠在一起：审查由同一上下文完成（用户既有的拒绝仍生效），且 11 条变异的执行体与结构判据脚本都只在 /tmp 下，机器一清即无人能重放 D8 与矩阵。r17 已把后者登记为 S17-STD-5，本片继续引用同一脚本而未搬运。",
+        "severity": "judgement",
+        "fix": "把变异/结构判据落成仓库内脚本（`scripts/graph-structure-check.sh`、`scripts/graph-mutation-check.mjs`）并由票面引用；独立审查若要做，需要新的 rex Command 与用户的重新授权。"
+      }
+    ]
+  },
+  "measuredDuringReview": [
+    "go build ./... → BUILD_OK（AGENTS.md 把这条列为发补丁前的必需命令，本轮实跑）",
+    "爆炸半径：全仓 grep `input type mismatch` 与 `pkg/hno/graph` 的 Go 侧引用 → 除 pkg/hno/graph 自身外无任何非文档消费者 ⇒ 文本面变更不会影响 agent/runner 或其它包",
+    "绑定命令 GREEN/REFACTOR 零退出：receipt:8674cf3f-6981-40de-b2dd-bd5297c07b22、receipt:e110a8db-4aa2-4567-bc41-b6112383b15b；RED 非零退出：receipt:3f831afa-731c-4021-b4db-1f0e4efeb5dd",
+    "go test ./pkg/hno/graph -run TestP1R18_ -count=20 -race → ok 1.424s，0 FAIL，0 DATA RACE；go test ./pkg/hno/graph -race -count=1 → ok 2.529s（切片 1–17 未减）",
+    "gofmt -l pkg/hno/graph/ 无输出；go vet ./pkg/hno/graph/ 通过",
+    "结构：sync_dot_graph=0 sync_dot_scheduler=0 recover_scheduler=1 ctx_checks_in_scheduler=4 loc_nonblank_nontest=663（上限 1500，本片 +14）testfunc_total=62；exportedSymbols=24（与基线相同）",
+    "覆盖：Typed 0.0% → 100.0%，actualTypeLabel 100.0%，total 96.6% → 99.1%",
+    "变异矩阵 11 条（alpha/beta/gamma/delta/epsilon/zeta/eta/theta/lambda/mu/kappa）：10 条杀红、1 条等价；每条 restored=true，脚本末行 finalHash=a8e46a3a… identical=true；mu 的首次运行是 `[build failed]`（漏用 typed 触发 declared-and-not-used），已按基础设施失败处理、不计入杀红并重跑",
+    "nil 渲染实测（/tmp/p1-r18/nilcheck）：`%s` 对 nil reflect.Type 交出 `%!s(<nil>)`，D5 的 got 正则对其 match=false，对 `no value`/`<nil>`/`nil` 均 match=true ⇒ 实现里的 `no value` 分支由判据逼出",
+    "golangci-lint 仍未运行（见 S18-STD-6/S18-STD-6 的同一债务线，未写成已过）"
+  ],
+  "verdict": {
+    "result": "approve-with-adjudications",
+    "scope": "只覆盖本片的有边界差异（graph.go 的两个 hunk + 新增 p1r18_typed_test.go + 四份证据文档）。不等于 P1 完成，也不等于 B11 之后的切片 19+ 可借用本 verdict。",
+    "blocking": [],
+    "nonBlockingButMustBeAdjudicated": [
+      "S18-SPEC-1（票面 :70 与母约 §3.4 的写回未执行；本阶段之后立即补做，并在 postAcceptanceAmendments 记录）",
+      "S18-SPEC-2 / S18-STD-…交付状态：HEAD 与切片字节相差 17 个切片，是否提交、如何拆分 commit 由负责人决定（本轮无提交授权）",
+      "S18-STD-1 + R18-Q1（是否新增导出小类型/哨兵，使归因不依赖文本；若同意则 exportedSymbols 24→25，需同步改票面 §1 与 D8）",
+      "R18-Q2（nil fn 的 Typed 节点是否升级为构建期拒绝；今天由切片 14 的 panic 屏障兜住）",
+      "S18-SPEC-3 / R18-GAP-1（契约 3(a) 形态不可达，D4 无 solo 杀手；下次 design 收窄措辞或上移归因）",
+      "S18-SPEC-4（kappa 等价变异作为观察上限登记，不追加措辞断言）",
+      "S18-SPEC-5（B11 前半句编译期性质不以测试担保）",
+      "S18-STD-2（D6 的标签检查改用 p1r18Labels + 小写，纯测试改动，可与下一片并做）",
+      "S18-STD-4（D5 接口夹具的死分支改成自证式失败）",
+      "S18-STD-6 + S18-SPEC-6（工具链与判据可重放性：make lint 仍未跑；变异脚本与 struct.sh 是否入库）"
+    ],
+    "summary": "两轴各 6 条发现；Standards 轴最重为 S18-STD-1（归因寄生在错误文本上，judgement，受票面 §1 冻结），Spec 轴最重为 S18-SPEC-1（票面文本尚未按交付精确化，hard，本阶段后立即回写）。无阻塞项，无「实现与规格相反」的缺陷。"
+  },
+  "evidenceRefs": [
+    "receipt:3f831afa-731c-4021-b4db-1f0e4efeb5dd（绑定命令 RED，exit 1）",
+    "receipt:8674cf3f-6981-40de-b2dd-bd5297c07b22（绑定命令 GREEN，exit 0）",
+    "receipt:e110a8db-4aa2-4567-bc41-b6112383b15b（绑定命令 REFACTOR，exit 0）",
+    "artifact:docs/design/v3-red-observation-p1r18.md#section-3",
+    "artifact:docs/design/v3-p1-graph-r18-green.md",
+    "artifact:docs/design/v3-p1-graph-r18-refactor.md",
+    "artifact:docs/design/v3-testability-decision-p1r18.json",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice18.json",
+    "/tmp/p1-r18/mutants.out.json 与 /tmp/p1-r18/mutants-<id>.out.txt（11 条变异的逐条 -v 输出）",
+    "git hash-object --no-filters：基线还原 dca23943…、最终 graph.go a8e46a3a…、scheduler.go 0ce6c3b3…（未变）、p1r18_typed_test.go 10bce61b…"
+  ],
+  "postAcceptanceAmendments": [
+    {
+      "id": "S18-SPEC-1-closure",
+      "amendedAt": "2026-09-27T19:56:40Z",
+      "finding": "S18-SPEC-1",
+      "action": "票面 :70 B11 行按 §11.1 先例改为「可归因」并新增票面 §14；母约 docs/design/v3-platform.md §3.4 补写归因归属段（包装层给出、调度器不参与、与 §3.3 取消归一化互不重叠）。",
+      "artifacts": [
+        "docs/design/v3-test-scope-p1-graph.md:70",
+        "docs/design/v3-test-scope-p1-graph.md §14.1–§14.5",
+        "docs/design/v3-platform.md §3.4"
+      ],
+      "check": "§14.2 的四行文本逐条对齐 v3-p1-graph-r18-green.md:85-91 的实测探针；§14.5 回执 id 为完整 uuid（b1222ea4 / 3f831afa / 8674cf3f / e110a8db / a7b51ac5）；§14.3 的 kappa/mu/R18-GAP-1 与 refactor 文档 §3 一致。",
+      "remainingOpen": [
+        "R18-Q1（是否新增导出小类型/哨兵）",
+        "R18-Q2（nil fn 是否升级为构建期拒绝）",
+        "S18-STD-6（make lint 仍未运行）",
+        "S18-SPEC-2（HEAD 与切片字节相差 17 个切片，无提交授权）",
+        "struct.sh/mutants.mjs 仍在 /tmp（同 S17-STD-5）"
+      ]
+    },
+    {
+      "id": "S18-SPEC-4-and-S18-SPEC-5-placement",
+      "amendedAt": "2026-09-27T19:56:40Z",
+      "finding": "S18-SPEC-4 / S18-SPEC-5",
+      "action": "两条观察上限按切片 17 的先例写进票面 §14.3 第 2、4 条，并在母约 §3.4 末句留一条「只担保可定位、不担保指针形式」的上限说明；不追加断言去堵。",
+      "artifacts": [
+        "docs/design/v3-test-scope-p1-graph.md §14.3",
+        "docs/design/v3-platform.md §3.4"
+      ]
+    }
+  ]
+}

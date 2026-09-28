@@ -1,0 +1,109 @@
+{
+  "schema": "rex.hardening-record.v1",
+  "workItemKey": "work-p1-graph-engine-r8-teeth-rework",
+  "workflowActivationId": "aad3cb04-df5d-4059-b429-106ab27c2b31",
+  "activationId": "71c5cfe2-858d-49ad-b844-2275ea4b5aaa",
+  "stageId": "harden",
+  "closedItems": ["B7-1", "B7-2", "B7-3", "B7-4", "B7-5"],
+  "changes": [
+    {
+      "id": "H1",
+      "closes": "B7-2 / 契约 A2",
+      "where": "pkg/hno/graph/graph_test.go:57-97（TestP1G_UnsupportedEdgeDeclarationsAreRejected 的表与断言）",
+      "change": "把定位从单节点名 wantHit 升级为 wantPhrases=[\"graph: join edge\", \"not routable by this engine\", \"\\\"merge\\\"\"]，并改写表注释说明为什么节点名子串不够。",
+      "mutationAttribution": "M-B（graph.go:234 的 not-routable 原因短语改写为 is invalid）→ 判红在 graph_test.go:94。",
+      "receiptRef": "receipt:c481f8f5-67b4-499b-9c0f-c0890812e255"
+    },
+    {
+      "id": "H2",
+      "closes": "B7-2 / 契约 A1",
+      "where": "graph_test.go:455-502 新增 TestP1G_ValidateRejectsMissingOrUnknownEntry（表驱动两行：never-declared、not-a-node）",
+      "change": "经导出 API 构造『除入口外完全合法』的图，断 Validate 错误同时含 \"graph: entry node\"、被指名的入口名（\"\" 或 \"ghost\"）、\"does not exist\"；再断 Run 同一图必须返回错误且不返回 Result。",
+      "mutationAttribution": "M-A（删除 graph.go:220-222 的入口存在性分支）→ 判红在 graph_test.go:483，两个子用例各一次。加固前同一变异实测全绿（receipt:b16b68fd-220c-4f3e-9679-95f111774bdf，35/35 PASS），加固后 exit 1、35 PASS/3 FAIL。",
+      "coverageCorroboration": "覆盖画像里 graph.go:220.36,222.3 块的计数从 0 变为 1：加固前 receipt:6a34ef4b-722f-4e70-9c6e-4b6e5f0ce94e，加固后 receipt:cc8f921a-7318-4a45-a7c6-7e8e65953dd1。这是与断言无关的独立数值佐证。",
+      "receiptRef": "receipt:746268d0-17f3-40a4-9bb5-fa7441eff54c"
+    },
+    {
+      "id": "H3",
+      "closes": "B7-3 / 契约 A3",
+      "where": "graph_test.go:607-621（对照块『捕获的范围是一次 Run』）",
+      "change": "把只读 Completed 的对照改为同时断言 Output() 的绝对期望 D-OUT，使切片 7 引入却无人读取的夹具值第一次承载观察。",
+      "mutationAttribution": "M-C（scheduler.go:123 的 item.name == s.plan.output 反转为 !=）→ 判红在 graph_test.go:618。诚实标注：该变异并非只被新断言抓住，完整击杀集是 graph_test.go:40、:240×6（切片 4 的路由表）、:618、:640，共 10 个 FAIL 行（含父用例）。新断言的增量在于：它是 in-flight/对照这一族里唯一能在输出面抓住 M-C 的站点，而 :40/:240 属另一族。",
+      "receiptRef": "receipt:82faa9ea-e0ee-4fe7-a176-906383434e53"
+    },
+    {
+      "id": "H4",
+      "closes": "B7-1 / 契约 A4",
+      "where": "graph_test.go:636-641（正对照子用例『Run 之后新注册的节点对下一次 Run 可见』）",
+      "change": "删除按构造不可能为假的 reference.Completed() 谓词，替换为对同一次 Run 的绝对期望 got.Output()==\"seed\"（新节点 e 接在输出节点 b 之后，输出源不得随之挪走）。注释里写明为什么不能回头比对 reference。",
+      "mutationAttribution": "被删断言：无击杀者（删除后全套件零退出，receipt:37eb1423-1f85-449a-8212-42be72c1e2ec）。替换后的新断言：M-C 判红在 graph_test.go:640（Output() = E-OUT, want seed）——即它杀掉了被删者永远杀不掉的变异。",
+      "receiptRef": "receipt:82faa9ea-e0ee-4fe7-a176-906383434e53"
+    },
+    {
+      "id": "H5",
+      "closes": "B7-4 / B7-5 / 契约 A5",
+      "where": "docs/design/v3-test-scope-p1-graph-slice7.json、v3-p1-graph-slice7-hardening.json、v3-p1-graph-slice7-invariant-review.json",
+      "change": "契约判据 (d) 结案为 unachievable-by-construction 并附等价性证明（不再是欠账）；台账新增 cycle7Corrections 五条：T2 改靶理由由『只对崩溃面敏感』改为 Completed 去重稳健性、T4 夹具撤回『收紧』、行号区分 change/killedBy 并修正 :433/:347/:363/:556/:515-548、T6 归属为无击杀者的惰性断言。",
+      "mutationAttribution": "文档更正不对应变异；其担保方式是每条更正都指向本轮或 cycle7 的真实回执/实测行号。"
+    }
+  ],
+  "positiveControlForLifetimeFreeze": {
+    "why": "删除 :574-577 后必须证明『正对照仍然抓得住终身冻结式实现』，否则删除就是在削弱担保。",
+    "mutant": "M-D：Graph 增字段 frozen *plan，capturePlan 首次捕获后缓存并复用（一次『把 per-run 捕获偷成 per-graph 冻结』的可行实现）。",
+    "observed": "exit 1；判红三处 —— graph_test.go:612（Completed 未含新边）、:618（输出未解析到新节点）、:633（Run 之后注册的节点未参与下一次执行）。被删的那条 reference 谓词在该变异下依然为绿，因其读取的是另一次已完成 Run 的不可变 Result。",
+    "receiptRef": "receipt:4bf1ce43-228a-4855-a896-2772048e9135"
+  },
+  "mutationKillSummary": [
+    "M-A 删入口分支：加固前 exit 0（b16b68fd）→ 加固后 exit 1（746268d0），覆盖块计数 0 → 1。",
+    "M-B 改写 not-routable 原因短语：加固前 exit 0（cycle7 C7-SPEC-4 实测）→ 加固后 exit 1（c481f8f5）。",
+    "M-C 反转输出节点比较：exit 1（82faa9ea），10 个 FAIL 行，新断言 :618/:640 在 in-flight/对照族内首次给出输出面击杀。",
+    "M-D 终身冻结 plan：exit 1（4bf1ce43），三处判红含新写的 :618。"
+  ],
+  "testDiffAccounting": {
+    "vsFixedPoint": "git diff --numstat 0387000 -- pkg/hno/graph = graph.go +91/-16、scheduler.go +51/-11、graph_test.go +545/-0（相对 fixed point 仍零删除）。",
+    "vsSlice7": "graph_test.go +78/-14，新哈希 0c5076ffac3abf6fcac9f6d061f60b6d37b30f27。",
+    "deletedLines": [
+      "8 行：unsupported 表的 wantHit 字段、其单条断言与相关注释 → 替换为锚定的 wantPhrases 三元组，是严格更强的超集（M-B 实测判红）。",
+      "3 行：对照块的 got := mustRun(...).Completed() 与其两行断言 → 替换为保留 res 的 Completed + 绝对 Output 双断言（M-C 实测判红）。",
+      "3 行：:574-577 的 reference.Completed() 谓词及其 Errorf → 替换为对同一次 Run 的绝对 Output 期望（M-C 实测判红，被删者无任何击杀者）。"
+    ],
+    "noWeakening": "没有任何既有断言被放宽或删除；切片 1–6 的断言行相对 fixed point 逐字节未动（numstat 删除 0）。",
+    "productionPurity": "graph.go 与 scheduler.go 在四个变异实验后复算哈希仍为 3483783f1e787c96ca6c236341664d095acec5c0 / 87854ffbb7629f9adeb2d45fbb74d91f2032b99d；导出符号面不变；非测试文件 sync./atomic./recover( 命中 0。"
+  },
+  "affectedBoundary": {
+    "suite": "go test ./pkg/hno/graph/... -count=1 exit 0（-run TestP1G -v 实测 38 PASS / 0 FAIL / 0 SKIP，较基线 35 增 3：新父用例 + 两个入口行）",
+    "race": "go test -race ./pkg/hno/graph/... -count=1 exit 0 → receipt:d5e526b4-8d05-4eab-b051-78dc8ba78871",
+    "buildVetFmtNeighbors": "go build ./... && go vet ./pkg/hno/graph/... && gofmt -l pkg/hno/graph 为空 && go test ./pkg/hno/agent/... ./pkg/hno/runner/... 全绿 → receipt:56aca895-6b1e-4570-b4da-e9430d4439c4",
+    "downstreamScenario": "独立模块 /tmp/p1-baseline-r8（11 条场景：6 条 in-flight/参照 + next-run-visible 的绝对输出断言 + 4 条拒绝场景，全部经导出 API，rejection 带 recover 使 panic 可上报）exit 0 BASELINE-OK → receipt:7534f3f2-360d-4cec-80c9-92ebd6338d0e。加固前后同一场景集输出逐行一致，说明公开行为无回退。"
+  },
+  "limitations": [
+    "M-C 不具独占性：路由表族（:40、:240）本就抓住它；本轮新增的是 in-flight/对照族的输出面击杀，不是『唯一击杀者』。不以此宣称超出实测的强度。",
+    "M-A 的两行入口用例只钉住三条词组（种类前缀、入口名、does not exist），角色对调类退化（把 from/to 文案混进入口消息）仍可能静默通过：其根治点是结构化拒绝错误，属下一轮行为差异切片。",
+    "入口名用裸字符串 \"\" 与 \"ghost\" 断言，未做锚定前缀以外的位置校验；若将来入口校验与边端点校验共用同一模板，可能互相满足。已把该风险并入 typed-error 切片判据。",
+    "C7-STD-4 的测试改名（ConcurrentMutation → InFlightMutation）与 C7-STD-2 的表驱动化本轮未做：前者会在本轮已多处改动的文件里再挪一次行号、让 cycle7 台账引用的判红行整体漂移；后者属契约显式推迟的结构轮。仍登记为开放项，不伪装闭结。",
+    "C6-STD-1/C6-STD-3/C6-STD-4（注释与 scheduler.go:70 活读 g.entry）与母约 §3.3/§3.5 回写本轮未触碰，按契约非目标留在册上。"
+  ],
+  "nextOwed": [
+    "(1) 结构化拒绝错误（typed error：Kind/Endpoint/NodeName），一并消解 D1/D1b/D3 与本轮 limitation 1/2/3。",
+    "(2) 注释诚实化轮：C6-STD-1、C6-STD-3（含 Run 的 happens-before 与并发告诫）、C6-STD-4。",
+    "(3) 结构轮：in-flight 隔离子用例表驱动化 + assertReasonMentions 抽取 + 测试改名。",
+    "(4) 能力轮：B4 stepLimit、B5 无条件环拒绝、B2 Join 路由、C5-SPEC-1、C5-SPEC-2、C4-STD-2 (2)。",
+    "(5) 治理：母约 §3.3/§3.5 回写（PreToolUse gate 阻断，需在 v3-*.md 之外留痕或请用户解除）。"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-slice8-hardening.json#changes",
+    "artifact:docs/design/v3-p1-graph-slice8-baseline.json#scenarios",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice8.json#completionCriteria",
+    "receipt:746268d0-17f3-40a4-9bb5-fa7441eff54c",
+    "receipt:c481f8f5-67b4-499b-9c0f-c0890812e255",
+    "receipt:82faa9ea-e0ee-4fe7-a176-906383434e53",
+    "receipt:4bf1ce43-228a-4855-a896-2772048e9135",
+    "receipt:cc8f921a-7318-4a45-a7c6-7e8e65953dd1",
+    "receipt:d5e526b4-8d05-4eab-b051-78dc8ba78871",
+    "receipt:56aca895-6b1e-4570-b4da-e9430d4439c4",
+    "receipt:7534f3f2-360d-4cec-80c9-92ebd6338d0e",
+    "receipt:b16b68fd-220c-4f3e-9679-95f111774bdf",
+    "receipt:37eb1423-1f85-449a-8212-42be72c1e2ec",
+    "receipt:de41c46d-5832-413e-9f21-81a48c50923f"
+  ]
+}

@@ -1,0 +1,125 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.red-observations.v1",
+  "workItemKey": "work-p1-graph-r15-warnings",
+  "capabilityId": "software.testing.tdd",
+  "activationId": "4cd4b915-f540-4103-b068-a2dc06b3fdef",
+  "stageId": "red",
+  "slice": "P1 切片 15 = 票面 B7 判据 8（stepLimit 缺失告警）",
+  "contract": "artifact:docs/design/v3-test-scope-p1-graph-slice15.json",
+  "redBytes": {
+    "pkg/hno/graph/p1r15_warnings_test.go": "e7bd66ad1f8c6930442a643d8ab5f970b1d45d0c",
+    "pkg/hno/graph/graph.go": "a189a8692c0364266352e83ad3debeed738f6608",
+    "pkg/hno/graph/scheduler.go": "61c7ba6db72b65eda938c099968e7409fc944d73",
+    "existingTestsUnchanged": "graph_test.go=425ea0303e1d5c5c8e95bacf57663ae94a4309ee、p1r13_step_limit_test.go=bc4ab8e71527809e23a12590a078add8f35d68d1、p1r14_panic_barrier_test.go=0ed607dbc01955864276212fa61e0902577ce7b8，全部与切片 14 登记字节全等（本片只新增文件）。",
+    "note": "所有下列 receipt 都对同一份 RED 字节复取过（前一批 receipt 因一条 t.Fatalf 文案修订而作废，未用于本 ledger）。"
+  },
+
+  "scenarioCommand": {
+    "executable": "go",
+    "args": ["test", "-count=1", "-run", "TestP1R15_ConditionalCycleWithoutStepLimitWarns", "./pkg/hno/graph/"],
+    "cwd": "/Users/rex/codes/agno-go"
+  },
+
+  "redRows": [
+    {
+      "row": "T1",
+      "test": "TestP1R15_ConditionalCycleWithoutStepLimitWarns",
+      "input": "graph.New()（无 Option）→ entry/ping/pong 三节点 → AddEdge(entry,ping) → AddConditional(ping,pong,never) → AddConditional(pong,ping,never) → SetEntry(entry)/SetOutput(entry)",
+      "contractExpectation": "Validate() 为 nil，且 Warnings() 含一条点名「步数上限 + 环」的告警（票面 :66 前半句）",
+      "observedUserVisible": "Validate() 确实为 nil（前提成立，未退化成构建期拒绝），Warnings() 交出 0 条",
+      "failureOutput": "p1r15_warnings_test.go:62: Warnings() 交出 0 条 []，其中没有一条点名「步数上限 + 环」…",
+      "command": "go test -count=1 -run TestP1R15_ConditionalCycleWithoutStepLimitWarns ./pkg/hno/graph/",
+      "exitCode": 1,
+      "receiptRef": "receipt:4bcdf606-8e36-464f-af18-ee1c03f11296",
+      "failureClass": "缺失目标行为（Warnings 桩 return nil）"
+    },
+    {
+      "row": "T4",
+      "test": "TestP1R15_WarningDoesNotChangeValidationOrRun",
+      "input": "同 T1 的含环无上限图",
+      "contractExpectation": "Validate() nil + 提示在场 + Run 收敛为 completed=[entry ping]、output=seed（票面 :66「Validate() 为 nil、Run 正常」+ :119 不得污染致命语义）",
+      "observedUserVisible": "Validate() nil、Run 也确实收敛，但「提示在场」这一前提不成立",
+      "failureOutput": "p1r15_warnings_test.go:123: 本行要同时看见「有提示」与「执行不受影响」，提示缺席时它退化成一条空断言",
+      "command": "go test -count=1 -run TestP1R15_WarningDoesNotChangeValidationOrRun ./pkg/hno/graph/",
+      "exitCode": 1,
+      "receiptRef": "receipt:01ea3630-de71-431e-92b6-509562e66d36",
+      "failureClass": "缺失目标行为；本行刻意加了在场前提，避免在提示缺席时变成永真断言",
+      "designChoice": "若不加在场前提，T4 今天会以「执行没变」为由直接绿，等于把票面 :119 的一半判据挂空——这是 RED 第 4 条（只证 helper 被调）的反面防范。"
+    },
+    {
+      "row": "T5",
+      "test": "TestP1R15_SelfLoopConditionalEdgeAlsoWarns",
+      "input": "entry → body，AddConditional(body, body, never)（自环条件边），无 Option",
+      "contractExpectation": "该图合法（判据 7 只禁「每条边都必定被走」的环）且收到步数上限告警",
+      "observedUserVisible": "Validate() 为 nil（设计阶段实测已确认此拓扑放行），Warnings() 交出 0 条",
+      "failureOutput": "p1r15_warnings_test.go:158: 自环条件边图没有收到步数上限告警（Warnings()=[]）：单节点自环同样能在谓词恒真时永不返回",
+      "command": "go test -count=1 -run TestP1R15_SelfLoopConditionalEdgeAlsoWarns ./pkg/hno/graph/",
+      "exitCode": 1,
+      "receiptRef": "receipt:66ae763d-21f4-4097-aed1-74be6b55b8b4",
+      "failureClass": "缺失目标行为（环的定义覆盖面）"
+    },
+    {
+      "row": "T6",
+      "test": "TestP1R15_WarningsAreDeterministicAcrossRepeatedQueries",
+      "input": "同 T1 图，连续两次 Warnings()",
+      "contractExpectation": "两次等长、首条文案逐字节全等，且两次都能认出这条告警（仓库稳定文案约定 + 判据 8 在场）",
+      "observedUserVisible": "两次都返回空切片，等长但无可比对象——确定性断言会在空集上空转，因此本行带在场前提并以非零退出",
+      "failureOutput": "p1r15_warnings_test.go:175: 第一次询问没有交出步数上限告警，本行的确定性断言会空转",
+      "command": "go test -count=1 -run TestP1R15_WarningsAreDeterministicAcrossRepeatedQueries ./pkg/hno/graph/",
+      "exitCode": 1,
+      "receiptRef": "receipt:db5cd55d-35c2-4c1a-8df1-4fd370cdea92",
+      "failureClass": "缺失目标行为；确定性维度目前不可证，登记为 GREEN 后须由 map 排序实现真正受测"
+    },
+    {
+      "row": "T7",
+      "test": "TestP1R15_QueryingWarningsDoesNotMutateTheGraph",
+      "input": "两张同形含环无上限图；其中一张先调用 Warnings() 两次再 Run，另一张直接 Run",
+      "contractExpectation": "被询问过的图与未询问的同形图跑出同样的 Completed()/Output()，且提示不会被询问消费",
+      "observedUserVisible": "第一次询问就拿不到告警（提示根本不存在），询问-消费这一维度尚未被证伪",
+      "failureOutput": "p1r15_warnings_test.go:191: 第 1 次询问的 Warnings() 里没有步数上限告警：第 1 次就没有是提示缺席，问过之后才没有则是 Warnings() 消费/改写了图状态",
+      "command": "go test -count=1 -run TestP1R15_QueryingWarningsDoesNotMutateTheGraph ./pkg/hno/graph/",
+      "exitCode": 1,
+      "receiptRef": "receipt:842c6b45-1b8c-4d2c-8724-8818729ea026",
+      "failureClass": "缺失目标行为",
+      "messageFix": "首轮观察时本行文案写死成「提示被消费掉了」，与真实失败原因（提示缺席）不符；已在取正式 receipt 前改为同时说清两种形状，断言本身一字未放宽。"
+    }
+  ],
+
+  "absenceRowsGreenBeforeImplementation": [
+    {
+      "row": "T2",
+      "test": "TestP1R15_ExplicitStepLimitSilencesTheWarning",
+      "exit": 0,
+      "whyNotIllegitimateRed": "T2 断言的是「显式设置后不含它」——在没有任何告警的今天必然为真。它不是本片缺失行为的证据行，而是配对约束：只有 T1 同时为红时，T2 才与 T1 构成对同一对象的识别性判据。契约 forbiddenShortcuts 明令不得把它改成不断言，本片也必须在 GREEN 后确认它会因「无条件告警」的实现而红（变异 (b)/(c) 负责）。"
+    },
+    {
+      "row": "T3",
+      "test": "TestP1R15_AcyclicGraphWithoutStepLimitDoesNotWarn",
+      "exit": 0,
+      "whyNotIllegitimateRed": "同上：T3 是判据 8 触发条件的否定面，今天必然为真，其牙齿由变异 (b)「不看环就告警」验证。"
+    }
+  ],
+
+  "familyObservation": {
+    "command": "go test -count=1 -run TestP1R15 ./pkg/hno/graph/",
+    "exitCode": 1,
+    "receiptRef": "receipt:78de49e2-acd9-4caa-8273-e7f76ae4faec",
+    "summary": "整族一次跑：7 行里 5 红 2 绿（红=T1/T4/T5/T6/T7，绿=T2/T3 两条否定行）。与逐行 -run 的结论一致，无相互污染。"
+  },
+
+  "evidenceContractDisclosure": {
+    "constraint": "rex-harness 在 TDD 各阶段会把 testabilityDecision.redCandidate.command 与 evidence item 里每一个 receipt 的 command 逐元素比对（expectedScenarioCommand → validate-command-evidence.mjs:45-47），命令不符会整条 evidence 被拒且原因被吞。",
+    "consequence": "因此 failing-test-observed 只挂 T1 的那一条（命令与登记的 scenario 全等，receipt 4bcdf606…）；T4/T5/T6/T7 与整族 receipt 在此登记，不放进 evidence 信封。",
+    "notHidden": "这一限制不是把失败藏起来：上述四条 receipt 都是真实非零退出、可用 `rex-harness` 的 receipts 存储复核，且逐行的精确命令都写在本文件里。"
+  },
+
+  "failureClassificationSummary": {
+    "infrastructureFailures": 0,
+    "preImplementationFixturesVerified": "Validate() 在三张搭建图上均返回 nil（不是被构建期拒了才拿不到告警）；gofmt -l 干净；go vet ./pkg/hno/graph/ exit 0；同一 RED 字节下 5 行各自可归属非零。",
+    "alreadyPassingBeforeChange": "T2/T3 两条否定行（定义使然，非把期望改成当前错误输出）",
+    "redType": "天然 RED（非恢复 RED：本片实现尚未动过，graph.go 哈希仍是切片 13 收尾的 a189a869…）"
+  },
+
+  "nextStageCondition": "GREEN 只实现 Warnings() 使 T1/T4/T5/T6/T7 变绿，且必须同时保持 T2/T3 绿、现有三个测试文件字节不变、recover( 计数仍为 1、sync. 计数仍为 0；GREEN 后要以变异 (a)–(g) 证明这 7 行都有牙齿，特别是 T2/T3 这两条今天为绿的否定行。"
+}

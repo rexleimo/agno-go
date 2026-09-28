@@ -1,0 +1,191 @@
+{
+  "schema": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p1-graph-engine-r10-cycle-termination",
+  "activationId": "986e6818-d428-476d-b77a-78e260b2b05b",
+  "stageId": "design-tests",
+  "capabilityId": "software.testing.design",
+  "cycle": "cycle-10 / P1 图引擎切片 10",
+  "createdAt": "2026-09-27T09:31:00Z",
+
+  "userGoal": "把母约 §3.5 第 7 项「环检测」变成调用方可观察的行为：由「一定会被走」的边构成的环，Validate 必须拒绝且错误能定位到成环节点，Run 必须把这个拒绝原样传达出来且不执行任何节点。今天这类图在构建期完全放行、执行期永不返回。",
+
+  "whyThisSliceRepresentsTheGoal": "cycle-9 审查实测出 R9-SPEC-3：a→a 自环让 Run 永不返回，探针挂死约 15 分钟后被外部终止。本轮把同一形状的测量从「一次挂死事故」升级为「一张测量表」（见 measuredBaseline），并在包外公共入口证明五类无条件环全部放行。这是 P1 验收判据「5 类图端到端测试」中「环」这一类的前提：环这类图如果连「死循环 vs 合法循环」都区分不了，就没有可结束的端到端测试可写。",
+
+  "measuredBaseline": {
+    "how": "仓库外模块 /tmp/p1-r10-probe（go.mod 里 replace github.com/rexleimo/agno-go => /Users/rex/codes/agno-go），只用 graph 包公共入口；每个 Run 放进 goroutine 并施加 1.5s 硬期限，永不返回记为 HUNG，因此测量本身不可能挂死。节点计数用逐案例独立计数器：共享计数器会被前一个 HUNG 案例遗留的自旋 goroutine 污染（第一版实测把后续行的 executed 抬到 166，已修正后复测）。",
+    "commands": [
+      "cd /tmp/p1-r10-probe && go run ."
+    ],
+    "rows": [
+      {"shape": "uncond-self-loop", "decl": "AddEdge(\"a\",\"a\")", "validate": "<nil>", "run": "HUNG", "nodesExecutedWithinDeadline": 3175697},
+      {"shape": "uncond-two-node", "decl": "AddEdge(\"a\",\"b\")+AddEdge(\"b\",\"a\")", "validate": "<nil>", "run": "HUNG", "nodesExecutedWithinDeadline": 3366710},
+      {"shape": "uncond-three-node", "decl": "a→b→c→a 全无条件", "validate": "<nil>", "run": "HUNG", "nodesExecutedWithinDeadline": 2356461},
+      {"shape": "uncond-cycle-w-cond-exit", "decl": "a→b、b→a 无条件，另有 b→out 条件边恒真", "validate": "<nil>", "run": "HUNG", "nodesExecutedWithinDeadline": 1108628},
+      {"shape": "default-loop-no-alt", "decl": "a→b 无条件，b→a 兜底边且 b 无条件边替代", "validate": "<nil>", "run": "HUNG", "nodesExecutedWithinDeadline": 1287530},
+      {"shape": "stepLimit3-uncond-cycle", "decl": "uncond-two-node + graph.New(WithStepLimit(3))", "validate": "<nil>", "run": "HUNG", "nodesExecutedWithinDeadline": 821456},
+      {"shape": "cond-cycle-that-breaks", "decl": "a→b 无条件，b→a 条件边（第二次转假），b→end 条件边", "validate": "<nil>", "run": "RETURNED", "completed": ["a", "a", "b", "b", "end"], "nodesExecutedWithinDeadline": 5},
+      {"shape": "default-loop-w-cond-alt", "decl": "a→b 无条件，b→end 条件边（第二次转真），b→a 兜底边", "validate": "<nil>", "run": "RETURNED", "completed": ["a", "a", "b", "b", "end"], "nodesExecutedWithinDeadline": 5},
+      {"shape": "cond-cycle-never-breaks", "decl": "条件环且谓词永不转假，另加 WithStepLimit(3)", "validate": "<nil>", "run": "HUNG", "nodesExecutedWithinDeadline": 1228674},
+      {"shape": "join-back-edge", "decl": "a→b 无条件，AddJoin([\"b\"],\"a\")", "validate": "graph: join edge from \"b\" to \"a\" is declared but not routable by this engine", "run": "同一错误", "nodesExecutedWithinDeadline": 0},
+      {"shape": "acyclic-control", "decl": "a→b 无条件", "validate": "<nil>", "run": "RETURNED", "nodesExecutedWithinDeadline": 2}
+    ],
+    "readOut": [
+      "§3.5 第 7 项零实现：五种无条件环形状无一在构建期被拒，全部进入执行并自旋到测量期限之外。",
+      "「有出口不豁免」：无条件自环旁边挂一条恒真条件边也照样不自旋退出，说明这类图不是「忘了设出口」，而是环上没有任何可断开的边。",
+      "WithStepLimit(3) 对同一形状毫无作用（期限内心跳 821,456 次节点执行），把 R9-SPEC-3 的「安全阀是死 API」从静态推断升级为逐字实测。",
+      "条件环今天可正常结束（completed=[a a b b end]，重访节点被记两次），所以本轮的拒绝集合绝不能扩大到「任何环」。",
+      "join 回边已经被既有的 not-routable 检查拒掉，且拒绝时零节点执行 —— 检查前置效应这条 slice-8 不变量是新拒绝必须复用的样板。"
+    ]
+  },
+
+  "acceptanceMapping": [
+    {
+      "id": "A1",
+      "behavior": "无条件自环在构建期被拒，且错误能定位到成环节点",
+      "publicEntry": "(*graph.Graph).Validate",
+      "assertion": "AddEdge(\"a\",\"a\") 的图：err != nil；err.Error() 同时含 \"graph: unconditional cycle\" 与被指名的 `\"a\"`",
+      "whyUserObservable": "调用方拿到的是「哪条声明不合法」的拒绝，而不是一个永不返回的 Run；不钉节点名的话任何提到 cycle 的文案都能通过（cycle-6/cycle-7 实测教训）。",
+      "falsePassRisk": "只判 err != nil 会让「入口未声明」「join 不可路由」等既有拒绝冒充本行为的担保。"
+    },
+    {
+      "id": "A2",
+      "behavior": "多节点无条件环同样被拒，错误点名环上节点",
+      "publicEntry": "(*graph.Graph).Validate",
+      "assertion": "二节点环（a→b→a）与三节点环（a→b→c→a）各成一行：err != nil 且同时点名该行涉及的所有节点名",
+      "whyUserObservable": "自环只是最小形状；用户实际写出来的是跨节点回边。两行彼此独立失败，缺一行就不会发现「只查了自环」的实现。",
+      "falsePassRisk": "只测自环的实现（判 from==to）会在这一行红；只测大环的实现（判深度≥2）会在自环行红。"
+    },
+    {
+      "id": "A3",
+      "behavior": "兜底边构成的、没有条件替代的环同样算无条件环",
+      "publicEntry": "(*graph.Graph).Validate",
+      "assertion": "a→b 无条件 + AddDefault(\"b\",\"a\") 且 b 无条件边替代：err != nil 且点名 \"graph: unconditional cycle\"、`\"a\"`、`\"b\"`",
+      "whyUserObservable": "母约 §3.5 第 7 项只放行「由条件边构成」的环；这条把措辞落到可判定的边上，并给出下面 ambiguityResolutions[1] 的取舍边界。",
+      "falsePassRisk": "把兜底边当成「可断开」而放行，等于留下第二个永不返回的入口。"
+    },
+    {
+      "id": "A4",
+      "behavior": "同一非法声明经 Run 传达为错误，且零节点执行",
+      "publicEntry": "(*graph.Graph).Run",
+      "assertion": "A1–A3 每个形状的 Run：err != nil 且错误文案与 Validate 一致；res == nil；节点体内计数器为 0；并且必须在有界时间内返回（见 seam 的挂死防护）",
+      "whyUserObservable": "调用方只调 Run 也必须拿到同一拒绝，且不会先看到副作用 —— 这正是 join 回边今天已经做到的样板。",
+      "falsePassRisk": "若只断言 err != nil，「先自旋跑掉几百万次节点再返回 ctx 错」的实现也能通过；所以计数为 0 与「有界返回」都是断言的一部分。"
+    },
+    {
+      "id": "A5",
+      "behavior": "合法环必须继续被接受并且能结束（不过紧对照）",
+      "publicEntry": "(*graph.Graph).Validate + (*graph.Graph).Run",
+      "assertion": "①谓词会转假的条件环（a→b、b→a 条件、b→end 条件）：Validate 返回 nil，Run 在有界时间内返回且 Completed() 恰为 [a a b b end]；②兜底边回环但同节点有条件边替代：同样接受且结束；③无环对照：接受且 Completed()=[a b]",
+      "whyUserObservable": "本轮新增的拒绝必须只砍掉不可终止的形状。行 ①②今天实测就能结束，若实现把「任何环」都拒掉，这两行立刻红。",
+      "falsePassRisk": "Completed() 用精确等值而非「包含」；含重访节点，因此「去重」或「只跑一遍」的实现也会被抓住。"
+    },
+    {
+      "id": "A6",
+      "behavior": "非终止形状绝不会被写成可能挂死的测试（工程不变量）",
+      "publicEntry": "测试自身结构（不新增产品出口）",
+      "assertion": "每个 Run 调用都跑在 goroutine + select 期限内，期限到即 cancel 上下文并 t.Fatal；聚焦命令额外带 -timeout 25s 作为第二层护栏",
+      "whyUserObservable": "R9-SPEC-3 的事故就是「探针挂死 15 分钟」。这条把自己也钉住：RED 阶段观察到的是断言失败，而不是无限等待。",
+      "falsePassRisk": "如果 RED 靠 go test 的超时 panic 才「失败」，它就不是行为断言；本设计要求期限到就产生显式 t.Fatal 文案。"
+    }
+  ],
+
+  "inScope": [
+    "§3.5 第 7 项的构建期拒绝：自环、多节点无条件环、无条件+无替代兜底边环；错误含 \"graph: unconditional cycle\" 与成环节点名。",
+    "Run 面把同一拒绝原样传达，且零节点执行、有界返回。",
+    "合法环（条件可断开的环、兜底边但有条件替代的环）作为不过紧的反向对照。",
+    "挂死安全的测试构造（goroutine + 期限 + cancel）。"
+  ],
+
+  "explicitNonGoals": [
+    {"id": "NG1", "item": "让 WithStepLimit / stepLimit / ErrStepLimitExceeded 真正生效", "why": "母计划 §9 把「环死循环被 StepLimit 拦住」判给 P3（G6，v3-platform.md:467），本轮把它做进 P1 会静默合并两张票。但它已不再是「未测量的未来事项」：measuredBaseline 里 stepLimit3-uncond-cycle 一行给出 821,456 次节点执行的实测无效力。处置：作为 G6 的挂号项，优先级按 cycle-9 的 priority-raise 保持。", "residualRisk": "条件环谓词永不转假的形状（cond-cycle-never-breaks，实测 1,228,674 次执行）本轮仍然不自旋退出 —— 这是明知留下的残留风险，不属于本轮声称修掉的范围，且不得写成锁定该缺陷的测试。"},
+    {"id": "NG2", "item": "§3.5 第 8 项「存在无条件环时若未设 stepLimit → 警告」与 Warnings() 的实现", "why": "第 7 项一旦拒绝无条件环，第 8 项的前提就永不可满足 —— 母约自身冲突，见 ambiguityResolutions[2]。本轮只记录，不实现，也不给 Warnings() 编造内容（它今天恒返回 nil）。"},
+    {"id": "NG3", "item": "Join 路由语义（B2）", "why": "join 回边已被既有 not-routable 检查拒掉（实测零执行）；本轮不新增任何 join 行为。"},
+    {"id": "NG4", "item": "空节点名与重名 AddNode 的校验（R9-SPEC-1 / R9-SPEC-2）", "why": "属下一切片；本轮若顺手修会把两条互不相干的拒绝搅进同一份证据。"},
+    {"id": "NG5", "item": "重构 Validate 的检查次序、引入结构化拒绝错误类型（R9-STD-2/3/4）", "why": "本轮新增拒绝文案会再加一处子串耦合，这是已知的债，但把「引入错误类型」和「实现环检测」放在一起会让 RED 无法归因。"},
+    {"id": "NG6", "item": "修改 Result/Completed 对重访节点的语义、扇出顺序契约", "why": "A5 只钉今天已成立且被文档判为契约的结论。"},
+    {"id": "NG7", "item": "graph 包之外的任何改动（agent/runner/workflow）", "why": "票面边界。"}
+  ],
+
+  "ambiguityResolutions": [
+    {
+      "id": "AR1",
+      "question": "「无条件边成环」是否包含兜底边？严格文本读法（§3.5:220「合法环需由条件边构成」）会把 a→b 无条件 + b→a 兜底 + b→end 条件这类环也判为错误。",
+      "choice": "采「不可断开」判据：环上每条边一旦其起点被激活就必定被走（AddEdge，或该起点没有任何条件边替代的 AddDefault），才判为无条件环；环上存在至少一条可断开的边（条件边，或有条件替代的兜底边）则算合法环。",
+      "why": "§3.5 第 7 项自己的目的是「区分合法环与死循环」，母计划风险表（v3-platform.md:509）也把它列为「条件边成环导致死循环」的缓解。严格文本读法会拒绝掉今天实测可正常结束的 retry-with-escape 形状（default-loop-w-cond-alt，completed=[a a b b end]），那等于用一个新误杀换掉一个真缺陷。",
+      "evidence": "measuredBaseline 的 default-loop-no-alt（HUNG）与 default-loop-w-cond-alt（RETURNED）两行是这一取舍的可观察分界。",
+      "status": "需要在门控解除后写回母约 §3.5（NG2/AR2 一并处理）"
+    },
+    {
+      "id": "AR2",
+      "question": "§3.5 第 8 项要求「存在无条件环且未设 stepLimit → 警告」，但第 7 项已把无条件环判为错误，且 WithStepLimit 未设时也有默认 1000（v3-platform.md:144、192）。",
+      "choice": "记录为母约自相矛盾条款，本轮不实现第 8 项。",
+      "why": "在两个互斥读法之间替作者选一个并写进代码，正是不 fail-closed 的做法；这必须走需求写回而不是实现侧裁决。",
+      "status": "blocked-on-contract，挂号到 §3.5 写回批次"
+    },
+    {
+      "id": "AR3",
+      "question": "错误文案是否要求给出完整环路径？",
+      "choice": "只要求点名成环节点（A1–A3 断言的是 `\"a\"`/`\"b\"`/`\"c\"` 与种类前缀），不钉路径顺序。",
+      "why": "路径顺序是实现细节，把它钉进断言会让等价的另一种列举方式红；而「能不能定位到这条声明」才是用户可观察部分。完整路径诊断与聚合诊断属 R9-STD-4 已挂号的结构化错误工作。"
+    }
+  ],
+
+  "testSeam": {
+    "allowed": "pkg/hno/graph 的外部测试包 graph_test，只用导出入口：graph.New/WithStepLimit、AddNode/NodeFunc、AddEdge/AddConditional/AddDefault/AddJoin、SetEntry/SetOutput、Validate、Run、Result。新增测试函数 TestP1G_ValidateRejectsUnconditionalCycle（放在既有 graph_test.go 里，紧邻其他构建期拒绝测试）。",
+    "forbidden": [
+      "不新增 test-only 产品出口，不为测试导出私有调度器字段（stepLimit/plan/scheduler 一律不碰）。",
+      "不断言内部调用次数、不 mock 调度器；节点体内计数器只用于「拒绝时零副作用」这一条用户可观察事实。",
+      "不通过放宽既有断言、删除用例或跳过（t.Skip 必须保持 0）换取通过。",
+      "不写任何可能永不返回的断言：所有 Run 都必须包在 goroutine + 期限 + cancel 里。"
+    ],
+    "hangProtection": "每个 Run 一次 goroutine，select 1s 期限；期限到 → cancel() + t.Fatal(\"Run 未在期限内返回\")。聚焦命令带 -timeout 25s 作为第二层护栏（进程级 panic，不是行为断言）。",
+    "whyNarrowEnough": "环检测的全部对外后果就是「构建期拒绝 + 执行期传达 + 合法环照旧结束」三件事，它们都在 Validate/Run 这两个公共入口上可见，不需要更窄的缝。"
+  },
+
+  "focusedCommand": "go test ./pkg/hno/graph/... -run TestP1G_ValidateRejectsUnconditionalCycle -count=1 -timeout 25s -v",
+  "adjacentCommands": [
+    "go test ./pkg/hno/graph/... -count=1 -timeout 60s -race",
+    "gofmt -l pkg/hno/graph && go build ./... && go vet ./pkg/hno/graph/..."
+  ],
+
+  "falsePassProhibitions": [
+    "只判 err != nil 不判文案 → 既有拒绝（入口/输出/悬空端点/join 不可路由）可以冒充本轮担保。",
+    "只测自环 → 判 from==to 的残缺实现全绿。",
+    "只测非法行 → 把合法条件环一起拒掉的过度收紧实现全绿。",
+    "Run 面不设期限 → 「先自旋再报 ctx 错」的实现也算通过，且测试有挂死风险（R9-SPEC-3 事故重演）。",
+    "Completed() 用 Contains 而非精确等值 → 重访语义被削弱也看不见。"
+  ],
+
+  "completionCriteria": [
+    "A1–A4 每个形状都有 Validate 面与 Run 面两条断言，且逐行独立可失败；文案锚定种类前缀 + 成环节点名。",
+    "A5 三行合法对照全绿，证明拒绝集合没有扩大到「任何环」。",
+    "RED 必须是断言失败（非零退出、有失败文案），不得是超时 panic；GREEN 后聚焦命令与全包 -race 零退出。",
+    "graph_test.go 只增不减（删除行数 0），t.Skip 计数保持 0。",
+    "包外场景模块复现同一结论：非法环零节点执行、合法环照常结束。",
+    "NG1/NG2 的残留与母约冲突写进账本并挂号，不因本轮顺手实现。",
+    "变异证据：至少一条「只拒自环」与一条「把合法环也拒掉」的变异分别被 A2/A3 与 A5 唯一归因地杀掉。"
+  ],
+
+  "environmentNotes": [
+    "docs/design/*.md 被 rex-self-sediment-gate 挡住，本轮所有账本用 .json。",
+    "管道会吞退出码：需要判定失败时用不带管道的命令，或显式 test $? -eq 1。",
+    "任何构造可能永不返回的 Run 的探测/测试都必须自带期限；上一轮的探针在无期限环境下挂死约 15 分钟。",
+    "变异测试后必须从备份恢复并核对哈希，且确认恢复后的文件与 GREEN 态逐字节一致。"
+  ],
+
+  "downstreamEvidence": {
+    "outOfRepoScenario": "/tmp/p1-invariants-r10（沿用 r8/r9 的 replace 模块样板）：逐形状断言「无条件环被拒 + 零节点执行」，同时保留合法环结束与无环对照，并显式打印 cond-cycle-never-breaks 作为已知 GAP 而不是断言它被修好。",
+    "carriedFrom": [
+      "cycle-9 R9-SPEC-3（本切片的来源缺陷）",
+      "cycle-8 S8-IV-1 的「检查前置于副作用」不变量样板（join-back-edge 实测 executed=0）",
+      "cycle-9 R9-SPEC-1/2（下一切片：节点名有效性与重名注册）"
+    ]
+  },
+
+  "nextOwed": [
+    "G6/P3：WithStepLimit 真正生效并返回 ErrStepLimitExceeded，覆盖条件环谓词永不转假的残留非终止（本轮实测数据可直接作为其 RED 基线）。",
+    "§3.5 第 8 项与第 7 项的冲突裁决 + 本轮 AR1 取舍写回母约（门控解除后）。",
+    "结构化拒绝错误类型，替换随本轮继续增长的文案子串断言。",
+    "cycle-9 未闭结项：空节点名、重名 AddNode、S8-STD-2/4、C6-STD-1/3/4、B2 Join 路由、C5-SPEC-1/2、C4-STD-2(2)。"
+  ]
+}

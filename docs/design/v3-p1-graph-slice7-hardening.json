@@ -1,0 +1,150 @@
+{
+  "kind": "rex.hardening-record.v1",
+  "workItemKey": "work-p1-graph-engine-r7-assertion-teeth",
+  "activationId": "31e8d02e-6473-4327-be45-ddf04e9f57c7",
+  "commandToken": "e272ce52-4e67-4c10-9543-ecc35156b6b6",
+  "stage": "harden",
+  "contractRef": "artifact:docs/design/v3-test-scope-p1-graph-slice7.json",
+  "baselineRef": "artifact:docs/design/v3-p1-graph-slice7-baseline.json",
+  "governingReview": "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle6",
+  "recordedAt": "2026-09-27T07:16:00Z",
+  "diff": {
+    "filesTouched": [
+      "pkg/hno/graph/graph_test.go",
+      "docs/design/v3-p1-graph-slice7-baseline.json"
+    ],
+    "nonTestCodeTouched": "无。graph.go 与 scheduler.go 在本阶段结束时复算哈希仍为 3483783f1e787c96ca6c236341664d095acec5c0 / 87854ffbb7629f9adeb2d45fbb74d91f2032b99d（变异期间的临时改动全部 cp 回写并核验）。",
+    "slice7Only": "+59/-11（对 /tmp/p1-cycle6/graph_test.go 基线 62e0b2cf 逐行 diff）",
+    "cumulativeVsFixedPoint": "git diff --numstat 0387000 -- pkg/hno/graph/graph_test.go = +481/-0 —— 相对 fixed point 仍是纯增、删除 0 行，切片 1–4 的既有断言一行未动。",
+    "deletedLinesAccounting": "被删的 11 行全部落在切片 5/6 自己新增的断言与注释上，且每一处都是收紧：两处裸子串 \"conditional\" 改为锚定 \"graph: conditional edge\"、表行 kind 断言改为 \"graph: \"+kind+\" edge\"、夹具里 d 由透传改为返回 D-OUT、S2 刺激由同靶 b 改为新靶 d、两段函数头注释改写。没有任何一条用户可观察约束被放宽。",
+    "hashAfter": "0ebcadebed389afe7aa842a6958f3116dc7a9af2",
+    "lineDrift": "cycle6 台账引用的 graph_test.go 行号本轮整体后移（S4 对照的 Errorf 由 :528 移到 :554；隔离用例断言面 :504-520 移到 :530-547）。旧回执按当时哈希 62e0b2cf 仍可逐字复核，行号不作为跨周期定位依据。"
+  },
+  "hardening": [
+    {
+      "id": "T1",
+      "change": "边种类钉住由裸子串改为锚定前缀：[]string{tc.kind, ...} → []string{\"graph: \"+tc.kind+\" edge\", ...}（graph_test.go:435）；slice5 的两处必查列表由 \"conditional\" 改为 \"graph: conditional edge\"（:349、:365）。",
+      "whyAnchored": "裸子串 \"conditional\" 是 \"unconditional edge\" 的子串，所以『把条件边的拒绝文案换成无条件边的文案』这一缺陷可以整条空过；锚定 \"graph: \" 前缀后该子串在其它种类的文案里无处出现。这不是洁癖而是 cycle6 receipt:422ce345 的直接结论。",
+      "closes": "C6-SPEC-1（并把 C5-SPEC-4 从『名义已还』变成『有击杀证据』）"
+    },
+    {
+      "id": "T2",
+      "change": "运行中缺谓词边的刺激由同靶 AddConditional(\"a\",\"b\",nil) 改为新靶 AddConditional(\"a\",\"d\",nil)。",
+      "closes": "C6-SPEC-2 的可得部分，见 limitations[0]。"
+    },
+    {
+      "id": "T3",
+      "change": "新增子用例『运行中覆盖同名节点不得改变本次输出来源』：入口节点内 AddNode(NodeFunc(\"b\", 返回 OVERRIDE-B))，断言与参照三面一致。",
+      "closes": "C6-STD-2 / C6-SPEC-3 的 nodes map 面"
+    },
+    {
+      "id": "T4",
+      "change": "新增子用例『运行中改写输出节点名不得改变本次输出』：入口节点内 SetOutput(\"d\")，夹具的 d 改为返回可区分的 D-OUT（透传会让输出来源被换掉却在 Output 面上看不出来）。",
+      "closes": "C6-STD-2 / C6-SPEC-3 的 output 面"
+    },
+    {
+      "id": "T5",
+      "change": "参照 Run 增加绝对期望 Output()==\"seed\"（graph_test.go:501），与既有的 Completed()==[a b] 绝对断言配对。",
+      "closes": "cycle6 的『参照与受试同向退化不可见』盲区（receipt:cf8c0d58）"
+    },
+    {
+      "id": "T6",
+      "change": "新增第二个反向对照『Run 之后新注册的节点对下一次 Run 可见』（注册 e 并连 b→e），使 T3 不能靠『把图终身冻结』这种实现蒙过去。",
+      "closes": "cycle6 只对照了 AddEdge/SetOutput 两条腿、节点腿无正向可见性对照的缺口"
+    }
+  ],
+  "mutationKills": [
+    {
+      "id": "MUT-1",
+      "mutation": "label(edgeConditional) 返回 \"unconditional edge\"（只贴错一种类的标签）。",
+      "cycle6": "receipt:422ce345-f149-4519-9e55-98c609ffada4 exit 0（全包无反应）",
+      "cycle7": "receipt:9f72cb33-2f49-4ffc-ab3b-5bfb4a744890 exit 1",
+      "killedBy": "graph_test.go:349、:365（slice5 两处必查列表）与 :435 的 conditional-to/from 两行，共 4 处判红，报『错误 … 未含 graph: conditional edge』",
+      "proves": "T1 的种类钉住不再为空断言。"
+    },
+    {
+      "id": "MUT-2",
+      "mutation": "capturePlan 改回 nodes := g.nodes（共享活节点表，去掉 map 复制）。",
+      "cycle6": "receipt:ce012bd9-8373-4c29-82a9-4f38ef66dd21 exit 0",
+      "cycle7": "receipt:7d5f7a2e-0b0e-4a5f-8afa-7b81acd89ce1 exit 1",
+      "killedBy": "graph_test.go:531 新子用例，报『运行中被覆盖的节点 b: Output() = OVERRIDE-B，参照图为 seed』",
+      "proves": "真正承载隔离的 map 复制现在有测试观察。"
+    },
+    {
+      "id": "MUT-3",
+      "mutation": "plan 的 output 捕获抹为 \"\"（输出捕获整体失效）。",
+      "cycle6": "receipt:cf8c0d58-8629-4b76-8988-e93d6bdd8e1c exit 0（隔离用例自身判不出）",
+      "cycle7": "receipt:7ed5a0bc-ad65-40eb-b27f-b99c4103c34d exit 1",
+      "killedBy": "graph_test.go:501 的参照绝对期望，报『参照图自身就不满足切片 1–4 的既有语义: Output() = <nil>, want seed』",
+      "proves": "T5 关闭了同向退化盲区。"
+    },
+    {
+      "id": "MUT-3b",
+      "mutation": "调度器重新持有 *Graph 并在 complete 里活读输出名（s.plan.output → s.g.output，另加 struct 字段与 Run 赋值共三行）。",
+      "cycle6": "无法取证：该形态在 cycle6 的断言面下与正确实现不可区分（Output 面全是相对断言）。",
+      "cycle7": "receipt:45284724-4af0-432f-b9f5-acdd02589795 exit 1，且只有 T4 子用例判红（其余 6 个子用例含两个对照全 PASS）",
+      "killedBy": "graph_test.go:539，报『运行中被改写的输出节点: Output() = <nil>，参照图为 seed』",
+      "proves": "T4 提供的是全套件里独一份的检测力 —— 不是把 MUT-3 换个写法再杀一次，而是杀在一个此前无人覆盖的机制上。"
+    }
+  ],
+  "limitations": [
+    "T2 的契约原文（『在 successors 里加回 e.p != nil 静默跳过守卫必须判红』）是我在 design 阶段没验证可达性就写下的，无法兑现：nil 谓词没有定义路由结果，所以『读到并静默跳过』与『根本没读到』在 err/Completed/Output 三面上完全等价，任何结果断言都区分不了；而 Validate 已让预先声明的 nil 谓词边到不了 successors，该守卫一旦加回就是死代码。真正的收获是别的：改新靶之后，『活读 + 把 nil 谓词当恒真』与『declare 阶段把缺谓词条件边降级为无条件边』这两类实现会让 Completed 多出 d 而判红；旧的同靶写法只对崩溃面敏感。cycle6 的 S2 天然 RED（receipt:bfbbb06b，FAIL 后 panic 于 e.p(out)）仍然是这一行最主要的证据。",
+    "edges 的深拷贝依旧无法被任何测试杀掉，原因已在本周期由源码确认：declare 只 append，导面无就地改写 edgeDecl 的路径，捕获的 slice header 已冻结长度。本轮不假装给它补检测力，正确处理是改注释（scheduler.go:30-31），属下一条切片排序 (2) 的文案诚实化，且被本轮『非测试代码不得改动』的约束排除。",
+    "C6-STD-3（plan GoDoc 与导出 Run 的 happens-before 限定、并发 caveat）与 C6-STD-4（entry 未进 plan 的次序不变式）本轮未做：都是非测试代码的注释/结构调整，与契约 IN-4 冲突，留在册上不伪装闭结。",
+    "C6-SPEC-7（母约 §3.3/§3.5 与实现相互矛盾）仍被 PreToolUse 门阻塞。"
+  ],
+  "invariantsHeld": [
+    "IN-1 文案逐字不变：本轮只加断言，Validate 产出的句子未动（graph.go 哈希一致即为证）。",
+    "IN-2 声明场景命令复跑：加固后 go test ./pkg/hno/graph/... -run TestP1G -count=1 -v = receipt:f7297939-dc18-4028-8f26-9ecf5e02201c exit 0，与基线 receipt:090b7f84 同命令同形态。 下游真实场景行为不变：/tmp/p1-baseline-r7 的六种运行中改图全部仍与参照一致、next-run-visible 不变，加固后 receipt:98e20296-368e-4dfe-9b36-e6f59886f38a exit 0（与基线 receipt:9d054241 同形）。",
+    "IN-4 非测试代码哈希保持 3483783f / 87854ffb；sync./atomic./recover( 在非测试文件中仍为 0 命中。",
+    "IN-5 相对 fixed point 删除 0 行（+481/-0）。",
+    "gofmt -l 无输出；go vet ./pkg/hno/graph/... 净；-race 全包 receipt:ccac1e0e-a5b5-4799-a05d-8984c5508db2 exit 0；邻近包 + graph 三包 receipt:e08d8304-64a6-4d6f-a09d-50fc00456a41 exit 0。",
+    "聚焦面由 32 条 PASS 增至 35 条（新增 T3、T4、T6 三个子用例），0 FAIL、0 SKIP。"
+  ],
+  "nextOwed": [
+    "(1) 结构化拒绝原因：typed error 携带 Kind/Endpoint/NodeName，让测试断言字段而非任何子串，一并关闭 C5-STD-3、C6-STD-8、C6-SPEC-6 与本轮 limitations[0] 的根因（stringly-typed 断言）。属 behavior-delta，需自取 RED。",
+    "(2) 文案诚实化：capturePlan 归因、plan/Run 的 happens-before 限定与并发 caveat、entry 进 plan 或注释其次序。",
+    "(3) B4 stepLimit 消费现有配置面，(4) B5 环拒绝 + 谓词收敛环对照，(5) C5-SPEC-1/2 与 C4-STD-2 (2)，(6) C4-STD-3 种类折表 + C5-STD-7 去重 + capturePlan 归位。",
+    "台账一致性：cycle6 台账四处 superseded 标注中，C6-SPEC-1/2、C6-STD-2、C6-SPEC-4 的取证本轮已补齐或改写为可达形式；『构建期校验即终局』这句仍须带并发前提，未由本轮解除。"
+  ],
+  "evidenceRefs": [
+    "receipt:f7297939-dc18-4028-8f26-9ecf5e02201c",
+    "receipt:a3ab9c2f-0935-4e93-9583-ae443ce6427c",
+    "receipt:9f72cb33-2f49-4ffc-ab3b-5bfb4a744890",
+    "receipt:7d5f7a2e-0b0e-4a5f-8afa-7b81acd89ce1",
+    "receipt:7ed5a0bc-ad65-40eb-b27f-b99c4103c34d",
+    "receipt:45284724-4af0-432f-b9f5-acdd02589795",
+    "receipt:98e20296-368e-4dfe-9b36-e6f59886f38a",
+    "receipt:ccac1e0e-a5b5-4799-a05d-8984c5508db2",
+    "receipt:e08d8304-64a6-4d6f-a09d-50fc00456a41",
+    "artifact:docs/design/v3-p1-graph-slice7-baseline.json",
+    "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle6",
+    "file:pkg/hno/graph/graph_test.go#L498-L575"
+  ],
+  "cycle7Corrections": [
+    {
+      "id": "C7-CORR-1",
+      "superseded": "limitations[0] 与 graph_test.go:522-524 注释：『旧的同靶写法只对崩溃面敏感』。",
+      "corrected": "旧同靶写法在 Completed 面本就判红：cycle6 备份的刺激是 AddConditional(\"a\",\"b\",nil)（/tmp/p1-cycle6/graph_test.go:335），『把 nil 谓词当真』会让 b 再执行一次得到 [a b b] ≠ [a b]（cycle7 审查 PV-4 实测）。改新靶的真实且更窄的收益是对 Completed 去重实现的稳健性：去重后同靶形态与参照无法区分，新靶多出 d 仍可区分。",
+      "status": "falsified-by-measurement"
+    },
+    {
+      "id": "C7-CORR-2",
+      "superseded": "T4 说明与 invariant-review assertionDelta[2]：把夹具 d 改为常量 D-OUT 称作『收紧』。",
+      "corrected": "T4 场景里 d 从不执行，output 捕获失效时无论 d 返回什么都判红；\"D-OUT\" 在切片 7 的测试文件里只出现在定义处，从未被任何断言读取（PV-5 实测：grep 计数 1）。该夹具值在切片 8 才通过对照块的绝对期望获得载荷。",
+      "status": "over-claimed"
+    },
+    {
+      "id": "C7-CORR-3",
+      "superseded": "diff.lineDrift 与 T1.change 的行号。",
+      "corrected": "锚定后的必查列表位于 :433（判红在 :435），slice5 两处列表位于 :347/:363（判红在 :349/:365）；既有对照块的 Errorf 在 :556（不是 :554）；三个既有隔离子用例现在位于 :515-548，:530-547 是新增的 T3/T4 一对。change 字段一律记改动行，killedBy 一律记判红行。",
+      "status": "line-drift"
+    },
+    {
+      "id": "C7-CORR-4",
+      "superseded": "T6 被登记为已交付加固项。",
+      "corrected": "T6 新增的 reference.Completed() 谓词按构造不可能为假（与 :495 的 Fatalf 同一谓词，且 reference 是另一次已完成 Run 的不可变 Result），删除后全套件仍零退出（receipt:37eb1423-1f85-449a-8212-42be72c1e2ec）。它不属于任何变异的击杀者，切片 8 已把它替换为对第二次 Run 的绝对 Output 期望。",
+      "status": "vacuous-assertion"
+    }
+  ]
+}

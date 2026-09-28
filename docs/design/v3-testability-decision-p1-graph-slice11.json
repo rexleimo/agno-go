@@ -1,0 +1,68 @@
+{
+  "schema": "rex.testability-decision.v1",
+  "workItemKey": "work-p1-graph-engine-r11-reachability",
+  "activationId": "5b1846bf-d374-438c-8e4c-901c55011b61",
+  "stageId": "decide-testability",
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:docs/design/v3-testability-decision-p1-graph-slice11.json#decision",
+  "contractRef": "artifact:docs/design/v3-test-scope-p1-graph-slice11.json#inScopeBehaviors",
+
+  "redCandidate": {
+    "publicEntry": "github.com/rexleimo/agno-go/pkg/hno/graph：Graph.Validate() 与 Graph.Run(ctx, in) 的返回值，外加 Result.Output()/Completed()/Value(name)（测试文件是外部包 graph_test，只用导出面）",
+    "setup": "同一测试函数内两类行。不合法行用 looping(count) 注册节点，每行只含一条缺陷：orphan-registered 是 entry 无出边 + 一个没有任何边相连的 orphan；unreachable-chain 是 a 无出边 + 一条独立接不上主线的 c→d；unreachable-output 是 entry 无出边 + SetOutput(\"out\") 而 out 不可达。A6 行则是 a 无出边 + 一条完全不可达的 c→d→c 环。反向对照三组今天就该绿：条件边谓词运行期恒 false 的目标节点、单节点图/两条来路汇聚/谓词会转假的条件环、以及四张「既含不可达节点又含一条更前面的既有缺陷」的图。",
+    "command": {
+      "executable": "go",
+      "args": [
+        "test",
+        "./pkg/hno/graph/...",
+        "-run",
+        "TestP1G_ValidateRejectsUnreachableNodes",
+        "-count=1",
+        "-timeout",
+        "25s",
+        "-v"
+      ],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "契约 slice11 的 A1/A2/A4：三行不可达声明都要被 Validate 以「graph: unreachable node + 被点名的节点」拒绝，Run 同步返回 err!=nil 且 res==nil、节点执行计数为 0；A6：既不可达又含环时先报可达性、不再报环。",
+    "observed": "四条子测试判红、七条对照判绿，包级 FAIL，exit 1，耗时 <1s（不是挂死也不是超时 panic）。三行不合法行全部停在同一句 t.Fatal（graph_test.go:1031「从入口不可达的节点被 Validate 判为合法，调用方拿到的是少跑了节点的 Result」）；A6 行实测拿到的仍是切片 10 的文案 graph: unconditional cycle \"c\" -> \"d\" -> \"c\"…，在 :1098 与 :1101 各判一次（未先报不可达 / 把永不执行的东西说成运行时风险）。对照面今天全绿：条件边不命中的 b 仍被接受且 Value(\"b\") 报 ok=false，Completed 精确等值 [a end]、[only]、[a b c c]、[a a b b end]，四张既有缺陷图的错误仍是既有的那一条。",
+    "failureReason": "Validate 目前只做五件事：入口存在、输出存在、每条边两端存在、条件边有谓词、边种类可路由，收尾接 rejectUnconditionalCycles（pkg/hno/graph/graph.go:225-247）；函数体里没有任何从入口出发的可达性闭包，g.nodes 是 map 而调度器只按队列激活，所以注册了但接不上线的节点既不报错也不执行——B2 那张图因此今天就能交出 err==nil 而 Output()==nil 的 Result（/tmp/p1-r11-probe 实测）。而不可达的环今天被拒，只是因为环检查不看可达性（graph.go:279-317 遍历全部 g.edges），这正是要被裁定的不自洽。测试红的是这两条缺失的构建期语义，不是夹具或环境。",
+    "receiptRef": "receipt:dac49825-72ae-466b-84e0-605e7a2cfd94"
+  },
+
+  "decision": {
+    "summary": "存在诚实 RED：不可达声明从「静默放行」变成「构建期拒绝」是新的用户可观察行为，已用稳定公共入口真实复现为 4 条判红、非零退出、亚秒完成，因此走 behavior-delta TDD，不走加固。",
+    "redIndependence": "三行不合法行与 A6 行各自可独立失败：A6 行即便三条不合法行都已通过（可达性检查存在但不区分可达与否）仍会因为报的是环文案而红；反向对照七条今天全绿，只提供「新校验不得越界」的边界，不参与本次红。",
+    "scopeDiscipline": {
+      "inThisSlice": "Validate 增加从 entry 出发的静态可达性闭包检查（点名一个确定性的不可达节点），并把它的次序放在既有五项检查之后、环检查之前；Run 随 Validate 一致拒绝。",
+      "explicitlyNot": "第 5 项无出口 sink（B9 实测今天放行）、空节点名 R9-SPEC-1、重名 AddNode R9-SPEC-2、Add* 增量检查 S10-SPEC-1、结构化拒绝错误、死旋钮处置、母约 .md 写回。",
+      "contractAmendment": "两条，均已在实现前落定而不是事后追改：(1) 契约 ambiguityResolutions[2] 原写「按注册/声明顺序稳定」，但节点存在 g.nodes 这个 map 里、注册顺序在公共面不可恢复，改为「按节点名字典序取第一个」，A1 的 unreachable-chain 行因此期望点名 \"c\"；(2) 契约 A1 的措辞是「点名被拒的那个节点」，实际实现一次只报一个名字，已在该条 assertion 里按确定性单名理解。"
+    },
+    "fixtureDisclosure": "第一次写不合法行时，我给 entry 加了 AddEdge(\"entry\",\"entry\") 想让它有出边，结果每行同时含两条缺陷（不可达 + 自环），而 A6 那条对照组里同样混进了自环——那会让「报可达性而不是报环」在任何正确实现下都不可能通过。取回执前已把这四处自环全部删掉，使每行只有一条缺陷；被丢弃的那次运行未取回执、也没有被引用（它只输出过一次包级 FAIL）。如实记录，不当没发生过。"
+  },
+
+  "notChosen": {
+    "behavior-preserving-hardening": "不选：本轮改变调用方可观察的拒绝集合（今天三行放行、之后拒绝），且 A2 直接消灭一个 err==nil 而 Output()==nil 的返回值形状，属新用户可观察行为，并有真实非零退出回执。",
+    "blocked": "不选：A1–A7 全部可经公共入口观察；对照组 7 条已实测为绿，说明目标形状并未过度收紧。"
+  },
+
+  "greenObligations": [
+    "GREEN 必须让同一条命令零退出，且不得改动本轮 RED 的任何断言、行名或期望文案。",
+    "可达性检查必须插在 rejectUnconditionalCycles 之前、既有五项之后：A7 与 A6 两组对照就是这条次序的守门人，任何靠调整期望换来的通过都不算。",
+    "至少三个单点变异归因：整体去掉可达性检查、把可达性做成「运行期跑过才算可达」（必须被 A3 判红）、把可达性放到环检查之后（必须被 A6 判红）。每个变异要给出被判红的行集与站点，杀伤不唯一时如实标注。",
+    "邻居回归：pkg/hno/graph 全包（含切片 10 的 8 条子测试逐条不变）、pkg/hno/agent、pkg/hno/runner 不得新增失败；全包 -race 零退出。",
+    "包外场景模块需从公共入口证明：B1/B2/B4 被拒且零节点执行，B3/B5/B6/B10 全部照旧，B8 文案与切片 10 逐字一致。"
+  ],
+
+  "blockedConditions": [
+    "若发现必须新增导出 API（例如 Graph.Reachable()）才能让 A1–A7 通过，即判为缝选错，停下报告而不是新增 test-only 出口。",
+    "若 A3 或 A5 任一条对照在实现后失败，说明可达性被实现成了运行期语义或误伤了多路汇聚，回退实现而不是放宽断言。",
+    "若为了让 unreachable-chain 通过而改成一次报出全部不可达节点（聚合诊断），判为越出契约范围：聚合另立条目（R9-STD-4 在册），本轮不做。"
+  ],
+
+  "evidenceRefs": [
+    "artifact:docs/design/v3-testability-decision-p1-graph-slice11.json#decision",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice11.json#measuredBaseline",
+    "receipt:dac49825-72ae-466b-84e0-605e7a2cfd94"
+  ]
+}

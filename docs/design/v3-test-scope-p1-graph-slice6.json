@@ -1,0 +1,82 @@
+{
+  "kind": "rex.test-scope-contract.v1",
+  "decisionRef": "artifact:test-scope-contract:p1-graph-engine-slice6-r1",
+  "workItemKey": "work-p1-graph-engine-r6-immutable-run",
+  "activationId": "9da04289-9d20-43a6-b32f-015abac4fdea",
+  "commandToken": "69b31726-d2a9-40d7-b80d-85f3f6642c87",
+  "authority": "本节把 docs/design/v3-p1-graph-review-verdict.json 的 cycle5.verdict 排序第 (0)(1) 两步落地为可测判据，不新增也不删除母契约 docs/design/v3-test-scope-p1-graph.md §4 的任何行为，不改 §1 的公共面。它兑现三项在册债：C5-STD-5（运行中改图可把宿主打成不可 recover 的 SIGSEGV）、C5-SPEC-4（拒绝断言未钉边种类，违反 slice5 契约文本与 falsePassProhibitions 第 6 条）、C5-SPEC-6（REFACTOR 论证『包外无绕过路径』已被现场复现证伪，需改写成以快照为前提的成立形式）。",
+  "gateNote": "docs/design/v3-*.md 仍被 PreToolUse 写入闸门锁定，故本周期契约以类型化 JSON 入册；与 .md 前序章节冲突时，以本文件的场景表为切片 6 的判据，前序章节继续生效于其自身切片。",
+  "userGoal": "让 pkg/hno/graph 的构建期校验成为终局：一次 Run 只执行进入 Run 时那一份已验证的拓扑，之后对 builder 的任何结构修改都不能推翻它，也不能把宿主进程带进 nil 解引用或 SIGSEGV。同时把『被拒的声明必须指名边种类与原因』这条已写进契约却未落进断言的强度补回来。",
+  "semanticDecision": {
+    "statement": "选定语义为『Run 入口捕获拓扑快照』，不选『运行中改图返回错误』。",
+    "reason": "错误检测需要一个能被安全观察的修改计数；而调用方若从与 channel 无 happens-before 关系的 goroutine 改图，那本身就是数据竞争，任何计数都无法诚实地观察到它。竞争无关的唯一可靠承诺恰是『本次 Run 执行进入 Run 时捕获的拓扑』，因此快照既是防崩溃的手段，也是这条语义本身。静默疑虑由它消解：这不是把修改悄悄丢掉，而是 Run 的文档化语义（编译后执行的同型选择）。",
+    "boundary": "本切片不引入 recover、不引入锁、不做 panic 转错误（B10 仍在册未做）；快照只覆盖 Run 实际读取的拓扑输入：节点集合、边声明表、输出节点名（入口节点只在 Run 入口读取，已天然免疫）。"
+  },
+  "inScopeBehaviors": [
+    "S1（运行中加悬空边）一张已 Validate 通过的图，其入口节点在自身函数体内对同一 builder 追加一条指向不存在节点的无条件边 ⇒ Run 必须返回 err == nil，且 Completed()/Output() 与一张完全相同但未被修改的参照图逐字段相等（参照图在同一次测试运行内实跑取得，不写死期望值），测试进程存活。今日实测：scheduler.go:86 对 map 查表得到的 nil 节点调用 Run ⇒ goroutine 内 SIGSEGV，主 goroutine recover 不住，整个 test binary 非零退出（cycle5 C5-STD-5 liveEvidence (b)）。",
+    "S2（运行中加 nil 谓词条件边）同上，但节点体内追加 AddConditional(\"a\",\"b\",nil)（两端都存在）⇒ 结果与 S1 的参照图逐字段相等、进程存活。今日实测：Validate 已在 Run 前放行，successors 的 e.p(out) nil 解引用可被 recover 接住但仍无结果（liveEvidence (a)）。",
+    "S3（运行中加合法边不得改变路由）节点体内追加一条两端都存在、且若被读到就会多激活一个已注册节点 d 的无条件边 ⇒ Run 结果仍等于未修改参照图（Completed() 不含 d），进程存活。这一行把语义钉成『捕获』而非『读到什么算什么』，是 S1/S2 的通则化。",
+    "S4（反向对照：快照不得变成永久冻结）第一次 Run 返回之后，对同一 builder 追加节点与边，再跑第二次 Run ⇒ 第二次结果必须体现新声明。该行挡住两类退化实现：把图一次性冻结（第二次 Run 拒绝或仍返回旧拓扑）、用 sync.Once 之类只允许跑一次。",
+    "S5（断言强度还债·既有拒绝面）把 slice5 的 S1/S2（缺失谓词的条件边被拒）与 S4（悬空端点各边种类被拒）的断言从『只含节点名』升级为『同时钉住边种类标签与拒绝原因词』，并按 slice5 契约 inScopeBehaviors.S4 原文补回 join 端点行：期望错误同时含 join 与 does not exist，从而与『join 不可路由』的 not routable 文案区分开 ⇒ 端点校验对四种边（unconditional/conditional/default/join）各自成行、彼此可区分。今日断言形态实测无法区分：把 edgeKind.label() 退化为常量、或把 from/to 两条文案互换，S4 四行仍全绿（C5-SPEC-4）。"
+  ],
+  "outOfScope": [
+    "C5-SPEC-1（AddJoin(nil,\"b\") 等空前驱集合 ⇒ err==nil + 空 Result）与 C5-SPEC-2（输出节点从入口不可达 ⇒ Output()==nil）：同属构建期校验缺失但各是独立声明，必须各取独立 RED，不随本轮夹带。",
+    "C5-SPEC-3 / B4 stepLimit（§7 默认 1000、ErrStepLimitExceeded 的产生点）与 B5 无条件边成环的构建期拒绝：『图会挂死宿主』类，失效模式与本轮不同，cycle4 C4-SPEC-3 明令不得与本轮合并。",
+    "C4-STD-2 (2) 多条 Default 边全部激活、(3) 谓词收敛环端到端：已在 verdict.cycle5 与台账 owedRedForNextSlice 挂号，本轮不做。",
+    "B6 余下校验、B7 Warnings、B8 并发上限 FIFO、B9 取消归一化、B10 节点 panic 转错误、B11 Typed 分支测试。",
+    "C5-STD-3 哨兵错误 / 结构化拒绝原因：S5 只钉种类标签与原因词，不钉整句，因此不需要新公共面；引入哨兵错误属另一决定。",
+    "§3 全部非目标（G3/G4/G5/G7/G8/G10）不变。"
+  ],
+  "allowedTestSeam": "仅 pkg/hno/graph 的导出 API，测试文件保持 package graph_test（外部观察）：New / AddNode / NodeFunc / AddEdge / AddConditional / AddDefault / AddJoin / SetEntry / SetOutput / Validate / Run，与 Result 的 Output / Value / Completed。S1–S3 的改图动作通过节点闭包捕获外层 builder 完成（这是外部调用方本来就能做的动作，不需要内部知识）。禁止断言：nodes、edges、unrouted、successors、snapshot、scheduler、cfg 等未导出符号；禁止断言 goroutine 数、channel 收发次数、快照拷贝次数、错误的具体类型；错误文本只允许断言包含边种类标签与原因词。",
+  "whyThisSeamIsEnough": "『拓扑在 Run 期间不再被推翻』本身就是调用方可观察的：同一次执行内，改了图的 Run 与没改的参照 Run 三面（err、Completed、Output）必须完全一致，而崩溃会让测试进程直接非零退出，无需任何内部可见性。S4 从反面把边界钉住：快照是一次 Run 的范围，不是图的终身状态。S5 全在既有公共面上加强断言词，不开新缝。",
+  "acceptanceMapping": [
+    { "behavior": "S1 运行中加悬空边", "observable": "err == nil 且 Completed()/Output() == 同轮实跑的未修改参照图；测试进程存活", "falseProxyToReject": "把 goroutine panic 捕获后判『没崩就算过』——必须比结果，不能只比存活" },
+    { "behavior": "S2 运行中加 nil 谓词边", "observable": "同上（与参照图逐字段相等）", "falseProxyToReject": "断言错误文本含 predicate —— 目标是不被读到，而不是被读到后再报错" },
+    { "behavior": "S3 运行中加合法边", "observable": "Completed() 精确等于参照值，不含新边目标", "falseProxyToReject": "用集合包含断言放宽成『至少包含 a』，那样读到新拓扑也能过" },
+    { "behavior": "S4 第二次 Run 看到新声明", "observable": "第二次 Run 的 Completed() 含新追加的节点", "falseProxyToReject": "只跑一次 Run 的测试，或断言第二次 Run 报错" },
+    { "behavior": "S5 拒绝错误钉种类与原因", "observable": "四种边各自的 Validate 错误同时含该边种类标签与 does not exist；每行只含一种缺陷", "falseProxyToReject": "只断言含 ghost（slice5 已犯并被 C5-SPEC-4 判红）；或断言整句文案从而锁死措辞" }
+  ],
+  "sliceJustification": "S1 是余下所有拒绝类判据的信任根：B4/B5/B6/B2 的每条契约都写『Validate 拒绝 ⇒ 引擎根本不会执行它』，但只要 scheduler 读活对象，这条推断就只覆盖 Run 的第一微秒，任何后续拒绝测试都存在被绕过的路径；而 S2/S3 与 S1 是同一条根因（读活拓扑）的三个可观察面，必须一起成立才叫终局。同时本轮是唯一一次『纯测试债 + 它的实现』能合在同一缝上还清的切片：S5 的强化断言正是让 S1–S3 之后的拒绝测试有牙的前提。",
+  "falsePassProhibitions": [
+    "用 recover 把崩溃转成错误返回 ⇒ 那是 B10（panic 转错误），本轮明确未做，出现即判超范围。",
+    "引入 sync.Mutex/RWMutex/atomic 或 channel 保护读边 ⇒ 破坏在册不变式 grep -c 'sync\\.' 必须仍为 0/0。",
+    "只在 Run 入口重新 Validate 一遍（今日已有）而不捕获拓扑 ⇒ S1–S3 全部判红（崩溃照旧）。",
+    "把图永久冻结、第二次 Run 拒绝或看不到新声明 ⇒ S4 判红。",
+    "把 S1–S3 的期望写成『任意 err 或任意结果』⇒ 判红：必须与同轮实跑的参照图逐字段相等，且参照值不得写成实现现状的硬编码。",
+    "S5 退回到只断言节点名子串，或为了过而把边种类标签改成当前实现的整句文案（锁死措辞同样是失败）。",
+    "删除或弱化切片 1–5 的既有用例、把 Completed() 期望改成实现现状、把全序断言降级为集合包含。",
+    "顺带实现 stepLimit / 环拒绝 / Join 路由 / 空 AddJoin 拒绝来『让测试更好过』⇒ 超范围，即使全绿也算失败。",
+    "编译失败、import 错误、-race 环境错误一律不得记为 RED 或变异击杀。"
+  ],
+  "redPlan": "S1–S3：向 pkg/hno/graph/graph_test.go 追加单个测试 TestP1G_RunIsolatesTopologyFromConcurrentMutation，三个子用例各自自带参照图与断言，可独立失败。今日实现下三者都以 test binary panic（invalid memory address / SIGSEGV）非零退出，失败形态正是缺失行为本身；S4 对照子用例在同一命令下今日即通过（今日图确实是活的，第二次 Run 能看到新声明）。S5：向既有 TestP1G_ValidateRejectsConditionalWithoutPredicate 与悬空端点表追加种类与原因词断言、补回 join 行 ⇒ 属检测力取证，按恢复式 RED 流程走（先临时把 label() 退化为常量、把端点检查退回只判无条件边，取得真实非零退出回执，再逐字节校验还原哈希），台账必须标注 recovered RED，不得伪装成天然 RED。",
+  "focusedCommands": [
+    "go test ./pkg/hno/graph/... -run P1G -count=1",
+    "go test -race ./pkg/hno/graph/... -count=1",
+    "go vet ./pkg/hno/graph/...",
+    "gofmt -l pkg/hno/graph",
+    "grep -c 'sync\\.' pkg/hno/graph/graph.go pkg/hno/graph/scheduler.go",
+    "go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1",
+    "find pkg/hno/graph -name '*.go' -not -name '*_test.go' | xargs wc -l"
+  ],
+  "completionCriteria": [
+    "S1、S2、S3 各有一条真实非零退出的 RED 回执（同一命令、失败点指名各子用例）与一条零退出的 GREEN 回执；S4 在同一命令下持续通过。",
+    "S5 有 recovered RED 回执，并在同一命令下 GREEN；join 端点行按契约原文入表（期望含 join 与 does not exist）。",
+    "slice5 既有的 23 条 PASS、R1 的 join-only 拒绝行、切片 1–4 全部用例在同一命令下仍 PASS；邻近包（agent/runner）零退出。",
+    "非测试 LOC ≤ 1500；grep -c 'sync\\.' 仍为 0/0；-race 绿；gofmt/vet 净。",
+    "至少三条变异被行为断言（非编译失败）杀掉：(a) 去掉拓扑捕获、让 scheduler 回到读活对象 ⇒ S1 判红（进程崩溃）；(b) 把捕获做成永久冻结 ⇒ S4 判红；(c) 把 edgeKind.label() 退化为对所有种类返回同一常量 ⇒ S5 至少三行判红。每次变异后必须校验还原哈希逐字节一致。",
+    "scheduler.go:105-107 的绝对命题改写为以拓扑捕获为前提的成立形式（C5-SPEC-6），Run 的 GoDoc 写明『本次 Run 执行进入 Run 时已验证的拓扑，之后对 builder 的修改不影响本次 Run』；不引入 panic 转错误、不引入锁。",
+    "verdict.cycle5.blocking 中 C5-STD-5 与 C5-SPEC-4 两项在台账标记闭；C5-SPEC-1/2/3 与 C4-STD-2 (2)(3) 继续在 owedRedForNextSlice 挂号，不得静默消失。"
+  ],
+  "environmentNotes": [
+    "工作树未提交（fixed-point 0387000 之上切片 1–5 全部为未提交改动），因此任何还原都必须走文件级备份 + git hash-object --no-filters 校验，禁止 git stash / git checkout --（共享工作树，会吞掉未提交工作）。",
+    "S1–S3 的崩溃类 RED 会让整个 test binary 退出，`-run P1G` 的其它用例会一起消失于输出，这是预期形态，不得因此改用 `-run` 精确到单个子用例来『让失败点更干净』。",
+    "go test 输出不得经管道取退出码；回执命令必须与本契约 focusedCommands 逐字一致。"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle5",
+    "artifact:docs/design/v3-p1-graph-slice5-test-diff-review.json#owedRedForNextSlice",
+    "artifact:docs/design/v3-test-scope-p1-graph.md",
+    "artifact:/tmp/c5probe（C5-STD-5 两条现场复现）",
+    "artifact:docs/design/v3-platform.md"
+  ]
+}

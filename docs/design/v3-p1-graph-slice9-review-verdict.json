@@ -1,0 +1,172 @@
+{
+  "schema": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p1-graph-engine-r9-output-contract",
+  "activationId": "4178ab9b-9b18-46fa-a768-a0aef4c6392d",
+  "stageId": "review",
+  "fixedPoint": "0387000",
+  "diffRef": {
+    "command": "git diff --numstat 0387000 -- pkg/hno/graph",
+    "observed": [
+      "pkg/hno/graph/graph.go 96 16",
+      "pkg/hno/graph/graph_test.go 638 0",
+      "pkg/hno/graph/scheduler.go 51 11"
+    ],
+    "slice9Delta": "graph.go：Validate 新增 3 行输出存在性检查 + 两处 GoDoc（Validate 的四项改五项、SetOutput 增加边界说明）；graph_test.go：新增 TestP1G_ValidateRejectsMissingOrUnknownOutput（92 行）与悬空端点行的 Result 面补判。scheduler.go 本轮零改动。",
+    "reviewedSpecs": [
+      "docs/design/v3-test-scope-p1-graph-slice9.json",
+      "docs/design/v3-p1-graph-slice9-red.json",
+      "docs/design/v3-p1-graph-slice9-green.json",
+      "docs/design/v3-p1-graph-slice9-refactor.json"
+    ]
+  },
+  "independence": {
+    "reviewedBy": "主 Agent 本人（作者），另加三个包外真实探针模块 /tmp/p1-invariants-r9、/tmp/p1-r9-probe 的实测输出",
+    "independentReviewerUsed": false,
+    "note": "本轮结论中三条最有价值的发现（SP-1/SP-2/SP-3）不是读代码读出来的，是跑出来的：SP-1/SP-2 有下面逐字贴出的探针输出，SP-3 有真实的挂死与外部终止事实。作者自审的独立性缺陷仍需由下一轮外部审查补足。"
+  },
+  "axes": {
+    "standards": {
+      "findings": [
+        {
+          "id": "R9-STD-1",
+          "smell": "注释过度声称（仓库标准：注释必须与代码同真）",
+          "location": "pkg/hno/graph/graph.go:208-213 SetOutput 的 GoDoc（审查时）",
+          "evidence": "文档写「名字不是已注册节点（或从未调用本方法）时…Validate 会拒绝它」。探针实测：注册一个名字就是空串的节点后，从不调用 SetOutput 的图 Validate 返回 <nil> 且 Run 成功（output=EMPTY-NODE-OUT），即「从未调用」这一分支只在节点名非空时成立。",
+          "severity": "hard",
+          "fix": "文档补边界（已做），并在 R9-SPEC-1 里把空节点名本身判为非法，之后边界句可以删掉。",
+          "status": "已在审查后修正：SetOutput 的 GoDoc 增加「只判声明是否指向已注册节点」的边界句，仅注释改动，复验 receipt:dd516984-fee3-4fc7-8030-3bbe7cf5b424（聚焦命令零退出）与 receipt:a21033cf-401b-461e-8788-a9242986f52b（gofmt 为空 + go build ./... + vet + -race 全包）；graph.go 哈希 eeb07f1c27a12fcf082d37e92b89c153e7e6fb80 → b4e6051ec2448e3a93f528eae9153731b4406d4a，测试与调度器字节未变。"
+        },
+        {
+          "id": "R9-STD-2",
+          "smell": "Duplicated Code",
+          "location": "pkg/hno/graph/graph.go:222-224 与 225-227",
+          "evidence": "入口与输出是两条形状完全相同三行检查（map 查找 + fmt.Errorf(\"graph: %s node %q does not exist\")）。",
+          "severity": "judgement",
+          "fix": "第三个同类必查项出现时再抽 requireNode(role, name string) error；现在折叠只会把两条不同文案塞进一张表，可读性净亏。账本 refactor 阶段已记 decline 理由。",
+          "status": "accepted-debt"
+        },
+        {
+          "id": "R9-STD-3",
+          "smell": "Primitive Obsession / 文案耦合（承接 S8-STD-3）",
+          "location": "pkg/hno/graph/graph_test.go:486 附近与本轮新增 :533-537",
+          "evidence": "新用例继续用 strings.Contains 钉散文错误，本轮新增的第 5 处同类循环使重复计数从 5 升到 6；文案一改即假红，文案同义改写而语义错位则假绿。",
+          "severity": "judgement",
+          "fix": "结构化拒绝错误（role/kind/side/node），散文断言降级为冒烟。契约本轮 explicitNonGoals 已排除，另轮取 RED。",
+          "status": "owed"
+        },
+        {
+          "id": "R9-STD-4",
+          "smell": "校验顺序隐含未声明",
+          "location": "pkg/hno/graph/graph.go:221-243",
+          "evidence": "入口检查在输出检查之前、两者都在边循环之前。一张同时缺入口与缺输出的图只会得到入口那条错误，调用方需逐轮修一次才看到下一条。契约与注释都没写这个次序。",
+          "severity": "judgement",
+          "fix": "要么在 GoDoc 写明「一次只报第一条致命问题」，要么与 §3.5 的告警面（Warnings 目前是 return nil 的死代码）一起改成聚合诊断。后者是新产品面，需单独 RED。",
+          "status": "owed"
+        }
+      ],
+      "smellsChecked": {
+        "Mysterious Name": "未见新增（测试名与本轮行为一致；S8-STD-4 的 Concurrent 命名债未在本轮扩散）",
+        "Duplicated Code": "有发现（R9-STD-2、R9-STD-3）",
+        "Feature Envy": "未见",
+        "Data Clumps": "边缘：(role, name) 两两同现，若 R9-STD-2 落地会自然成类型",
+        "Primitive Obsession": "有发现（R9-STD-3）",
+        "Repeated Switches": "未见（本轮未新增 switch）",
+        "Shotgun Surgery": "未见：一条逻辑变更只落在 Validate 一处",
+        "Divergent Change": "未见",
+        "Speculative Generality": "未见：新检查未带任何开关或预留参数；但既有死代码（stepLimit/maxConcurrency/Warnings/ErrStepLimitExceeded）仍属此类，见 SP-3",
+        "Message Chains": "未见",
+        "Middle Man": "未见",
+        "Refused Bequest": "不适用"
+      }
+    },
+    "spec": {
+      "findings": [
+        {
+          "id": "R9-SPEC-1",
+          "type": "新校验的判定条件可被绕开",
+          "location": "pkg/hno/graph/graph.go:222-227；母约 §3.5 第 2 项（重复节点名）与未列出的「节点名有效性」",
+          "evidence": "探针实测：P1 empty-node-name validate=<nil> run-err=<nil> output=EMPTY-NODE-OUT completed=[]（completed 打印为空是因为唯一元素就是空串）。即注册一个名字为 \"\" 的节点后，「从未声明入口/输出」在公共面上与「声明为那个空名节点」完全不可区分。",
+          "severity": "hard",
+          "fix": "下一轮 RED：AddNode/SetEntry/SetOutput 接受空名即 Validate 非 nil（错误需指名是哪个声明），把本轮 A1/A2 的 never-declared 行升级为可区分。",
+          "status": "blocking-next-slice"
+        },
+        {
+          "id": "R9-SPEC-2",
+          "type": "静默数据丢失（§3.5 第 2 项未实现）",
+          "location": "pkg/hno/graph/graph.go AddNode 的 map 写入；docs/design/v3-platform.md:214 必查项 2",
+          "evidence": "探针实测：P2 duplicate-node-name validate=<nil> run-err=<nil> winner=second output=SECOND completed=[a] —— 两次 AddNode(\"a\", …) 第一次被无声覆盖，构建期与执行期都不报错。",
+          "severity": "hard",
+          "fix": "按 §3.5 第 2 项取 RED：重名 AddNode 必须 Validate 非 nil 且错误指出现有/新注册者；本轮不做（契约非目标）。",
+          "status": "blocking-next-slice"
+        },
+        {
+          "id": "R9-SPEC-3",
+          "type": "非终止执行 + 规格承诺的安全阀是死代码",
+          "location": "docs/design/v3-platform.md:222 必查项 7/8；pkg/hno/graph/graph.go 中 stepLimit/maxConcurrency/ErrStepLimitExceeded/Warnings",
+          "evidence": "首版探针含一条无条件自环（AddEdge(\"a\",\"a\")）。该命令在 120s 工具超时后被转入后台持续运行，本 Agent 约 15 分钟后主动停止，期间没有观察到 Run 返回，也没有任何错误。无 receipt（挂死进程无法产生零/非零退出回执），可复现命令：在 /tmp 下用 replace 指向本仓库的模块里构造 a→a 自环并 Run —— 预期就是挂住，请勿在无外部超时的环境重跑。",
+          "severity": "hard",
+          "fix": "把 B5（无条件环构建期拒绝）与 B4（stepLimit 生效并返回 ErrStepLimitExceeded）提到下一批之前做，且必须先有一条带外部超时的 RED，否则测试本身会变成挂死。当前 WithStepLimit 是可调用但完全无效的 API，这点对使用者的误导比缺功能更严重。",
+          "status": "priority-raise"
+        },
+        {
+          "id": "R9-SPEC-4",
+          "type": "契约符合性确认",
+          "evidence": "A1/A2 由 receipt:795383c7（缺检查时红）→ receipt:d09d0e0f（实现后绿）闭环；A3/A4 两条对照全程为绿，且 A4 被证明对「按输出值过度收紧」有唯一杀伤力（receipt:f6e70495 单行判红）；M2 证明新校验是节点存在性而非字符串非空（receipt:2665050f 单行判红）。包外公共入口复验 receipt:5ffde403（11 拒绝行零节点执行 + 3 合法行 + 1 GAP 行）。测试文件对 fixed point 删除行数 0，断言点 47→58，t.Skip 0 次。",
+          "severity": "none",
+          "status": "confirmed"
+        },
+        {
+          "id": "R9-SPEC-5",
+          "type": "契约需要写回而当前被门控阻断",
+          "evidence": "§3.5 八项必查没有「输出声明不合法」，本轮已实现该拒绝但母约文字未记；治理门阻断 docs/design/v3-*.md 写入，需求只落在 v3-test-scope-p1-graph-slice9.json#contractAmendmentNeeded。R9-SPEC-1/2/3 同样暴露母约清单缺项（节点名有效性、非终止安全阀的强制性）。",
+          "severity": "judgement",
+          "fix": "治理轮集中把 §3.5 清单改写为：新增输出声明项与节点名非空项，并把环检测/stepLimit 标为未落地即禁止发布。",
+          "status": "blocked-by-gate"
+        }
+      ]
+    }
+  },
+  "postReviewCorrections": [
+    {
+      "ref": "R9-STD-1",
+      "kind": "comment-only",
+      "hashBefore": "eeb07f1c27a12fcf082d37e92b89c153e7e6fb80",
+      "hashAfter": "b4e6051ec2448e3a93f528eae9153731b4406d4a",
+      "receipts": [
+        "receipt:dd516984-fee3-4fc7-8030-3bbe7cf5b424",
+        "receipt:a21033cf-401b-461e-8788-a9242986f52b"
+      ]
+    }
+  ],
+  "blocking": [
+    "R9-SPEC-1：空节点名绕开本轮入口/输出的「未声明」判定。",
+    "R9-SPEC-2：重名 AddNode 静默覆盖，§3.5 第 2 项未实现。",
+    "R9-SPEC-3：无条件环导致 Run 永不返回，WithStepLimit 是无效 API。"
+  ],
+  "owed": [
+    "结构化拒绝错误，替换 6 处文案子串断言（R9-STD-3 / S8-STD-3）。",
+    "拒绝次序与聚合诊断的显式契约化（R9-STD-4 + Warnings 死代码）。",
+    "Validate 存在性检查的 requireNode 折叠时机（R9-STD-2，第三个必查项出现时）。",
+    "§3.5 母约写回（R9-SPEC-5，门控解除后）。",
+    "slice8 遗留：S8-STD-2 表驱动折叠、S8-STD-4 测试改名、S8-SPEC-2 逐断言归因、C6-STD-1/3/4 注释诚实性与 g.entry 活读、B2 Join 路由、非输出汇点/不可达告警项。"
+  ],
+  "verdict": "切片 9 的行为差异闭环成立：新校验有真实行为级 RED、GREEN 与两条唯一归因的变异证据，包外公共入口复现同一结论，测试面只增不减，且它没有将「输出值为 nil」误判为非法。本家族不闭结：三条 blocking 全部是本轮实测出来的规格缺口（空名绕过、重名覆盖、无条件环挂死），其中 R9-SPEC-3 属产品级风险，建议下一批先做 B5/B4 再补其余校验项。独立性仍弱：本轮为作者自审 + 真实探针，没有外部审查代理参与。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-slice9-review-verdict.json",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice9.json",
+    "artifact:docs/design/v3-p1-graph-slice9-red.json",
+    "artifact:docs/design/v3-p1-graph-slice9-green.json",
+    "artifact:docs/design/v3-p1-graph-slice9-refactor.json",
+    "receipt:795383c7-f346-4a7a-8739-78d32d706a2f",
+    "receipt:d09d0e0f-e349-4d61-8a94-75777ee00170",
+    "receipt:2665050f-2d1a-4963-8f1b-57a8e5a09f7d",
+    "receipt:f6e70495-a388-4b60-9647-65d9f9cf9e5e",
+    "receipt:8b085bd5-f6a9-4069-84fb-d56f4a27a672",
+    "receipt:5ffde403-20f4-45ef-8c0a-b3715f840774",
+    "receipt:43b9efbc-2e14-47ed-b635-1eb8fb7a85e5",
+    "receipt:da70d1ec-2822-4990-b6fd-10fd1987b579",
+    "receipt:fd48826b-b784-45c0-8eb1-65df635b3025",
+    "receipt:dd516984-fee3-4fc7-8030-3bbe7cf5b424",
+    "receipt:a21033cf-401b-461e-8788-a9242986f52b"
+  ]
+}

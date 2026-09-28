@@ -1,0 +1,155 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p1-graph-r16-max-concurrency",
+  "activationId": "11529278-39c9-40b7-8fd3-35d9bfc129a3",
+  "capabilityId": "software.review.standards-spec",
+  "stageId": "review",
+  "recordedAt": "2026-09-27T17:37:30Z",
+  "independenceDisclosure": "本轮仍是作者自查：用户此前明确拒绝对 P1 派发独立审查子代理（该次工具调用被拒），因此 Standards 与 Spec 两轴由本周期同一作者分别独立走查，独立性低于双代理审查。披露的具体后果：变异 α–θ 是作者本人选的，「变异集是否穷尽」这一层判断没有第二双眼睛；两轴各自记录、不互相背书（Standards 通过不掩盖 Spec 缺口，反之亦然）。",
+  "fixedPoint": {
+    "whyNotHead": "HEAD 在本周期内前移过（reflog：9854ce3 → 748f5f8 → 98db2a9 → 0387000），而 0387000 提交的是 pkg/hno/graph 的较早快照。本轮实测两条：git show HEAD:pkg/hno/graph/scheduler.go | grep -c stepLimit = 0、git cat-file -e HEAD:pkg/hno/graph/p1r16_max_concurrency_test.go = 不存在。以 HEAD 为 fixed-point 会把切片 13/14/15/15b 的成果算进本片差异，因此按前例改用切片 15b 收尾字节。",
+    "perFile": {
+      "pkg/hno/graph/scheduler.go": "61c7ba6db72b65eda938c099968e7409fc944d73 → f2d7fb4b10e9c133f9bbe8b566da40ea8e96d55e（3 处：结构体字段、Run 取値、dispatch 守卫＋注释）",
+      "pkg/hno/graph/graph.go": "9684e49efb85f6870784cc75a469739669e0a05b → dca23943fd9cade4766ceeffe43b47477b815a61（1 处：WithMaxConcurrency 的 GoDoc，行为零改动）",
+      "pkg/hno/graph/p1r16_max_concurrency_test.go": "不存在 → c4bf4638…（RED 阶段）→ 6934a4f2ae9ed2d80a59a30ead56b3de6bcc4296（REFACTOR 阶段仅 C5 一处加强）",
+      "pkg/hno/graph/graph_test.go": "425ea0303e1d5c5c8e95bacf57663ae94a4309ee 未动",
+      "pkg/hno/graph/p1r13_step_limit_test.go": "bc4ab8e71527809e23a12590a078add8f35d68d1 未动",
+      "pkg/hno/graph/p1r14_panic_barrier_test.go": "0ed607dbc01955864276212fa61e0902577ce7b8 未动",
+      "pkg/hno/graph/p1r15_warnings_test.go": "3ea06d27abd3994130e593d297951c895729a4dd 未动",
+      "pkg/hno/graph/p1r15b_warning_text_test.go": "0285ab35729ed3d50359e0fd407edb2d8b1c1a2a 未动"
+    },
+    "diffNonEmpty": "是：生产侧 4 个 hunk、测试侧新增 540 行的一个文件（8 个 Test 函数）。差异非空由 git hash-object 前后不一致与 patch 重建共同背书（见 measuredDuringReview）。"
+  },
+  "specSources": [
+    "docs/design/v3-test-scope-p1-graph.md :26（WithMaxConcurrency 的公共签名与 0 = 不限）、:67（B8 验收行：区间不重叠 + 声明序 + 后进入者观测到前序完成）、:75（不得用 sleep 定序）、:90（sync. 计数 0 + -race）、:92 行 4（节点侧 [name,start,end] 轨迹）、:117（并发判据须在 -race 下）、§9（结构判据）",
+    "docs/design/v3-platform.md :143（Option 签名）、:190（并发上限判据原文：maxConcurrency > 0 && len(runs) >= maxConcurrency → 激活进 pending（NodePending），每次 completion 后 FIFO 派发）",
+    "docs/design/v3-test-scope-p1-graph-slice16.json（本周期测试范围契约：C1–C9、非目标、完成判据）",
+    "docs/design/v3-p1-graph-r16-red.json / -green.json / -refactor.json（三阶段实跑账本）"
+  ],
+  "standardsSources": [
+    "AGENTS.md（Coding Style：tab 缩进、导出符号 GoDoc、%w 包装、错误文案小写；Testing Guidelines：测试须与被测代码同址、行为变化必须加回归测试；Build/Test：make fmt / make vet / make lint）",
+    "仓库内既有同形实践：graph.go:211 与 graph.go:422 已在公共 GoDoc 里引用内部契约标识；scheduler.consume/dispatch 的「先判后派」形状（切片 13 立）",
+    "Fowler smell 基线 12 条（逐条走查，见 smellBaselineSweep）"
+  ],
+  "standards": {
+    "summary": "生产改动只有 5 行有效代码（一个私有字段、一次取値、循环头三行守卫），余下是注释。命名、缩进、GoDoc、错误文案都符合 AGENTS.md；gofmt -l 无输出、go vet 零退出、go build ./... 零退出、go test ./... 零退出。发现 4 条 judgement 级问题，无硬违规。golangci-lint 本轮不可执行：环境里没有 golangci-lint 二进制（command -v 无输出），因此 AGENTS.md 的 make lint 一格只能记为「未运行」，不声称干净。",
+    "findings": [
+      {
+        "id": "S16-STD-1",
+        "title": "并发守卫用 return nil 表达「现在放不了，等下一次完成」，与「全部排空」的成功返回同形",
+        "location": "pkg/hno/graph/scheduler.go:124-126（dispatch 循环头 if s.maxConcurrency > 0 && s.running >= s.maxConcurrency { return nil }）",
+        "evidence": "同一函数里 return nil 出现在两处含义不同的位置：守卫命中（提前停止）与函数末尾（队列排空）。调用方 consume 只靠 s.running 判断是否继续等，因此正确性没问题；但函数名 dispatch 读起来像「把能派的都派了」，而守卫命中时它的返回值是 nil——一个不带任何信号的「没出错」。票面 :92 与契约 C1 都把「打满即等下一次完成」当判据，这条语义目前只由注释（dispatch 上方第 4 段）承载。",
+        "severity": "judgement（可读性，非硬违规；正确性已被 C1/C6 与矩阵 β 钉住）",
+        "fix": "把守卫的 return nil 换成 break：语义逐字等价（守卫后没有任何循环外语句），但把「停止排空」和「成功返回」两种意图分开。属 1 行改动，不新增行为，可与下一个切片合并做。"
+      },
+      {
+        "id": "S16-STD-2",
+        "title": "上限是裸 int，0 与负数被同一条守卫折叠成「不限」，与同包的 WithStepLimit 取向相反",
+        "location": "pkg/hno/graph/graph.go:73-79（WithMaxConcurrency 与其 GoDoc）、pkg/hno/graph/scheduler.go:124（守卫）",
+        "evidence": "同一份 config 里两个预算旋钮对非法値的处理相反：WithStepLimit 的非正数由 rejectInvalidStepLimit（graph.go:279-290）在构建期连同声明一起拒掉并点名旋钮，WithMaxConcurrency 的任意非正数则静默等于「不限」。实测两侧都有测试钉住：p1r13 族要求 stepLimit<=0 被拒，C5（p1r16_max_concurrency_test.go:390）要求 -1 不停摆也不被拒。这种不对称对调用方是可见的，且当前唯一的依据是母约 :190 那句 maxConcurrency > 0 前置守卫。",
+        "severity": "judgement（Primitive Obsession 的轻度命中；本片刻意不新增构建期拒绝，因为那是未授权的新行为）",
+        "fix": "归 R16-UNADJ-1 由人类裁决：要么两个旋钮都拒非正数并在母约里统一（需要新的 test-design 与一次 WithStepLimit 同形的判据），要么在母约 §3.3 明写「并发上限接受非正数并表示不限」，让这处不对称成为规格而不只是代码注释。"
+      },
+      {
+        "id": "S16-STD-3",
+        "title": "新增一个调度旋钮要动 5 处，改动的散布度已到值得记一笔的程度",
+        "location": "pkg/hno/graph/graph.go:68（config 字段）、:74-79（Option 与其闭包）、pkg/hno/graph/scheduler.go:57-59（scheduler 字段）、:80（Run 取値）、:124（守卫）",
+        "evidence": "Shotgun Surgery 的形态学特征已经出现：一个逻辑变更（多一种预算）在两个文件里 5 处落地。本片没有为此抽象，理由是下一个旋钮（每节点超时、或 pending 上限）现在并不存在，先抽一个 admission 结构会把「谁在派发前判、按什么次序判」这条被 C8 钉住的次序隐进抽象里。",
+        "severity": "judgement（记录性发现，本片不建议动）",
+        "fix": "等真的出现第三种预算时再收：届时把 stepLimit / maxConcurrency 一起放进一个带 admit(act, running) 判据的小类型，并让它带着自己的测试走一条新的 test-design，而不是在本片的守卫上继续叠 if。"
+      },
+      {
+        "id": "S16-STD-4",
+        "title": "公共 GoDoc 开始引用内部台账标识，三处之后这就是惯例而非个案",
+        "location": "pkg/hno/graph/graph.go:76（R16-UNADJ-1）、:211（契约 slice4 的非目标 B2）、:422（R15-UNADJ-1）",
+        "evidence": "本轮新增的 WithMaxConcurrency 注释引用了 R16-UNADJ-1。这与仓库既有实践一致（另两处早于本片），因此不构成违规；但这类标识指向 docs/design 下的周期文件，读者在 pkg 文档站上无法解析，且台账关闭后标识会失去归属。",
+        "severity": "judgement（一致性 OK，腐化风险真实）",
+        "fix": "建议定一条仓库级写法：公共注释只引用母约章节（如「母约 §3.3:190」，本片 scheduler.go:57 用的就是这种形式）与已实现的行为，未裁决事项留在 docs/design 的 unadjudicatedCarried 里，不进导出 API 的注释。三处存量可一并清理。"
+      }
+    ],
+    "positiveNotes": [
+      "零锁不变式是真的守住了：判据写在消费者独占的 dispatch 循环头，sync. 计数 graph=0 / scheduler=0、recover 仍为 1（结构脚本实测），没有为 cap 引入 mutex/atomic。这不是口头判断——契约 C9 把它做成命令背书的拒绝，且矩阵里没有任何一条变异需要靠加锁才被抓到。",
+      "没有新增导出面：改动仅新增 scheduler 的私有字段，测试只使用 graph.New/Option/WithMaxConcurrency/WithStepLimit/NodeFunc/AddNode/AddEdge/SetEntry/SetOutput/Validate/Run 与 Result 的三个读方法（对测试文件里 graph\\. 出现集合逐项统计得出）。",
+      "测试没有靠 sleep 定序：grep -c time.Sleep pkg/hno/graph/p1r16_max_concurrency_test.go 实测 0；同步全部走无缓冲登记 channel 与带阈值 gate，并且每条 gate 都有 2s 逃逸阀，把「永不放行」变成可判定的失败而不是悬挂。",
+      "矩阵发现并修复了一处真实的 vacuous 断言：C5 原来写 v, _ := res.Value(name)，忽略「这个节点到底有没有产出」，于是 δ（把 0/负数当成 0 个槽）能让两侧同为空、相等性判据两边成立而蒙混过关（首轮实跑 C5 0/20）。补强后 δ 由 C4/C5 各 20/20 判红。这类缺口是变异矩阵的价值所在，本次没有靠把 C5 改标成 green-at-red 了事。"
+    ],
+    "smellBaselineSweep": {
+      "Mysterious Name": "未见（maxConcurrency/running/pending/dispatch 与母约同词；但见 S16-STD-1 关于 return nil 表意）",
+      "Duplicated Code": "未见：cap 守卫只此一处；测试侧刻意复用 p1r14 的 runWithinGrace 而不是再造一个限时执行 helper",
+      "Feature Envy": "未见（守卫读的是 scheduler 自己的 running/pending）",
+      "Data Clumps": "轻微：stepLimit + maxConcurrency + running + pending 总一起出现，但抽象时机未到，见 S16-STD-3",
+      "Primitive Obsession": "命中，见 S16-STD-2（裸 int 且 0/负数折叠）",
+      "Repeated Switches": "未见新增（edgeKind 的 switch 在 successors，属切片 9 存量，本片未触碰）",
+      "Shotgun Surgery": "轻微命中，见 S16-STD-3",
+      "Divergent Change": "未见（scheduler.go 只因调度一件事变化）",
+      "Speculative Generality": "未见：REFACTOR 明确拒绝了 admit() 抽象与 cfg 侧规范化，本片没有为不存在的需求加参数或钩子",
+      "Message Chains": "未见（g.cfg.maxConcurrency 一层）",
+      "Middle Man": "未见",
+      "Refused Bequest": "不适用（无继承层次变化）"
+    }
+  },
+  "spec": {
+    "summary": "票面 :67 的 B8 三个半句全部落地并有逐轮实跑证据：(1) 执行区间不重叠 → C1 峰值 1（改动前实测 3）；(2) 激活顺序为声明顺序 → C2 逐字轨迹 [start a, end a, start s1, end s1, start s2, end s2]（改动前是 [start s1, start a, start s2, …]）；(3) 第二个节点观测到的前序完成集合包含第一个 → C3 经 Result.Value 交出的入口快照含 end a 且不含 start s2（改动前 0/1000 含 end a）。母约 :190 的判据形状被逐字采用，且「每次 completion 后 FIFO 派发」由 consume 的既有循环结构直接满足。差异里没有被规格未要求的行为（无 scope creep）。两条 spec 缺口都在既有的挂号项上：NodePending 这个规格命名的状态在公共面不存在；负数上限的处置规格未写。",
+    "findings": [
+      {
+        "id": "S16-SPEC-1",
+        "title": "母约 :190 说激活进入 pending 时叫 NodePending，但公共面没有任何地方能读到它",
+        "location": "docs/design/v3-platform.md:190 vs pkg/hno/graph/scheduler.go:53-59（pending/running 只有 scheduler 内部可见）",
+        "evidence": "本轮为验证 C3 只能让测试自己提供节点体、在无缓冲 channel 上登记 [start/end] 来重建「谁在飞、谁在等」（p1r16_max_concurrency_test.go:203-224），并在契约 observabilityLimit 里承认：cap > 1 时 goroutine 实际取得时刻不由调度器决定，因此严格按声明序的逐字轨迹只能在 cap=1 上断言，另立 C7 钉「cap=2 确实同时放行 2」。这说明票面 :92 行 4 那类判据目前依赖调用方自带的插桩，而不是引擎的可观察量。",
+        "severity": "blocking 之外的必须裁决项（本片判据本身不受影响，全部通过）",
+        "fix": "归 R16-UNADJ-2：要么给 Result（或一次 Run 的诊断出口）加一个只读的入途/等待快照，要么把母约 :190 的 NodePending 改名为内部实现术语并撤回「可观察」的暗示。前者是新增导出面，必须走独立的 test-design，不在本片动。"
+      },
+      {
+        "id": "S16-SPEC-2",
+        "title": "负数上限的处置规格未写，本片的读法需要人类确认",
+        "location": "docs/design/v3-test-scope-p1-graph.md:26（只写 0 = 不限）与 docs/design/v3-platform.md:143（同）vs pkg/hno/graph/graph.go:73-79（实现与注释把「0 或负数」都算不限）",
+        "evidence": "C5（TestP1R16_NegativeDoesNotStall）钉住「-1 不停摆、结果与不限基线逐字相同、也不在 Validate 被拒」。契约刻意声明这条读法的依据是母约 :190 的 maxConcurrency > 0 前置守卫，而不是任何一处明文；与之相邻的 WithStepLimit 对同一形态的输入是拒绝（rejectInvalidStepLimit）。若人类改判为「负数属非法声明」，需要动的正是 C5 这一行与 graph.go 的注释，且要新的 test-design。",
+        "severity": "judgement（本片未越权：没有新增构建期拒绝，也没有新增旋钮）",
+        "fix": "写回母约 §3.3 与票面 :26：明写「非正数 = 不限」并给出理由，或改判为拒绝并说明两个预算旋钮为何一致。这一条与 S16-STD-2 同源，建议同一次裁决一起处理。"
+      },
+      {
+        "id": "S16-SPEC-3",
+        "title": "有界差异里没有未被要求的行为（反向确认）",
+        "location": "本文件的 fixedPoint.perFile 两份哈希 + REFACTOR ledger 的 testDiffReview.proofOfLocality",
+        "evidence": "graph.go 侧的改动前字节由「逐处反向撤销本轮注释编辑」重建，重建结果的 blob 哈希与该周期决定阶段记录值 9684e49e… 逐字符相同；测试文件同理（撤销 C5 两处加强后复现 RED 阶段哈希 c4bf4638…）。因此「本轮只改了这些」不是自述，而是可复算的。五个既有测试文件与 scheduler.go 的其它函数（successors/runNode/complete/consume/capturePlan）字节未变。",
+        "severity": "记录性（无 finding）",
+        "fix": "无需修。登记此条是因为切片 15 曾出现过「审查无法确认差异边界」的问题，本轮把差异可复算性做成了证据。"
+      }
+    ],
+    "unmetSpecSilence": "票面 §9 的 Test 函数计数判据写的是「由 41 增至 41+本片新增行数」，实际 41 → 49（新增 8）；LOC 实测 634 ≤ 1500。两条都在命令输出里，未放宽。"
+  },
+  "measuredDuringReview": [
+    "命令 1：git show HEAD:pkg/hno/graph/scheduler.go | grep -c stepLimit → 0；git cat-file -e HEAD:pkg/hno/graph/p1r16_max_concurrency_test.go → 不存在。结论：HEAD 不可作 fixed-point，改用切片 15b 收尾字节。",
+    "命令 2：sh /tmp/p1-b8/struct.sh → sync_dot_graph=0、sync_dot_scheduler=0、recover_scheduler=1、loc_nonblank_nontest=634、testfunc_total=49、scheduler_maxConcurrency_reads=5（RED 阶段为 0）。",
+    "命令 3：python3 /tmp/p1-b8/matrix16.py → α–θ 八条全部 KILLED，指定杀手行每条 20/20 判红，8 次 20 轮运行 DATA RACE 计数 0，finally 恢复后 scheduler.go/graph.go 哈希自检 True。",
+    "命令 4：go test ./pkg/hno/graph -run TestP1R16_ -count=20 -race -v（C5 补强后）→ 8 个 Test 函数各 20/20 PASS，exit 0。",
+    "命令 5：go test ./pkg/hno/graph -count=1 -race → ok 1.610s；go test ./... → 零退出；gofmt -l pkg/hno/graph/ 无输出；go vet ./pkg/hno/graph/ 零退出。",
+    "命令 6（未运行，如实登记）：make lint / golangci-lint run ./pkg/hno/graph/... → 环境无该二进制（command -v 无输出），故 AGENTS.md 的 lint 一格在本周期没有证据，不作为干净依据。",
+    "反向不变式实测：审查中重点核对了「pending 非空但 running == 0 时 consume 会提前交出残缺 Result」这一新风险。逻辑上守卫只在 running >= cap >= 1 时触发，因此提前返回的必要条件是 pending 非空且 running == 0 且 cap > 0，三者不能同时成立；实跑侧由 β（恒真判据，即让守卫误停在 running == 0 上）验证：β 下 C1/C2/C3/C6/C7/C8 全部 20/20 判红，退化 Result 无处藏。"
+  ],
+  "verdict": {
+    "result": "approve",
+    "blocking": [],
+    "nonBlockingButMustBeAdjudicated": [
+      "S16-STD-1（守卫的 return nil 改 break，1 行）",
+      "S16-STD-2 / S16-SPEC-2（非正数上限的处置与两个预算旋钮的不对称，归 R16-UNADJ-1）",
+      "S16-STD-3（第三种预算出现时再收 admission，本片不动）",
+      "S16-STD-4（公共注释引用台账标识的仓库级写法）",
+      "S16-SPEC-1（NodePending 无公共出口，归 R16-UNADJ-2）",
+      "15b 遗留：文案「不预测执行」规则仍只到 token 层（η-token-only），需新的 test-design；判据 7 文案 so Run cannot terminate 的同类问题；S15-REFACTOR-1/3、S15-STD-1/2/3/6、R15-UNADJ-1/2、B7-AMEND-1"
+    ],
+    "authorNote": "判 approve 的理由是 B8 的验收三个半句都有逐轮实跑的可观察量背书，且矩阵把「旋钮真的生效」这层用八条变异覆盖到每轮必红；四条 Standards 与两条 Spec 发现都不改变对外行为，改动点分别落在注释表意、规格写回与未来抽象时机上。两处值得单独说明的诚实性披露：(a) golangci-lint 未运行，不能声称 lint 干净；(b) 本轮变异集由作者本人选取，独立性低于双代理审查，若后续要以此作为发布前担保，需要一次带第二双眼睛的复评。"
+  },
+  "nextSliceOrder": "B8 闭环后票面剩余行为行：B9（WithMaxConcurrency 打满时的取消归一化：ctx 取消时正在运行节点与等待队列的收尾）、B11（Typed 的类型不符出口）。B9 依赖本片的在途计数语义，建议先 B9。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-r16-review-verdict.json",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice16.json",
+    "artifact:docs/design/v3-p1-graph-r16-red.json",
+    "artifact:docs/design/v3-p1-graph-r16-green.json#implementationDiff",
+    "artifact:docs/design/v3-p1-graph-r16-refactor.json#mutationMatrix",
+    "receipt:45d6962c-712b-4790-aecb-9bab19c2e136",
+    "file:pkg/hno/graph/scheduler.go",
+    "file:pkg/hno/graph/p1r16_max_concurrency_test.go"
+  ]
+}

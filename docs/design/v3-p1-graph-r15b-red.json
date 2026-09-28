@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.tdd-red-ledger.v1",
+  "workItemKey": "work-p1-graph-r15b-warning-text",
+  "activationId": "a2339064-524f-4d98-b0da-2fdb6283af8a",
+  "capabilityId": "software.testing.tdd",
+  "stageId": "red",
+  "recordedAt": "2026-09-27T16:33:40Z",
+  "contract": "artifact:docs/design/v3-test-scope-p1-graph-slice15b.json",
+  "testabilityDecision": "artifact:docs/design/v3-testability-decision-p1r15b.json",
+  "previousStageEvidenceChecked": {
+    "clause": "契约 baselinePlan.redCandidateRow=U4，且 decision 的 scenarioCommandBindingNote 承诺「本阶段与其后 RED/GREEN/REFACTOR 的每个 receipt 都用同一条命令」",
+    "verified": "本轮唯一 receipt 的命令与 decision.redCandidate.command 逐字段一致：executable=go, args=[test, ./pkg/hno/graph, -run, TestP1R15B_, -count=1, -race, -v], cwd=/Users/rex/codes/agno-go",
+    "scopeContractUnchanged": "U1–U7 的行号、observable、teethMutant 与提交的契约字节一致；RED 阶段没有增删判据、没有放宽期望。夹具唯一的调整是把节点命名对齐到契约 U6 写明的 n0000..n0399（4 位补零），这是把测试向契约靠拢，不是改契约。"
+  },
+  "focusedCommand": {
+    "executable": "go",
+    "args": ["test", "./pkg/hno/graph", "-run", "TestP1R15B_", "-count=1", "-race", "-v"],
+    "cwd": "/Users/rex/codes/agno-go"
+  },
+  "redReceipt": "receipt:d7dbd5e8-da12-47bc-8f4b-7ade388dccbf",
+  "redReceiptFacts": {
+    "exitCode": 1,
+    "stdoutSha256": "8af6ec1a1ebad4a3e48b75354ef437109080d50d10e652afd7af2fe146362953",
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855（空）",
+    "observedAt": "2026-09-27T16:33:14.780Z",
+    "storedAt": ".rex-harness/receipts/d7dbd5e8-da12-47bc-8f4b-7ade388dccbf.json",
+    "testBinaryTotals": "同一字节状态下整包 -count=1 -race -v：38 PASS / 3 FAIL，失败的 3 行全部来自本文件（既有 34 个 Test 函数无一变红）"
+  },
+  "supersededReceipts": [
+    {
+      "ref": "receipt:da56f1b3-43ba-4594-9c08-dff21811ddea",
+      "stage": "decide-testability",
+      "why": "该回执对应的是被绑定的场景命令在「只有 U4 一行、节点名 3 位补零」字节状态下的真实非零退出（4131 字节 / 401 点名）。RED 阶段把夹具命名对齐到契约 U6 声明的 n0000..n0399 后，同一场景实测为 4532 字节 / 401 点名，并与契约 M-1 表的 400→4532/401 逐字节吻合。已接受的 decision 文件不回改（保持提交时的哈希），本条登记取代关系；本阶段提交给 failing-test-observed 的是 d7dbd5e8，不是旧回执。"
+    }
+  ],
+  "rows": [
+    {
+      "row": "U1",
+      "test": "TestP1R15B_WarningNamesTheKnobAndItsDefaultNumber",
+      "redStatus": "green-at-red",
+      "precondition": "conditionalCycleGraph()：entry → ping，ping ⇄ pong 两条条件边，未显式 WithStepLimit",
+      "contractExpected": "Error() 文本同时含 WithStepLimit 与独立数字 1000",
+      "observed": "通过（当前文案两处都在）",
+      "honestNote": "契约 M-3：这两半今天是「碰巧在」，测试侧此前无人守护。本行不是 RED，它把 U1 变成被断言的属性；它的牙齿由 teethMutant (α)（去掉默认数值）在 REFACTOR 的变异矩阵里证明。"
+    },
+    {
+      "row": "U2",
+      "test": "TestP1R15B_WarningMakesNoClaimAboutRun",
+      "redStatus": "red",
+      "precondition": "同 U1",
+      "contractExpected": "文案不含作为整词出现的 Run",
+      "observed": "失败：p1r15b_warning_text_test.go:135 —— 告警 \"graph: cycle \\\"ping\\\" -> \\\"pong\\\" -> \\\"ping\\\" has no explicit budget: WithStepLimit was not set, so Run stops only when the default stepLimit=1000 is reached\" 在字节 94 处出现 Run",
+      "failureClass": "行为缺陷（审查 blocking S15-SPEC-1）"
+    },
+    {
+      "row": "U3",
+      "test": "TestP1R15B_InvalidGraphWarningAlsoMakesNoRunClaim",
+      "redStatus": "red",
+      "precondition": "a ⇄ b 两条无条件边（判据 7 应当拒绝的图），未显式 WithStepLimit；行内先断 Validate() 非 nil 以守住「这是非法图」的前提",
+      "contractExpected": "Validate() 非 nil，且若 Warnings() 非空则每条文案都不含 Run（对提示在场与否中立）",
+      "observed": "失败：p1r15b_warning_text_test.go:158 —— 非法图的第 1 条告警同样带着「so Run stops only when the default stepLimit=1000 is reached」（字节 85）。Validate() 非 nil 这一半是通过的，判据 7 没有回归。",
+      "failureClass": "行为缺陷（S15-SPEC-1 的非法图半边：合法图清洗、非法图分支保留原句）"
+    },
+    {
+      "row": "U4",
+      "test": "TestP1R15B_LongCycleWarningIsBoundedAndStillLocatable",
+      "redStatus": "red",
+      "precondition": "longConditionalCycle(400)：entry → n0000 → … → n0399，闭合边 n0399 --条件(恒假)--> n0000；行内先断 Validate() 为 nil（前提：这张图合法可跑）",
+      "contractExpected": "点名数 ≤ 6、文案 < 1024 字节、文案把环长 400 作为独立数字说出来",
+      "observed": "失败（三条断言全红）：p1r15b_warning_text_test.go:175 点名 401 个；:179 文案 4532 字节；:183 无等于 400 的数字串。失败输出里能看见整条环被逐个抄出（\"n0000\" -> \"n0001\" -> … 一直到 n0399 再收尾于 n0000）。",
+      "failureClass": "行为缺陷（审查 blocking S15-STD-5：渲染无上界）"
+    },
+    {
+      "row": "U5",
+      "test": "TestP1R15B_ShortCycleStaysFullyRendered",
+      "redStatus": "green-at-red",
+      "contractExpected": "2 节点环仍逐字含 \"ping\" -> \"pong\" -> \"ping\"",
+      "observed": "通过（今天短环本就完整）",
+      "honestNote": "本行是收缩的反面约束：它现在绿，是因为它还谈不上被违反；它的存在是为了在 GREEN 加界时立刻抓住「界取 1 / 吃掉收尾节点」这类实现（teethMutant (δ)）。不把 green-at-red 冒充成 RED。"
+    },
+    {
+      "row": "U6",
+      "test": "TestP1R15B_NamedNodesComeFromTheGraph",
+      "redStatus": "green-at-red",
+      "contractExpected": "长环与短环文案里每个双引号点名的节点都落在测试自己声明的集合内",
+      "observed": "通过",
+      "honestNote": "这条正是切片 15 存活变异 (i)（把环名换成常量 \"a\" -> \"b\" -> \"a\"）当时无人能红的地方；本行让常量在 n0000 形状的图上必须变红。牙齿由矩阵里的 (ε) 证明，不在 RED 阶段谎称已取得。"
+    },
+    {
+      "row": "U7",
+      "test": "TestP1R15B_JudgementSevenMessageUnchanged",
+      "redStatus": "green-at-red",
+      "contractExpected": "2 节点无条件环的 Validate 错误仍含 graph: unconditional cycle、\"a\"、\"b\"",
+      "observed": "通过",
+      "honestNote": "护栏行，契约里就写明它不承担新增行为。"
+    }
+  ],
+  "failureReasonForStage": "三行红（U2/U3/U4）指向同一个缺失的用户可观察输出属性：Warnings() 的文案既在对某一次 Run 的结果作断言（在切片 15 自己的 T4 正例与非法图上都不成立），又把整条环逐节点抄进文本使长度随环长线性增长（400 节点 4532 字节 / 401 点名，20000 节点 260134 字节）且从不报出环的规模。四行绿（U1/U5/U6/U7）如实标注为 green-at-red：它们钉的是当前碰巧成立、但没有任何断言在管或被收缩后才会被触碰的属性，牙齿留到变异矩阵证明。没有基础设施失败：同一命令下编译通过、gofmt 干净、go vet 无输出、既有 34 个 Test 函数全部保持通过。",
+  "notCountedAsRed": [
+    "U1/U5/U6/U7 的四次 PASS 不作为 RED 证据，也不参与 failing-test-observed 回执的归属",
+    "整包 FAIL 只由本文件三行贡献，不借此声称回归被「修好了」"
+  ],
+  "infrastructureChecks": {
+    "gofmt": "gofmt -l pkg/hno/graph/ 无输出",
+    "vet": "go vet ./pkg/hno/graph/ 无输出",
+    "existingFamilyUntouched": "graph.go 8b8fb95b5bc0a7015abd12384636cf7cf106869b / scheduler.go 61c7ba6d… / graph_test.go 425ea030… / p1r13 bc4ab8e7… / p1r14 0ed607db… / p1r15 3ea06d27…（全部字节不变，契约 completionCriteria 第 3 条）",
+    "newFileHash": "pkg/hno/graph/p1r15b_warning_text_test.go = 0285ab35729ed3d50359e0fd407edb2d8b1c1a2a"
+  },
+  "nextStageCondition": "GREEN 只允许动 graph.go 的告警文案与环渲染（判据 8 那条 error 的措辞 + cycleOf 的有界渲染，保留前 6 个点名与收尾），必须让 U2/U3/U4 三行转绿且不把 U1/U5/U6/U7 改红；既有 34 个 Test 函数与三个既有测试文件字节不变；GREEN 的回执必须仍是同一条命令（receipt 绑定场景命令），零退出。若为了让 U4 绿而把界实现成「整条省略」或「只留第一个节点」，U5/U7 必须变红——那说明实现错了，不是断言错了。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-r15b-red.json",
+    "receipt:d7dbd5e8-da12-47bc-8f4b-7ade388dccbf",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice15b.json#acceptanceMapping",
+    "artifact:docs/design/v3-testability-decision-p1r15b.json"
+  ]
+}

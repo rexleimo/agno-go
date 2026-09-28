@@ -1,0 +1,96 @@
+{
+  "kind": "rex.hardening-baseline.v1",
+  "workItemKey": "work-p1-graph-engine-r7-assertion-teeth",
+  "activationId": "31e8d02e-6473-4327-be45-ddf04e9f57c7",
+  "commandToken": "45307f9c-094c-438b-b3a0-c298c6e4e3ea",
+  "stage": "baseline",
+  "decisionRef": "artifact:docs/design/v3-testability-decision-p1-graph-slice7.json#decision",
+  "contractRef": "artifact:docs/design/v3-test-scope-p1-graph-slice7.json",
+  "takenAt": "2026-09-27T07:07:00Z",
+  "preState": {
+    "gitHead": "0387000 feat(graph): land zero-lock scheduler with build-time edge validation",
+    "branch": "main...origin/main [ahead 9]，工作树未提交",
+    "frozenHashes": {
+      "pkg/hno/graph/graph.go": "3483783f1e787c96ca6c236341664d095acec5c0",
+      "pkg/hno/graph/scheduler.go": "87854ffbb7629f9adeb2d45fbb74d91f2032b99d",
+      "pkg/hno/graph/graph_test.go": "62e0b2cf5c6369050f2127a42fc33ffafd47aea5"
+    },
+    "hashVerification": "基线开跑前 git hash-object --no-filters 逐枚复算，与 cycle6 冻结记录一致；三枚全部命中。"
+  },
+  "environment": {
+    "whyReal": "本轮风险全部发生在『下游调用方经导出 API 能得到什么』这一边界上，因此基线同时取两个真实场景：(1) 仓库工具链编译并运行真实的测试二进制（真实 go 编译器、真实进程、真实退出码、真实 race detector）；(2) 一个仓库之外的独立 Go module，用 replace 指向本仓库、只 import 导出符号、自己构造夹具并自己断言 —— 这就是产品承诺的实际消费者形态，不经任何私有 helper。",
+    "toolchain": "go1.26.3 darwin/arm64，macOS（无 timeout 命令）",
+    "downstreamModule": {
+      "path": "/tmp/p1-baseline-r7（仓库外，可整目录清理，不污染工作台）",
+      "go.mod": "module p1baseline; require github.com/rexleimo/agno-go v0.0.0; replace => /Users/rex/codes/agno-go",
+      "surfaceUsed": "graph.New / AddNode / NodeFunc / AddEdge / AddConditional / SetEntry / SetOutput / Validate / Run / Result.Completed / Result.Output —— 全部导出符号，零内部符号"
+    }
+  },
+  "scenarios": [
+    {
+      "id": "BS-1",
+      "command": "go test ./pkg/hno/graph/... -run TestP1G -count=1 -v",
+      "cwd": "/Users/rex/codes/agno-go",
+      "expected": "零退出，且既有 32 条观察全部 PASS、0 FAIL、0 SKIP —— 加固开始前必须先确认现状无退化。",
+      "observed": "exit 0；32 条 --- PASS，0 FAIL，0 SKIP。",
+      "receiptRef": "receipt:090b7f84-f2ef-4b50-8f64-03772aaf20d1"
+    },
+    {
+      "id": "BS-2",
+      "command": "go test ./pkg/hno/graph/... -count=1",
+      "cwd": "/Users/rex/codes/agno-go",
+      "expected": "整包（不只聚焦面）零退出。",
+      "observed": "exit 0，全包 ok。",
+      "receiptRef": "receipt:5e74feb7-f800-477e-b8bf-dd5d2174fbe2"
+    },
+    {
+      "id": "BS-3",
+      "command": "go test -race ./pkg/hno/graph/... -count=1",
+      "cwd": "/Users/rex/codes/agno-go",
+      "expected": "race detector 下零退出（本引擎的核心卖点是单消费者零锁模型，竞态基线必须干净）。",
+      "observed": "exit 0。",
+      "receiptRef": "receipt:5b251860-4166-4e8a-8b5e-83b029a1910f"
+    },
+    {
+      "id": "BS-4",
+      "command": "go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1",
+      "cwd": "/Users/rex/codes/agno-go",
+      "expected": "邻近包零退出（P0 收口的流式循环不得被本轮触碰）。",
+      "observed": "exit 0，两包 ok。",
+      "receiptRef": "receipt:3a9abef1-b7c2-4c0d-ac5d-e2e32b17157c"
+    },
+    {
+      "id": "BS-5",
+      "command": "sh -c \"cd /tmp/p1-baseline-r7 && go run .\"",
+      "cwd": "/Users/rex/codes/agno-go（脚本内自包含 cd，故退出码即场景退出码）",
+      "expected": "下游程序自断言并打印 BASELINE-OK、零退出：夹具为恒等节点 a→b（输出 b）、d 注册但未连、输入 seed；参照面 Completed=[a b]、Output=seed；六种运行中改图（覆盖同名节点 b、SetOutput(d)、加缺谓词的 a→d 条件边、加悬空边 a→ghost、加合法新边 a→d）都必须与参照面完全一致；且捕获范围是一次 Run —— Run 返回后再声明 b→d 并 SetOutput(d)，第二次 Run 必须看到新拓扑。",
+      "observed": "exit 0，BASELINE-OK。逐行：reference OK completed=[a b] output=seed；inflight-AddNode OK completed=[a b] output=seed；inflight-SetOutput OK completed=[a b] output=seed；inflight-nil-predicate OK completed=[a b] output=seed；inflight-dangling-edge OK completed=[a b] output=seed；inflight-legal-edge OK completed=[a b] output=seed；next-run-visible completed=[a b d] output=D-OUT。进程存活走完全部断言，无 panic。",
+      "receiptRef": "receipt:9d054241-13b1-499a-b98d-e8be6081d579",
+      "note": "首次尝试 receipt:37dd8e8f 以 exit 1 结束，原因是回执以 --root 作为 cwd、`go run .` 落在仓库根（无 main 包），属调用方式错误而非场景失败；已改用自包含 cd 的 sh -c 形式重新取证，不拿它充当基线证据。"
+    }
+  ],
+  "invariantsToPreserve": [
+    "IN-1 Validate/Run 的拒绝文案逐字不变（本轮只加断言强度，不改产出）。",
+    "IN-2 一次 Run 的三面（err / Completed / Output）对上述六种运行中改图全部保持不变 —— 这是本轮要买回检测力的那条承诺。",
+    "IN-3 捕获范围是一次 Run 而不是图的终身状态（BS-5 的 next-run-visible 面）。",
+    "IN-4 非测试代码哈希保持 3483783f / 87854ffb；不新增 sync./atomic./recover(。",
+    "IN-5 既有断言零弱化：graph_test.go 相对 fixed point 仍为纯增（删除 0 行）。"
+  ],
+  "noop": "本轮没有新的用户可观察行为，因此没有行为差异型 RED 可取；任何声称『新行为测红了』的记录都是伪造。加固的唯一进展形式是：同一份实现下，变异从『全绿』变为『判红』。",
+  "negativeClauses": [
+    "不得把已通过测试、mock 调用或静态推断充当 failing-test-observed。",
+    "不得为了杀掉变异而改生产代码（IN-4）。",
+    "不得引入结构化错误 / typed error（属 slice 8 的 behavior-delta）。",
+    "不得给并发无同步改图加锁或 recover（B10 显式非目标）。",
+    "不得用『与实跑参照相等』这一种形式承担全部断言。"
+  ],
+  "priorBaselines": [
+    "cycle6 加固前基线：receipt:e79440ef（GREEN）、receipt:ebccf8fb（REFACTOR 校验）—— 同命令同夹具，可跨周期比对。",
+    "cycle6 的三条存活变异（receipt:422ce345 / ce012bd9 / cf8c0d58，全部 exit 0）就是本轮要反转为判红的对象；它们同时也是本基线所声明风险的实证来源。"
+  ],
+  "rollbackDigest": {
+    "method": "任何变异实验前 cp 备份到 /tmp/p1-cycle6/{graph.go,scheduler.go,graph_test.go}；实验后 cp 回写并 git hash-object --no-filters 复算，必须回到 preState.frozenHashes。",
+    "restoreProof": "本轮开始前再次复算三枚哈希 = 3483783f / 87854ffb / 62e0b2cf，与 cycle6 结束时逐字节一致。",
+    "cleanup": "/tmp/p1-baseline-r7 与 /tmp/p1-cycle6 为一次性目录，可整目录删除，不进入仓库。"
+  }
+}

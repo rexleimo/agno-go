@@ -64,3 +64,26 @@ go vet ./pkg/hno/graph/... → 净；gofmt -l pkg/hno/graph → 无输出
 | 结构判据 | `grep -c 'sync\.' pkg/hno/graph/*.go` → graph.go 0 / scheduler.go 0 / graph_test.go 0；非测试 LOC 293（上限 1500） |
 
 **仍开放的阻断项（切片 2 未触及，按契约 §11.3 次序推进）**：SPEC-2（`AddConditional`/`AddDefault`/`AddJoin` 静默丢弃声明）、SPEC-3（`WithStepLimit` 默认 1000 未落实）、§3.5 其余 6 项校验与 B5 无条件环检测。
+
+## 8. 切片 3（R1：未路由边声明的 fail-closed 拒绝）
+
+闭包 C2-SPEC-1（审查轴 cycle-2 阻断项：已校验通过的图仍会静默跑出空 Result）。
+
+| 项 | 内容 |
+|---|---|
+| 测试差异 | 仅向 `graph_test.go` 追加 `TestP1G_UnsupportedEdgeDeclarationsAreRejected`（表内一行 `join-only` + 反向对照子用例）。切片 1/2 的断言零修改，无删除、无跳过 |
+| RED | `receipt:31abe8b8-843d-4b12-84c9-5699e8808a95` exit 1，失败点在 `graph_test.go:86`「声明了引擎未路由的边，Validate 却判定合法」；类型化结论见 `docs/design/v3-testability-decision-p1-graph-slice3.json` |
+| GREEN | `receipt:749f5817-2a35-4656-83aa-9a5c6c58d2d0` exit 0（`go test ./pkg/hno/graph/... -run P1G -count=1`，测试夹具加固之后重取）；`-race` `receipt:3b22ce56-d6d4-49f1-be6e-44c4340de723` exit 0；`go build ./...` `receipt:fa30e346-500a-466f-8e49-8cb33eacb487` exit 0；邻近回归 `receipt:7d2d93e4-2d4b-440b-827b-a543fc0a12d8` exit 0 |
+| 断言加固（同一切片内的自纠） | 探针发现原 `wantHit: "j"` 形同虚设：错误文案里的单词 `join` 自带字母 `j`，任何不指名节点的报错也能通过。已把节点名改为 `alpha`/`beta`/`merge`、`wantHit` 改为 `"merge"`。加固后重取 GREEN 回执（上表） |
+| 无效证据登记 | 加固前的第一次变异回执 `receipt:5cfbd502-eaf0-4eff-a877-9653c07b629f` exit 1 实为 `declared and not used: d` 的 **build failed**，按 `rex-tdd` RED/GREEN 第 3 条判为不合法检错证据，已作废、不作为任何阶段的推进依据 |
+| MUTANT-1 静默丢弃回归 | `declareUnrouted` 的 append 改为 `_ = unroutedDecl{...}` → `receipt:8fba84da-5d36-4421-a6aa-e47c715ff313` exit 1，`graph_test.go:88` 报「Validate 却判定合法」；即 C2-SPEC-1 缺陷本身可被杀死 |
+| MUTANT-2 报错不可定位 | `%s from %q to %q` → `%s`（保留 `d.kind` 可编译）→ `receipt:9d114403-f91e-4847-99d9-27b46ae78ab5` exit 1，`graph_test.go:91` 报「Validate 错误未定位到 "merge": graph: join edge is declared but not routable by this engine」。该输出同时证明：若仍用旧的 `"j"`，此变异会存活 |
+| MUTANT-3 一律拒绝 | `if len(g.unrouted) >= 0` + 无条件报错 → `receipt:1f55bbac-52b5-40f1-b1c0-a1ad09e9e276` exit 1，命中契约 §12.3 反例条款：`graph_test.go:110`「合法图被拒」+ 切片 1 DAG 用例 + 切片 2 合法对照子用例 |
+| MUTANT-4 Run 不复查校验 | `scheduler.go:37` 的 `err != nil` → `err != nil && false` → `receipt:1851f1ab-207d-4f80-8066-58819c6bec63` exit 1，先由 `graph_test.go:96`「非法图仍可执行并返回 Output=\<nil\> Completed=[alpha]」这条行为断言判红，随后切片 2 用例复现 `scheduler.go:86` 的 nil 指针 SIGSEGV —— 即 SPEC-1 的崩溃守卫同样由 Run 前置校验承担 |
+| 还原校验 | 每次变异后 `cp` 基线还原，`shasum -a 256` 与变异前逐字节一致（graph.go `2586bd0c…`、scheduler.go `f7f827b9…`） |
+| REFACTOR | 去重：`unroutedDecl` 与 `declareUnrouted` 的注释重复陈述同一条迁移规则，只保留类型上的 fail-closed 说明；`AddJoin` 循环不再逐次重绑定 `g`；补回切片 2 测试函数被误删的观察面注释行；删除夹具中无用的 `gamma` 节点（它既不被断言，也会在 B6「不可达节点」校验落地后成为未来假失败源） |
+| 重复代码的取舍 | 反向对照（a→b 合法图）在切片 2 与切片 3 的测试里各写一遍，是刻意选择：两条契约必须各自独立证明「拒绝一切」会被抓到，共享夹具会把两个切片的红绿信号耦合在一起 |
+| 结构判据 | `gofmt -l pkg/hno/graph` 无输出；`go vet ./pkg/hno/graph/...` 净；`grep -c 'sync\.'` → graph.go 0 / scheduler.go 0；非测试 LOC 323（上限 1500）；`-race` `receipt:bf10618e-7b46-474e-a05b-3e99e82b8d07` exit 0 |
+
+**本切片刻意不做**：条件边/Default/Join 的真实路由（R2、B2）、§3.5 其余校验项（B5/B6/B7）、`stepLimit` 默认 1000（B4）、并发上限（B8）、取消归一化（B9）、panic 转错误（B10）、`Typed` 分支测试（B11）。`AddConditional`/`AddDefault` 与 `AddJoin` 一样进入拒绝集合，属 fail-closed 的临时状态，R2 落地路由后从该集合收缩 —— 这也让 R2 的 RED 仍可复现（当前实现会把条件边判为非法）。
+

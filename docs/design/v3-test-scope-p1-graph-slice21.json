@@ -1,0 +1,162 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p1-graph-r21-duplicate-node-name",
+  "activationId": "03703e84-3d34-4702-9b80-f28185165036",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-27T22:26:00Z",
+  "contractRef": "docs/design/v3-test-scope-p1-graph-slice21.json",
+  "slice": 21,
+  "userGoal": "票面 §4 B6 第 2 项（母约 §3.5 第 2 项）：同一张图上重复注册同名节点时，`Validate()` 返回非 nil 并点名那个名字，`Run` 随之拒绝、不跑半张图。今天这一情形是静默覆盖 —— 后一次 `AddNode` 的实现悄悄取代前一次，构建期一句话都没有。",
+  "whyThisSlice": "状态审计（`v3-p1-graph-status.md` §2）把这一行列为 P1 仅剩的未落地判据。切片 20 的第一版曾把它写成「与 `graph_test.go:953` 的静默覆盖语义正面对撞、属票面变更、需负责人裁决」，那是读测试名得出的推断；本轮在仓库副本上实测推翻了它（见 M2），因此本片不需要票面裁决，是一条正常的行为增量：今天的公共面确实把一张不自洽的图放行成结论，落地后同一张图必须被点名拒绝，红能真实复现。",
+  "measuredBeforeDesign": [
+    {
+      "id": "M1-今天的公共面形状（仓库外探针）",
+      "scene": "`/tmp/sinkexp/cmd/probe`（副本 module 里 `go run ./cmd/probe`，只调导出 API；跑在切片 19 写回字节上）",
+      "observations": [
+        "形2 `AddNode(\"entry\")→E1` 再 `AddNode(\"entry\")→E2`、`SetEntry/SetOutput(\"entry\")`：`Validate() = <nil>`、`Run err = <nil>`、`Output() = E2` —— 覆盖不仅静默，而且**可从输出观察到**（后注册者赢）。这就是票面 §161-168 fail-closed 精神要堵的那一格。",
+        "形1 同名 `entry` 两次 + `entry→out`：`Validate() = <nil>`、`Run` 成功、`Completed()` 含 `out` —— 重复声明不影响图跑完，说明今天没有任何一处把重复名当成事实。",
+        "形3 反向对照（全程不同名，`Run` 之后再注册 `b` 并 `SetOutput(\"b\")` 再 `Run`）：两次都 `err = <nil>`，第二次 `Output() = B` —— 既有担保「Run 之后新注册的节点对下一次 Run 可见」的形状必须在落地后继续成立。"
+      ]
+    },
+    {
+      "id": "M2-可行性实验（候选检查加在仓库副本上，仓库字节未动）",
+      "scene": "`/tmp/sinkexp`（切片 20 沿用下来的 11 文件副本）。改动只有两处：`Graph` 多一个 `dupNames []string` 字段、`AddNode` 在命中已有名字时记一笔、`Validate` 末位加 `rejectDuplicateNodeNames`（文案 `graph: node name %q is declared more than once`）。",
+      "commands": [
+        "go -C /tmp/sinkexp test ./pkg/hno/graph -count=1        # 加检查后：exit 0，-v 里 --- FAIL 计数 0",
+        "go -C /tmp/sinkexp test ./pkg/hno/graph -count=1 -race   # 同形状：exit 0（无 DATA RACE）"
+      ],
+      "observations": [
+        "副本基线（与仓库逐字节相同）exit 0：`receipt:6df86b2b-2ac3-4209-8317-b1bf5269ec3e`。",
+        "加检查后 `-count=1` exit 0：`receipt:330df6ad-0339-400c-a83e-15363007aeed`；`-count=1 -race` exit 0：`receipt:14aa3bd0-d4ed-497e-9d9f-a2e04406c4f3`。**0 个既有 Test 判红** —— 与切片 20 的 12/10 完全相反。",
+        "`TestP1G_RunIsolatesTopologyFromConcurrentMutation` 的子用例「运行中覆盖同名节点不得改变本次输出来源」（`graph_test.go:953`）在加检查后仍然通过：它覆盖的是**一次 in-flight Run 的捕获隔离**（`Run` 已越过 `Validate` 之后另一个 goroutine 才用同名 `AddNode` 覆盖 `b`），与「新图重复注册应在构建期被拒」不是同一条命题。",
+        "爆炸半径：`grep -rn \"AddNode(\" --include=*.go` 在 `pkg/hno/graph` 之外零命中（引擎尚未接进 workflow/agent），所以该检查不会打破仓库内任何既有调用方。",
+        "实验结束把副本逐文件恢复并与仓库比对：两边 `git hash-object --no-filters pkg/hno/graph/*.go` 的 md5 同为 `1250071191a7ddb896141a43bdeb3319`，探针目录已删除。"
+      ],
+      "conclusion": "判据可落地且不与任何既有担保对撞。本片没有票面冲突，剩下的只是设计取舍（见 designConsequence）。"
+    }
+  ],
+  "designConsequence": "按名字记账会让「跨 Run 故意重注册同名节点来替换实现」这种用法从此在 `Validate`/`Run` 上不可通过 —— 这是 OPT 之外的既有自由度的收窄，不是对撞。M2 显示仓库内没有任何测试或调用方依赖它；母约 §3.5 第 2 项本身要求的正是「重复节点名 = 构建期错误」，因此本片按该判据落地，并把这条自由度收窄写进票面与状态文档，供日后如需 `ReplaceNode` 一类的显式入口时引用。",
+  "implementationConstraintNote": "builder 的 `AddNode` 返回 `*Graph`、没有错误通道，因此「增量检查」只能落在记账 + `Validate` 拒绝这一形状（母约 §3.5 的「`Add*` 时增量检查、`Run` 前全量复查」在当前 API 形状下的唯一诚实读法）。这条是实现约束，不进断言：本片不新增导出符号、不改 `AddNode` 签名。",
+  "acceptanceMapping": [
+    {
+      "row": "D1",
+      "behavior": "同一张图上 `AddNode` 两次同名 → `Validate()` 返回非 nil，且错误文本点名那个名字（引号边界，沿用票面 §11.1 的可定位判据）",
+      "publicEntry": "graph.New / AddNode / NodeFunc / SetEntry / SetOutput → Validate",
+      "assertion": "`err != nil` 且 `err.Error()` 含 `graph: ` 前缀 + `\"entry\"`（M1 形2 的那张图）",
+      "independentlyFailable": "今天的观察是 `Validate() = <nil>`（M1 形2 实测），故这一行在实现前必红。"
+    },
+    {
+      "row": "D2",
+      "behavior": "`Run` 对同一张图原样交出 `Validate` 的错误、`res == nil`，不跑半张图、不交出后注册者的输出",
+      "publicEntry": "Graph.Run",
+      "assertion": "`res == nil` 且错误文本与 `Validate()` 一致；反向钉住今天那条 `Output() = E2` 的形状不得再出现",
+      "independentlyFailable": "今天是 `err = <nil>` + `Output() = E2`（M1 形2），独立可失败。"
+    },
+    {
+      "row": "D3",
+      "behavior": "反向对照：全程不同名的合法图 `Validate()` 为 nil 且 `Run` 正常（判据不得顺手收紧成「不许注册」）",
+      "publicEntry": "New / AddNode / AddEdge / Validate / Run",
+      "assertion": "`Validate() == nil`、`Run` 的 `Output()` 等于末端节点返回值、`Completed()` 形状不变",
+      "independentlyFailable": "反向对照由实现撑不撑得住「只拒重复名」决定；M2 的 0 判红不担保它，须本片自己断。"
+    },
+    {
+      "row": "D4",
+      "behavior": "反向对照：`Run` 之后再注册**新名字**的节点，对下一次 `Run` 可见并参与执行 —— 检查不得退化成「终身冻结」",
+      "publicEntry": "AddNode / AddEdge / SetOutput → 第二次 Run",
+      "assertion": "M1 形3 的形状照旧：第一次 `Output() = A`，注册 `b` 并改输出后第二次 `Output() = B`、两次 `err == nil`",
+      "independentlyFailable": "把重复名检查实现成「注册过就不许再注册任何节点」的冻结形状会让这行判红，而 D1 仍绿 —— 这行是给 D1 配的钉。"
+    },
+    {
+      "row": "D5",
+      "behavior": "可定位性在多个重复名上的下限：一张图里 `b`、`c` 各重复一次时，错误必须点名其中之一并给出可判定的名字",
+      "publicEntry": "Validate",
+      "assertion": "`err != nil` 且 `err.Error()` 含 `\"b\"` 或 `\"c\"` 之一（引号边界）；不断点名的是哪一个、不断一次报几个",
+      "independentlyFailable": "由「错误里连一个名字都没有」这种实现判红；多名的选择次序刻意不设断言，见 observabilityLimit。"
+    }
+  ],
+  "minimalVerticalSlice": "D1 + D2 + D3 + D4 四行（一条正向构建期拒绝、一条运行期联动、两条反向对照），D5 是同一个名字判据的下限补强。选它的理由：风险全部集中在「重复声明是不是事实」这一条构建期事实上，不碰路由、调度、屏障与取消；且 M2 已证明该形状下 0 个既有 Test 需要改动，红是真实的公共面红而不是对撞的红。",
+  "allowedTestSeam": {
+    "add": [
+      "pkg/hno/graph/p1r21_duplicate_node_test.go（`package graph_test`，外部包，只用导出 API）"
+    ],
+    "modify": [
+      "无。既有 9 份测试文件一份都不许动 —— M2 已经证明不需要动；若实现迫使任何既有断言改写，那说明判据形状错了，应回到本契约而不是改测试。"
+    ],
+    "retires": [],
+    "sourceSeam": "pkg/hno/graph/graph.go（`Graph` 字段、`AddNode` 记账、`Validate` 末位新检查）。scheduler.go 预期零改动。"
+  },
+  "forbiddenObservations": [
+    "scheduler 内部字段、queue 长度、goroutine 数、私有类型断言、内部计时（票面 :40）",
+    "`time.Sleep` 定序（票面 :75）",
+    "为测试导出内部可变状态、新增只服务测试的产品出口，或把 `dupNames` 这类账本变成公开读数"
+  ],
+  "baselineBytes": {
+    "pkg/hno/graph/graph.go": "4cb363b729cddf7541df8d1b1900c8240dff93f2",
+    "pkg/hno/graph/scheduler.go": "c878a6c74cad89bbdfc773c21c58952d3944630d",
+    "pkg/hno/graph/graph_test.go": "624f19624c6f4fa3c04ee6619e722b03de83336c",
+    "unchangedOtherTestFiles": [
+      "p1r13 bc4ab8e7", "p1r14 0ed607db", "p1r15 3ea06d27", "p1r15b 0285ab35",
+      "p1r16 6934a4f2", "p1r17 cbc8b692", "p1r18 10bce61b", "p1r19 8b4b7234"
+    ],
+    "counters": {
+      "loc_nonblank_nontest_wc_l": 838,
+      "sync_count": 0,
+      "exportedSymbols": 24
+    }
+  },
+  "explicitNonGoals": [
+    "B6 第 5 项（非输出汇点）—— 已经负责人裁决作废（OPT-A，票面 §16），本片不得借道复活它。",
+    "引入 `graph.END` 之类的终点哨兵或任何新导出符号（导出面必须保持 24）。",
+    "新增 `ReplaceNode`/`RemoveNode` 一类的显式替换入口：`designConsequence` 记录的自由度收窄不在本片补偿。",
+    "`Send` 动态扇出（P2/P3）、`InputSchema`/`OutputSchema`（v3.1）、Cache/Timeout/Trace（P2）。",
+    "调整 `Validate` 里既有检查的相对次序（票面 §15.3 第 2 点已量到次序的公共面后果）。",
+    "`R19-Q1`（屏障凑不齐且再无待派激活时 `err==nil` 而 `Output()==nil`）与 `S19-STD-1`（聚合 map 与累加器同一对象）—— 仍按未裁决/另起一片携带，不在本片顺手处理。"
+  ],
+  "completionCriteria": [
+    "1. D1–D5 每行有一个可独立失败的 Test，RED 阶段观察到与「今天静默覆盖」一致的失败，而非编译/环境失败。",
+    "2. 每行断言的牙齿由变异证明（至少：把新检查整体摘掉、把名字点名改成不含名字、把记账改成每次覆盖都记（会撑破 D4）、把检查位置提前到端点检查之前（观察是否改变次序敏感性））。等价变异如实登记为观察上限，不算杀红。",
+    "3. 既有 9 份测试文件零改动，逐文件 `git hash-object --no-filters` 复核并登记。",
+    "4. 票面 §7 门禁在最终字节上全 exit 0：`go build ./...`、`go test ./pkg/hno/graph/... -count=1`、`go test -race ./pkg/hno/graph/... -count=1`、`go vet ./pkg/hno/graph/...`、`gofmt -l pkg/hno/graph`。",
+    "5. 结构判据不放宽：`sync.` 计数仍为 0、非测试 LOC ≤ 1500、导出符号仍为 24。",
+    "6. 邻近回归不红：`go test ./pkg/hno/agent/... ./pkg/hno/runner/... ./internal/session/contract/... -count=1` exit 0。",
+    "7. 副本实验（M2）的数字在最终字节上重跑并取新回执；`-race` 下无 DATA RACE（M2 只在副本上量过一次，最终字节必须再量）。",
+    "8. 完成后回写：票面 §4 B6 行按字面判据重新登记为已落地、票面新增一节记录本片判据与牙齿归属、母约 §3.5 第 2 项标注已交付、状态文档 §2 该行与 §3/§4 的 P1 闭合结论改写。"
+  ],
+  "forbiddenShortcuts": [
+    "只断 `err != nil` 而不点名节点名（可定位性是 §11.1 确立的公共面判据）。",
+    "把检查实现成「注册过一次就冻结整张图」来同时满足 D1 与省事 —— 那会靠删除 D4 或用弱夹具来通过，属禁止。",
+    "为了让 D4 通过而把重复名检查限定到「只有第一次 Run 之前声明的才算」，从而把 M1 形2 那类图在下一次 Run 放行。",
+    "放宽或改写任何既有断言来给新判据让路。",
+    "用内部计数（`dupNames` 长度等）替代用户可观察结论；账本本身不是判据，`Validate`/`Run` 的返回值才是。"
+  ],
+  "observabilityLimit": [
+    "一张图里有多个重复名时，公共面只担保「点名的那一个确实重复了」，不担保点名次序、也不担保一次报全 —— 任何更强的断言都要么钉住 map 遍历序（不可恢复），要么钉 `dupNames` 记账顺序（内部面，票面 :40 禁止）。",
+    "「后注册者赢」这一今天的实际效果（M1 形2 的 `Output() = E2`）在落地后不再可达，因此没有任何一行能同时观察它和拒绝它；本片只观察拒绝。",
+    "`AddNode` 无错误通道是 API 形状，不是可观察行为：增量检查与 `Run` 前复查在公共面上同形，两者次序不设断言。"
+  ],
+  "verificationCommands": [
+    "go test ./pkg/hno/graph -run TestP1R21_ -count=1 -race -v   # 本片唯一绑定场景命令，所有 receipt 逐字用这条（cwd 仓库根，`receipt -- go test …` 直接取，不得 sh -c 包装）",
+    "go build ./... ; go test ./pkg/hno/graph/... -count=1 ; go test -race ./pkg/hno/graph/... -count=1 ; go vet ./pkg/hno/graph/... ; gofmt -l pkg/hno/graph",
+    "grep -o 'sync\\.' pkg/hno/graph/graph.go pkg/hno/graph/scheduler.go | wc -l   # 必须 0",
+    "find pkg/hno/graph -name '*.go' -not -name '*_test.go' | xargs wc -l          # 必须 ≤ 1500",
+    "go doc -all ./pkg/hno/graph | grep -cE '^(func|type|var|const) '              # 必须仍为 24"
+  ],
+  "writeBackOwed": [
+    "票面 §4 B6 行：把第 2 项按已落地登记（去掉 §16.4 的「待实现」标记），并在票面新增一节（§17）记录本片判据三要素、牙齿归属与观察上限。",
+    "母约 §3.5 第 2 项标注已交付，并把 §3.5 第 5 项的「仍待裁决/作废」措辞与本片结论对齐（第 5 项已作废、第 2 项已落地，§3.5 全项闭合）。",
+    "`v3-p1-graph-status.md` §2 第 2 项行改为已落地、§3 收尾句与 §4「P1 闭合条件」改为已闭合（并保留 §16.4 那次自纠的记录，不改写历史）。"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-test-scope-p1-graph.md#4",
+    "artifact:docs/design/v3-test-scope-p1-graph.md#16.4",
+    "artifact:docs/design/v3-p1-graph-status.md#2",
+    "artifact:docs/design/v3-platform.md#3.5",
+    "artifact:pkg/hno/graph/graph_test.go#L953",
+    "receipt:6df86b2b-2ac3-4209-8317-b1bf5269ec3e",
+    "receipt:330df6ad-0339-400c-a83e-15363007aeed",
+    "receipt:14aa3bd0-d4ed-497e-9d9f-a2e04406c4f3",
+    "receipt:72de44ae-4bf5-4761-80ac-c0f3978eb1e6"
+  ]
+}

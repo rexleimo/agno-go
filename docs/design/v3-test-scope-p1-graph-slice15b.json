@@ -1,0 +1,177 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p1-graph-r15b-warning-text",
+  "activationId": "a6c11edd-e917-46e9-96dc-8ac2778e8f13",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-27T16:24:00Z",
+  "userGoal": "把切片 15 审查判出的两条 blocking 变成有测试担保的行为：(1) graph.Warnings() 的步数上限告警不得对 Run 的结果作断言，但必须把调用方没选过的那个默认预算数值交给他；(2) 告警里那条环的渲染必须有确定上界，且在截断后仍然可定位（点名环上的真实节点并给出环长）。",
+  "whyThisSlice": "两条都是 S15 review 的 blocking（docs/design/v3-p1-graph-slice15-review-verdict.json verdict.blocking）。它们不是风格问题：第一条是用户可见文本里一句会兑现不了的断言（在自己族内的正例上就不成立），第二条让 Warnings() 这个「启动时打印一次」的天然用法在大图上给出 260KB 的输出。文案与渲染是 Warnings() 的唯一出口，所以修它就必须先立断言，否则下一次改文案又会只剩关键词判据在管。",
+  "measuredBeforeDesign": [
+    {
+      "id": "M-1",
+      "what": "告警文案随环长线性增长，无上界",
+      "command": "cd /tmp/p1-cycle15/review2 && go run .",
+      "observed": "环长 2→文案 154 字节/点名 3 个节点；3→165/4；6→198/7；7→209/8；8→220/9；50→682/51；400→4532/401。另一次实测（receipt:ec3b42ef-6008-400c-ac50-d945df7fe197）环长 20000 → 260134 字节。",
+      "conclusion": "点名数 = 环长 + 1（收尾重复第一个节点），没有任何上限判据在管。"
+    },
+    {
+      "id": "M-2",
+      "what": "当前文案对 Run 作了断言",
+      "command": "grep -n 'Run stops' pkg/hno/graph/graph.go",
+      "observed": "graph.go:404 原文：so Run stops only when the default stepLimit=%d is reached。同一族的 T4（p1r15_warnings_test.go:133）实测这张图 Completed()=[entry,ping]、Run 返回 nil —— 它停在自己的收敛上，没停在 1000。非法图侧实测（receipt:ec3b42ef）Validate 已拒绝，Run 一步都不跑。",
+      "conclusion": "这句话在正例与非法图上都为假；且当前只有「step/limit + cycle|loop」关键词判据在管文案，既拦不住假话也保护不了真话。"
+    },
+    {
+      "id": "M-3",
+      "what": "默认值 1000 目前在文案里是顺带出现，无人断言",
+      "command": "grep -n '1000' pkg/hno/graph/*_test.go",
+      "observed": "测试侧对默认预算的断言只有「未显式设置时撞上限」那族（p1r13）；B7 这一族没有任何一行要求提示把默认数值交给调用方。母约 §7 与票面 :27 都把默认值定成 1000。",
+      "conclusion": "「把调用方没选过的那个数说出来」是提示的核心价值，现在只是恰好出现在文案里。"
+    },
+    {
+      "id": "M-4",
+      "what": "既有 B5 族的环长度全部 ≤2，共享渲染器加界不会碰到它们的锚点",
+      "command": "grep -n 'wantNodes\\|unconditional cycle\\|AddEdge(\"' pkg/hno/graph/graph_test.go",
+      "observed": "graph_test.go:700 是 2 节点环（a↔b）；:1228 与 :1245 也各是 2 节点环（c↔d、a↔b）。锚点形如 anchors = [\"graph: unconditional cycle\"] + wantNodes，且用 strings.Contains 逐个判定。",
+      "conclusion": "只要渲染界保留前 6 个点名，2 节点环的文案逐字不变，B5 族的锚点不受影响。这条测量是本契约敢于改共享 cycleOf 的依据。"
+    },
+    {
+      "id": "M-5",
+      "what": "「把永远不会跑的东西说成运行时风险」在仓库里已被判为缺陷",
+      "command": "sed -n '1222,1240p' pkg/hno/graph/graph_test.go",
+      "observed": "原文注释：A6 前半 + 后半：同一条不可达的环现在报可达性，可达的环文案一字不动；断言侧对不可达环要求报 unreachable 而非环，并写下「把永远不会跑的东西说成了运行时风险」作为判红理由。",
+      "conclusion": "M-2 那条规则不是新偏好，而是仓库已有的取向：诊断文案不得把不会发生的执行说成风险。本契约把它从 Validate 的致命文案延伸到 Warnings() 的提示文案，因此 S15-SPEC-1 的修法有了归属地（回应切片 14 的 S14-SPEC-3「无 governing home」这一类问题）。"
+    }
+  ],
+  "acceptanceMapping": [
+    {
+      "row": "U1",
+      "behavior": "含合法环且未显式 WithStepLimit 的图：告警点名旋钮 WithStepLimit，并把调用方没选过的默认预算数值 1000 交给他",
+      "observable": "Warnings() 里那条 error 的 Error() 文本同时含 \"WithStepLimit\" 与 \"1000\"",
+      "publicEntry": "graph.New → AddNode/AddEdge/AddConditional/SetEntry/SetOutput → Validate → Warnings",
+      "specAnchor": "票面 :27（WithStepLimit 默认 1000，未显式设置时参与判据 8 告警）+ :66 B7",
+      "teethMutant": "把默认数值从文案里去掉（只说「默认预算」不给数字）→ U1 红"
+    },
+    {
+      "row": "U2",
+      "behavior": "该告警只对构建期可见的事实说话，不断言某次 Run 会怎样停",
+      "observable": "Warnings() 文案不含导出方法名 \"Run\"（今天为 \"so Run stops only when ...\"）",
+      "publicEntry": "同上",
+      "specAnchor": "M-5 的仓库取向（graph_test.go:1238-1239）+ 母约 :221 判据 8 只说「警告」",
+      "teethMutant": "把 \"Run\" 以任一变体写回文案（Run stops / Run will stop）→ U2 红；反向：只删掉这句而不留 U1 的数字 → U1 红，两半各管一头"
+    },
+    {
+      "row": "U3",
+      "behavior": "同一条不预测执行的规则在非法图上也成立（本契约不裁决非法图上到底该不该出提示）",
+      "observable": "无条件环图：Validate() 非 nil（致命语义不变），且若 Warnings() 非空则其文案同样不含 \"Run\"",
+      "publicEntry": "同上",
+      "specAnchor": "票面 :119（提示不得污染 Validate 的致命语义）+ M-2 (1)",
+      "teethMutant": "只在合法图上清洗文案、非法图分支保留原句 → U3 红（今天实测就是这一形态）"
+    },
+    {
+      "row": "U4",
+      "behavior": "环的渲染有确定上界：长环不整条列出，但仍说清是哪条环、有多长",
+      "observable": "400 节点条件环的告警：点名节点数 ≤ 6（按成对双引号计），文案含环长 400，且总长 < 1024 字节（今天实测 4532 字节 / 401 个点名）",
+      "publicEntry": "同上",
+      "specAnchor": "S15-STD-5（review blocking 之二）",
+      "teethMutant": "把界去掉（整条环继续拼）→ U4 三条断言全红；把界设成 500 → 点名数与字节数仍红"
+    },
+    {
+      "row": "U5",
+      "behavior": "短环不得被截断成不可定位，且界不得吃掉收尾节点",
+      "observable": "2 节点 ping⇄pong 的告警仍逐字含 \"ping\" -> \"pong\" -> \"ping\"（今天实测 154 字节形态）",
+      "publicEntry": "同上",
+      "specAnchor": "M-4（保留 B5 锚点所需的完整短环）",
+      "teethMutant": "界取得太小（例如只留 1 个点名）或对任何环都省略收尾 → U5 红"
+    },
+    {
+      "row": "U6",
+      "behavior": "被点名的节点必须来自这张图，不得是写死的样例名（这条顺带把切片 15 挂号的 S15-REFACTOR-2 在有界路径上关掉）",
+      "observable": "对声明为 n0000..n0399 的环，文案里出现的每个被双引号点名的节点名都在测试自己声明过的节点集合里；对 2 节点环，点名的就是 ping/pong",
+      "publicEntry": "同上（测试自己知道声明了哪些名字，因此这是公共可观察判据而非内部读取）",
+      "specAnchor": "artifact:docs/design/v3-p1-graph-slice15-refactor.json matrixFoundGap.S15-REFACTOR-2",
+      "teethMutant": "把环名换成常量 \"a\" -> \"b\" -> \"a\"（即当年的存活变异 (i)）→ 在 n0000 形状的图上 U6 红"
+    },
+    {
+      "row": "U7",
+      "behavior": "对照行（不新增判据，只要求不被本片改坏）：判据 7 的致命文案与既有 34 个 Test 函数全部保持",
+      "observable": "2 节点无条件环的 Validate 错误仍含 graph: unconditional cycle 与 \"a\"、\"b\"；go test -count=1 -race ./pkg/hno/graph/ 零退出",
+      "publicEntry": "graph.Validate / Warnings",
+      "specAnchor": "M-4 + 票面 §9",
+      "teethMutant": "把界实现成「只留第一个节点」或整条省略 → 既有 B5/B7 行的锚点红（这行是护栏，不承担新增行为）"
+    }
+  ],
+  "minimalVerticalSlice": "U4 单独一条就是本片足以代表目标的切片：它只依赖公共出口 Warnings()，可观察量是「点名了几个节点、总字节数、有没有说出环长」，今天的真实输出（4532 字节 / 401 个点名）与期望（≤6 / <1024 / 含 400）逐项对得上，因此不借助任何内部读取就能把「有界且仍可定位」这件事判红。它同时逼出 U1/U2 所需的那次文案重写，所以不是一行孤立的断言而是这一族的地基。",
+  "allowedTestSeam": {
+    "files": [
+      "pkg/hno/graph/p1r15b_warning_text_test.go（新增，package graph_test 外部测试包）",
+      "既有 pkg/hno/graph/p1r15_warnings_test.go 只允许在不改判据的前提下共用 helper；本片不删任何既有断言"
+    ],
+    "publicEntries": "graph.New / WithStepLimit / AddNode / NodeFunc / AddEdge / AddConditional / SetEntry / SetOutput / Validate / Warnings / Run / Result.Completed / Result.Output",
+    "forbiddenObservation": "不得读 cfg、stepLimitSet、defaultStepLimit 等私有标识；不得直接调用 cycleOf/firstCycleOf；不得对整条文案做快照式全文相等断言（那会把措辞本身冻成规格，本片要改的正是措辞）；不得用 time.Sleep 定序。"
+  },
+  "explicitNonGoals": [
+    "不裁决 R15-UNADJ-1（非法图上该不该给出提示）：本片只要求「若给出，则不得预测执行」，U3 因此刻意对提示的在场与否保持中立。",
+    "不导出哨兵 error（S15-STD-1）：那会新增公共面，须另开 test-design；本片仍用文案判据，并把它写成可断言的属性而非全文比对。",
+    "不改 Warnings() 的成本/记忆化语义（S15-STD-6）：只读、每次全量走图是切片 15 立的取舍，本契约只要求它文档化，不在本片动实现。",
+    "不改 firstCycleOf 的签名（S15-STD-2）与「全部已声明边」闭包的去重（S15-STD-3）：都是 non-blocking 的内部形态问题。",
+    "不触碰 Run/调度器、判据 7 的判定集合、stepLimit 的取值校验（rejectInvalidStepLimit 已归 B4 族）。",
+    "不把 U2 的规则写成 lint 或构建期检查：本片只管这一条告警文案。"
+  ],
+  "outOfScopeBehaviors": [
+    "Validate() 的致命文案（判据 7）：由既有 B5 行守护，本片只要求其短环锚点不被改坏（U7）。",
+    "多条告警并存时的排序与条数（S15-REFACTOR-1）：仍未裁决。",
+    "Result 的收敛内容：本片一字不动。"
+  ],
+  "completionCriteria": [
+    "U1-U4、U6 六条（U1、U2、U3、U4、U5、U6）全部有独立可失败的行，且每行都注明其 teethMutant；U7 作为护栏行由整包 -race 零退出背书。",
+    "变异矩阵至少含：(α) 去掉默认数值、(β) 把 \"Run stops only when\" 写回、(γ) 去掉渲染界、(δ) 界取 1（截断到不可定位）、(ε) 环名换成常量、(ζ) 界取 500（形同未加）。每条变异都要实跑并指明指定杀手行；任一指定杀手行未在该变异每轮判红即判该变异未被可靠杀死。",
+    "既有 34 个 Test 函数（grep -c '^func Test' pkg/hno/graph/*_test.go 在 -count=5 -race 下）全部保持通过；三个既有测试文件与 scheduler.go 字节不变。",
+    "结构判据由命令输出背书（票面 §9）：非空非测试行数、sync. 计数、以及「文案字节数 vs 环长」的实测表（同一命令 cd /tmp/p1-cycle15/review2 && go run . 在改动后重跑，界生效应可见）。",
+    "若矩阵或实跑发现某条行没有可信变异能碰到它，照实登记为缺口并挂到 review，不静默放宽期望或删行。"
+  ],
+  "forbiddenShortcuts": [
+    "不得把断言改成「抄当前输出」（票面 §9 + rex-tdd GREEN 第 4 条）；期望值来自本契约文本与 M-1 实测表，而不是改完实现后再回填。",
+    "不得为了让 U2 通过而直接删掉整条提示（那会让 U1/U4 红，也违反 B7 的在场要求）。",
+    "不得用 t.Skip / 放宽到「只要非空就算过」/ 只断言 helper 被调用。",
+    "不得把界做成「按调用方传参」的可选项而没有默认（票面 :119 之外没有新公共旋钮，且那是 Speculative Generality）。"
+  ],
+  "unadjudicatedCarried": [
+    "R15-UNADJ-1 非法图上 Warnings 说什么（本片刻意中立）",
+    "R15-UNADJ-2 与 B7-AMEND-1 的母约措辞写回",
+    "S15-REFACTOR-1 告警条数是否钉成恰好一条",
+    "S15-REFACTOR-3 判据 7 文案的顺序稳定性由谁守护",
+    "S14-SPEC-1 谓词 panic 的归属（生产者 recover 还是消费者逃逸）"
+  ],
+  "retires": [
+    "S15-SPEC-1（review blocking 之一）→ 由 U2/U3 立断言后闭环",
+    "S15-STD-5（review blocking 之二）→ 由 U4/U5 立断言后闭环",
+    "S15-REFACTOR-2（环名真实性）→ 在有界渲染路径上由 U6 关闭；短环整条列出的路径仍由 U5 覆盖"
+  ],
+  "sedimentCarried": [
+    "切片 15 契约 docs/design/v3-test-scope-p1-graph-slice15.json 的 T1-T7 全部保持有效，本片是在其上追加文案与渲染维度，不重开 B7 的在场/缺席判据。",
+    "切片 15 的矩阵方法（每轮注入-执行-无条件恢复并断言哈希）直接复用：matrix.py 与 probe_single_cycle_t6.py 在 /tmp/p1-cycle15。"
+  ],
+  "baselinePlan": {
+    "kind": "behavior-delta",
+    "why": "两条 blocking 都是新的用户可观察输出属性（文案不再断言 Run；长环输出有界且仍可定位），能只靠公共入口 Warnings() 复现为真实失败：M-1 与 M-2 已经给出今天的反例数值（4532 字节 / 401 个点名 / 含 \"Run stops\"）。",
+    "notHardeningBecause": "没有新的用户可观察输出变化就不是 hardening：界与措辞改变的是调用方读到的那段文本本身。",
+    "notBlockedBecause": "验收条件全部可在真实公共场景观察（外部 module 里用导出面搭图、读 Warnings 文本），无需新旋钮或内部读取。",
+    "redCandidateRow": "U4"
+  },
+  "writeBackOwed": [
+    "母约 §3.5 判据 8：把「提示只描述构建期可见事实、不断言某次 Run 的结果」与「环渲染有界」两条写进去（本片的 M-5 已给出仓库内既有取向作为依据）。",
+    "票面 :66 B7 的验收列补一句：告警必须给出默认预算数值与可定位但有界的环引用。"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-slice15-review-verdict.json",
+    "artifact:docs/design/v3-p1-graph-slice15-refactor.json",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice15.json",
+    "receipt:ec3b42ef-6008-400c-ac50-d945df7fe197",
+    "file:pkg/hno/graph/graph.go",
+    "file:pkg/hno/graph/graph_test.go",
+    "file:pkg/hno/graph/p1r15_warnings_test.go"
+  ]
+}

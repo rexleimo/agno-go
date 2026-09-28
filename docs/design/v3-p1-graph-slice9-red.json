@@ -1,0 +1,72 @@
+{
+  "schema": "rex.tdd-red-observation.v1",
+  "workItemKey": "work-p1-graph-engine-r9-output-contract",
+  "activationId": "b0469c9c-438d-4ac7-b3b5-34bd3bcedd87",
+  "stageId": "red",
+  "capability": "software.testing.tdd",
+  "contractRef": "docs/design/v3-test-scope-p1-graph-slice9.json",
+  "behaviorsObserved": [
+    "A1 SetOutput 指向未注册节点 → 必须构建期被拒（本轮红）",
+    "A2 从未调用 SetOutput → 必须构建期被拒（本轮红）",
+    "A3 合法输出节点照常解析（对照，已绿）",
+    "A4 合法输出节点返回 nil 不是非法声明（对照，已绿）"
+  ],
+  "testAdded": {
+    "file": "pkg/hno/graph/graph_test.go",
+    "func": "TestP1G_ValidateRejectsMissingOrUnknownOutput",
+    "package": "graph_test（外部测试包，只用导出面）",
+    "redAssertionLine": 533,
+    "controlSubtests": [
+      "对照：合法输出节点照常解析",
+      "对照：合法输出节点返回 nil 不是非法声明"
+    ]
+  },
+  "command": {
+    "executable": "go",
+    "args": [
+      "test",
+      "./pkg/hno/graph/...",
+      "-run",
+      "TestP1G_ValidateRejectsMissingOrUnknownOutput",
+      "-count=1",
+      "-v"
+    ],
+    "cwd": "/Users/rex/codes/agno-go"
+  },
+  "observedOutput": [
+    "=== RUN   TestP1G_ValidateRejectsMissingOrUnknownOutput/never-declared",
+    "    graph_test.go:533: 输出不是已注册节点，Validate 却判定合法",
+    "=== RUN   TestP1G_ValidateRejectsMissingOrUnknownOutput/not-a-node",
+    "    graph_test.go:533: 输出不是已注册节点，Validate 却判定合法",
+    "--- FAIL: TestP1G_ValidateRejectsMissingOrUnknownOutput (0.00s)",
+    "    --- FAIL: .../never-declared (0.00s)",
+    "    --- FAIL: .../not-a-node (0.00s)",
+    "    --- PASS: .../对照：合法输出节点照常解析 (0.00s)",
+    "    --- PASS: .../对照：合法输出节点返回_nil_不是非法声明 (0.00s)",
+    "FAIL\tgithub.com/rexleimo/agno-go/pkg/hno/graph\t0.316s"
+  ],
+  "exitStatus": 1,
+  "receiptRef": "receipt:795383c7-f346-4a7a-8739-78d32d706a2f",
+  "failureReason": "Validate 的函数体只做四项检查（入口存在、每条边两端存在、条件边必须带谓词、边种类必须可路由），从不读 g.output；调度器又只在完成节点名等于本次 plan.output 时才写 result.output，因此 output 不合法时图照样跑完并交出 Output()==nil 的 Result。红的就是这条缺失的构建期检查。",
+  "failureReasonLocation": [
+    "pkg/hno/graph/graph.go:219-238 无 output 分支",
+    "pkg/hno/graph/scheduler.go:123-125 输出只在名字命中完成节点时被赋值"
+  ],
+  "legitimacyChecks": {
+    "notInfrastructureFailure": "go vet ./pkg/hno/graph/... 与 go build ./... 通过（包内无编译错误），测试二进制正常跑完并打印结构化 FAIL，不是 panic、不是环境缺依赖。",
+    "notAlreadyGreen": "同一条命令在实现变更前真实非零退出，回执 id 见上。",
+    "notMockOnly": "断言全部落在 Validate 的 error 文案、Run 的 (Result, error) 与 Result.Output()/Value()，无任何 mock 或私有 helper 参与。",
+    "causeMatchesGoal": "失败信息「输出不是已注册节点，Validate 却判定合法」与契约 A1/A2 的期望一字对应，不是无关断言先红。"
+  },
+  "greenPreconditions": [
+    "GREEN 只能改 pkg/hno/graph 的生产代码，不得触碰本文件任何断言。",
+    "实现须同时满足 A3/A4：不得把校验做成「output 为空/为 nil 就报错」以外的形状。",
+    "实现后须重跑同一条命令并取零退出回执，再跑全包 + -race + 邻居包。"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-slice9-red.json",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice9.json#inScopeBehaviors",
+    "artifact:docs/design/v3-testability-decision-p1-graph-slice9.json#redCandidate",
+    "receipt:795383c7-f346-4a7a-8739-78d32d706a2f"
+  ]
+}

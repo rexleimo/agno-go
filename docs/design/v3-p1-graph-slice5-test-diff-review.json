@@ -1,0 +1,101 @@
+{
+  "kind": "rex.test-diff-review.v1",
+  "workItemKey": "work-p1-graph-engine-r5-silent-result",
+  "activationId": "db3d0649-89e9-46dd-a6e9-fa8f687b99f3",
+  "reviewedSlice": "切片 5（R3）—— 关闭「Validate 通过却返回 err==nil 空 Result」的静默通道",
+  "contractRef": "artifact:docs/design/v3-test-scope-p1-graph-slice5.json",
+  "behaviorChain": {
+    "S1-natural-red": "go test ./pkg/hno/graph/... -run P1G -count=1 → receipt:736cb312-a94a-4d10-a09c-ad946bf855ca exit 1，graph_test.go:343「Validate() = <nil>，缺失谓词的条件边被放行」。同一命令在测试追加前 exit 0（receipt:e0875681-af05-4c57-a855-0bb90a86fc33）。decide-testability 阶段的失败观察另见 receipt:bb70c8b2-c65e-4a01-ad7d-4e7c89316ddf。",
+    "S2-natural-red": "同一次 exit 1 的第二个失败点 graph_test.go:355「Run() 的 err = <nil>，Completed() = [a]、Output() = <nil>：调用方拿到一个没有输出的空结果」。",
+    "S3-control": "「永不命中的合法谓词不得被误判为非法」在 RED 阶段即 PASS（正确对照，非装饰）：MUTANT-C 下它判红，证明它有牙。",
+    "S4-recovered-red": "标注为 recovered RED（行为已由切片 4 实现，测试事后取证）。流程：备份 pkg/hno/graph/graph.go → 把 Validate 的端点检查限制回 e.kind == edgeUnconditional（保持全部标识符被使用，无编译失败）→ 同一聚焦命令 receipt:c192debb-c53c-4d3e-81cb-f113d31bbd50 exit 1，四个子用例分别报 graph_test.go:418「Validate() = <nil>，conditional-to-missing / conditional-from-missing / default-to-missing / default-from-missing 的悬空端点被放行」→ 从备份还原，cmp 逐字节一致（RESTORE_BYTE_EXACT），还原后 hash-object = 68123f3907305c8c4e31e62f9c1a2fdc9c7f4c40 与 GREEN 哈希一致。",
+    "green": "go test ./pkg/hno/graph/... -run P1G -count=1 → receipt:fc4a6847-6aea-46a4-9cd2-3ea6c3963a9f exit 0；-race ./pkg/hno/graph/... → receipt:e88adbe3-7107-4d04-b4ed-d264eb0f32af exit 0；邻近包 ./pkg/hno/agent/... ./pkg/hno/runner/... ./internal/session/contract/... → receipt:fa604fda-5483-4b6f-9257-e08fef589fd8 exit 0。",
+    "refactor-check": "go test ./pkg/hno/graph/... -run P1G -count=1 → receipt:e0107592-0967-4781-8e28-52b7c2317d80 exit 0（守卫移除后全绿），gofmt -l 无输出、go vet 净。"
+  },
+  "implementationDelta": {
+    "green": "pkg/hno/graph/graph.go 三处编辑：Validate 的边循环新增 `if e.kind == edgeConditional && e.p == nil { return fmt.Errorf(\"graph: conditional edge from %q to %q declares no predicate\", e.from, e.to) }`；AddConditional 与 Validate 的 GoDoc 同步（GoDoc 由「三项」改为「四项」并写明 nil 谓词被拒）。基线可核验性：把这三处编辑逐一反向替换后，文件的 git hash-object = 38584f61bc6387c4982b94f0d6631a58c02e40b0，与 cycle-4 裁定的记录逐字符一致，证明本切片对 graph.go 只做了这三处改动。diff:/tmp/p1-green/slice5-r3-impl-diff.txt",
+    "refactor": "pkg/hno/graph/scheduler.go 删掉 successors 里条件边分支的 `e.p != nil &&` 守卫并更新注释：该守卫正是切片 5 关掉的静默丢边通道本身；不变式改由 Validate 单点持有（Run 在 scheduler.go:37 先调用 Validate，successors 仅由消费者经 complete 在 :102 调用，包外无绕过路径）。行为等价性：全部输入可达集上守卫的新值为 nil 当且仅当 Validate 已被绕过，故对本切片所有用例语义不变（重构后同命令 exit 0）。基线可核验性：反向替换后哈希 = 98b8f6a027f233527c2166ccea755908e5b5d047，与 cycle-4 记录一致。diff:/tmp/p1-green/slice5-r3-refactor-diff.txt",
+    "finalHashes": {
+      "pkg/hno/graph/graph.go": "68123f3907305c8c4e31e62f9c1a2fdc9c7f4c40",
+      "pkg/hno/graph/scheduler.go": "19dcf6d244f50352577184cc38b4bc6dffcdc713",
+      "pkg/hno/graph/graph_test.go": "844ccef83f2d809210e3932fc5df83b04f84bd5f"
+    },
+    "boundary": "累计差异（vs fixed-point 0387000，git diff --numstat）：graph.go +85/-16、graph_test.go +329/-0、scheduler.go +21/-6。切片 5 自身的差异（对重建基线逐文件 diff 计数）：graph.go +8/-3、scheduler.go +3/-2、graph_test.go +104/-0（修正值；初稿误记为 +95，见 verdict.cycle5.selfCorrections C5-SELF-1）（两个新测试函数），测试文件相对 HEAD 仍是纯新增。"
+  },
+  "mutationKills": [
+    {
+      "mutant": "MUTANT-A：把 nil 谓词的拒绝改成 `continue`（静默跳过这条声明）",
+      "expectation": "行为级判红而非编译失败",
+      "observed": "receipt:813765d1-f035-4a25-9f61-ec5bf39cdc70 exit 1 —— S1 graph_test.go:343、S2 graph_test.go:355 双双判红",
+      "killedBy": "S1 + S2"
+    },
+    {
+      "mutant": "MUTANT-B：删掉 Validate 的 nil 检查并把 successors 改成 `e.p == nil || e.p(out)`（把 nil 当恒真，cycle4 fix 明令禁止的对称静默）",
+      "observed": "receipt:a97ed245-107a-4aa3-b728-adf4303102bc exit 1 —— S1 判红；S2 报出 Completed() = [a b]、Output() = seed，即边被静默激活的反方向",
+      "killedBy": "S1 + S2"
+    },
+    {
+      "mutant": "MUTANT-C：条件边一律拒绝（忽略 `&& e.p == nil`），即退化实现",
+      "observed": "receipt:17e19928-553c-4ac0-b68b-4880f6d6aef0 exit 1 —— 切片 4 的五个路由子用例判红，且本切片 S3 对照单独复核亦判红（--- FAIL: .../永不命中的合法谓词不得被误判为非法）",
+      "killedBy": "S3 对照 + 切片 4 既有用例"
+    },
+    {
+      "mutant": "RECOVERED-RED 变异：端点检查限制回只对无条件边生效",
+      "observed": "receipt:c192debb-c53c-4d3e-81cb-f113d31bbd50 exit 1 —— S4 四个子用例全部判红",
+      "killedBy": "S4"
+    }
+  ],
+  "testDiffReview": {
+    "stillConstrainsUserBehavior": "两个新测试的断言全部落在调用方可观察面上：Validate 的返回值及其能否指名缺失的那个节点名、Run 的 err 与 res 是否为 nil、Completed() 的确切切片、恒假谓词仍能落到兜底边。没有任何断言引用 edges/declare/successors/config 等未导出符号，没有断言错误的具体类型或包装层级，没有断言谓词调用次数。",
+    "noWeakening": "未删除、未跳过、未弱化既有用例；graph_test.go 相对 HEAD 仍为纯新增（+329/-0）；S2 的期望值是「err 非 nil 且 res==nil」而非把当前的 err==nil 现状写成期望。",
+    "locatorAssertionRationale": "S1/S2 要求错误文本同时出现 \"a\" 与 \"b\"（带引号），因为只断言 err != nil 会被任何其它校验满足；而 S4 只断言错误指名 ghost 而不钉「conditional edge」这类种类字样，钉种类文案会把实现措辞固化进测试，且对 conditional/default 而言该图只含这一种缺陷，任何拒绝都只能来自端点校验。",
+    "contractDeviation": "契约 S4 原文写「对 conditional / default / join 三种边种类同样拒绝」。本切片只覆盖 conditional 与 default（各 to/from 两行），join 一行未入表且原因如下，属主动申报的范围收缩而非静默遗漏：AddJoin 的声明在 R1 已被「不可路由」分支拒绝，若同一条 join 声明的端点也缺失，公共面上两次拒绝都会指名 ghost（不可路由的文案本身带 from/to 节点名），端点检查对 join 的贡献无法在不钉错误措辞的前提下与 R1 的拒绝区分。join 的端点行因此顺延到 B2 真正实现 join 路由之后再取，届时它是唯一拒绝理由，测试才有牙。已同步登记到 owedRedForNextSlice。"
+  },
+  "structuralCriteria": {
+    "nonTestLOC": "graph.go 247 + scheduler.go 130 = 377 ≤ 1500",
+    "zeroLocks": "grep -c 'sync\\.' graph.go/scheduler.go = 0/0",
+    "race": "receipt:e88adbe3 exit 0",
+    "fmtVet": "gofmt -l pkg/hno/graph 无输出；go vet ./pkg/hno/graph/... 净",
+    "outOfScopeUntouched": "diff 未触及 config 的 stepLimit/maxConcurrency/stepLimitSet、未新增 Completed 去重、未实现 join 路由、未加 recover —— 契约 outOfScope 各项零出现。",
+    "independentReview": "子代理双轴（只读仓库、探针在 /tmp）与实现者侧自查取到同一组冻结哈希；自查漏掉的三项 hard 已记入 verdict.cycle5.selfCorrections。"
+  },
+  "environmentNotes": [
+    "切片 4 收尾的全量 go test ./... 唯一失败是 pkg/hno/tools/pubmed 的 TestPubMedToolkit_SearchArticles（线上 PubMed API 500），外部依赖、与 graph 无关、非本轮回归；本轮邻近回归只取 agent/runner/contract 三包回执（receipt:fa604fda exit 0）。",
+    "过程事故记录：一次 shell 拼装失误留下了一条无害的 `import_out` 未找到命令（退出码非零但无副作用），未影响任何文件；恢复式 RED 与变异全程使用 cp 备份 + cmp/git hash-object 校验，未使用 git stash / checkout -- 等可能吞掉未提交成果的手段。"
+  ],
+  "owedRedForNextSlice": [
+    "断言强度还债（C5-SPEC-4，纯测试改动）：S1/S2 与 S4 每行必须钉「边种类 + 拒绝原因词」，并按契约原文补回 join 端点行；当前 S4 四行彼此不可区分。",
+    "C5-STD-5：Run 入口对 nodes/edges 取快照，使运行中改图无法推翻 Validate 的结论；已现场复现两条（nil 谓词 panic、scheduler.go:86 SIGSEGV 杀死进程），并改正 scheduler.go:105-107 的绝对命题。",
+    "C4-STD-2 (2)：同一节点多条 Default 边全部激活（当前无任何断言）。",
+    "C4-STD-2 (3)：谓词收敛环端到端跑完并给出 Output（与 B5 的「无条件环被拒」配对，构成合法环对照组，同时补票面判据 5 的环图类）。",
+    "B4 stepLimit：New 落实默认 1000、stepLimitSet 区分显式设置、消费者按激活步数计数并产生 ErrStepLimitExceeded（全包 grep 目前仍只有定义无产生点）。",
+    "B5 无条件边成环的构建期拒绝；与 B4 各取独立 RED、独立回执（cycle4 C4-SPEC-3 明令不得合并）。",
+    "S4-join 端点行：待 B2 join 路由落地后补，使端点校验成为唯一拒绝理由。",
+    "C4-STD-1 Result.Completed() 重名语义：需先由设计侧决定「完成日志（含重名）」还是「去重集合」，未定之前不用测试锁定。",
+    "B6 余下校验（重复节点名静默覆盖、不可达节点、非输出汇点、Join 前驱数）、B7 Warnings、B8 并发上限 FIFO、B9 取消归一化、B10 panic 转错误、B11 Typed 分支测试。",
+    "cycle4 未闭项：§3.5 文档回写（悬空检查覆盖全种类 + 条件边必须带谓词）、Add* 增量校验立场、C4-STD-3（edgeKind 三处 switch 折表）、§3.4 规则 5 的母契约回写。"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-test-scope-p1-graph-slice5.json",
+    "artifact:docs/design/v3-testability-decision-p1-graph-slice5.json",
+    "artifact:/tmp/p1-green/slice5-r3-impl-diff.txt",
+    "artifact:/tmp/p1-green/slice5-r3-test-diff.txt",
+    "artifact:/tmp/p1-green/slice5-r3-refactor-diff.txt",
+    "receipt:736cb312-a94a-4d10-a09c-ad946bf855ca",
+    "receipt:bb70c8b2-c65e-4a01-ad7d-4e7c89316ddf",
+    "receipt:fc4a6847-6aea-46a4-9cd2-3ea6c3963a9f",
+    "receipt:e88adbe3-7107-4d04-b4ed-d264eb0f32af",
+    "receipt:fa604fda-5483-4b6f-9257-e08fef589fd8",
+    "receipt:c192debb-c53c-4d3e-81cb-f113d31bbd50",
+    "receipt:813765d1-f035-4a25-9f61-ec5bf39cdc70",
+    "receipt:a97ed245-107a-4aa3-b728-adf4303102bc",
+    "receipt:17e19928-553c-4ac0-b68b-4880f6d6aef0",
+    "receipt:e0107592-0967-4781-8e28-52b7c2317d80",
+    "receipt:e0875681-af05-4c57-a855-0bb90a86fc33"
+  ],
+  "reviewFindingsDischarged": {
+    "C4-SPEC-2": "闭。nil 谓词构建期被拒，天然 RED + GREEN + 两杀（receipt:736cb312 / fc4a6847 / 813765d1 / a97ed245）。",
+    "C4-STD-2 (1)": "部分闭。conditional/default 有表驱动断言与 MUTANT-3 回执（17e19928），但断言未钉边种类（C5-SPEC-4）且 join 行顺延。",
+    "C4-STD-2 (2)(3)": "未闭。本台账此前既未把它列入 outOfScope 也未列入 owedRedForNextSlice ⇒ 由 cycle5 审查判为静默顺延（C5-SPEC-5），现已补入下方首四项。"
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "schema": "rex.slice-stage-ledger.v1",
+  "workItemKey": "work-p1-graph-engine-r11-reachability",
+  "workflowActivationId": "745a9caf-71a7-41ba-9bc1-db887602191e",
+  "activationId": "2995e72c-07f9-4a50-9f53-7b0ef9976c61",
+  "capabilityId": "software.testing.tdd",
+  "stage": "refactor",
+  "measuredAt": "2026-09-27T11:32:00Z",
+
+  "changes": [
+    {
+      "id": "RF1",
+      "what": "抽出 (*Graph).adjacency(keep func(edgeDecl) bool) map[string][]string，rejectUnreachableNodes 与 alwaysTakenAdjacency 共用它。",
+      "why": "两个可达性检查各自手写同一段「按声明顺序把边收成 from→后继表」的循环（Duplicated Code，smell 基线第 2 条）。共用后 keep 是唯一的差异点，读代码时「哪些边算数」这件事只剩一处。",
+      "scope": "私有方法，没有新增导出符号、配置项或钩子。"
+    },
+    {
+      "id": "RF2",
+      "what": "rejectUnreachableNodes 的 BFS 改为先取后继表再扩展，不再对每个出队节点重扫全部 g.edges。",
+      "why": "原写法是 O(节点数 × 边数)；一张 200 节点 400 边的图要扫 8 万次。可达性闭包只需要每个节点的后继表一次。",
+      "scope": "只改遍历骨架，reached 的闭包语义与文案完全不变。"
+    },
+    {
+      "id": "NOT-CHANGED",
+      "what": "rejectUnconditionalCycles 的起点循环仍然遍历 g.edges。",
+      "why": "它的文档写明「起点按声明顺序遍历，因此同一张图永远报出同一个环」；换成 map 键序就破坏切片 10 的确定性契约。这里刻意不顺手整理。"
+    }
+  ],
+
+  "hashDelta": {
+    "graph.go": "9d65003747def45b66d9147a7aa4f9a251f49e6e（GREEN 字节）→ e75d58d529af2dad7e7f3cbc25ffdff8129f802b（REFACTOR 字节），+18/-14 行，差异存 /tmp/p1-cycle11/graph-go-refactor.diff",
+    "graph_test.go": "d60690eb8d606b116ba4f6898b06555f9edd0289 —— 本阶段一个字节都没动",
+    "scheduler.go": "87854ffbb7629f9adeb2d45fbb74d91f2032b99d —— 未触碰"
+  },
+
+  "receipts": {
+    "refactorCheck": {
+      "id": "receipt:ae43dcd6-e112-453b-8cb8-5518662fcb54",
+      "argv": "go test ./pkg/hno/graph/... -run TestP1G_ValidateRejectsUnreachableNodes -count=1 -timeout 25s -v",
+      "exit": 0,
+      "note": "argv 与测试范围决定里声明的公共场景命令逐字段一致，因此可作为 refactor-check-recorded。"
+    },
+    "graphPackageRace": {
+      "id": "receipt:e1db08ce-c472-4266-85d4-dfaee367b4b3",
+      "argv": "go test ./pkg/hno/graph/... -count=1 -timeout 180s -race",
+      "exit": 0
+    },
+    "neighbors": {
+      "id": "receipt:d612e2a8-473b-43f6-b9dc-8f8ce75461f1",
+      "argv": "go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1 -timeout 300s",
+      "exit": 0
+    },
+    "scenarioDifferential": {
+      "id": "receipt:57bb0fcb-2612-4940-ab57-96d308a32a1e",
+      "argv": "bash -c 'cd /tmp/p1-r11-probe && go run . > out-refactor.txt 2>&1 && cmp out-green.txt out-refactor.txt && echo IDENTICAL'",
+      "exit": 0,
+      "note": "仓库外模块的 10 个形状（含每个节点真实执行次数）在 REFACTOR 前后逐字节相同——公共面没有任何东西被这次整理改掉。"
+    },
+    "style": "gofmt -l pkg/hno/graph/ 无输出；go vet ./pkg/hno/graph/... 零退出。"
+  },
+
+  "mutationRecheckAfterRefactor": {
+    "command": "go test ./pkg/hno/graph/... -count=1 -timeout 60s -v，脚本 /tmp/p1-cycle11/matrix3.py，每个变异 3 次，基线字节 = e75d58d5",
+    "matrix": [
+      {"id": "MU1", "injection": "删掉 Validate 里的可达性检查调用", "failRows": 6, "sites": ["1051", "1131", "1134"], "killedEveryRun": true},
+      {"id": "MU2", "injection": "可达只沿无条件边（adjacency keep 改成 kind==edgeUnconditional）", "failRows": 16, "sites": ["232", "267", "388", "718", "735", "755", "784", "878", "1102", "1185"], "killedEveryRun": true},
+      {"id": "MU3", "injection": "次序反转：先环后可达", "failRows": 2, "sites": ["1131", "1134"], "killedEveryRun": true, "note": "站点唯一，仍只有 A6 对照能看见次序。"},
+      {"id": "MU4b", "injection": "sort 不再决定被点名的节点（_ = sort.IntSlice(nil)）", "failRows": 3, "sites": ["1063"], "killedEveryRun": true},
+      {"id": "MU5", "injection": "取字典序最后一个", "failRows": 3, "sites": ["1068", "1084"], "killedEveryRun": true},
+      {"id": "MU6", "injection": "把输出节点当作第二个根", "failRows": 2, "sites": ["1051"], "killedEveryRun": true},
+      {"id": "MU7", "injection": "共用骨架的 keep 判定取反（if !keep(e)）", "failRows": 31, "sites": ["38", "116", "232", "267", "320", "388", "560", "580", "714", "718", "735", "755", "784", "803", "878", "1102", "1149", "1185"], "killedEveryRun": true, "note": "抽出来的骨架本身也在测试担保之下：判反会打穿 31 行，横跨切片 4/5/6/7/10/11。"},
+      {"id": "MU8", "injection": "breakable 永远不置位（兜底边一律算必走）", "failRows": 2, "sites": ["784"], "killedEveryRun": true, "note": "切片 10 的 AR1 判据（有条件替代的兜底回环合法）在重构后仍由 :784 钉住，说明这次共用没有削弱上一片的担保。"}
+    ],
+    "restoreVerification": "每个变异后立刻写回 /tmp/p1-cycle11/graph.go.refactor 并断言逐字节相等；矩阵结束后再测一次 on-disk=e75d58d5…，整包 exit 0。",
+    "nonUniquenessDisclosed": "MU1/MU2/MU6 共享 :1051，MU1/MU3 共享 :1131/:1134 —— 单看站点无法区分这三对，区分靠行集：MU1 6 行、MU2 16 行、MU3 2 行、MU6 2 行且只含 unreachable-output。MU4b 在 GREEN 字节的测量里行集是 2–3 抖动（map 顺序本身随机），在 REFACTOR 字节的三次测量里都是 3 行；不把它写成固定行集。"
+  },
+
+  "testDiffReview": {
+    "testFileBytesInThisStage": "无变化（d60690eb8d606b116ba4f6898b06555f9edd0289 与 GREEN 收尾一致）",
+    "publicEntryOnly": "测试文件仍是外部包 graph_test，只用 New/AddNode/AddEdge/AddConditional/SetEntry/SetOutput/Validate/Run/Result；没有调用私有方法、没有断言 adjacency/rejectUnreachableNodes 的存在或调用次数。",
+    "assertions": {
+      "fileAssertionSites": 104,
+      "newFunctionAssertionSites": 22,
+      "skipCalls": 0,
+      "deletedOrWeakenedAssertions": 0
+    },
+    "stillUserObservable": "契约 slice11 的 A1/A2/A4（三行不可达声明被拒 + Run 同错）、A3（条件边谓词运行期不命中仍算可达）、A5（可达性只点一个字典序最小的名字且重复调用稳定）、A6（既不可达又含环先报可达性）、A7（既有五项的拒绝次序不被抢走）逐条仍由断言钉住；RF1/RF2 没有为任何一条添加实现细节型断言。",
+    "conclusion": "refactor-check-recorded + test-diff-review-recorded：测试差异为空集，用户可观察约束没有弱化。"
+  },
+
+  "disclosures": [
+    "GREEN 阶段提交证据被拒了 3 次（blockedReason=evidence-invalid，运行时把异常吞掉了，返回体里没有原因）。真实原因是我在同一条 passing-test-observed 里同时引用了 focused receipt 和整包 -race receipt，而 src/application/validate-command-evidence.mjs:44 对同一证据项里的每个 receipt: 引用都执行 assertExecutionReceiptMatchesCommand——非场景命令的收据会让整条提交抛错。改成只引用与 redCandidate.command 逐字段一致的那条收据后立刻通过，另三条收据继续在 ledger 里作为支撑证据引用但不作为阶段证据提交。这是第 2 次在同一 CLI 上踩到「证据项里混入非场景收据/缺收据」，已记入经验，未来切片直接按这个形状提交。",
+    "另一次失败原因不同：我用的是上下文压缩前遗留的旧 commandToken（b6da3975），而当前 Command 的 executionToken 已经轮换成 c7be38d7。恢复工作时必须从 store 或 fresh resume 重新取 token，不能沿用摘要里的值。",
+    "RF1 是判断性整理，不是契约要求：如果只按最小实现，切片 11 可以留着两段重复的邻接表构造继续跑。之所以值得做，是 RF2 的复杂度问题必须借 RF1 才能落地，两者是同一个改动的两面。",
+    "没有把聚合诊断（一次列出全部不可达节点）顺手做掉：契约只钉了「稳定地点一个名字」，扩展它需要新的 RED。",
+    "本轮没有触碰 §3.5 第 2/5/6/8 项，也没有触碰 Add* 增量检查（S10-SPEC-1）；B9 那张「汇点不是输出」的图在场景里仍然 validate=nil。"
+  ]
+}

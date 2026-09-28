@@ -1,0 +1,50 @@
+{
+  "schemaVersion": 1,
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:docs/design/v3-testability-decision-p1r16.json",
+  "workItemKey": "work-p1-graph-r16-max-concurrency",
+  "activationId": "94cead5a-0811-4c66-bfdd-1f91cbdd9bbb",
+  "stageId": "decide-testability",
+  "contract": "artifact:docs/design/v3-test-scope-p1-graph-slice16.json",
+  "redCandidateRow": "C1",
+  "redCandidate": {
+    "publicEntry": "graph.New(graph.WithMaxConcurrency(1)) → (*Graph).AddNode / graph.NodeFunc → (*Graph).AddEdge → SetEntry → SetOutput → (*Graph).Validate → (*Graph).Run，读的是节点侧登记账本交出的 [start/end] 轨迹与 Result.Completed()/Result.Output()",
+    "setup": "pkg/hno/graph/p1r16_max_concurrency_test.go 的 p1r16Fan(ledger, 3, 1, graph.WithMaxConcurrency(1))：入口节点出三条无条件边指向兄弟 a、s1、s2（声明顺序即此），三者再各自指向输出节点 done。每个兄弟节点体第一步是无缓冲登记「start <name>」并取一份此刻的账本快照，随后忙等一段确定工作量，最后登记「end <name>」并把快照作为节点输出交出。登记即握手，因此「同时在途峰值」与「轨迹次序」是可定位的观察量；全程不用 time.Sleep 定序。夹具先以 Validate() 为 nil 守住前提。",
+    "command": {
+      "executable": "go",
+      "args": [
+        "test",
+        "./pkg/hno/graph",
+        "-run",
+        "TestP1R16_",
+        "-count=1",
+        "-race",
+        "-v"
+      ],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "契约 C1：WithMaxConcurrency(1) 下一次在途的节点数峰值恰为 1（母约 :190 的 maxConcurrency > 0 && 在途数 >= 上限 → 激活进 pending）。C2 在此基础上要求放行次序是声明顺序，即轨迹逐字等于 [start a, end a, start s1, end s1, start s2, end s2]。C3 要求后进入的兄弟在自己节点体入口就观测到前序已经完成（快照含 \"end a\"）且看不到后序（不含 \"start s2\"）。C6 把同一判据放到 6 个兄弟、上限 2 上：峰值 ≤ 2 且每对 start/end 成对出现。",
+    "observed": "go test 退出码 1，四条行判红（同一条命令 -count=20 -race 重跑为 20/20 FAIL 且 0 次 race 检测，见契约 M-6）。C1：「WithMaxConcurrency(1) 下同时在途节点峰值 = 3, want 1；轨迹 = [start s1 start a start s2 end a end s1 end s2]」。C2：「登记轨迹 = [start s2 start a start s1 end s2 end a end s1], want [start a end a start s1 end s1 start s2 end s2]」。C3：「s1 在入口观测到的已完成集合不含 \"end a\"；实际交出 = \"start s1 | start a\"」与「s2 …不含 \"end s1\"；实际交出 = \"start s1 | start a | start s2\"」。C6：「WithMaxConcurrency(2) 下峰值在飞 = 6, want <= 2」。同族 C4/C5/C7/C8 判绿：它们钉的是「上限不得把 0 或负数变成永不派发」「上限不得虚耗步数预算」这些不能被改坏的属性。",
+    "receiptRef": "receipt:cbf5c6c0-c983-47da-b414-4f5d95f0c231",
+    "failureReason": "缺失的目标行为是「WithMaxConcurrency 的上限真的限制同时在途节点数，且等待的激活按声明顺序 FIFO 放行」：scheduler.go 的 dispatch() 在循环头无条件排空整个 pending，全仓库对 cfg.maxConcurrency 的读取点为零（契约 M-1 实测），所以旋钮导出但完全不生效。这不是编译、夹具或环境问题——同一命令下 Validate()、Run 的收敛结果与 C4/C5/C7/C8 四行都成立，判红只发生在 C1/C2/C3/C6 声明的用户可观察输出属性上，因此是新的用户可观察行为缺失，而不是既有断言被改坏。"
+  },
+  "nonDeterministicOutputDisclosure": "轨迹里的具体交错次序随调度而变：cbf5c6c0 那次与本轮抄录的那次给出的排列不同（前者 s1 先登记、后者 s2 先登记），但峰值 = 3 / 6 与「看不到 end a」这两类判红量在 -count=20 下 20/20 稳定复现。因此本决定绑定的是行的失败与可观察量，不绑定某一串排列。",
+  "whyNotHardening": "hardening 的前提是没有新的用户可观察行为。本片恰好相反：调用方传 WithMaxConcurrency(n) 之后，n 首次真正决定一次 Run 里有几个节点同时在跑、后来者进入时前序是否已完成——这是原本不存在的外部可观察行为，且能以公共入口复现为真实失败，故为 behavior-delta。",
+  "whyNotBlocked": "全部验收行都能经导出面观察：graph.New/WithMaxConcurrency/AddNode/AddEdge/SetEntry/SetOutput/Validate/Run 与节点侧账本（节点体由测试自己提供，登记走无缓冲 channel 握手）+ Result 的公共读取器。不需要读 cfg、pending、running 等私有标识，也不需要新增旋钮或测试专用出口，因此不构成 blocked。",
+  "observabilityLimitDisclosure": "上限 > 1 时，「同一批激活里谁先真正开始跑」不由调度器决定（spawn 只保证入队次序，不保证 goroutine 取得时间的次序），所以 C2 那条严格按声明顺序的逐字轨迹只在 cap = 1（完全串行）下成立；C7 专门钉住「上限 2 确实同时放行 2 个」的下界，防止把上限实现成恒等于 1 来骗过 C1/C2。这一取舍已写进契约 C7 行与 observabilityLimit，不靠断言 goroutine 启动次序来凑证据。",
+  "scenarioCommandBindingNote": "本阶段与其后 RED/GREEN/REFACTOR 的每个 receipt 都用上面这一条命令；-run TestP1R16_ 覆盖 p1r16_max_concurrency_test.go 的整族 C 行，逐行归属靠 -v 输出，不混用其它命令。包级全量 -race 与结构判据（sync. 计数、LOC 上限）作为契约 completionCriteria 的另行测量，不作为阶段 receipt。",
+  "measuredAt": "2026-09-27T17:19:27.000Z",
+  "productionBytesAtDecision": {
+    "pkg/hno/graph/graph.go": "9684e49efb85f6870784cc75a469739669e0a05b",
+    "pkg/hno/graph/scheduler.go": "61c7ba6db72b65eda938c099968e7409fc944d73",
+    "pkg/hno/graph/graph_test.go": "425ea0303e1d5c5c8e95bacf57663ae94a4309ee",
+    "pkg/hno/graph/p1r16_max_concurrency_test.go": "c4bf463898b197db97fbbed1904ef3f000b8631f"
+  },
+  "notTouchedByThisSlice": [
+    "R16-UNADJ-1（负数上限是否该在构建期被拒）：本片按母约 :190 逐字的 maxConcurrency > 0 守卫实现「n ≤ 0 = 不限」，并把「负数是否算非法声明」挂号待人类裁决；C5 只要求它不停摆。",
+    "R16-UNADJ-2（是否新增公共的逐节点在途/NodePending 可观测量）：票面 §3.3 提到的状态钩子不在本片新增导出面，FIFO 次序改由节点侧账本这一允许缝观察。",
+    "edgeJoin 种类的路由实现（routable == false，Validate 继续拒绝）：并发上限不改变边种类语义。",
+    "stepLimit 的取值校验与判据 8 的告警文案：C8 只要求等待队列不虚耗步数，动的是判据语义的守护侧而非实现。",
+    "B9（取消时正在跑的节点如何收尾）与 B11（Typed）：另开切片。"
+  ]
+}

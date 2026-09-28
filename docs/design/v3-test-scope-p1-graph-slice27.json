@@ -1,0 +1,282 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p5-graph-g7-hitl-core",
+  "activationId": "pending",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-28T06:45:00Z",
+  "contractRef": "docs/design/v3-test-scope-p1-graph-slice27.json",
+  "slice": 27,
+  "series": "P5 第 1 片（母约 §9 G7：图引擎 HITL Interrupt/Resume 核心；D1 已裁决 OPT-1，2026-09-28，会话侧车存储为第 2 片）",
+  "userGoal": "节点能把执行挂起等待人类并跨恢复点继续：节点经 RequestInterrupt(i) 提出中断（带 InterruptID/Message/ResponseSchema/Payload/Mode），Run 以可 errors.Is 到 ErrSuspended 的 *Suspension（含全部待答中断与已完成状态）取代半截 Result 返回；Resume(ctx, responses) 按 Interrupt.Mode 走 Rerun（节点带响应重跑）或 Handoff（响应直接成为节点输出喂后继），带 schema 校验（不过 → 节点保持 Waiting 可重试）与幂等（重复/无处可恢复 → ErrNothingToResume）；挂起经切片 24 的 Checkpointer 持久化（EntryInterrupt 条目），跨进程恢复由第 2 片的会话侧车完成。",
+  "whyThisSlice": "D1 已裁决（OPT-1 侧车+派生视图），G7 解锁；母约 P5 验收「审批场景跨进程恢复；重复 Resume 幂等」中，引擎侧三语义（schema 校验/幂等/Rerun+Handoff）是全部后续的地基。切片拆分登记：第 1 片（本片）= 引擎内 HITL 核心 + 挂起的检查点条目；第 2 片 = 会话侧车存储 + 派生视图 + 跨进程恢复接线（依 D1 裁决，契约另立）；第 3 片（可选）= run 事件流与 CheckpointEvent 生产者桥接（S23-SPEC-1 的交点）。",
+  "measuredBeforeDesign": [
+    {
+      "id": "M1-今天的公共面形状（仓库外探针）",
+      "scene": "/tmp/g7m1（module github.com/rexleimo/agno-go，pkg/hno/graph 为切片 24 收口字节逐字节副本，cmd/probe 只调导出 API）",
+      "commands": [
+        "go -C /tmp/g7m1 run ./cmd/probe",
+        "go -C /tmp/g7m1 test ./pkg/hno/graph -count=1",
+        "go -C /tmp/g7m1 doc -all ./pkg/hno/graph"
+      ],
+      "observations": [
+        "结构：interrupt/resume/suspend/hitl/waiting 符号在导出面为零（receipt:e001cd46-…）。",
+        "行为：今天想问人类的节点只有「返回错误」一条路 —— Run 交出该错误、res=nil、没有任何可恢复状态；第二次 Run 从头重跑（探针实测，receipt:419c60d1-…，exit 0；基线测试 receipt:2e5cdc32-…，exit 0）。"
+      ]
+    },
+    {
+      "id": "M2-可行性实验（候选缝整体落在仓库副本上，仓库字节未动）",
+      "scene": "/tmp/g7exp（副本 + 新文件 hitl.go 325 行 + scheduler/graph 接线 + durability 的 EntryInterrupt 条目；cmd/probe 十五个观察面）",
+      "commands": [
+        "go -C /tmp/g7exp test ./pkg/hno/graph -count=1",
+        "go -C /tmp/g7exp test ./pkg/hno/graph -count=1 -race",
+        "go -C /tmp/g7exp run ./cmd/probe",
+        "go -C /tmp/g7exp run -race ./cmd/probe"
+      ],
+      "observations": [
+        "既有全部测试在带缝副本上 0 判红（receipt:cb2eba15-… / receipt:e21251d9-…，多轮含 -race 均 exit 0）。",
+        "十五个观察面全绿（receipt:b7d8282d-…、-race receipt:932b3d85-…、终版 receipt:491e3e88-…）：OBS-1 中断 → res=nil + errors.Is(ErrSuspended) + errors.As(*Suspension)，已完成前驱留在 Suspension；OBS-2a/2b 坏响应/缺必填 → 包 ErrInvalidResponse 且挂起原样保留；OBS-2c Rerun → 节点带响应重跑（callsB=2、同输入）、图跑完；OBS-3b Handoff → 节点不再执行（callsB=1）、响应成为其输出进后继；OBS-4/5 双重 Resume 与从未挂起的 Resume → ErrNothingToResume；OBS-6 未知 InterruptID 的响应被拒且挂起仍可用（修正后重试成功）；OBS-7 Sync 持久化 → 挂起时检查点含完成条目 + EntryInterrupt 条目（节点/输入/ID 全量）；OBS-7b 普通完成的条目种类零值不变（既有 durability 语义不破）；OBS-8 重试×5 + 中断 → 恰好 1 次节点体内执行后挂起（重试不吞中断）；OBS-9 并行双中断 → Suspension 含 2 个待答、一次 Resume 双答后 Join 照常；OBS-10 重悬链（恢复后再中断）成立；OBS-11 空 InterruptID → 运行期点名错误（非挂起）；OBS-12 步数预算跨恢复累计（恢复后撞阀 → ErrStepLimitExceeded）；OBS-13 挂起时 sink 失败 → 同时可 Is 到 ErrSuspended 与 sink 错误（不互掩）；OBS-14 Exit 档挂起照常冲刷；OBS-15 并发重复 InterruptID → 运行期点名错误。开发中途两条 exit 1（receipt:448cd39f-… / receipt:8bcd7b67-…）为夹具迭代，非引擎缺陷。",
+        "结构代价（副本实测）：导出符号 41 → 56（+Interrupt/InterruptMode/ResumeRerun/ResumeHandoff/Suspension/RequestInterrupt/ErrSuspended/ErrNothingToResume/ErrInvalidResponse/Resume/InterruptResponse 上下文取值器等 +3 durability 条目种类相关）；非测试 LOC 1219 → 1562（超既有 1500 上限 —— 本片把上限放宽到 1800，见 baselineBytes.counters 的放宽说明）；`sync.` 计数仍 0（挂起态存 Graph/调度器字段，消费者口径）。"
+      ]
+    }
+  ],
+  "designConsequence": "七条语义在本片定形（实验已按此实现并实测）：（1）中断面是哨兵错误 RequestInterrupt(i Interrupt) error —— 节点在任何执行路径返回它即挂起，不改 Node.Run 签名（与 Sender 同一可选扩展先例）；Interrupt 在母约四字段外补 Mode InterruptMode（Rerun 默认/Handoff），先例同切片 22 给 TraceConfig 补 Hook；（2）挂起的可观察形状是 *Suspension（实现 error，errors.Is → ErrSuspended、errors.As 可取中断清单与已完成状态）—— Run 交 (nil, suspension) 而非半截 Result，fail-closed 不与 R19-Q1 族混淆；（3）Resume(ctx, responses map[string]any)：响应集必须恰好覆盖全部待答中断（多给 → 未知 ID 错、少给 → 缺失错）；任一响应不过该中断的 ResponseSchema → 包 ErrInvalidResponse 的错误且挂起原样保留（节点保持 Waiting，调用方修正后重试）；全部通过 → 按 Mode 各归 Rerun/Handoff；恢复可再次挂起（重悬链）；无处可恢复/重复恢复 → ErrNothingToResume（幂等语义）；（4）ResponseSchema 是 JSON Schema 诚实子集：type=object + required + properties.<name>.type（string/number/boolean/integer/object/array）—— 本片只担保这个子集，超出部分不校验不静默放过（登记为观察上限）；（5）持久化复用切片 24 Checkpointer：新增条目种类 EntryInterrupt（携带节点名/输入/Interrupt 全量），挂起时照常冲刷（Sync/Async/Exit 三档语义不变），sink 错误与 ErrSuspended 同时可 Is、不互掩；步数预算跨恢复累计（一次逻辑运行一个预算）；（6）重试与中断的交互：RequestInterrupt 不是错误 —— 重试循环不吞它、不重试它（节点体内恰执行一次后挂起）；（7）并发纪律沿用 builder 口径：同一张图上的 Run/Resume 链不并发；跨进程恢复（第 2 片侧车）经 Graph 重建 + pending 恢复入口，本片不暴露内部字段。",
+  "redProtocol": "两段制：第一段落 API 面（hitl.go 的类型/哨兵/构造与 Resume 签名、durability 条目种类、scheduler 的挂起态字段声明），D1–D15 中的行为行按今天的形状真实判红（今天无任何挂起面：节点返回的错误就是普通错误，M1 实测）；第二段落消费者接线（中断捕获→挂起构造→Run 返回 suspension；Resume 的校验/幂等/双档调度；检查点 EntryInterrupt 写入）转绿。两段各自留 receipt。",
+  "acceptanceMapping": [
+    {
+      "row": "D1",
+      "behavior": "中断正例：节点返回 RequestInterrupt → Run 交 (nil, err)，errors.Is(err, ErrSuspended)=true、errors.As 取到 *Suspension（含 InterruptID/Message/Payload/Mode 与已完成前驱状态）；不交半截 Result",
+      "publicEntry": "NodeFunc 内 RequestInterrupt → Run",
+      "assertion": "res==nil + Is + As 三断言（今天该错误只是普通错误，M1 实测，实现前必红）",
+      "independentlyFailable": "对把挂起当失败/当完成的实现判红"
+    },
+    {
+      "row": "D2",
+      "behavior": "schema 校验不过（类型错/缺必填）→ Resume 返回包 ErrInvalidResponse 的错误，挂起原样保留（可再试）；修正后的同一挂起可恢复成功",
+      "publicEntry": "Resume + 坏/好响应序列",
+      "assertion": "两次尝试：第一次 Is(ErrInvalidResponse) 且再 Resume 仍可成功（OBS-2a/2b/2c）",
+      "independentlyFailable": "对「校验失败即丢弃挂起」或「不校验」的实现判红"
+    },
+    {
+      "row": "D3",
+      "behavior": "Rerun 档：恢复后等待节点带着响应重新执行（同输入再跑、响应经 ctx 取值器可见），图从该节点继续跑完",
+      "publicEntry": "Interrupt{Mode:ResumeRerun} + Resume",
+      "assertion": "节点体第二次执行、输出含响应内容、Run 正常交 Result（OBS-2c）",
+      "independentlyFailable": "对不重跑直接用旧输出的实现判红"
+    },
+    {
+      "row": "D4",
+      "behavior": "Handoff 档：恢复后等待节点不再执行（体内调用数不变），响应直接成为其输出喂给后继",
+      "publicEntry": "Interrupt{Mode:ResumeHandoff} + Resume",
+      "assertion": "callsB 不增 + Value(b)==响应 + 后继收到响应（OBS-3b）",
+      "independentlyFailable": "对「Handoff 也重跑」或「后继收不到」的实现判红"
+    },
+    {
+      "row": "D5",
+      "behavior": "幂等与无处可恢复：对同一挂起二次 Resume、以及对从未挂起的图 Resume → ErrNothingToResume（errors.Is）",
+      "publicEntry": "Resume ×2 / 从未挂起 Resume",
+      "assertion": "两次 Is(ErrNothingToResume)（OBS-4/5）",
+      "independentlyFailable": "对二次恢复重跑图或panic的实现判红"
+    },
+    {
+      "row": "D6",
+      "behavior": "响应集恰好覆盖：少给（缺某中断）→ 缺失错误；多给（未知 InterruptID）→ 未知 ID 错误；挂起均保留",
+      "publicEntry": "Resume(部分/多余)",
+      "assertion": "两方向错误文案点名 ID、挂起仍可正确恢复（OBS-6）",
+      "independentlyFailable": "对静默忽略多余/缺失的实现判红"
+    },
+    {
+      "row": "D7",
+      "behavior": "挂起持久化：Sync 档挂起时 Checkpointer 收到 完成条目 + EntryInterrupt 条目（节点名/输入/Interrupt 全量）；普通完成的条目种类零值不变（既有 durability 反向对照）",
+      "publicEntry": "WithDurability+WithCheckpointer → Run 挂起 → 夹具 sink",
+      "assertion": "条目序与内容断言（OBS-7/7b）",
+      "independentlyFailable": "对挂起不落条目或改既有条目形状的实现判红"
+    },
+    {
+      "row": "D8",
+      "behavior": "重试不吞中断：带 WithRetry(MaxAttempts=5) 的节点第 1 次执行即返回中断 → 恰执行 1 次后挂起（RequestInterrupt 不是可重试错误）",
+      "publicEntry": "WithRetry × RequestInterrupt",
+      "assertion": "calls==1 + 挂起成立（OBS-8）",
+      "independentlyFailable": "对把中断重试 5 次的实现判红"
+    },
+    {
+      "row": "D9",
+      "behavior": "并行双中断：两分支各提出中断 → Suspension 含 2 个待答；一次 Resume 双答 → 两路继续、Join 照常汇聚",
+      "publicEntry": "并行分支 × RequestInterrupt × Resume",
+      "assertion": "待答数==2 + 恢复后 Join 输入完整（OBS-9）",
+      "independentlyFailable": "对丢失并发中断之一的实现判红"
+    },
+    {
+      "row": "D10",
+      "behavior": "重悬链：恢复后的执行可再次提出中断（可能不同 ID/不同节点）→ 新 Suspension；可继续恢复至完成",
+      "publicEntry": "Resume → 再中断 → 再 Resume",
+      "assertion": "两次挂起 + 最终正常完成（OBS-10）",
+      "independentlyFailable": "对第二次挂起当错误的实现判红"
+    },
+    {
+      "row": "D11",
+      "behavior": "空 InterruptID → 运行期点名错误（不是挂起、不是 panic）；并发重复 InterruptID → 运行期点名两个节点名",
+      "publicEntry": "空 ID / 重复 ID 中断",
+      "assertion": "两条错误文案可定位（OBS-11/15）",
+      "independentlyFailable": "对静默接受空/重 ID 的实现判红"
+    },
+    {
+      "row": "D12",
+      "behavior": "步数预算跨恢复累计：一次逻辑运行（Run+若干 Resume）共享一个 stepLimit；恢复段撞阀 → ErrStepLimitExceeded",
+      "publicEntry": "WithStepLimit × 挂起+恢复链",
+      "assertion": "恢复段交阀错误（OBS-12）",
+      "independentlyFailable": "对每次 Resume 重置预算的实现判红"
+    },
+    {
+      "row": "D13",
+      "behavior": "挂起时 sink 失败：返回的错误同时 errors.Is 到 ErrSuspended 与 sink 错误（不互掩）；Exit 档挂起照常冲刷",
+      "publicEntry": "失败 sink × 挂起 / Exit 档",
+      "assertion": "双 Is 成立 + Exit 条目完整（OBS-13/14）",
+      "independentlyFailable": "对吞 sink 错误或吞挂起的实现判红"
+    },
+    {
+      "row": "D14",
+      "behavior": "非中断节点零影响（反向对照）：不含 RequestInterrupt 的图在带缝引擎上行为同今天；既有全部测试零改动全过",
+      "publicEntry": "普通图 → Run",
+      "assertion": "既有 13+ 份测试文件哈希不变全绿",
+      "independentlyFailable": "对消费者路径引入语义漂移的实现判红"
+    },
+    {
+      "row": "D15",
+      "behavior": "Rerun 响应取值面：重跑的节点能经引擎提供的公共取值器拿到自己中断的响应（不靠闭包外带）",
+      "publicEntry": "InterruptResponse(ctx, id)",
+      "assertion": "重跑体内取到响应值（OBS-2c 的取值器路径）",
+      "independentlyFailable": "对只能靠夹具闭包传响应的实现判红（公共面缺取值器）"
+    }
+  ],
+  "minimalVerticalSlice": "D1 + D2 + D3 + D5 四行（挂起形状、校验保留、Rerun、幂等），D4/D6–D15 为 Handoff/持久化/交互补强。理由：母约三条必须语义各占一行，加挂起形状这一地基。",
+  "allowedTestSeam": {
+    "add": [
+      "pkg/hno/graph/p5g7_hitl_test.go（package graph_test，外部包，只用导出 API；夹具自备 sink 与计数）"
+    ],
+    "modify": [
+      "无。既有全部测试文件不许动 —— M2 已证 0 判红。"
+    ],
+    "retires": [],
+    "sourceSeam": "pkg/hno/graph/hitl.go（新文件：Interrupt/InterruptMode/Suspension/三哨兵/RequestInterrupt/InterruptResponse/Resume）、scheduler.go（挂起捕获与恢复调度、预算累计、EntryInterrupt 写入）、durability.go（EntryInterrupt 条目种类）、graph.go（pending 挂起态与 Run 接线）。policy.go 预期零改动（重试不吞中断落在 scheduler 包络）。"
+  },
+  "forbiddenObservations": [
+    "scheduler 内部字段、pending 表形状、goroutine 数（票面 :40 同族）—— 挂起状态经 Suspension 公共面观察",
+    "time.Sleep 定序；并行双中断的完成次序不断言（ Suspension 的清单序由声明序决定）",
+    "为测试导出 pending 态或恢复入口的内部版本",
+    "断言 schema 子集之外的校验行为（超集字段、nested anyOf 等 —— 观察上限已登记）"
+  ],
+  "baselineBytes": {
+    "note": "切片 26 已于 2026-09-28 收口（send.go dcd04661…、graph.go 7d7bb8d8…、scheduler.go fcd552c5…）；本节 baseline 已按收口字节重取，切片 27 实现可以开工。",
+    "rebaselineCommand": "git hash-object --no-filters pkg/hno/graph/graph.go pkg/hno/graph/scheduler.go pkg/hno/graph/policy.go pkg/hno/graph/durability.go pkg/hno/graph/send.go（切片 26 收口后执行并回填本节）",
+    "referenceAtSlice24Close": {
+      "pkg/hno/graph/graph.go": "98b8bdaddb5b5d9259705aa3a54c5d485e78f83c",
+      "pkg/hno/graph/scheduler.go": "4641de5251af296a3f2092a023fe9446e16f62f0",
+      "pkg/hno/graph/policy.go": "6d71fa47ba73c769c8e1bc7d697d39d355e5210f",
+      "pkg/hno/graph/durability.go": "da57a17ed818c9d22db56ad59b23e4a54cf84acc"
+    },
+    "counters": {
+      "exportedSymbolsAtSlice24Close": 41,
+      "expectedAfterSlice26": 45,
+      "expectedFinalExportedSymbols": 60,
+      "locCeiling": 1800,
+      "locCeilingRationale": "切片 24 的 1500 上限按「图引擎非测试代码」设；HITL + 之前各片累计在副本实测 1562，放宽到 1800 一次登记（+Send 后约 1780 仍在内），避免每片机械 bump。sync 计数仍必须 0。",
+      "syncCount": 0,
+      "exportedSymbolsAtSlice26Close": 45
+    },
+    "rebaselinedAtSlice26Close": {
+      "pkg/hno/graph/graph.go": "7d7bb8d86f8448761eb6f90482ceca4b6260527f",
+      "pkg/hno/graph/scheduler.go": "fcd552c5714af8c875825e4e634686db9f3dcfc6",
+      "pkg/hno/graph/send.go": "dcd046612fcf716bbdec5373744cb2ffb714ab7e",
+      "pkg/hno/graph/policy.go": "6d71fa47ba73c769c8e1bc7d697d39d355e5210f",
+      "pkg/hno/graph/durability.go": "da57a17ed818c9d22db56ad59b23e4a54cf84acc"
+    }
+  },
+  "carriedItems": [
+    {
+      "id": "D1-裁决",
+      "ref": "artifact:docs/design/v3-adjudication-d1-session-events.md §5",
+      "carriedIntoDesign": "OPT-1 已裁决：本片不动 Session 对外 JSON；会话侧车与跨进程恢复是第 2 片，依裁决材料的 marshal 边界盘点落位。"
+    },
+    {
+      "id": "R19-Q1",
+      "ref": "票面 §15.5",
+      "carriedIntoDesign": "挂起形状刻意与「凑不齐交空结论」区分：Suspension 是显式可恢复态而非 err==nil 的半截 Result。若 R19-Q1 日后裁决为 fail-closed，不改动本片形状。"
+    },
+    {
+      "id": "S19-STD-1",
+      "ref": "状态文档 §5",
+      "carriedIntoDesign": "Resume 后 Join 聚合仍走既有 joinReady 键控路径（OBS-9 验证），别名问题不扩大。"
+    },
+    {
+      "id": "S24-后续",
+      "ref": "切片 24 verdict",
+      "carriedIntoDesign": "resume/replay 挂在本片与第 2 片：本片交付引擎内恢复 + EntryInterrupt 持久化；跨进程重建由第 2 片侧车完成。"
+    },
+    {
+      "id": "第2片登记",
+      "ref": "本契约 whyThisSlice",
+      "carriedIntoDesign": "会话侧车（internal/session 侧的事件存储 + 派生视图，D1=OPT-1 形态）在 G7 第 2 片契约化，依裁决材料的四个 marshal 边界。"
+    }
+  ],
+  "explicitNonGoals": [
+    "会话侧车存储与跨进程恢复（第 2 片，D1 裁决材料指路）。",
+    "run 事件流生产者桥接 / CheckpointEvent（S23-SPEC-1，第 3 片可选）。",
+    "ResponseSchema 的完整 JSON Schema（nested/anyOf/oneOf/pattern —— 只担保 type=object+required+properties.type 子集）。",
+    "adk 完整 EventActions（母约 §9.1 已明确不抄）。",
+    "G5 Send（切片 26）、G8 Store（D2 材料未备）。"
+  ],
+  "completionCriteria": [
+    "1. redProtocol 两段各自留 receipt（第一段落 API 面 +durability 条目种类 +scheduler 挂起字段，行为行判红；第二段消费者接线转绿）；两段之间测试文件零改动。",
+    "2. 每行牙齿由变异证明（至少：挂起捕获摘掉→中断变普通错误、schema 校验摘掉、幂等判据摘掉、Handoff 档错走 Rerun、EntryInterrupt 写入摘掉、重试不吞中断的判据反转、预算累计改每次重置）；等价变异登记。",
+    "3. 既有全部测试文件零改动（在切片 26 收口字节上复核），逐文件 hash-object 登记。",
+    "4. 门禁全 exit 0（build/test/-race/vet/gofmt + 邻近 agent/runner/session-contract）。",
+    "5. 结构判据：导出符号恰 60（切片 26 后基线 +15）、非测试 LOC ≤1800（放宽理由见 baselineBytes.counters）、sync.=0。",
+    "6. 绑定命令在最终字节重跑取新回执；-race 无 DATA RACE。",
+    "7. 写回：母约 §9 标注引擎核心已交付（切片 27）+ 三语义落点；交付表 P5 行标注第 1 片交付、第 2 片待侧车；状态文档由编排方收口。",
+    "8. 防碰巧绿：绑定 -count=30 -race 与整包 -count=5 -race 各一次 exit 0。"
+  ],
+  "forbiddenShortcuts": [
+    "把挂起实现成「交出半截 Result + nil error」（R19-Q1 批评过的形状）或「当普通错误失败」。",
+    "schema 校验失败即销毁挂起（必须保留可重试）。",
+    "响应集多余/缺失时静默取交集。",
+    "Handoff 偷跑节点体（callsB 必须不变）。",
+    "重试循环把 RequestInterrupt 当可重试错误。",
+    "为测试导出 pending 内部态；改写既有断言（M2 已证不需要）。"
+  ],
+  "observabilityLimit": [
+    "ResponseSchema 只担保 type=object+required+properties.<name>.type 子集；schema 超集字段的校验行为不在公共面。",
+    "并行中断在 Suspension 清单中的次序由声明/完成序共同决定，实现可选择稳定序但不担保跨版本。",
+    "跨进程恢复入口在第 2 片定型前，Resume 只在同一 Graph 实例（或经其重建的等价图）上担保。",
+    "重悬链深度无独立上限（步数预算是唯一安全阀）。"
+  ],
+  "verificationCommands": [
+    "go test ./pkg/hno/graph -run TestP5G7_ -count=1 -race -v   # 本片唯一绑定场景命令（cwd 仓库根，直接取）",
+    "go build ./... ; go test ./pkg/hno/graph/... -count=1 ; go test -race ./pkg/hno/graph/... -count=1 ; go vet ./pkg/hno/graph/... ; gofmt -l pkg/hno/graph",
+    "go test ./pkg/hno/agent/... ./pkg/hno/runner/... ./internal/session/contract/... -count=1",
+    "go doc -all ./pkg/hno/graph | grep -cE '^(func|type|var|const) '   # 必须恰为 60（切片 26 后基线 +15）",
+    "grep -o 'sync\\.' pkg/hno/graph/graph.go pkg/hno/graph/scheduler.go pkg/hno/graph/hitl.go | wc -l   # 0"
+  ],
+  "writeBackOwed": [
+    "母约 §9：引擎核心已交付标注（三语义落点 + Mode 字段的补充登记）；交付表 P5 行标注。",
+    "状态文档 §4：由编排方收口。",
+    "第 2 片（会话侧车）契约起草时引用本契约 carriedItems 的 D1 材料与 marshal 边界。"
+  ],
+  "adjudicationOptions": [],
+  "notes": "本契约由主代理基于被取消子代理的完整 /tmp 实验测量写成（M1/M2 全部回执真实落盘；实验副本 /tmp/g7m1、/tmp/g7exp；开发中途两条 exit 1 为夹具迭代已如实登记）。实现串行约束：在切片 26 收口并重取 baselineBytes 后才可开工。activationId 待派发回填。仓库字节未动。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-platform.md#9",
+    "artifact:docs/design/v3-adjudication-d1-session-events.md",
+    "receipt:419c60d1-17b9-4a3a-8a93-0fbfa6578e0b",
+    "receipt:2e5cdc32-47e5-4f0e-a8a3-5b6435c2342d",
+    "receipt:e001cd46-d935-4c50-92d3-dd3f605f18df",
+    "receipt:cb2eba15-deac-4d02-9ab2-f379961db46d",
+    "receipt:e21251d9-5dea-4572-ab59-945c5075d688",
+    "receipt:b7d8282d-16e3-4e89-a014-3c8578b2a9ed",
+    "receipt:932b3d85-c380-43c7-91bf-947c15d0651d",
+    "receipt:491e3e88-f3be-4e6d-a47f-06c7b3460732",
+    "receipt:448cd39f-b673-4afb-930e-be7f71e33631",
+    "receipt:8bcd7b67-9b7f-4c98-8aff-9854757d5e22"
+  ]
+}

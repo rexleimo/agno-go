@@ -84,7 +84,7 @@ v2 设计文档 §4 的两条否决被推翻：
 | G6 | Durability 三档 + recursion_limit | LangGraph | ~400 |
 | G7 | 会话事件化 + HITL interrupt/resume | adk | ~1,500 |
 | G8 | `Store` 长期记忆（层级 namespace + 向量） | LangGraph | ~1,200 |
-| G9 | 观测接线（现有零件接进 G1） | 自有 | ~600 |
+| G9 | 观测接线（现有零件接进 G1）**——第 1 片已交付（切片 25：runner 模型路径 retry/breaker + model 级 span）** | 自有 | ~600 |
 | G10 | workflow 迁移到图，公共 API 不变 | — | ~1,200 |
 | | **合计** | | **~9,500** |
 
@@ -172,7 +172,7 @@ type scheduler struct {
     queue   chan queueItem    // 唯一共享状态
     runs    map[string]*nodeRun  // consumer-only，无锁
     state   *RunState            // consumer-only，无锁
-    cancels map[string]context.CancelFunc // consumer-only，无锁
+    cancels map[string]context.CancelFunc // consumer-only，无锁（P1 切片 17 后修订：节点不拿派生 ctx 时不需要，见下方「取消」）
     pending []activation          // 并发打满时的等待队列
     steps   int                  // recursion_limit 计数
 }
@@ -185,7 +185,11 @@ type scheduler struct {
 
 **为什么这在 Go 里比 Python 简单**：Python 版必须用 `asyncio.Lock` / `asyncio.Queue` 保护这些状态；Go 的「单 goroutine 独占可变状态」是天然模式，**把锁的问题在结构上消除了**。
 
-**取消**：`cancelAll()` 遍历 `cancels` 调 `context.CancelFunc`；在途节点返回 `context.Canceled`，consumer 统一归一化为取消而非错误。
+**取消**：在途节点返回 `context.Canceled`，consumer 把「调用方已经取消」归一化成**取消结论**，而不是转述节点交出的业务错误。归一化的判据不在结论文本，而在**咨询位置**：consumer 必须在每一条交出结论的路径上现问一次 `ctx` —— ① 每轮循环开头、进入 `select` 之前；② 从 `queue` 取到一项之后、判定它算不算结论之前；③ 派发循环把激活交给节点之前。②是必需的，因为 `select` 在两个 case 同时就绪时随机挑选，「调用方已 cancel」与「节点交出错误」会同时成立；③是必需的，因为消费者忙于派发循环期间不回到 `select`，那段时间里的取消只有这里看得见。在 `Run` 入口读一次快照、后续都复用那份快照，**不算咨询**。
+
+> 本段原文写的是「`cancelAll()` 遍历 `cancels` 调 `context.CancelFunc`；…统一归一化为取消而非错误」。P1 切片 17（票面 B9）落地后按实测回写两处（证据：`docs/design/v3-p1-graph-r17-refactor.md` §7、`docs/design/v3-p1-graph-r17-review-verdict.json`、票面 §13）：
+> 1. **`cancelAll()` / `cancels` 未实现，且当前形状下不需要**：节点拿到的就是调用方那一份 `ctx`（`runNode` 直接传 `s.ctx`），取消由 ctx 树自动传播到在途节点，无需按节点注册取消函数。只有当节点改拿**派生** ctx 时它才成为必需 —— 即 P2 G3 的 Timeout/Retry（每个节点自带超时子 ctx，取消才需要被聚合）。
+> 2. **「统一」不适用于成功路径（`running == 0`），且这一取舍目前不带断言**：在节点阻塞期间取消的形状里量不到「取消后仍交出成功 Result」的窗口（0/300 轮）；而「极早取消」下交出成功 Result 的 26/60 轮，在公共面上与「图确实先收敛」不可区分。该路径是否也必须报取消，登记为未裁决项（`S17-SPEC-3` / `R17-UNADJ-1`）挂 review，不用「统一」二字把它写成已决。
 
 **并发上限**：`maxConcurrency > 0 && len(runs) >= maxConcurrency` → 激活进 `pending`（`NodePending`），每次 completion 后 `tryDispatchPending()` FIFO 派发。
 
@@ -202,21 +206,49 @@ type scheduler struct {
   5. 扇出时给每个分支打 sub-branch（隔离 LLM 历史）
 ```
 
+**规则 3（Join 汇聚屏障）已由切片 19 落地**，判据、牙齿归属与观察上限见 `v3-test-scope-p1-graph.md` §15。
+落到代码上的三条要如实记下：
+
+- 「所有前驱 Completed」的判据是**去重前驱名集合被键覆盖**：`joinBarriers` 在进入 `Run` 时从拓扑快照算
+  一次，运行中改图不会给已开始的这次执行增删屏障（与 `stepLimit`/`maxConcurrency` 同一套「取一次值」不变量）。
+  「聚合前驱输出」的形状是 `map[string]any` —— 键 = 前驱名、值 = 该前驱本次输出，交给激活的就是这个 map 本身。
+- 前驱因条件环重跑时键集合不再增长，于是屏障会被**再次**满足，汇聚目标可重跑；票面没有一行要求
+  「每张图上每个屏障至多 fire 一次」。含 `edgeJoin` 的环不被 §3.5 第 7 项的构建期环检查拒绝
+  （汇聚边按可断开处理），它落到步数安全阀。
+- 「未收敛由安全阀结束」只在图仍在产生激活时成立：若声明过的汇聚前驱始终没跑且再无待派激活，
+  今天交出的是 `err==nil` 而 `Output()==nil` 的 Result，该形状未裁决（`R19-Q1`）。
+
 **红线 4 冲突的处理**：`Node.Run(in any) (any, error)` 用了 `any`，这是**引擎契约**，不是用户配置的公共 API 参数。为降低代价：
 
 - v1 提供泛型包装 `graph.Typed[TIn, TOut]`（Go 1.24 泛型），用户可获得编译期类型安全
 - schema 校验（`InputSchema`/`OutputSchema`，借鉴 adk）留 v3.1
+
+**运行期类型不符的归因由包装层给出，调度器不参与**（切片 18 已交付，判据见 `v3-test-scope-p1-graph.md` §14）：
+`Typed` 在包装期算出期望类型、在断言失败时交出带引号节点名 + 期望/实收类型的错误，`nil` 实收渲染为「无值」。
+编译期那一半由泛型签名本身担保，不走运行期测试缝；调度器只透传节点错误，因此取消归一化（§3.3）
+与类型归因是两条互不重叠的路径。观察上限：错误文本只担保「可定位」，不担保「报的是值的类型而非其指针形式」。
 
 ### 3.5 构建期校验（借鉴 adk `validation.go`，精简版）
 
 `Validate()` 必查项（全部在 `Add*` 时增量检查，`Run` 前全量复查）：
 
 1. 悬空边（`from`/`to` 指向不存在的节点）
-2. 重复节点名
+2. 重复节点名 —— **已交付**（切片 21）：同一张图上重复注册同名节点时，`Validate()` 末位返回
+   `graph: node name %q is declared more than once` 并点名那个名字，`Run` 随之拒绝、不跑半张图；
+   记账在 `AddNode`（builder 无错误通道，增量检查的唯一诚实形状），map 覆盖语义保留以维持
+   in-flight Run 的捕获隔离。判据、牙齿与观察上限见票面 §17。
 3. 无入口 / 入口不存在
 4. 不可达节点（从入口 BFS 不可达 → 报错而非静默）
-5. 无出口（无出边的非输出节点）
-6. Join 节点的前驱数 < 2
+5. 无出口（无出边的非输出节点）—— **裁决为不作校验项**（负责人 2026-09-27 选 OPT-A）：
+   §3.4 路由核心的规则 1 允许无条件扇出的终点节点输出无人消费，条件边与兜底边也天然产生分支终点，
+   因此该判据与本引擎的路由模型不相容。实测：把字面判据加到仓库副本上 12 个既有顶层 Test 判红，
+   最窄的非空限定版（只判无条件边的目标）仍 10 个判红，其中 `TestP1G_ConditionalAndDefaultRouting/unconditional-fanout`
+   与 `p1r13_step_limit_test.go` 的「合法的扇出图」子用例就是被误拒的那一类。要把这类意外悬空汇点变得可判，
+   必须先引入显式终点声明（`graph.END` 一类），那是新的公共面表达力而非一条校验规则。
+   数字、命令与三种形状见票面 §16 与 `v3-test-scope-p1-graph-slice20.json` 的 M1–M3。
+6. Join 节点的前驱数 < 2 —— **已交付**（切片 19）：`Validate` 点名那个目标并给出实收的去重前驱数，
+   `Run` 随之拒绝；判据形状与打红它的变异见票面 §15.1 第 3 点、§15.2 倒数第二行。
+   本节第 2 项已随切片 21 交付（见上），第 5 项按上条裁决作废 —— **§3.5 八项至此全项闭合**。
 7. **环检测**（区分「合法环」与「死循环」：合法环需由条件边构成，无条件边成环 = 错误）
 8. `stepLimit` 校验：存在无条件环时若未设 `stepLimit` → 警告
 
@@ -255,13 +287,21 @@ type TimeoutConfig struct {
     PerAttempt bool // true=每次尝试超时；false=整个节点超时
 }
 
-// TraceConfig 控制节点级 span 记录
+// TraceConfig 控制节点级事件记录
 type TraceConfig struct {
-    Enabled  bool
-    RedactIn bool  // 脱敏输入
+    Enabled   bool
+    RedactIn  bool  // 脱敏输入
     RedactOut bool
+    Hook      func(NodeEvent) // sink（切片 22 补出：没有 sink 的 trace 无法被任何调用方观察）
 }
 ```
+
+> **已交付（切片 22）**：四个策略经 `AddNode` 的变参 `NodeOption`（`WithRetry/WithTimeout/WithCache/WithTrace`）
+> 挂载，执行缝在 scheduler 的 `runNode` 包络——重试与期限在生产者 goroutine 内生效（不产生新激活、
+> 不消耗步数预算）、缓存查询在生产者侧、trace 事件由消费者串行发射；零锁模型未破（`sync.` 计数 0）。
+> 取值语义沿 WithMaxConcurrency 先例「guard 钳制、不进 Validate」：MaxAttempts<1 即 1 次、Timeout<=0
+> 即不限时、`ShouldRetry=nil` 一律不重试（fail-closed）、缓存只存成功结果。判据 D1–D14、变异矩阵与
+> 观察上限见 `docs/design/v3-test-scope-p1-graph-slice22.json` 与 `docs/design/v3-p2-graph-g3-*.md`。
 
 **与现有 `cache` 包共存**：`cache.Provider` 保留不变（agent 的 LLM 响应缓存继续用），新增 `CacheStore` 接口，graph 节点用泛化版。
 
@@ -299,42 +339,84 @@ type Event interface {
 
 **迁移影响评估（已核实）**：`RunStreamResult` 在 `pkg/`、`cmd/`、`examples/` 中**无外部消费方**（仅 `agent` 包内自用），因此改签名的爆炸半径可控。`output.Events` 的消费方是 `team/inheritance.go`、`workflow/run.go`、`workflow/step.go` —— 扩展新事件类型对它们是**增量兼容**（旧类型不变）。
 
+> **已交付（切片 23，协议层）**：`pkg/hno/run/modes.go`（StreamMode 七常量 + 六个新事件 wire 名 + `ErrUnsupportedStreamMode`）、`pkg/hno/run/stream_events.go`（六事件类型 + New\* 构造函数 + canonical JSON）、`decodeEvent` 精确匹配块（先于 contains 归一化，次序由 D12 钉死）、`Agent.RunStreamMode` 选择器（`pkg/hno/agent/agent.go`；`RunStream` 成为它的 `StreamMessages` 纯包装）。旧 `run_content`/`run_completed` 的 wire 形状与既有测试逐字节零改动。判据 D1–D12、两段 RED/GREEN、6 条变异矩阵见 `docs/design/v3-test-scope-p1-graph-slice23.json` 与 `docs/design/v3-red-observation-p4g4.md` / `v3-p4-run-g4-green.md` / `v3-p4-run-g4-refactor.md`。
+>
+> **七模式解禁状态**：
+>
+> | 模式 | 状态 |
+> |---|---|
+> | `StreamMessages` | **已接**（`runStreamMessages` 生产者，`RunStream`/`RunStreamMode` 同形） |
+> | `StreamValues` | fail-closed 待生产者片（graph 节点事件桥接） |
+> | `StreamUpdates` | fail-closed 待生产者片（graph 节点事件桥接） |
+> | `StreamTasks` | fail-closed 待生产者片 |
+> | `StreamCheckpoints` | fail-closed 待生产者片（检查点生产者） |
+> | `StreamDebug` | fail-closed 待生产者片（依赖 Tasks/Checkpoints 的并集发射） |
+> | `StreamCustom` | fail-closed 待生产者片（节点内自定义写入入口） |
+>
+> 其余六模式在 `RunStreamMode` 上返回包装 `ErrUnsupportedStreamMode` 的错误、不启动流；各自生产者接线片落地时解禁（S23-SPEC-1）。
+
 ---
 
 ## 6. G5 动态扇出 Send
 
+**已交付（切片 26）**：`Send` + `Sender`（`SendRun` 可选扩展面）+ `SenderFunc` 适配器 + 显式汇聚声明
+`AddJoinSend(source, target)`——R19-Q2 裁决 OPT-C 的落地形态。契约
+`docs/design/v3-test-scope-p1-graph-slice26.json`（D1–D9）；证据 `docs/design/v3-p3-graph-g5-green.md`。
+
 ```go
 // Send 是节点在运行时决定的一次扇出派发
 type Send struct {
-    Node string   // 目标节点
+    Node string   // 该次派发的目标节点
     In   any      // 该次派发独有的输入
 }
 
-// 支持 Send 的节点
+// Sender 是节点的可选扩展面。方法名刻意不是 Run：Node.Run 已占用两返回值签名，
+// 一个类型不可能同时实现 2 值与 3 值的 Run——调度器对每次激活做类型断言，
+// 断言成功走 SendRun（sends 被派发），失败走 Node.Run（普通节点零改变）。
 type Sender interface {
-    Run(ctx context.Context, in any) (out any, sends []Send, err error)
+    SendRun(ctx context.Context, in any) (out any, sends []Send, err error)
 }
+
+// SenderFunc 用函数构造一个支持运行期扇出的 Node
+func SenderFunc(name string, fn func(ctx context.Context, in any) (any, []Send, error)) Node
 ```
 
-**用法（map-reduce 模式）**：
+**用法（map-reduce 模式，可跑通形态）**：
 
 ```go
 g := graph.New().
-    AddNode(graph.NodeFunc("fanout", func(ctx context.Context, in any) (any, error) {
-        var items []string = // ...
+    AddNode(graph.SenderFunc("fanout", func(ctx context.Context, in any) (any, []graph.Send, error) {
+        items := in.([]string) // 数量与参数都在运行期决定
         sends := make([]graph.Send, 0, len(items))
         for _, it := range items {
             sends = append(sends, graph.Send{Node: "summarize", In: it})
         }
         return nil, sends, nil
     })).
-    AddNode(graph.NodeFunc("summarize", /* ... */)).
-    AddJoin([]string{"summarize"}, "reduce").   // reduce 聚合全部 summarize 输出
+    AddNode(graph.NodeFunc("summarize", func(ctx context.Context, in any) (any, error) {
+        return summarizeOne(in.(string)), nil // 每片独立激活，输入 = 该次 Send.In
+    })).
+    AddNode(graph.NodeFunc("reduce", func(ctx context.Context, in any) (any, error) {
+        // 聚合输入 map[string][]any：键 = 声明的 source 名，值 = 按派发序的各次 summarize 输出
+        outs := in.(map[string][]any)["summarize"]
+        return mergeAll(outs), nil
+    })).
+    AddJoinSend("summarize", "reduce"). // 等 summarize 名下本轮全部 Send 激活完成后，以聚合输入激活 reduce 一次
     SetEntry("fanout").
     SetOutput("reduce")
 ```
 
 **与静态扇出的区别**：静态 `AddParallel(from, tos...)` 目标编译期定死；`Send` 的**数量和参数运行时决定**。这是 adk 静态边做不到的。
+
+**语义（切片 26 契约 designConsequence 五条钉死）**：`AddJoinSend(source, target)` 构建期不数前驱名数、
+不经 §3.5 第 6 项、不与 `AddJoin` 判据互通（单前驱 `AddJoin` 照旧被拒），只查端点存在并贡献
+source→target 一条可达性边（source 本身被视为可达——Send 的目标名是运行期值，构建期无法反驳
+「会有 Sender 指名它」）；运行期屏障按「source 名下 pending Send 计数归零」判凑齐，归零时以聚合输入
+激活 target 一次，多波扇出（source 因环重跑再派发）逐波独立凑齐；零派发 → target 不激活，Run 交
+err==nil 而 Output()==nil（R19-Q1 同族，联动登记）；Send 指向未注册节点 → 运行期点名错误（fail-closed，
+不静默丢）。原「示例跑不通、与 §3.5 第 6 项相冲（R19-Q2）」的注记已由裁决（OPT-C）+ 本片落地关闭：
+材料与三选项存档于 `docs/design/v3-adjudication-r19-q2-send-join.md`；判据原文见
+`v3-test-scope-p1-graph.md` §15.5。
 
 ---
 
@@ -351,7 +433,9 @@ const (
 
 v1 语义：控制 `graph` 在每个节点完成后向 `Session` 存储提交事件的时机。默认 `DurabilitySync`（最安全），低延迟场景可降级。
 
-**StepLimit**：默认 1000，超限返回 `ErrStepLimitExceeded`。**这是图有环场景的必要安全阀**（我们现状：`workflow.Loop` 条件写反会死循环到 ctx 超时）。
+> ✅ **Durability 三档已交付（切片 24，契约 `v3-test-scope-p1-graph-slice24.json` D1–D9）**。缝形状（契约 designConsequence 的落点）：`Checkpointer` 接口（`Append(ctx, Checkpoint) error`）与 `Checkpoint` 条目（Seq/Node/Output 最小集）**声明在 `graph` 包内**（沿 CacheStore 先例，不依赖 internal/session，存储适配留给调用方）；**Seq 由消费者 goroutine 在提交时机盖章**，从 1 连续递增，条目流 append-only；**三档时机全在消费者侧**——Sync 在 complete 之后、下一轮 dispatch 之前同步落（默认档，零值即 Sync），Async 交后台冲刷 goroutine（与引擎只共享 commits 通道，**零锁保持**）、Run 返回前冲刷完毕，Exit 只积累、退出一次落齐；sink 失败 **fail-closed**（`errors.Is` 可归因到 sink 交的错误，失败路径上 runErr 优先不被掩盖）；已完成节点的条目在失败/撞阀退出时照常交付；声明档位而未挂 sink = 不持久化、不报错，零新增 Validate 行。**恢复/重放（读回续跑）未交付，按 §7 门槛挂至 P5/G7**（S24-SPEC-1）。实现 `pkg/hno/graph/durability.go`；证据 `docs/design/v3-p3-graph-g6-green.md`（变异矩阵 `scripts/mutation/p3g6-durability.mjs`）。
+
+**StepLimit**：默认 1000，超限返回 `ErrStepLimitExceeded`。**这是图有环场景的必要安全阀**（我们现状：`workflow.Loop` 条件写反会死循环到 ctx 超时）。**已随切片 13 交付**（`defaultStepLimit=1000`、`WithStepLimit` 构建期校验、`p1r13_step_limit_test.go` 8 个 Test 锚定）。
 
 ---
 
@@ -435,6 +519,7 @@ type Interrupt struct {
     Message        string
     ResponseSchema map[string]any  // JSON Schema
     Payload        any
+    Mode           InterruptMode   // ResumeRerun（默认）| ResumeHandoff —— 引擎调度语义，切片 27 补出的第五字段
 }
 
 // Resume 恢复（借鉴 adk resume.go 的幂等语义）
@@ -446,6 +531,22 @@ func (g *Graph) Resume(ctx context.Context, responses map[string]any) (*Result, 
 2. **幂等**：`resolvedCount == 1` 才是首次恢复；重复 Resume 同一 `InterruptID` 是 no-op（返回 `ErrNothingToResume`）
 3. **两种恢复模式**：`Rerun`（重入，节点拿到响应重跑）vs `Handoff`（交接，响应作为节点输出给后继）
 
+> ✅ **引擎核心已交付（切片 27，2026-09-28，契约 `v3-test-scope-p1-graph-slice27.json`）**。三语义落点：
+> （1）**schema 校验**——`Resume` 逐中断校验 `ResponseSchema`（诚实子集：`type=object` + `required` +
+> `properties.<name>.type`；子集之外的声明报不支持而非静默放过），不过 → 包 `ErrInvalidResponse`
+> 且挂起原样保留，节点保持 Waiting 可修正重试；（2）**幂等**——挂起账由 `Graph` 独占（`pending`），
+> 无处可恢复/重复 Resume → `ErrNothingToResume`；响应集必须**恰好覆盖**全部待答中断（多给/少给都
+> 点名 InterruptID，不静默取交集）；（3）**Rerun/Handoff**——`Interrupt.Mode`（草图四字段外补出的
+> 字段）各归其档：Rerun 带响应重入（响应经 `InterruptResponse(ctx, id)` 公共取值器可见）、Handoff
+> 节点体不再执行、响应直接成为其输出喂后继。挂起形状：`Run`/`Resume` 交 `(nil, *Suspension)`（可
+> `errors.Is(ErrSuspended)` / `errors.As` 取全部待答中断与已完成状态），无半截 Result；重试不吞中断
+> （`RequestInterrupt` 是不可重试终态）；空/并发重复 InterruptID 运行期点名；挂起经切片 24
+> Checkpointer 以 `EntryInterrupt` 条目持久化（sink 失败与挂起经 `errors.Join` 双可达）；步数预算跨
+> 恢复累计。**切片拆分登记**：第 1 片 = 引擎内 HITL 核心 + 挂起检查点条目（本片）；第 2 片 = 会话
+> 侧车存储 + 派生视图 + 跨进程恢复接线（依 D1 裁决 OPT-1，契约另立）；第 3 片（可选）= run 事件流
+> 与 CheckpointEvent 生产者桥接（S23-SPEC-1 交点）。实现 `pkg/hno/graph/hitl.go`；证据
+> `docs/design/v3-p5-graph-g7-green.md`（变异矩阵 `scripts/mutation/p5g7-hitl.mjs`）。
+
 ### 9.3 契约层影响 ⚠️
 
 `internal/session/contract` 有 9 个 Go↔Python fixture 对齐测试。**事件化会改变 session 存储形态**。
@@ -453,7 +554,13 @@ func (g *Graph) Resume(ctx context.Context, responses map[string]any) (*Result, 
 **应对**：
 - v1：**不改 `Session` 的对外 JSON 结构**，事件流作为**新增的内部存储 + 派生视图**
 - 若必须改，需同步更新 `internal/session/contract` 的 fixture，并评估是否破坏 agno-python 互操作
-- **这是一个需要显式拍板的决策点（§12 D1）**
+- **已拍板（2026-09-28，负责人选 OPT-1/v1）**：不改 `Session` 对外 JSON；事件流为侧车内部存储 +
+  派生视图，实现细节（侧车挂在哪个 Store、派生视图形态）由 G7 切片契约定。材料与实测
+  （含 fixtures 实为 skip-green 的发现）见 `docs/design/v3-adjudication-d1-session-events.md`。
+- **第 2 片已交付（切片 28）**：侧车落位 `pkg/hno/session/sidecar`（旁路容器，四个 marshal 边界
+  8 锚逐字节不变）+ `internal/hitlbridge`（Capture/Install/ResumeSaved，事件 fail-open、
+  挂起记录 fail-closed）+ 引擎条件性恢复入口 `graph/restore.go`（ResumeAccount/RestorePending）。
+  P5 验收「审批场景跨进程恢复」实测达成（双档端到端）。
 
 ---
 
@@ -463,12 +570,12 @@ func (g *Graph) Resume(ctx context.Context, responses map[string]any) (*Result, 
 |---|---|---|---|---|
 | **P0** | G1 循环收口 | — | agent 全部走 `runner`；删除 run.go/stream.go 内的循环 | `runner` 被引用；`grep -c "for {" agent/` ≤ 1；`make test` 绿 |
 | **P1** | G2 图引擎 v1 | P0 | `pkg/hno/graph` | 5 类图（DAG/并行/汇聚/条件/环）端到端测试；`-race` 全绿 |
-| **P2** | G3 策略四合一 | P1 | Retry/Cache/Timeout/Trace | 每个策略独立测试 + 组合测试 |
-| **P3** | G5 Send + G6 Durability/StepLimit | P1 | 动态扇出 + 安全阀 | map-reduce 端到端；环死循环被 StepLimit 拦住 |
-| **P4** | G4 StreamMode | P0 | 七模式 + 旧类型兼容 | 旧 `run_content`/`run_completed` 行为不变 |
-| **P5** | G7 事件化 + HITL | P0 + 决策 D1 | 事件存储 + Resume | 审批场景跨进程恢复；重复 Resume 幂等；**契约测试绿** |
+| **P2** | G3 策略四合一 | P1 | ~~Retry/Cache/Timeout/Trace~~ **已交付（切片 22）** | 每个策略独立测试 + 组合测试（D1–D14 + 9 条变异矩阵） |
+| **P3** | G5 Send + G6 Durability/StepLimit | P1 | 动态扇出 + 安全阀 | **全清**：**G5 Send 已交付（切片 26：动态扇出 Send + AddJoinSend，R19-Q2 裁决 OPT-C 落地，map-reduce 端到端 D1–D9 + 6 杀红变异）**；**G6 Durability 已交付（切片 24）**；StepLimit 已随切片 13 交付 |
+| **P4** | G4 StreamMode | P0 | 七模式 + 旧类型兼容 **协议层已交付（切片 23）**；六模式生产者接线待各自成片 | 旧 `run_content`/`run_completed` 行为不变 |
+| **P5** | G7 事件化 + HITL | ~~P0 + 决策 D1~~ **全清（切片 27 引擎核心 + 28 侧车/跨进程恢复）** | 事件存储 + Resume **全部交付（27：引擎核心；28：`pkg/hno/session/sidecar` + `internal/hitlbridge` + `graph/restore.go`，D1–D10 + 10 杀红变异）** | 审批场景跨进程恢复**实测达成（双档端到端）**；重复 Resume 幂等**实测达成（跨重启）**；**契约测试绿（8 边界锚逐字节）** |
 | **P6** | G10 workflow 迁移 | P1–P4 | 线性 []Step 编译为链式图 | **现有用户零改动**；`make test` 绿 |
-| **P7** | G9 观测接线 | P0 | retry/breaker 接进 runner | span 覆盖 run/agent/model/tool |
+| **P7** | G9 观测接线 | P0 | retry/breaker 接进 runner **模型阶段已交付（切片 25，D1–D13 + 9 杀红变异矩阵）**；run/agent 级 span 待第 2 片（S25-DEFER-1） | span 覆盖状态表：**model=已接于 runner**（每尝试 chat span + usage 归集）；**tool=已在 agent 既有**（execute_tool）；**run/agent=待 P7 第 2 片**（pkg/hno/agent） |
 | **P8** | G8 Store | 决策 D2 | 长期记忆 | 与 knowledge/vectordb 分工清晰 |
 
 **关键路径**：P0 → P1 → (P2/P3/P4 并行) → P6
@@ -493,7 +600,7 @@ func (g *Graph) Resume(ctx context.Context, responses map[string]any) (*Result, 
 
 | # | 决策 | 选项 | 我的倾向 |
 |---|---|---|---|
-| **D1** | 会话事件化是否改动 `Session` 对外 JSON？ | (a) 不改，事件为内部存储+派生视图（安全，但契约层无感）<br>(b) 改，同步更新 Python fixture（暴露能力，但可能破坏互操作） | **(a) 先做 a**，b 作为独立任务 |
+| **D1** | 会话事件化是否改动 `Session` 对外 JSON？ | (a) 不改，事件为内部存储+派生视图（安全，但契约层无感）<br>(b) 改，同步更新 Python fixture（暴露能力，但可能破坏互操作） | **已裁决（2026-09-28）：(a)**，实测材料见 `v3-adjudication-d1-session-events.md` |
 | **D2** | G8 Store 是否进 v3.0？ | (a) 进（+1,200 LOC，全新概念，范围最大）<br>(b) 延到 v3.1 | **(a) 进** —— 「能记住用户」是产品差异化，但需先定与 knowledge 的边界 |
 | **D3** | `graph.Node` 用 `any` 还是泛型？ | (a) `any` + `Typed[TIn,TOut]` 包装<br>(b) 纯泛型 | **(a)** —— 引擎需要异构节点，纯泛型会锁死组合性 |
 | **D4** | P0 是否要先合入主干？ | (a) 是，单独发一个 minor<br>(b) 全部做完一起发 major | **(a)** —— 死代码与 4 份循环是持续风险，不应压到 major 发布 |

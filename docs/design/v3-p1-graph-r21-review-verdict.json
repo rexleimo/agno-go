@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p1-graph-r21-duplicate-node-name",
+  "activationId": "2d96c915-5fc4-48c2-baa6-b27b7c27b29e",
+  "capabilityId": "software.review.standards-spec",
+  "stageId": "review",
+  "recordedAt": "2026-09-27T22:50:00Z",
+  "independenceDisclosure": "作者自查，非独立审查者。用户此前已拒绝对 P1 派发独立审查子代理，两轴（standards/spec）由实现者本人执行。后果如实写下：本片形状小（+34 行、单一判据），自查漏判风险主要在「判据与既有担保的相互作用」，因此本轮把审查结论尽量落在实测上（变异矩阵、防碰巧绿复跑、契约逐条对账），可复现命令逐字写出。",
+  "fixedPoint": {
+    "note": "本切片的 fixed point 是契约 baselineBytes，不是某个 commit。切片 2–21 的成果至今未提交（HEAD 仍是 0387000，只含第一片桩），且基线 blob 从未 `git hash-object -w` 入库，所以 `git diff <fixedPoint>...HEAD` 在本切片物理上不可得。本轮还发生一次 git checkout 事故把 graph.go 回退到 HEAD 存根，靠 /tmp/sinkexp 的逐字节副本恢复（详录：票面 §17.4、green 文档 §5）—— fixed point 哈希在恢复前后两次实测对上，这比任何走查都硬。",
+    "graphGo": "4cb363b729cddf7541df8d1b1900c8240dff93f2",
+    "schedulerGo": "c878a6c74cad89bbdfc773c21c58952d3944630d",
+    "graphTest": "624f19624c6f4fa3c04ee6619e722b03de83336c",
+    "carriedFinding": "S18-SPEC-2（未提交、无提交授权）仍在，且本轮以事故形式实测了它的代价"
+  },
+  "diffRef": {
+    "how": "逐文件 baseline→final 清单（非三点 git diff，理由见 fixedPoint.note）",
+    "changedFiles": [
+      {
+        "path": "pkg/hno/graph/graph.go",
+        "before": "4cb363b729cddf7541df8d1b1900c8240dff93f2",
+        "afterGreen": "b7790b9f0eab673d6b89ad8fdf1008652ea6b468",
+        "afterRefactor": "b7790b9f0eab673d6b89ad8fdf1008652ea6b468",
+        "linesBaselineToFinal": "580 -> 614（净增 +34）"
+      },
+      {
+        "path": "pkg/hno/graph/p1r21_duplicate_node_test.go",
+        "before": null,
+        "afterRefactor": "a8a936ed101cbf3c2883205fc9ecd280826e7255",
+        "scope": "本片新增（allowedTestSeam.add 授权），D1–D5 五个 Test"
+      },
+      {
+        "path": "scripts/mutation/p1r21-duplicate-node.mjs",
+        "before": null,
+        "scope": "本片新增的变异执行体，4 条，仓库内可复现（沿用 p1r19 骨架）"
+      }
+    ],
+    "unchangedFiles": "scheduler.go c878a6c7… 与既有 9 份测试文件逐字节未动（契约判据 3；逐文件 git hash-object 复核记录在 green 文档 §3）",
+    "nonTestLoc": "基线 838 -> 最终 872（判据 ≤1500）",
+    "exportedSymbols": "24 -> 24（本片零新增导出符号）",
+    "syncCount": "0 -> 0（零锁不变式未破）"
+  },
+  "standardsAxis": {
+    "gates": [
+      {
+        "gate": "go build ./...",
+        "result": "exit 0"
+      },
+      {
+        "gate": "go test ./pkg/hno/graph/... -count=1",
+        "result": "ok，exit 0（receipt:0f363770-b290-4477-ac2a-c3c5bd14b594）"
+      },
+      {
+        "gate": "go test -race ./pkg/hno/graph/... -count=1",
+        "result": "ok，exit 0，无 DATA RACE（receipt:9665d14d-350e-4b49-8f3c-0a235da3579e）"
+      },
+      {
+        "gate": "go vet ./pkg/hno/graph/...",
+        "result": "exit 0"
+      },
+      {
+        "gate": "gofmt -l pkg/hno/graph",
+        "result": "无输出"
+      },
+      {
+        "gate": "邻近回归 agent/runner/session-contract -count=1",
+        "result": "三包 ok，exit 0（receipt:06927728-9537-4483-aa0c-2f158dce541d）"
+      },
+      {
+        "gate": "防碰巧绿：绑定命令 count=30 -race",
+        "result": "ok，exit 0（receipt:d47899e6-2dc3-49a1-b3fd-e89d02b0c092）"
+      },
+      {
+        "gate": "防碰巧绿：整包 count=5 -race",
+        "result": "ok，exit 0（receipt:ea69d208-3e0a-4278-b3f2-141d7d1336e7）"
+      }
+    ],
+    "forbiddenShortcutsAudit": "逐条核对契约 forbiddenShortcuts：断言点名了名字（m2 杀红证明）；未实现冻结形状（D4 担保 + m3 杀红证明）；未限定「只有第一次 Run 前」（D4 的第二次 Run 在检查落地后照常）；未改写任何既有断言（9 份测试文件哈希未动）；未用内部计数替代公共面结论（dupNames 无读出途径，判据全是 Validate/Run 返回值）。"
+  },
+  "specAxis": {
+    "coverageMapping": "契约 D1–D5 逐行有 Test、逐行有实现落点（green 文档 §4）、逐行有牙齿归属（refactor 文档 §2 表）：m1 杀红 D1/D2/D5，m2 杀红 D1/D5，m3 杀红 D3/D4/D5；m4 等价、按契约登记为观察上限而非漏网。",
+    "redAuthenticity": "RED（receipt:5964bbf8…）三处失败全是「Validate 放行了今天的静默覆盖」的公共面形状；无编译/环境失败。首次 RED（receipt:90d305b4…）的 D1 假绿（unreachable 文案顶名）已按契约 M1 形2 修正夹具后重取，全程披露于 red 文档 §2。"
+  },
+  "findings": [
+    {
+      "id": "S21-SPEC-1",
+      "severity": "observation-limit",
+      "title": "「末位」是文档声明，不是测试事实",
+      "detail": "等价变异 m4（检查挪到入口检查之前）在 D1–D5 与既有 TestP1G_ 上全绿：没有任何一行判据钉住重复名检查相对端点/可达性/环检查的次序。按契约 observabilityLimit 登记即可，不追加断言；若日后有调用方依赖报错次序，应是一次新的 rex-test-design（新 RED），不是本片补丁。"
+    },
+    {
+      "id": "S21-SPEC-2",
+      "severity": "carried",
+      "title": "自由度收窄已在契约与母约登记",
+      "detail": "「跨 Run 故意重注册同名节点替换实现」从此在 Validate 上不可通过（契约 designConsequence 的既定取舍，M2 实测仓库内零依赖方）。日后若需要该用法，起点是显式的 ReplaceNode 一类入口（契约 explicitNonGoals 已排除本片顺手实现）。"
+    },
+    {
+      "id": "S21-STD-1",
+      "severity": "process",
+      "title": "git checkout 事故：单拷贝工作树的实测代价",
+      "detail": "变异阶段一次 git checkout 把切片 2–21 未提交字节回退到 HEAD 存根；靠 /tmp/sinkexp 副本逐字节恢复（b7790b9f… 复核全同，绑定命令复跑 exit 0，receipt:bd24a87d…）。教训登记进状态文档 §5：在拿到提交授权前，任何变异/实验脚本不得对本仓工作树执行 git 破坏性命令；本次是 /tmp 副本救回了仓库 —— S17-STD-5 的教训反转为「仓库没有备份时，入库的实验副本就是唯一备份」。"
+    },
+    {
+      "id": "S21-STD-2",
+      "severity": "carried",
+      "title": "lint 欠项沿用",
+      "detail": "golangci-lint / make lint 至今从未运行（S19-STD-6 沿用）；本片 -34/+34 行全部在 gofmt 与 go vet 通过的字节上。"
+    }
+  ],
+  "completionAudit": {
+    "contractCriteria": "8 条 completionCriteria 逐条对账见 refactor 文档 §3，全部满足（判据 8 的写回已落：票面 §4/§17、母约 §3.5 第 2 与第 6 项、状态文档 §2/§3/§4/§5）",
+    "p1Closure": "B1–B13 逐行背书完毕：B6 第 5 项 OPT-A 作废（票面 §16）、第 2 项本片落地（票面 §17）—— P1 关闭。下一前沿是 P2（Timeout/Retry/Cache/Trace/Send），启动前需裁决 R19-Q2（母约 map-reduce 示例与 §3.5 第 6 项相冲）与 R19-Q1/S19-STD-1 两个携带项。"
+  },
+  "verdict": "pass",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-test-scope-p1-graph-slice21.json",
+    "artifact:docs/design/v3-red-observation-p1r21.md",
+    "artifact:docs/design/v3-p1-graph-r21-green.md",
+    "artifact:docs/design/v3-p1-graph-r21-refactor.md",
+    "artifact:docs/design/v3-test-scope-p1-graph.md#17",
+    "artifact:docs/design/v3-p1-graph-status.md",
+    "receipt:5964bbf8-f78d-4594-8d4c-e98a87c5519a",
+    "receipt:aaea7171-83d4-41be-a832-a4dbbcf3f326",
+    "receipt:bd24a87d-73fa-4678-accb-04e8904529b9",
+    "receipt:0f363770-b290-4477-ac2a-c3c5bd14b594",
+    "receipt:9665d14d-350e-4b49-8f3c-0a235da3579e",
+    "receipt:06927728-9537-4483-aa0c-2f158dce541d",
+    "receipt:d47899e6-2dc3-49a1-b3fd-e89d02b0c092",
+    "receipt:ea69d208-3e0a-4278-b3f2-141d7d1336e7",
+    "receipt:90d305b4-a81c-4d43-81fe-0a7aa2a1c5f6",
+    "receipt:9c9c8ac3-a940-49cc-bdc0-e35937465ea1"
+  ]
+}

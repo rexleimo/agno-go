@@ -1,0 +1,90 @@
+{
+  "schema": "rex.p1-graph-slice-red.v1",
+  "workItemKey": "work-p1-graph-engine-r11-reachability",
+  "activationId": "2995e72c-07f9-4a50-9f53-7b0ef9976c61",
+  "stageId": "red",
+  "kind": "natural-red",
+  "contractRef": "artifact:docs/design/v3-test-scope-p1-graph-slice11.json#inScopeBehaviors",
+  "decisionRef": "artifact:docs/design/v3-testability-decision-p1-graph-slice11.json#decision",
+  "command": {
+    "executable": "go",
+    "args": [
+      "test",
+      "./pkg/hno/graph/...",
+      "-run",
+      "TestP1G_ValidateRejectsUnreachableNodes",
+      "-count=1",
+      "-timeout",
+      "25s",
+      "-v"
+    ],
+    "cwd": "/Users/rex/codes/agno-go"
+  },
+  "exitCode": 1,
+  "receiptRef": "receipt:dac49825-72ae-466b-84e0-605e7a2cfd94",
+  "argvBinding": "回执 argv 与 testability-decision.redCandidate.command 逐字段一致（可执行文件 go、7 个参数、同一 cwd），不是另取一条命令。",
+  "testSurface": {
+    "file": "pkg/hno/graph/graph_test.go（外部包 graph_test，只用导出面）",
+    "hashBefore": "a14299e6af6d98b93094bffbbf21696acda0c1f1（切片 10 收尾）",
+    "hashAfter": "8b48c5cb9137a66a3ec61baddff4cf229d7a61a8",
+    "addedRange": "graph_test.go:970-1210（文档注释起于 :970，函数体 :977 起）新增一个测试函数 TestP1G_ValidateRejectsUnreachableNodes；既有 10 个测试函数、82 个断言行、切片 10 的 8 条子测试一字未动（本轮对测试文件是纯追加，文件从 967 行增至 1210 行）。",
+    "subtestTotals": "1 个父测试 + 3 条不合法行 + 4 组对照（其中「既有拒绝次序」组内再分 4 条子子测试）= 11 条可独立失败判定。"
+  },
+  "observed": {
+    "redRows": [
+      {
+        "row": "orphan-registered",
+        "site": "graph_test.go:1031",
+        "message": "从入口不可达的节点被 Validate 判为合法，调用方拿到的是少跑了节点的 Result"
+      },
+      {
+        "row": "unreachable-chain",
+        "site": "graph_test.go:1031",
+        "message": "同上"
+      },
+      {
+        "row": "unreachable-output",
+        "site": "graph_test.go:1031",
+        "message": "同上"
+      },
+      {
+        "row": "对照：不可达的环报可达性，可达的环仍报环",
+        "sites": [
+          "graph_test.go:1098",
+          "graph_test.go:1101"
+        ],
+        "message": "两个检查同时成立时报了 \"graph: unconditional cycle \\\"c\\\" -> \\\"d\\\" -> \\\"c\\\": every edge on it is always taken, so Run cannot terminate\"，未先报更根本的不可达事实 / 不可达的环报成了同一条文案，把永远不会跑的东西说成了运行时风险"
+      }
+    ],
+    "greenRows": [
+      "对照：条件边运行期不命中也算可达（Validate 返回 nil，Completed=[a end]，Value(\"b\") 的 ok=false）",
+      "对照：单节点图/多路汇聚/条件环照旧（Completed 分别 [only]、[a b c c]、[a a b b end]）",
+      "对照：既有拒绝次序不被抢走 的全部四条（悬空边 to node \"ghost\"、entry node \"ghost\"、output node \"ghost\"、declares no predicate）"
+    ],
+    "wallClock": "包级 0.760s 内完成，进程正常退出测试二进制：不是超时 panic、不是编译错误、不是夹具缺依赖。",
+    "independence": "三条不合法行各自只含一条缺陷（entry/out-of-edge 干净），A6 行是可达性与环检查的重叠面，因此四条红互不掩盖。"
+  },
+  "failureReason": {
+    "whatIsMissing": "Validate（graph.go:225-247）没有从 entry 出发的静态可达性闭包：它只判入口存在、输出存在、每条边两端存在、条件边有谓词、边种类可路由，随后直接进 rejectUnconditionalCycles。g.nodes 是 map，调度器只按激活队列取节点，所以「注册了但接不上线」既不报错也不执行。",
+    "whyRowsRed": "三行不合法行因此在 err == nil 上判红（:1031），连后续的 Run 面与零副作用断言都没机会执行；A6 行的图今天会被环检查先拒，拿到的仍是切片 10 的环文案，于是 :1098（未先报不可达）与 :1101（把永不执行的说成运行时风险）各红一次。",
+    "baselineEvidence": "/tmp/p1-r11-probe 只用公共入口实测过同形状的十张图：B1/B2/B4 全部 validate=nil，其中 B2 交出 run-err=nil 且 output=nil（切片 9 已承诺不再出现的静默形状的另一半）；B7 的不可达环今天被拒——这就是 S10-SPEC-3 记录的不自洽。",
+    "notInfrastructure": "红全部发生在断言层：没有 import 错误、没有夹具缺失、没有环境依赖；同一二进制里 7 条对照判绿，说明测试骨架与被测面本身可用。"
+  },
+  "assertionDelta": {
+    "against": "切片 10 收尾（graph_test.go a14299e6，82 个 t.Error/t.Fatal、10 个测试函数）",
+    "after": "t.Error/t.Fatal 计数 82→102（+20），测试函数 10→11，t.Skip 仍为 0；graph_test.go 由 a14299e6 变为 8b48c5cb。",
+    "removedOrRelaxedExisting": "0 行。既有用例与断言未删、未跳过、未放宽；本轮只做追加。",
+    "note": "RED 阶段的测试文件字节（8b48c5cb）就是 GREEN 必须迁就的基线，不允许再改断言。"
+  },
+  "disclosedSlip": {
+    "what": "初稿的三行不合法图与 A6 对照图里，我都给 entry 加了 AddEdge(\"entry\",\"entry\") 想让入口有出边，结果每行同时含「不可达」与「无条件自环」两条缺陷；A6 那条尤其致命——自环使 entry 可达，任何正确实现都不可能再报可达性，那条断言会变成不可能通过的红。",
+    "handled": "取回执前删掉全部四处自环，重跑聚焦命令并只引用删改之后的那一次回执；被丢弃的运行没有回执、也未被任何账本引用。",
+    "whyRecorded": "「每行只有一条缺陷」是这套测试族能归因的前提，我差点自己破坏它，留档说明它不是天然成立的。"
+  },
+  "nextStageCondition": "GREEN 必须让同一条命令零退出、不改任何断言，且可达性检查插在既有五项之后、rejectUnconditionalCycles 之前；A7 四组与 A6 后半就是这条次序与切片 10 文案的守门人。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-slice11-red.json#observed",
+    "artifact:docs/design/v3-p1-graph-slice11-red.json#failureReason",
+    "receipt:dac49825-72ae-466b-84e0-605e7a2cfd94"
+  ]
+}

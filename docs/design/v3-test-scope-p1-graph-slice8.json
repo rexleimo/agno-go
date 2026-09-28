@@ -1,0 +1,97 @@
+{
+  "schema": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p1-graph-engine-r8-teeth-rework",
+  "activationId": "aad3cb04-df5d-4059-b429-106ab27c2b31",
+  "slice": "P1 图引擎 切片 8（牙齿返工轮）：闭结切片 7 审查的阻断项 B7-1…B7-5。",
+  "userGoal": "让 pkg/hno/graph 的构建期拒绝真的被测试担保：删掉任何一条必检校验都必须判红，而不是像现在这样 35 个断言全绿；同时撤掉上一轮自己新增的永真断言，并把台账与契约里被实测证伪的理由改回诚实。",
+  "acceptanceSource": [
+    "docs/design/v3-p1-graph-review-verdict.json#cycle7.blocking（B7-1…B7-5 为阻断，B7-6/B7-7 为承前端口，本轮不承诺）",
+    "docs/design/v3-p1-graph-review-verdict.json#cycle7.parentVerification（PV-1…PV-6 的父侧实测）",
+    "docs/design/v3-test-scope-p1-graph.md §4 B6、§6 判据 3、§12.1 R1、§12.2 推迟清单（入口校验在范围内、未被推迟）",
+    "docs/design/v3-platform.md §3.5 必检项 3『无入口 / 入口不存在』"
+  ],
+  "inScopeBehaviors": [
+    {
+      "id": "A1",
+      "behavior": "入口不存在（含从未 SetEntry 的默认空名）时，Validate() 返回非 nil 且 Run() 把同一拒绝传达为错误；错误可定位到『entry node』与被指名的节点。",
+      "publicEntry": "graph.New()…SetEntry(\"ghost\")/不调用 SetEntry，随后 .Validate() 与 .Run(ctx, in)",
+      "observables": ["Validate() 的 err 文本", "Run() 的 err 文本", "Run() 不返回 Result", "进程存活（不得 panic）"],
+      "mapsToMutant": "M-A：删除 graph.go:220-222 的入口存在性分支。今日实测该变异全绿（receipt:b16b68fd…，35/35 PASS）；本轮之后必须判红。"
+    },
+    {
+      "id": "A2",
+      "behavior": "声明了引擎尚不路由的边种类时，拒绝理由本身可定位：错误必须同时钉住边种类与该种类『不可路由』这条原因词，而不只是钉住节点名。",
+      "publicEntry": "AddJoin(...) 后 .Validate()",
+      "observables": ["err 文本含 \"graph: join edge\"、\"from\"/\"to\" 端点、以及 not-routable 原因短语"],
+      "mapsToMutant": "M-B：删除或改写 graph.go:234 的 \"is declared but not routable by this engine\" 原因短语。今日实测全绿；本轮之后必须判红。"
+    },
+    {
+      "id": "A3",
+      "behavior": "第二次 Run 的输出解析到『本次捕获的 output 节点』的返回值本身，而不是任何完成节点的透传值：夹具常量必须真的承载一次观察。",
+      "publicEntry": "既有对照场景（Run 之后 AddEdge(\"b\",\"d\") 且 SetOutput(\"d\")）再 Run 一次，读 Result.Output()",
+      "observables": ["Output() == \"D-OUT\"（绝对期望，不是与参照同向比较）"],
+      "mapsToMutant": "M-C：把 scheduler.go:123 的 `item.name == s.plan.output` 反转为 `!=`。在 d 为透传的旧夹具下该变异在 Output 面不可见（所有值都是 seed）；夹具改为常量后必须判红。若实测发现 M-C 同时被既有断言抓住，则如实记录击杀集合，不夸大独占性。"
+    },
+    {
+      "id": "A4",
+      "behavior": "删除按构造不可能为假的断言之后，『一次性捕获 vs 终身冻结』这条区分仍必须有真实检测力：正对照（下一次 Run 看得见新注册节点）不得随删除一起失去担保。",
+      "publicEntry": "graph_test.go:562-578 的对照子用例，只读 Completed()/Output()",
+      "observables": ["第二次 Run 的 Completed()==[a b e] 保留", ":574-577 的 reference.Completed() 谓词删除", "删除后全套件仍零退出（证明被删者确无检测力）"],
+      "mapsToMutant": "M-D：让 Run 之后的图终身冻结（例如 capturePlan 结果被缓存在 Graph 上复用）。必须被 :570 判红；若删除 :574-577 后 M-D 仍被抓住，即证明被删断言是惰性的、删除没有削弱担保。"
+    },
+    {
+      "id": "A5",
+      "behavior": "台账与契约的陈述与实测一致：契约判据 (d) 结案为构造性不可满足并附等价性证明；T2 改靶理由改为 Completed 去重稳健性；T4 夹具不再声称收紧；行号区分 change/killedBy 并修正。",
+      "publicEntry": "docs/design/*.json 文本与实测记录（本轮不产生代码行为）",
+      "observables": ["契约条目状态从 owed 变为 unachievable-by-construction", "台账每条断言都归属到具体变异与真实 receipt"],
+      "mapsToMutant": "不适用（文档更正）。诚实性担保方式：更正后的每条理由都必须指向本轮真实跑过的变异与回执，不接受无回执的叙述。"
+    }
+  ],
+  "explicitNonGoals": [
+    "不改生产代码：pkg/hno/graph/graph.go 与 scheduler.go 的 git hash-object --no-filters 在本轮结束时必须仍是 3483783f1e787c96ca6c236341664d095acec5c0 / 87854ffbb7629f9adeb2d45fbb74d91f2032b99d（变异实验期间的临时改动必须 cp 回写并复算核验）。",
+    "不引入结构化拒绝错误（typed error 携带 Kind/Endpoint/NodeName）：那是 cycle7 排序 (2) 的 behavior-delta，需要自己的 RED 与导出面决策。本轮若顺手引入就是偷渡导出面变更。",
+    "不做第五种 edgeKind 的穷尽性防线（C7-SPEC-5 的 D3）：其根治点是 typed error + 每条原因短语一行表，属下一轮；本轮只承诺 A2 的原因短语锚定这一条可达部分。",
+    "不加锁、不做 recover、不承诺并发无同步改图的安全性（B10 仍是显式非目标）。",
+    "不实现 stepLimit（B4）、无条件环拒绝（B5）、Join 路由（B2）、空 AddJoin（C5-SPEC-1）、输出可达性（C5-SPEC-2）、多 Default 扇出（C4-STD-2 (2)）。",
+    "不触碰 C6-STD-1/C6-STD-3/C6-STD-4 的注释与 entry 活读问题（承前端口 B7-6），也不处理母约 §3.3/§3.5 回写（B7-7，被 PreToolUse gate 阻断）。",
+    "不把 5 份隔离子用例表驱动化、不抽取 assertReasonMentions（C7-STD-2 属结构轮，本轮若做会让删除面扩大到既有断言，反而看不清牙齿是否变强）。"
+  ],
+  "outOfScopeObservableChanges": "本轮没有任何新用户可观察行为：入口缺失的拒绝、不可路由种类的拒绝、输出解析语义都已在生产中实现并被现有测试间接经过。变化只发生在『测试能否发现它们坏掉』这一层，因此不存在诚实的 natural RED（正确实现下公共入口不可能失败），只能走基线 + 加固 + 变异证明的路径。",
+  "allowedTestSeam": [
+    "pkg/hno/graph/graph_test.go（外部测试包 graph_test）：只允许调用导出符号 New/AddNode/AddEdge/AddConditional/AddDefault/AddJoin/SetEntry/SetOutput/Validate/Run/Result.Completed/Result.Output/Result.Value，以及新增表行、新增子用例、修改夹具、删除被证明无检测力的断言。",
+    "docs/design/v3-test-scope-p1-graph-slice8.json 与本文件对应的台账 JSON（契约更正与证据登记）。",
+    "禁止：新建导出 helper/测试专用出口、给生产文件加导出符号、以私有字段或包内部状态作为唯一断言依据、以 mock 调用次数替代行为断言。"
+  ],
+  "falsePassProhibitions": [
+    "不得靠放宽期望、删除断言（除 A4 中被实测证明惰性的那一条并单列理由）、跳过用例（t.Skip）或扩大容差取得通过。",
+    "不得用『与实跑参照同向退化』的比较代替绝对期望：本轮新增/保留的断言必须至少钉住一个绝对值。",
+    "不得把子串包含当穷尽性：A2 必须锚定完整前缀（\"graph: join edge\" 形式），因为裸子串会被无条件边文案吞掉（cycle6 receipt:422ce345 实测）。",
+    "不得把无回执的叙述写成证据：每个判据要么指向零退出/非零退出的 receipt:<uuid>，要么明确标注为不可满足。",
+    "不得声称某条断言有独占检测力，除非给出『其余断言全绿』的实测输出（A3 的 M-C 若被既有断言同时抓住，必须如实记录）。",
+    "不得在 A1 只测 Validate() 而漏 Run()：拒绝必须在两个入口上都成立。",
+    "不得用 panic 作为通过条件：A1 的观测必须包含进程存活（现有 SIGSEGV 是缺陷后果，不是期望）。",
+    "不得在变异实验后遗留任何生产文件差异：结束前逐文件哈希与冻结值比对。",
+    "不得引用未逐个回查的 receipt：本轮引用的每个 receipt 必须在 .rex-harness/receipts/<id>.json 可 grep 到。"
+  ],
+  "completionCriteria": [
+    "(1) 四个变异各自真实判红并有非零退出回执：M-A（删 graph.go:220-222 入口分支）、M-B（删 graph.go:234 的 not-routable 原因短语）、M-C（scheduler.go:123 的 == 反转为 !=）、M-D（Run 之后图终身冻结，缓存 plan 复用）。每条回执须记录判红断言的行号与失败文本。",
+    "(2) 基线：改动前真实场景零退出回执（现有全套件 + 下游模块场景 /tmp/p1-baseline-r7 的 BASELINE-OK 复跑）。",
+    "(3) 受影响边界：加固后全套件、-race、go vet、gofmt、go build ./...、邻近包 ./pkg/hno/agent/... ./pkg/hno/runner/... 全部零退出回执。",
+    "(4) 纯测试/纯文档：graph.go / scheduler.go 哈希不变；graph_test.go 相对 fixed point 0387000 的删除行只允许是 A4 那一条被证明惰性的断言（4 行内），且必须在台账单列该行号与惰性证明回执（receipt:37eb1423 或本轮复算）。",
+    "(5) 覆盖证据：M-A 判红的同时，覆盖画像里 graph.go:220.36,222.3 块的计数必须从 0 变为非 0（`go test -coverprofile` 复核），作为『必检项真的有测试经过』的独立佐证。",
+    "(6) 每条新增/保留断言在台账里写明它杀哪个变异、杀在哪条断言（行号），并区分 change 行与 killedBy 判红行。",
+    "(7) 台账/契约更正落地：A5 的四处更正各自指向本轮真实回执或 cycle7 的 PV 条目；契约 (d) 的状态字段不再是欠账。",
+    "(8) 无法达成或构造性不可满足的判据，必须写明原因与替代担保，不得静默消失或以欠账形式传递。"
+  ],
+  "environmentNotes": {
+    "receiptTool": "node /Users/rex/codes/harness-cli/rex-harness/bin/rex-harness.mjs receipt --root /Users/rex/codes/agno-go -- <cmd>；receipt 以 --root 为 cwd，跨目录命令须包成 sh -c \"cd <dir> && …\"。",
+    "exitCodeMask": "管道会掩盖 go test 的退出码（cycle7 已踩：receipt:e665f5a4 因 | tail 得零退出）。判据所需回执一律直接运行 go test，不带管道。",
+    "mutationHygiene": "变异前后各跑一次 git hash-object --no-filters，与 cycle7 冻结值逐字节比对；备份放 /tmp/p1-cycle6，不放仓库根。",
+    "gate": "PreToolUse 仍阻断 docs/design/v3-*.md 的写入，治理产物用 .json 留痕。"
+  },
+  "downstreamEvidence": {
+    "harness": "/tmp/p1-baseline-r7（go.mod replace 指向本仓库）",
+    "scenarios": "reference / inflight-AddNode / inflight-SetOutput / inflight-nil-predicate / inflight-dangling-edge / inflight-legal-edge / next-run-visible（后者断言 completed=[a b d] 且 output=D-OUT）",
+    "why": "本轮 A3 的夹具值承载观察这一判据，必须在真实下游模块里也成立，不能只在包内测试里自证。"
+  }
+}

@@ -1,0 +1,226 @@
+{
+  "schema": "rex.slice-stage-ledger.v1",
+  "workItemKey": "work-p1-graph-engine-r11-reachability",
+  "workflowActivationId": "745a9caf-71a7-41ba-9bc1-db887602191e",
+  "activationId": "2995e72c-07f9-4a50-9f53-7b0ef9976c61",
+  "capabilityId": "software.testing.tdd",
+  "stage": "green",
+  "measuredAt": "2026-09-27T11:26:00Z",
+  "scope": "§3.5 第 4 项：从入口沿已声明边走不到的节点必须报错，而不是静默少跑节点；并裁定 S10-SPEC-3 的不自洽（不可达的无条件环今天被拒、不可达的普通节点今天放行）。",
+
+  "implementationDiffRecorded": {
+    "filesTouched": [
+      "pkg/hno/graph/graph.go"
+    ],
+    "filesUntouchedProduction": [
+      "pkg/hno/graph/scheduler.go (87854ffbb7629f9adeb2d45fbb74d91f2032b99d，本切片逐字节未变)"
+    ],
+    "graphGo": {
+      "hashBefore": "e790d40c5e7a05b76c0f39134b91678a593c2220（切片 10 收尾字节，取自 /tmp/p1-cycle10/graph.go.postref）",
+      "hashAfter": "9d65003747def45b66d9147a7aa4f9a251f49e6e",
+      "diff": "+49/-7 行，完整差异已存 /tmp/p1-cycle11/graph-go-slice10-to-11.diff",
+      "addedSymbols": [
+        "(*Graph).rejectUnreachableNodes()：从 g.entry 沿全部 g.edges 做 BFS（不分边种类、不看谓词），missing 为空则返回 nil，否则报 graph: unreachable node %q: not reachable from entry %q through any declared edge"
+      ],
+      "modifiedCallSites": [
+        "Validate 收尾：在五类声明检查之后、rejectUnconditionalCycles 之前插入 rejectUnreachableNodes 的调用"
+      ],
+      "modifiedImports": [
+        "sort（用于字典序选名，理由见 contractAmendment）"
+      ],
+      "modifiedDocsOnly": [
+        "SetOutput：原注释把「节点存在但不会被本次执行到达」列为边界外，现在这条已被第 4 项覆盖，注释改为只保留两条仍未覆盖的边界（可达但本次没跑到＝运行期事实；空名节点与从未声明同形）",
+        "Validate：不再枚举覆盖了 §3.5 哪几项（S10-STD-7 的收口），改为固定调用方依赖的次序，并写明次序本身可观察、改动需要新的 RED"
+      ],
+      "noNewExportedAPI": "本切片没有新增导出符号、没有新增配置项、没有新增错误类型。"
+    },
+    "graphTestGo": {
+      "hashAtRedReceipt": "8b48c5cb9137a66a3ec61baddff4cf229d7a61a8（receipt:dac49825 记录的字节）",
+      "hashAtGreen": "d60690eb8d606b116ba4f6898b06555f9edd0289",
+      "additiveChangesOnly": [
+        "新增非法行 unreachable-many（三个不可达节点 alpha/beta/gamma，钉住「只点一个名字且该名字确定」）",
+        "每条非法行加 16 次重复校验循环：同一张图重复 Validate 必须给出逐字相同的文案",
+        "邻居夹具修复（见 fixtureRepair）"
+      ],
+      "assertionsNotWeakened": "本轮没有删除、跳过、放宽或改写任何 RED 期断言；RED 判红的四处（:1031 时代的三行 + A6 的两处）在 GREEN 里仍是同一判定，只是站点随新增行前移到 :1051/:1131/:1134。",
+      "counts": {
+        "fileLines": 1243,
+        "testFunctions": 11,
+        "assertionSitesInFile": 104,
+        "assertionSitesInNewFunction": 22,
+        "skipCalls": 0
+      }
+    }
+  },
+
+  "receipts": {
+    "focused": {
+      "id": "receipt:2c6eefed-e642-4463-8e32-f3b64d612d89",
+      "argv": "go test ./pkg/hno/graph/... -run TestP1G_ValidateRejectsUnreachableNodes -count=1 -timeout 25s -v",
+      "cwd": "/Users/rex/codes/agno-go",
+      "exit": 0,
+      "argvByteIdenticalToRedCandidateCommand": true,
+      "note": "与 RED receipt:dac49825 同一条命令；12 行 PASS（父测试 + 4 条非法行 + 4 组对照 + 对照内 4 条既有次序行）",
+      "observedTail": "ok github.com/rexleimo/agno-go/pkg/hno/graph 0.154s"
+    },
+    "graphPackageRace": {
+      "id": "receipt:55eb8b93-2bf8-4de6-bfad-59b237329946",
+      "argv": "go test ./pkg/hno/graph/... -count=1 -timeout 180s -race",
+      "exit": 0,
+      "note": "带 -race 的整包通过；另跑一次 -race -v 统计得 65 条 PASS 行、0 条 FAIL 行，切片 10 的 TestP1G_ValidateRejectsUnconditionalCycle 8 条子测试与 TestP1G_RunIsolatesTopologyFromConcurrentMutation 7 条子测试逐条仍在且仍绿。"
+    },
+    "neighbors": {
+      "id": "receipt:f4b420b6-307b-42e0-acf4-6946f4a0de0b",
+      "argv": "go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1 -timeout 300s",
+      "exit": 0
+    },
+    "build": {
+      "id": "receipt:2a01583e-d060-4f0b-ac75-0bf38aa83bf7",
+      "argv": "go build ./...",
+      "exit": 0
+    },
+    "scenarioModule": {
+      "id": "receipt:c159ce31-5148-4fd5-aa5b-798f069feb0e",
+      "argv": "bash -c 'cd /tmp/p1-r11-probe && go run . > out-green.txt 2>&1 && grep -c \"^B\" out-green.txt'",
+      "exit": 0,
+      "note": "仓库外模块（replace github.com/rexleimo/agno-go => /Users/rex/codes/agno-go），只经公共入口 New/Add*/Set*/Validate/Run/Result 观察；10 个形状全部报出。"
+    }
+  },
+
+  "greenObligationsCheck": [
+    {
+      "obligation": "GREEN 必须让同一条命令零退出，且不得改动本轮 RED 的任何断言、行名或期望文案。",
+      "status": "met",
+      "evidence": "receipt:2c6eefed exit 0，argv 与 redCandidate.command 逐字段一致（executable/args/cwd 三项都在 receipts/2c6eefed*.json 里）。行名沿用 RED 的 8 组，另加 1 组非法行；既有断言文案未改。"
+    },
+    {
+      "obligation": "可达性检查必须插在 rejectUnconditionalCycles 之前、既有五项之后。",
+      "status": "met",
+      "evidence": "diff 显示插入点在边种类 routable 检查的循环之后；次序由两组守门人钉住：MU3（把可达性挪到环检查之后）只被判红 2 行，站点唯一落在 A6 对照 :1131/:1134；「对照：既有拒绝次序不被抢走」的 4 条嵌套行（悬空边/入口不存在/输出指向未注册节点/条件边缺谓词）在 GREEN 全绿，说明新检查没有抢走既有五项的任何一条。"
+    },
+    {
+      "obligation": "至少三个单点变异归因。",
+      "status": "met",
+      "evidence": "见 mutationMatrix：MU1/MU2/MU3/MU4b/MU5/MU6 六个可编译单点变异全部被判红，且各自有独立站点集合。"
+    },
+    {
+      "obligation": "邻居回归。",
+      "status": "met",
+      "evidence": "receipt:55eb8b93（整包 -race exit 0）、receipt:f4b420b6（agent+runner exit 0）、receipt:2a01583e（go build ./... exit 0）。"
+    },
+    {
+      "obligation": "包外场景模块：B1/B2/B4 被拒且零节点执行，B3/B5/B6/B10 照旧，B8 与切片 10 逐字一致。",
+      "status": "met",
+      "evidence": "见 scenarioDifferential。执行计数由 tracker 在每个节点函数体内自增后快照，B1/B2/B4/B7 的 execs 全部为 0；B3/B5/B6/B8/B9/B10 整行逐字节与「去掉可达性检查」的对照运行相同。"
+    }
+  ],
+
+  "scenarioDifferential": {
+    "method": "同一份 /tmp/p1-r11-probe 程序跑两遍：一遍对着 GREEN 字节（graph.go=9d650037），一遍对着把 Validate 里那句 rejectUnreachableNodes 调用删掉的字节（graph.go=c3742f44，即切片 10 的可达性语义）。两遍输出都带每个节点的真实执行次数。跑完立刻还原并用 git hash-object 校验回 9d650037。",
+    "green": [
+      "B1-orphan-node validate=graph: unreachable node \"orphan\": not reachable from entry \"entry\" through any declared edge run-err=同文案 output=nil completed=[] execs=[entry=0 orphan=0]",
+      "B2-unreachable-output validate/run-err=graph: unreachable node \"out\"… execs=[entry=0 out=0]",
+      "B3-never-true-conditional-target validate=nil run-err=nil output=SEED completed=[a end] values=map[b:<nil>/false] execs=[a=1 b=0 end=1]",
+      "B4-unreachable-chain validate/run-err=graph: unreachable node \"c\"… execs=[a=0 c=0 d=0]",
+      "B5-entry-only validate=nil completed=[only] execs=[only=1]",
+      "B6-parallel-fanout validate=nil completed=[a b c c] execs=[a=1 b=1 c=2]",
+      "B7-unreachable-cycle validate/run-err=graph: unreachable node \"c\"…（切片 10 这里报的是 unconditional cycle \"c\" -> \"d\" -> \"c\"）execs=[a=0 c=0 d=0]",
+      "B8-reachable-uncond-cycle validate=graph: unconditional cycle \"a\" -> \"b\" -> \"a\": every edge on it is always taken, so Run cannot terminate execs=[a=0 b=0]",
+      "B9-sink-not-output validate=nil completed=[a end sink] execs=[a=1 end=1 sink=1]",
+      "B10-legal-conditional-cycle validate=nil completed=[a a b b end] execs=[a=2 b=2 end=1]"
+    ],
+    "preGreenDelta": [
+      "B1: 放行，err==nil、completed=[entry]、orphan 计数 0 —— 就是这个「少跑节点还说自己成功」的形状被第 4 项关掉",
+      "B2: 放行，err==nil、completed=[entry]、Output()==nil",
+      "B4: 放行，err==nil、completed=[a]、c/d 计数 0",
+      "B7: 报环；现在报不可达（S10-SPEC-3 的裁定：永不执行的环不该被说成运行时风险）",
+      "B3/B5/B6/B8/B9/B10: 从 validate= 到 execs= 的整行逐字节相同，其中 B8 的整行相等判定为 True —— 切片 10 的环文案一个字节都没被改动"
+    ]
+  },
+
+  "mutationMatrix": {
+    "command": "go test ./pkg/hno/graph/... -count=1 -timeout 60s -v（对 graph.go 单点注入，脚本 /tmp/p1-cycle11/matrix.py 与 matrix2.py，每个变异重复 3–4 次）",
+    "matrix": [
+      {
+        "id": "MU1",
+        "injection": "删掉 Validate 里对 rejectUnreachableNodes 的调用（函数体保留，等价于回到切片 10）",
+        "runs": 4,
+        "killedEveryRun": true,
+        "failRows": 6,
+        "rows": ["TestP1G_ValidateRejectsUnreachableNodes/orphan-registered", "…/unreachable-chain", "…/unreachable-many", "…/unreachable-output", "…/对照：不可达的环报可达性，可达的环仍报环", "父测试 TestP1G_ValidateRejectsUnreachableNodes"],
+        "sites": ["graph_test.go:1051", "graph_test.go:1131", "graph_test.go:1134"],
+        "attribution": "去检查的唯一杀伤面；与 MU6 共享 :1051，所以 :1051 单独不足以区分两者。"
+      },
+      {
+        "id": "MU2",
+        "injection": "把「可达」实现成「沿无条件边走得到」（BFS 只看 edgeUnconditional）",
+        "runs": 4,
+        "killedEveryRun": true,
+        "failRows": 16,
+        "sites": ["graph_test.go:232", "graph_test.go:267", "graph_test.go:388", "graph_test.go:718", "graph_test.go:735", "graph_test.go:755", "graph_test.go:784", "graph_test.go:878", "graph_test.go:1102", "graph_test.go:1185"],
+        "attribution": "契约要求的「必须被 A3 判红」成立：:1102 是对照「条件边运行期不命中也算可达」。同时打穿切片 4/5/6/10 的既有路由与条件边测试，说明这条误读会毁掉整个条件分支语义，不是切片 11 的私事。"
+      },
+      {
+        "id": "MU3",
+        "injection": "两个检查都在，但次序反转（先 rejectUnconditionalCycles 后 rejectUnreachableNodes）",
+        "runs": 3,
+        "killedEveryRun": true,
+        "failRows": 2,
+        "sites": ["graph_test.go:1131", "graph_test.go:1134"],
+        "attribution": "站点唯一：只有 A6 对照能看见次序，其它行两两相同。这是次序契约的可执行证明。"
+      },
+      {
+        "id": "MU4",
+        "injection": "删掉 sort.Strings(missing) 并保持其余不变",
+        "runs": 3,
+        "killedEveryRun": false,
+        "failRows": 0,
+        "attribution": "非变异：import sort 变成未使用，编译失败（exit 1、0 条 FAIL 行）。编译不过不计为杀伤，已如实丢弃，改由 MU4b 表达同一意图。"
+      },
+      {
+        "id": "MU4b",
+        "injection": "sort.Strings 换成 _ = sort.IntSlice(nil)（保留 import，被点名的节点改由 map 遍历顺序决定）",
+        "runs": 4,
+        "killedEveryRun": true,
+        "failRows": [3, 2, 3, 3],
+        "sites": ["graph_test.go:1063"],
+        "attribution": "四次全部只打在 :1063 —— 16 次重复校验的确定性循环。行数在 2–3 之间抖动，因为 map 顺序本身随机：这正是被钉的性质。杀伤归因唯一，但行集不唯一，如实记为非唯一行集。"
+      },
+      {
+        "id": "MU5",
+        "injection": "排序保留，但取字典序最后一个而不是第一个",
+        "runs": 3,
+        "killedEveryRun": true,
+        "failRows": 3,
+        "sites": ["graph_test.go:1068", "graph_test.go:1084"],
+        "attribution": "打在「点名哪个节点」的期望上（unreachable-chain 期望含 c、unreachable-many 期望含 alpha），并连带 :1084 的「Validate 与 Run 两个入口给出的定位必须一致」。"
+      },
+      {
+        "id": "MU6",
+        "injection": "把输出节点也当作 BFS 的第二个根",
+        "runs": 3,
+        "killedEveryRun": true,
+        "failRows": 2,
+        "sites": ["graph_test.go:1051"],
+        "attribution": "只被 unreachable-output 行看见：不可达的输出节点正是「err==nil 而 Output()==nil」那个最坏形状。站点与 MU1 共享，行集不同（MU1 还看见另三行）。"
+      }
+    ],
+    "restoreVerification": "脚本在每个变异后立刻写回 /tmp/p1-cycle11/graph.go.green 并断言逐字节相等；矩阵结束再测一次 on-disk=9d65003747def45b66d9147a7aa4f9a251f49e6e，并跑一次整包 exit 0 / 0 FAIL。"
+  },
+
+  "disclosures": [
+    "RED 之后的测试字节变过三次（8b48c5cb → 夹具修复 → 加 unreachable-many 与确定性循环 → d60690eb）。RED receipt:dac49825 记录的行集因此与 GREEN 的行集不同：RED 判红 4 处，GREEN 的对应判定现在落在 :1051/:1131/:1134 并且多了一行 unreachable-many。这是加严，不是放宽，但必须记下来：拿 RED 收据的行号去核对 GREEN 输出会对不上。",
+    "receipt 4a2c21b1 / 0481c9e7 / 98d682fd / b00578e0 是对着旧测试字节取的，已被上面四条取代，不得再作为 GREEN 证据引用。",
+    "MU4 是一次无效注入（编译失败），我一开始把它当作杀伤写进矩阵过；本轮重跑把它剔除并补了 MU4b。矩阵里 MU4 条目保留为「非变异」而不是删掉，是为了让这次误判可见。",
+    "MU4b 的行集在 2–3 之间抖动：变异本身不确定，所以「固定行集」这种写法在这里不适用；唯一稳定的是站点 :1063 与「每次都死」。",
+    "切片 10→11 的 graph.go 差异是从 /tmp/p1-cycle10/graph.go.postref 的备份字节算出来的，不是 git diff：本工作项的 P1 全部改动仍未提交（HEAD=0387000，工作树领先 9 个提交之外），git 里没有切片 10 的基线可选。graph_test.go 没有等价备份，所以它的 RED→GREEN 增量只能按编辑记录描述，不能给逐字节 diff。",
+    "可达性判定不看谓词，所以一张「条件边永远不命中」的图里那个目标节点仍然算可达（B3 证明）。这一条是刻意的：构建期判不了谓词，把它判成不可达等于禁止一切条件分支。",
+    "本切片没有触碰 §3.5 第 5 项（无出口汇点）、第 6 项（join 前驱 <2）、第 8 项（stepLimit），也没有触碰 Add* 增量检查（S10-SPEC-1）；B9 在场景里仍然 validate=nil，第 5 项仍是欠账。"
+  ],
+
+  "notClaimed": [
+    "不声称 §3.5 已闭结：已落地 1/3/4/7 与两个声明类检查，第 2、5、6、8 项仍欠。",
+    "不声称聚合诊断（一次报出全部不可达节点）已实现：现在只点字典序第一个名字。",
+    "不声称已提交或已推送：全部改动留在工作树。"
+  ]
+}

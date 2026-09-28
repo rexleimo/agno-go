@@ -1,0 +1,226 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p1-graph-r20-dead-end-sink",
+  "activationId": "05385c4b-481a-4922-9f8b-92f997affc94",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-27T21:05:00Z",
+  "contractRef": "docs/design/v3-test-scope-p1-graph-slice20.json",
+  "slice": 20,
+  "userGoal": "票面 §4 B6 第 5 项（母约 §3.5 第 5 项）：注册了、既没有出边又不是输出的节点，`Validate()` 返回非 nil 并点名那个节点，`Run` 随之拒绝；同时保住切片 19 交付的形状 —— 只通过 Join 出发的节点（其唯一出边是汇聚声明）不得被误拒。",
+  "whyThisSlice": "状态审计（`docs/design/v3-p1-graph-status.md` §2）把这一项列为 P1 仅剩的两行未落地之一。当年把它排在切片 19 之后的理由是「sink 判据的形状取决于 Join 最终如何建边」；切片 19 已定形（`AddJoin` 把 `from` 逐个 `declare` 成 `edgeJoin` 出边），排队前提已消，所以它是最小可用的一片 —— 只要判据本身成立。",
+  "measuredBeforeDesign": [
+    {
+      "id": "M1-今天的公共面形状",
+      "scene": "仓库外独立 module `/tmp/r19q1/sink`（`go run ./sink`，`replace` 引本仓 `pkg/hno/graph`，只调公共 API），跑在切片 19 写回字节上",
+      "observations": [
+        "A 死端汇点（`AddEdge(\"entry\",\"sink\")` + `SetEntry(\"entry\")` + `SetOutput(\"entry\")`）：`Validate() = <nil>`，且 `Run` 成功交出 `output=x completed=[entry sink]` —— 一个节点的输出没有任何消费者，全程静默。",
+        "B 反向对照（`entry→{a,b}`、`AddJoin([\"a\",\"b\"],\"j\")`、`SetOutput(\"j\")`）：`Validate() = <nil>`。a/b 的唯一出边是汇聚声明。",
+        "C 反向对照（`entry→out`、`SetOutput(\"out\")`）：`Validate() = <nil>`。输出节点自身没有出边。"
+      ],
+      "conclusion": "判据缺口是真的（A 格），且新检查必须同时保住 B、C 两格。"
+    },
+    {
+      "id": "M2-可行性实验（候选检查加在仓库副本上，仓库字节未动）",
+      "scene": "`/tmp/sinkexp`：把 `pkg/hno/graph` 的 11 个文件与全部测试原样拷进一个 `module github.com/rexleimo/agno-go` 的空壳 module，只在副本的 `graph.go` 里加一个候选 `rejectDeadEndSinksBroad`（判据逐字照票面 §3.5 第 5 项：注册了、没有任何出边、不是输出 → 判红，多个目标按字典序点名第一个）并接进 `Validate` 的末位。副本命令统一为 `go -C /tmp/sinkexp test ./pkg/hno/graph -count=1`（回执里 executable=`go`、args 头两格 `-C /tmp/sinkexp`、cwd 仓库根）。副本 baseline `receipt:7f442439-8bce-4f23-b44f-a5e6d0ca0375`（exit 0）；加字面判据后同命令 `receipt:dd11883e-75ad-4d88-844e-2139f94a2f6c`（exit 1，`-v` 里 12 个顶层 Test 判红）。实验完把副本逐文件恢复并与仓库比对：`git hash-object --no-filters pkg/hno/graph/*.go` 在副本与仓库两边 md5 相同（`1250071191a7ddb8…`），副本复跑 exit 0。仓库字节全程未动。",
+      "replay": [
+        "mkdir -p /tmp/sinkexp/pkg/hno/graph && cp <repo>/pkg/hno/graph/*.go /tmp/sinkexp/pkg/hno/graph/",
+        "printf 'module github.com/rexleimo/agno-go\\n\\ngo 1.24.11\\n' > /tmp/sinkexp/go.mod",
+        "go -C /tmp/sinkexp test ./pkg/hno/graph -count=1        # 基线，应为 exit 0（receipt:7f442439…）",
+        "在副本 graph.go 里加：hasOut := map[string]bool{}; for _, e := range g.edges { hasOut[e.from] = true }; 遍历 g.nodes，跳过 g.output 与 hasOut[name]，剩下的按字典序点名第一个 → fmt.Errorf(\"graph: dead-end node %q has no outgoing edge and is not the output\", …)",
+        "在副本 Validate 里把它接在最后一条 return 之前（即不可达与无条件环之后）",
+        "go -C /tmp/sinkexp test ./pkg/hno/graph -count=1 -v | grep -cE '^--- FAIL'   # 12（receipt:dd11883e… 为该命令的 exit 1 回执）"
+      ],
+      "observations": [
+        "候选检查放在「前驱数检查之后、不可达检查之前」：16 个顶层 Test 判红。",
+        "候选检查放在最晚的位置（不可达、无条件环之后）：仍有 12 个顶层 Test 判红 —— `TestP1G_ConditionalAndDefaultRouting`、`TestP1G_ValidateRejectsConditionalWithoutPredicate`、`TestP1G_RunIsolatesTopologyFromConcurrentMutation`、`TestP1G_ValidateRejectsUnreachableNodes`、`TestP1R13_LimitRefusesActivationsAtDispatch`、`TestP1R14_PanicErrorNamesThePanickingNode`、`TestP1R15_AcyclicGraphWithoutStepLimitDoesNotWarn`、`TestP1R17_*`（4 个）。",
+        "冲突不是文案次序问题，是既有担保本身：`graph_test.go:236` 那行断言的原文是「按 §3.4 合法的路由图被 Validate 拒绝」，它担保的正是「条件边/兜底边的分支终点（无出边、非输出）在构建期放行」。候选检查命中 `\"b\"`、`\"c\"` 这些分支终点后，这行既有断言判红。",
+        "同一形状还会抢占别的切片的地盘：`p1r14_panic_barrier_test.go:149` 观察到 panic 夹具里的 `bad` 节点先被判成死端，调用方拿到的是构建期文案而不是运行期 panic 文案；`p1r17_cancel_normalization_test.go:475` 的夹具被以同样方式拒绝。"
+      ],
+      "conclusion": "票面 §4 B6 第 5 项 / 母约 §3.5 第 5 项的**字面判据**与本引擎的路由模型不相容：条件边与兜底边天然产生「没有出边的分支终点」，而这些终点不该、也没有被要求收敛到输出。要在不改动 12 个既有 Test 的前提下落地该判据，只有一条路是把检查限定到「限定后即与既有不可达检查同义」的空集 —— 那是票面 §9 禁止的假通过。"
+    },
+    {
+      "id": "M3-限定版判据也没能救回来（同一副本，第二轮实验）",
+      "scene": "同一 `/tmp/sinkexp`，把候选换成最窄的非空限定版 `rejectDeadEndSinksNarrow`：只有「无条件边的目标 + 没有任何出边 + 不是输出」才判红。副本 `cmd/probe` 直调公共 API 实测该限定版**同时**做到两件事：`entry→sink`、`SetOutput(\"entry\")` 收到 `graph: dead-end node \"sink\" has no outgoing edge and is not the output`（M1 的 A 格抓住了），条件边两个终点 `b`/`c` 的图收到 `Validate() = <nil>`（分支终点放行了）。",
+      "observations": [
+        "同一条 `go -C /tmp/sinkexp test ./pkg/hno/graph -count=1` 在限定版下仍 exit 1（`receipt:f594bc89-77f3-4ca3-bcb2-16fdc621d5ec`），`-v` 里 **10 个顶层 Test 判红** —— 相比字面版的 12 个，只省掉 `TestP1G_ValidateRejectsConditionalWithoutPredicate` 与 `TestP1G_ValidateRejectsUnreachableNodes`。",
+        "判红理由不是分支终点，而是**无条件扇出的终点**：`graph_test.go:236` 那条断言的原文是「按 §3.4 合法的路由图被 Validate 拒绝」，判红的子用例名字就是 `TestP1G_ConditionalAndDefaultRouting/unconditional-fanout`，被点名的节点是 `\"b\"`；`p1r13_step_limit_test.go:135` 写的是「合法的扇出图被构建期拒绝」，被点名的节点是 `\"x\"`。",
+        "`p1r14_panic_barrier_test.go:149` 的失败形状不同但同源：夹具里的 `bad` 节点先被判成死端，调用方拿到构建期文案而不是运行期 panic 文案，于是「错误文案表明这是一次 panic 而不是普通节点失败」那条断言判红。"
+      ],
+      "conclusion": "冲突的根不在「条件/兜底分支终点」这一层，而在 §3.4 规则 1 本身 —— 无条件扇出的目标节点按设计就允许「输出无人消费」，而且有 10 个既有顶层 Test 在担保它。任何能把 A 格判红又不落回空集的判据，都必须先修改 §3.4 的路由语义或引入终点声明（OPT-B 那条路），这不是切片权限，是票面裁决。把判据悄悄限定成能过的那个子集，正是本契约 forbiddenShortcuts 第 1 条禁止的行为。"
+    }
+  ],
+  "acceptanceMapping": [
+    {
+      "row": "D1",
+      "behavior": "注册了、没有出边、不是输出的节点 → `Validate()` 非 nil 且点名该节点（引号边界的节点名，沿用 §11.1 的可定位判据）",
+      "publicEntry": "graph.New/AddNode/AddEdge/SetEntry/SetOutput → Validate",
+      "assertion": "`err != nil` 且 `err.Error()` 含 `graph: ` 前缀 + `\"<节点名>\"` + 一句说明它既无出边也不是输出",
+      "status": "当前票面下不可执行：与 `graph_test.go:236` 的既有担保正面冲突（见 M2）"
+    },
+    {
+      "row": "D2",
+      "behavior": "`Run` 对被拒的死端图原样交出 `Validate` 的错误，`res == nil`（不跑半张图）",
+      "publicEntry": "Graph.Run",
+      "assertion": "`res == nil` 且错误文本与 `Validate()` 相同",
+      "status": "同 D1"
+    },
+    {
+      "row": "D3",
+      "behavior": "输出节点自身没有出边仍合法（否则每张图都被拒）",
+      "publicEntry": "Validate",
+      "assertion": "`Validate() == nil`",
+      "status": "M1 的 C 格已实测为 nil；这一格是任何方案都必须保住的反向对照"
+    },
+    {
+      "row": "D4",
+      "behavior": "唯一出边是汇聚声明的前驱节点不得被判成死端（切片 19 的形状）",
+      "publicEntry": "AddJoin + Validate",
+      "assertion": "`Validate() == nil`",
+      "status": "M1 的 B 格已实测为 nil；同上"
+    },
+    {
+      "row": "D5",
+      "behavior": "条件边 / 兜底边的分支终点（无出边、非输出）在构建期放行",
+      "publicEntry": "AddConditional/AddDefault + Validate",
+      "assertion": "`Validate() == nil`，且 `Run` 走到该分支时不报构建期错误",
+      "status": "既有 `TestP1G_ConditionalAndDefaultRouting` 已在担保它；把它写成显式行等于**用测试否定票面第 5 项**，属票面变更，须负责人裁决"
+    }
+  ],
+  "minimalVerticalSlice": "若判据成立，最小切片是 D1 + D2 + D3 + D4 四行（一条正向、一条运行期联动、两条反向对照），它们能独立失败且只用 `New/AddNode/AddEdge/AddJoin/AddConditional/SetEntry/SetOutput/Validate/Run` 这一个公共缝。选它是因为它把风险集中在「谁消费这个节点的输出」这一条构建期事实上，不牵动路由与调度。但 M2 显示：这四行里的 D1/D2 与既有担保互斥，因此本片**没有可在当前票面下取红的最小纵向切片**。",
+  "allowedTestSeam": {
+    "add": [
+      "pkg/hno/graph/p1r20_dead_end_sink_test.go（`package graph_test`，外部包，只用导出 API）"
+    ],
+    "modify": [
+      "无。本片不得改动任何既有测试文件、既有断言或夹具形状 —— M2 里那 12 个判红的 Test 正是「改动既有担保」的代价，属票面变更而非本片权限。"
+    ],
+    "retires": [],
+    "forbidden": [
+      "scheduler 内部字段、queue 长度、goroutine 数、私有类型断言、内部计时（票面 :40）",
+      "`time.Sleep` 定序（票面 :75）",
+      "为测试导出内部可变状态或新增只服务测试的产品出口"
+    ]
+  },
+  "baselineBytes": {
+    "pkg/hno/graph/graph.go": "4cb363b729cddf7541df8d1b1900c8240dff93f2",
+    "pkg/hno/graph/scheduler.go": "c878a6c74cad89bbdfc773c21c58952d3944630d",
+    "pkg/hno/graph/graph_test.go": "624f19624c6f4fa3c04ee6619e722b03de83336c",
+    "unchangedOtherTestFiles": [
+      "p1r13 bc4ab8e7",
+      "p1r14 0ed607db",
+      "p1r15 3ea06d27",
+      "p1r15b 0285ab35",
+      "p1r16 6934a4f2",
+      "p1r17 cbc8b692",
+      "p1r18 10bce61b",
+      "p1r19 8b4b7234"
+    ],
+    "counters": {
+      "loc_nonblank_nontest_wc_l": 838,
+      "sync_count": 0,
+      "exportedSymbols": 24
+    }
+  },
+  "explicitNonGoals": [
+    "B6 第 2 项（重复节点名）：与 `TestP1G_RunIsolatesTopologyFromConcurrentMutation`（`graph_test.go:872`，同名覆盖子用例在 :953）担保的静默覆盖语义正面对撞，同属票面变更，本片不做。",
+    "引入 `graph.END` 之类的终点哨兵或任何新导出符号（导出面必须保持 24）—— 那是一条产品决策，需要独立设计与新的票面行。",
+    "`Send` / 运行时动态屏障（P2）。",
+    "`InputSchema`/`OutputSchema` 校验（母约 §3 划到 v3.1）。",
+    "调整 `Validate` 里既有检查的相对次序（切片 19 §15.3 第 2 点已量到次序的公共面后果）。"
+  ],
+  "outOfScopeBehaviors": [
+    "R19-Q1 的收口形状（汇聚前驱没跑且再无待派激活时 `err==nil` 而 `Output()==nil`）。",
+    "S19-STD-1（交给节点的聚合 map 与调度器累加器是同一对象）—— 需另起 behavior-delta。",
+    "把票面 §3.5 其余项重新解释成别的判据。"
+  ],
+  "completionCriteria": [
+    "1. 负责人先就「§3.5 第 5 项如何与本引擎的路由模型共存」给出裁决（三个候选见 adjudicationOptions）；只有拿到新 `rex-test-design` Command，本契约才允许被改写成可执行的测试范围。",
+    "2. 裁决后每条范围内行为有一个可独立失败的 Test，并在 RED 阶段观察到与缺失行为一致的失败。",
+    "3. 每行断言的牙齿由变异证明；等价变异与不可达形态如实登记为观察上限，不算杀红。",
+    "4. 构建失败不计为判红；判红只认 `-v` 输出里的 `--- FAIL: TestP1R20_*` 名字，退出码单独记录。",
+    "5. 既有 9 份测试文件零改动（逐文件 `git hash-object --no-filters` 复核）；若裁决要求改动其中任何一份，那必须先出现在新的契约里被授权，不得在 GREEN 阶段顺手做掉。",
+    "6. 票面 §7 四条门禁在最终字节上全 exit 0，`gofmt -l pkg/hno/graph` 无输出。",
+    "7. 结构判据不放宽：`sync.` 计数仍为 0、非测试 LOC ≤ 1500、导出符号仍为 24。",
+    "8. 邻近回归不红：`go test ./pkg/hno/agent/... ./pkg/hno/runner/... ./internal/session/contract/... -count=1` exit 0。",
+    "9. 完成后回写票面 §4 B6 行、§3.5 第 5 项的解释、状态文档 §2 那一行，以及母约对应处。"
+  ],
+  "forbiddenShortcuts": [
+    "把死端检查限定到「只有既无出边又不可达的节点才判红」—— 那与既有不可达检查同义，等于新判据是空集却报告为交付。",
+    "把死端检查限定到「只有无条件边的目标才判红」（M3 实测：抓住 A 格、放行条件终点，但仍有 10 个既有顶层 Test 判红）。为了把 10 变成 0 而继续收窄判据、或反过来放宽那 10 个 Test 的期望，都是用实现便利性改写票面。",
+    "为了让 12 个既有 Test 继续绿而放宽期望、删除断言、跳过用例或改写夹具。",
+    "只断言错误非 nil 而不点名节点（可定位性是 §11.1 确立的公共面判据）。",
+    "用「节点数量」等内部计数替代用户可观察结论。",
+    "在未获裁决前把票面 §3.5 第 5 项按自己的解释改掉 —— 那是用实现反推测试目标。"
+  ],
+  "observabilityLimit": "M3 修正了本契约第一版的措辞：分支终点（条件边/兜底边的目标）与无条件边的终点在**声明形态**上是可区分的，限定版判据确实放行了前者。不可区分的是另一对：「无条件扇出的终点」与「意外悬空的汇点」—— 两者都是 `AddEdge(from, x)` 之后 `x` 再无出边，引擎既不记录谁消费 `x` 的输出，也没有终点声明。于是任何只靠现有声明形态的判据都只能在「放过 A 格」与「误拒既有扇出担保」之间二选一。这才是 §3.5 第 5 项需要重新表述的根因，不是实现技巧问题。",
+  "adjudicationOptions": [
+    {
+      "id": "OPT-A",
+      "shape": "作废票面 §3.5 第 5 项 / §4 B6 第 5 行，并在状态文档登记「本引擎允许分支终点」。",
+      "cost": "无代码改动；B6 只剩第 2 项未落地（也需裁决）。",
+      "gain": "与既有 12 个 Test 的担保一致，不引入新导出面。"
+    },
+    {
+      "id": "OPT-B",
+      "shape": "引入显式终点（LangGraph 式 `graph.END`）：分支终点必须写成 `AddEdge(\"b\", graph.END)`，第 5 项改为「既没有出边、也不等于输出、也没有指向 END 的可达节点 → 拒绝」。",
+      "cost": "新增导出符号（24→25）与一条新票面行；既有夹具里那些「隐式终点」要显式化，涉及多份测试文件的形状改动，需逐片授权。",
+      "gain": "A 格的意外死端可判红，分支终点仍合法，公共面第一次能区分两者。"
+    },
+    {
+      "id": "OPT-C",
+      "shape": "把第 5 项降级为告警（与 §3.5 第 8 项同族，走 `Warnings()`）：可达且无出边的非输出节点产生一条可定位告警，不拒绝。",
+      "cost": "判据从「拒绝」变「告警」，需改票面措辞；切片 15/15b 的告警面要加行。",
+      "gain": "零既有测试冲突即可取红，且保留可发现性。"
+    }
+  ],
+  "unadjudicatedCarried": [
+    "R19-Q1、R19-Q2、S19-STD-1、S19-STD-6（票面 §15.5）",
+    "R18-Q1、R18-Q2、R17-GAP-1/2/3、S17-SPEC-3/R17-UNADJ-1、R18-GAP-1",
+    "S18-SPEC-2：HEAD `0387000` 仍只含首片存根，切片 2–19 未提交；**无提交授权**",
+    "S17-STD-5/S18-STD-6 残余：`struct.sh`、前两片的 `mutants.mjs`、本审计与本片探针的 `/tmp` 夹具未入库"
+  ],
+  "sedimentCarried": "切片 19 已把 Join 的建边形状定死（`AddJoin` 对每个 `from` 记一条 `edgeJoin` 出边），本片的 D4 反向对照直接依赖它；票面 §15 的可定位判据与「检查次序」教训沿用到本片。",
+  "verificationCommands": [
+    "go test ./pkg/hno/graph -run TestP1R20_ -count=1 -race -v   # 本片唯一绑定场景命令，所有 receipt 逐字用这条（cwd 仓库根，`receipt -- go test …` 直接取，不得 sh -c 包装）",
+    "go build ./... ; go test ./pkg/hno/graph/... -count=1 ; go test -race ./pkg/hno/graph/... -count=1 ; go vet ./pkg/hno/graph/... ; gofmt -l pkg/hno/graph",
+    "grep -o 'sync\\.' pkg/hno/graph/graph.go pkg/hno/graph/scheduler.go | wc -l   # 必须 0",
+    "find pkg/hno/graph -name '*.go' -not -name '*_test.go' | xargs wc -l          # 必须 ≤ 1500",
+    "go doc -all ./pkg/hno/graph | grep -cE '^(func|type|var|const) '              # 必须仍为 24（选 OPT-B 时需先在票面改这一判据）"
+  ],
+  "writeBackOwed": [
+    "票面 §4 B6 第 5 行与 §3.5 第 5 项按负责人裁决改写（作废 / END 哨兵 / 降级为告警三选一），并在票面新增一节记录：M1 的三格实测、M2 的 16→12 冲突数字、以及裁决选择的理由。",
+    "`docs/design/v3-p1-graph-status.md` §2 的 B6 第 5 行按裁决结论登记（不得按未实现的判据勾销），§4 的后续次序同步改写。",
+    "母约 `docs/design/v3-platform.md` §3.5 第 5 项同步（并标注它与 §3.4 路由核心的关系）。"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-test-scope-p1-graph.md#4",
+    "artifact:docs/design/v3-test-scope-p1-graph.md#15",
+    "artifact:docs/design/v3-p1-graph-status.md#2",
+    "artifact:docs/design/v3-platform.md#3.5",
+    "artifact:pkg/hno/graph/graph_test.go#L236",
+    "artifact:pkg/hno/graph/p1r13_step_limit_test.go#L135",
+    "artifact:pkg/hno/graph/p1r14_panic_barrier_test.go#L149",
+    "artifact:pkg/hno/graph/p1r17_cancel_normalization_test.go#L475",
+    "receipt:73a2c954-adb0-4b83-8c3c-e67849d23536",
+    "receipt:7f442439-8bce-4f23-b44f-a5e6d0ca0375",
+    "receipt:dd11883e-75ad-4d88-844e-2139f94a2f6c",
+    "receipt:f594bc89-77f3-4ca3-bcb2-16fdc621d5ec"
+  ],
+  "optionsNotMeasured": "只有 M1–M3 是对「字面判据」与其限定版的实测。OPT-B 的「夹具要显式化涉及多份测试文件」是按 `AddEdge` 用法读出来的估计，OPT-C 的「零既有测试冲突即可取红」未经验证 —— 若日后选 OPT-C，要先在副本上加一条候选告警并跑 `TestP1R15_*`/`TestP1R15B_*` 确认告警面的既有断言不被撑破，再落成契约。",
+  "adjudicationOutcome": {
+    "decidedBy": "负责人（rex 工作项外的裁决）",
+    "decidedAt": "2026-09-27T22:18:00Z",
+    "choice": "OPT-A",
+    "meaning": "作废票面 §4 B6 第 5 项 / 母约 §3.5 第 5 项，登记「本引擎允许无条件扇出终点与分支终点」。零代码改动、无新增测试文件、导出面保持 24。",
+    "writeBackDone": [
+      "票面新增 §16（16.1 三条实测与回执、16.2 限定版也不是出路、16.3 作废后仍成立的那半句、16.4 第 2 项另待裁决、16.5 自纠与回执）并把 §4 B6 行的「无出口」划掉",
+      "母约 §3.5 第 5 项改写为裁决作废并把第 6 项的备注改成「第 2 项仍待裁决、第 5 项作废」",
+      "状态文档 §2 该行由「不能按字面落地」改为「经裁决作废」、§3 收尾句、§4 次序（P1 闭合条件只剩第 2 项）、§6 过程登记"
+    ],
+    "stillOpen": "B6 第 2 项（重复节点名）：本片第一版「与 graph_test.go:953 的静默覆盖语义正面对撞、属票面变更」的说法已被本轮副本实测推翻 —— 记录 dupNames + Validate 末位拒绝后 `-count=1` 与 `-race` 均 exit 0、0 个判红（receipt:330df6ad…、receipt:14aa3bd0…），且 AddNode( 在本包之外零调用方。它不需要裁决，是一片正常的 behavior-delta（切片 21）。详见票面 §16.4。",
+    "postWriteBackReceipt": "receipt:72de44ae-4bf5-4761-80ac-c0f3978eb1e6"
+  },
+  "recordedReceiptsReplaced": "本契约第一版（design-tests 阶段提交）在 M2 里写的是 `receipt:efa1ac82-…` 与 `receipt:b917dd0a-…`。那两个 id 在 `.rex-harness/receipts/` 里**不存在**（`grep -rn` 零命中），是当时凭印象写下、没有实际取回执的引用，属伪造。现已用上面三条真实回执（`7f442439` 副本基线 exit 0 / `dd11883e` 字面版 exit 1 / `f594bc89` 限定版 exit 1）替换，并把实验在副本上重跑一遍以确认 12 与 10 这两个数字是实测而不是推断。design-tests 阶段已接受的三项 evidence 不被撤回，但其引用的回执 id 以本字段为准；状态文档里同一对假 id 也已替换。"
+}

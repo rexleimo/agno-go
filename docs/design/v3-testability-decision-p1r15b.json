@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 1,
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:docs/design/v3-testability-decision-p1r15b.json",
+  "workItemKey": "work-p1-graph-r15b-warning-text",
+  "activationId": "a6c11edd-e917-46e9-96dc-8ac2778e8f13",
+  "stageId": "decide-testability",
+  "contract": "artifact:docs/design/v3-test-scope-p1-graph-slice15b.json",
+  "redCandidateRow": "U4",
+  "redCandidate": {
+    "publicEntry": "graph.New / graph.WithStepLimit（本场景刻意不调用）/ graph.NodeFunc / (*Graph).AddNode / (*Graph).AddEdge / (*Graph).AddConditional / SetEntry / SetOutput / (*Graph).Validate / (*Graph).Warnings，读的是返回的 error 文本本身",
+    "setup": "pkg/hno/graph/p1r15b_warning_text_test.go 里的 longConditionalCycle(400)：entry → n000 → n001 → … → n399，闭合边 n399 --条件(恒假)--> n000。图未显式设置 WithStepLimit，因此判据 8 的告警应当出现；节点名一律三位补零，n000…n399 里没有任何一条数字串等于 400，所以「文案中出现独立数字 400」只可能是在说环长。夹具先用 Validate() 为 nil 守住前提。",
+    "command": {
+      "executable": "go",
+      "args": [
+        "test",
+        "./pkg/hno/graph",
+        "-run",
+        "TestP1R15B_",
+        "-count=1",
+        "-race",
+        "-v"
+      ],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "契约 U4 的三条同时成立：告警文案点名的节点数 ≤ 6；文案总长 < 1024 字节；文案把环长 400 作为独立数字说出来（截断之后仍知道这环有多大）。",
+    "observed": "go test 退出码 1。三条断言全部为假：文案点名 401 个节点；文案长 4131 字节；文案里没有等于 400 的数字串。实际文案形如 graph: cycle \"n000\" -> \"n001\" -> … 一直列到第 401 个名字，即整条环被逐节点抄进错误信息（同一形状在审查探针里 20000 节点时达 260134 字节）。",
+    "receiptRef": "receipt:da56f1b3-43ba-4594-9c08-dff21811ddea",
+    "failureReason": "缺失的目标行为是「环的渲染有确定上界且收缩后仍可定位」：Warnings() 用的 cycleOf 把闭合路径整条拼进文案，长度随环长线性增长，且从不报出环的规模。这不是编译/夹具/环境问题——同一命令下 Validate() 与告警的存在性都成立，失败仅发生在 U4 声明的三个输出属性上，因此是新的用户可观察输出属性缺失，而非既有断言被改坏。"
+  },
+  "whyNotHardening": "没有新的用户可观察输出变化才走 hardening。本片改变的是调用方从 Warnings() 读到的文本本身（去掉对 Run 结果的断言、给环渲染加上界），是输出契约变化，属 behavior-delta。",
+  "whyNotBlocked": "两条 blocking（S15-SPEC-1、S15-STD-5）都可在导出面上搭图、读 Warnings() 文本观察；无需读私有字段，也无需新增旋钮。",
+  "scenarioCommandBindingNote": "本阶段与其后 RED/GREEN/REFACTOR 的每个 receipt 都用上面这一条命令；-run TestP1R15B_ 覆盖 p1r15b_warning_text_test.go 的整族 U 行，逐行失败信息靠 -v 输出归属，不混用其它命令。",
+  "measuredAt": "2026-09-27T16:28:55.890Z",
+  "productionBytesAtDecision": {
+    "pkg/hno/graph/graph.go": "8b8fb95b5bc0a7015abd12384636cf7cf106869b",
+    "pkg/hno/graph/scheduler.go": "61c7ba6db72b65eda938c099968e7409fc944d73",
+    "pkg/hno/graph/p1r15_warnings_test.go": "3ea06d27abd3994130e593d297951c895729a4dd",
+    "pkg/hno/graph/graph_test.go": "425ea0303e1d5c5c8e95bacf57663ae94a4309ee"
+  },
+  "notTouchedByThisSlice": [
+    "R15-UNADJ-1（非法图上该不该出提示）：U3 只要求文案不预测执行，对提示存在与否保持中立",
+    "S15-STD-1（导出哨兵错误）：仍挂号待人类裁决",
+    "S15-STD-2（firstCycleOf 的签名）与 S15-STD-3（邻接闭包去重）：内部形态问题不在本片",
+    "判据 7 的致命文案措辞与判定集合：不改。有界渲染确实作用于共享的 cycleOf（契约 M-4 已量出既有 B5 族的环长全部 ≤2，保留前 6 个点名时 2 节点环的文案逐字不变），U7 是这条取舍的护栏行，而不是把界限制在 Warnings 路径内"
+  ],
+  "measurementNote": "U4 夹具（节点名 n000…n399）本轮实测文案 4131 字节 / 401 个点名；契约 M-1 表里的 400→4532 字节来自审查探针 /tmp/p1-cycle15/review2 的另一种命名长度。两者都远越过 1024 的上界，也都不含等于 400 的数字串，结论方向一致；本条决定用的是前者，因为它是被绑定的场景命令交出的数字。"
+}

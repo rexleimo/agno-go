@@ -1,0 +1,192 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p1-graph-r15-warnings",
+  "activationId": "6b0fe43c-1731-4382-b14a-3c647d503646",
+  "capabilityId": "software.review.standards-spec",
+  "stageId": "review",
+  "recordedAt": "2026-09-27T16:20:00Z",
+  "independenceDisclosure": "作者自查，非独立审查：用户此前拒绝对 P1 派发独立审查子代理（原话被记录为「不要重复该调用」）。因此本 verdict 的两个轴由同一上下文的人做出，缺少独立视角这一层保障；作为补偿，所有会被写进结论的判断都尽量改成实跑（见 measuredDuringReview），静态走查不足以支撑的地方一律标注为推测。",
+  "fixedPoint": {
+    "whyNotHead": "本周期内 HEAD 变为 0387000，但它提交的是 pkg/hno/graph 的较早快照：git show HEAD:pkg/hno/graph/scheduler.go 的 recover( 计数为 0、stepLimit 计数为 0，三个新测试文件在 HEAD 不存在。以 HEAD 为 fixed-point 会把切片 13/14 的成果算进本片差异。",
+    "perFile": {
+      "pkg/hno/graph/graph.go": "a189a8692c0364266352e83ad3debeed738f6608 → 8b8fb95b5bc0a7015abd12384636cf7cf106869b",
+      "pkg/hno/graph/p1r15_warnings_test.go": "不存在 → 3ea06d27abd3994130e593d297951c895729a4dd（234 行，7 个 TestP1R15_* 行）",
+      "pkg/hno/graph/scheduler.go": "61c7ba6db72b65eda938c099968e7409fc944d73 未动",
+      "pkg/hno/graph/graph_test.go": "425ea0303e1d5c5c8e95bacf57663ae94a4309ee 未动",
+      "pkg/hno/graph/p1r13_step_limit_test.go": "bc4ab8e71527809e23a12590a078add8f35d68d1 未动",
+      "pkg/hno/graph/p1r14_panic_barrier_test.go": "0ed607dbc01955864276212fa61e0902577ce7b8 未动"
+    }
+  },
+  "diffNonEmpty": {
+    "verdict": "非空：graph.go 单 hunk @@ -353,66 +353,104 @@，+72 / -34；测试文件为整文件新增。",
+    "diffRef": "artifact:/tmp/p1-cycle15/graph-go-slice15-refactor.diff"
+  },
+  "specSources": [
+    "artifact:docs/design/v3-test-scope-p1-graph.md（票面 B7 :66、公共面 :22/:27、禁止假通过 :113-119、R1 :160-166、§5）",
+    "artifact:docs/design/v3-platform.md（母约 §3.5 :208-221 判据 7/8、§3.3 步数上限 :192）",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice15.json（本片行为契约 T1-T7 与挂号项）"
+  ],
+  "standardsSources": [
+    "file:AGENTS.md（Coding Style：导出符号带 Godoc、错误小写并以 %w 包装；Testing：断言走公共面、结构判据要命令输出）",
+    "smell baseline（Fowler ch.3，12 条逐条过，见 smellBaselineSweep）"
+  ],
+  "standards": {
+    "summary": "REFACTOR 本身是净收益：判据 7/8 的重复三色 DFS 收成一个 firstCycleOf，非空非测试行从 GREEN 的 612 回到 588（起点 551），sync. 仍为 0。留下的是接口形态与文案的两类问题：调用方无法程序化识别告警，以及告警文案的长度和成本无上界声明。",
+    "findings": [
+      {
+        "id": "S15-STD-1",
+        "title": "Warnings() 的告警没有哨兵，唯一识别手段是文案子串",
+        "location": "pkg/hno/graph/graph.go:403（fmt.Errorf 直接构造）；pkg/hno/graph/p1r15_warnings_test.go:21-29（isStepLimitCycleWarning 用 ToLower+Contains）",
+        "evidence": "实测（/tmp/p1-cycle15/review/main.go，receipt:ec3b42ef-6008-400c-ac50-d945df7fe197）：errors.Is(w, graph.ErrStepLimitExceeded) = false——图上唯一的哨兵与这条告警无关，而 graph 包没有别的导出哨兵。仓库对错误有两套识别机制并存：ErrStepLimitExceeded 走 errors.Is（票面 :27 明列「哨兵」），构建期错误走文案 Contains（p1r13_step_limit_test.go:324 用 Contains(\"WithStepLimit\")）。票面 :22 只把 Warnings 定成 []error，没规定可识别性。",
+        "severity": "judgement（对 AGENTS.md「%w 包装」是偏离，但仓库已有同形先例，不算硬违规）",
+        "fix": "导出 graph.ErrNoStepLimitBudget 并以 %w 包进这条 error；测试把 errors.Is 作为主判据，Contains 降级为「文案确实点名旋钮」的附加断言。注意这是公共面新增（票面 §1 要同步），须走 test-design 而不是在 review 阶段顺手改。"
+      },
+      {
+        "id": "S15-STD-2",
+        "title": "firstCycleOf(adj, edges) 带着没被写下来的前置条件（Data Clumps / 隐性不变式）",
+        "location": "pkg/hno/graph/graph.go:415 定义，:356 与 :399 两个调用点",
+        "evidence": "两个参数必须来自同一份 g.edges：adj 是过滤后的边集，edges 只提供遍历起点。今天两个调用点都传 g.edges，行为正确；但签名允许传不相配的一对（例如 adj 用 alwaysTaken、edges 只给一半），那时起点缺失、环可能被漏报，而编译器不说。参数对（邻接表 + 声明序）本身就是一个想要诞生的小类型。",
+        "severity": "judgement",
+        "fix": "把第二个参数改成显式的种子序（func firstCycleOf(adj map[string][]string, seeds []string)），由 Graph 提供 declaredSources()；这样「谁定序」在类型上就说明了自己，注释里那条稳定性约定也随之落地为代码。"
+      },
+      {
+        "id": "S15-STD-3",
+        "title": "「全部已声明边」这条判据没有名字，只以字面闭包出现两次（Duplicated Code）",
+        "location": "pkg/hno/graph/graph.go:291 与 :399 各一处 func(edgeDecl) bool { return true }",
+        "evidence": "它不是普通样板：对判据 8 而言「环的判据取全部已声明边」正是本片刻意区别于判据 7 的那一步（契约 R15-DIVERGE-1 落点）。一个承载判据语义的谓词写成两处匿名闭包，改名或调整时容易只改一处。",
+        "severity": "judgement",
+        "fix": "提出包级具名 keep（如 allDeclaredEdges），或在 Graph 上加一个 declaredCycleAdjacency() 与 alwaysTakenAdjacency() 并列。"
+      },
+      {
+        "id": "S15-STD-4",
+        "title": "三色 DFS 把 unvisited 依赖为 0（Primitive Obsession + 隐性不变式，无注释钉住）",
+        "location": "pkg/hno/graph/graph.go:416-422",
+        "evidence": "state 是 map[string]int，未登记的键读到 0；const 块里 unvisited = iota 恰好为 0，正确性靠这个巧合。今天没有注释说明，未来谁在 unvisited 之前插一个常量就会静默把「没来过」读成别的状态。",
+        "severity": "judgement",
+        "fix": "一行注释写明「unvisited 必须保持 0：map 缺键读到的就是它」，或把 state 换成显式查询（ok 判定 + 独立枚举类型）。"
+      },
+      {
+        "id": "S15-STD-5",
+        "title": "告警文案长度 = 环长，实测 20000 节点的环给出 260KB 的 error",
+        "location": "pkg/hno/graph/graph.go:403-405（cycleOf 把整条环拼进文案）",
+        "evidence": "实测（receipt:ec3b42ef）：20000 节点链 + 一条条件回边、未设上限 → Warnings() 1 条，「文案 260134 字节」，形如 graph: cycle \"n000000\" -> \"n000001\" -> ...。Warnings() 的常见用法是 CLI 启动时打印，这条打印会把终端埋掉；票面 :119 只禁 panic/log.Fatal，没管可读性。",
+        "severity": "hard（对用户可见输出的可用性，判据来自实测而不是偏好）",
+        "fix": "渲染时截断（首尾各 k 个节点 + %d more），或只报环入口与环长。可定位性到哪一级是产品判断，需与仓库既有约定（一次只点一个可定位对象）一起裁决。"
+      },
+      {
+        "id": "S15-STD-6",
+        "title": "Warnings() 不记忆化，文档承诺了只读却没承诺成本",
+        "location": "pkg/hno/graph/graph.go:380-406",
+        "evidence": "实测（receipt:ec3b42ef）：20000 节点/20000 边的图上，首次 Warnings() 6.171ms，再问 20 次共 104.765ms（≈5.2ms/次），每次都全量走图。这是契约 T7「只读」的直接后果（记忆里化就会重演 S15 变异 (g) 的以写代读），实现是对的；缺的是文档——今天 doc 说了「不改 cfg、不消费状态」，没说「每次重算」，调用方可能把它放进循环。",
+        "severity": "judgement",
+        "fix": "doc 补一句成本说明（每次 O(V+E)，勿置于热路径），让「不记忆化」成为写下来的取舍而不是遗漏。"
+      }
+    ],
+    "positiveNotes": [
+      "REFACTOR 消除了 GREEN 挂号的 deferredToRefactor 重复，且没有把两处判据压成一个带 flag 参数的布尔开关（那会是 Repeated Switches 的雏形）。",
+      "rejectUnconditionalCycles 现在 3 行委托但不只是转发：它仍持有判据 7 的语义与文案归属，因此不算 Middle Man。",
+      "新增测试全在外部测试包 graph_test，结构上读不到私有面；time.Sleep 0 次，符合票面 §4.1/§9。"
+    ],
+    "smellBaselineSweep": {
+      "Mysterious Name": "未见（firstCycleOf/cycleOf/alwaysTakenAdjacency 都表达了各自持有的判据）",
+      "Duplicated Code": "命中 → S15-STD-3（另一处大的 DFS 重复本轮已消除）",
+      "Feature Envy": "未见",
+      "Data Clumps": "命中 → S15-STD-2（adj + 声明序这一对参数）",
+      "Primitive Obsession": "命中 → S15-STD-4（int 状态码 + 零值语义）",
+      "Repeated Switches": "未见",
+      "Shotgun Surgery": "已修复项：合并前「改环遍历」要碰判据 7/8 两处，现在一处",
+      "Divergent Change": "未见（graph.go 仍按「构建期校验」单一原因变化）",
+      "Speculative Generality": "未见（没有为 v3.x 预留参数或钩子）",
+      "Message Chains": "未见",
+      "Middle Man": "未见（见 positiveNotes 第 2 条）",
+      "Refused Bequest": "不适用（无继承层级）"
+    }
+  },
+  "spec": {
+    "summary": "B7 的四个子句都有行覆盖并实测通过；真正的问题在文案的「预测」：它声称了 Run 会怎样停，而这句话在它自己的正例上就不成立。判据 8 的字面触发集为空这件事仍未裁决。",
+    "findings": [
+      {
+        "id": "S15-SPEC-0",
+        "title": "票面 B7 满足（逐子句映射）",
+        "location": "docs/design/v3-test-scope-p1-graph.md:66",
+        "evidence": "票面原文：「含合法条件环且未显式 WithStepLimit 的图：Validate() 为 nil、Run 正常、Warnings() 含该告警；显式设置后 Warnings() 不含它」。四个子句分别由 T1（:48 判 Validate 为 nil + 告警在场）、T4（:117 判 Run 结果等于实现前实测的 completed=[entry,ping]/output=seed）、T1+T5（含环形状与自环）、T2（显式设置后不含）承担；:27 对 WithStepLimit 的注解「未显式设置时参与判据 8 告警」正是 cfg.stepLimitSet 这个触发位的规格依据。§9 禁止条款：Warnings 路径无 panic、无 log.Fatal，Validate 的 error 未被污染（graph.go 内 Warnings 不触碰 reject*，实测非法图 Validate 仍返回原致命错误）。",
+        "severity": "pass"
+      },
+      {
+        "id": "S15-SPEC-1",
+        "title": "告警文案预测了 Run 的停止方式，且这句话在正例与非法图上都为假",
+        "location": "pkg/hno/graph/graph.go:404（\"so Run stops only when the default stepLimit=%d is reached\"）",
+        "evidence": "两处反证。(1) 非法图：实测（receipt:ec3b42ef）无条件环图上 Validate() 返回「every edge on it is always taken, so Run cannot terminate」，而 Warnings() 同时说 Run 会停在 stepLimit=1000 —— scheduler.go:60 让 Run 在 Validate 失败时立即返回，那次 Run 连一步都没跑，谈不上停在默认预算。(2) 合法正例：本片 T4 自己实测这张图的 Run 是「收敛返回、completed=[entry,ping]」，即 Run 并不停在 1000，停在自己的收敛上。文案原意是「你手上唯一的兜底是默认 1000」，写成「Run 只在……时才停」是一句会兑现不了的断言。这与 GREEN 阶段的 S15-GREEN-1 同形（当时删掉的是「被构建期放行」那半句），说明「文案能不能提到 Run 的结果」还没有任何判据在管——只有 T1 的关键词判据（step/limit + cycle/loop）在管，它既不会放过这句假话，也不会保护它。",
+        "severity": "hard（用户可见文本不真实；修法最小且不动行为）",
+        "fix": "把预测改成中性的条件句，例如 \"...so no budget was chosen; the default stepLimit=%d is what would apply.\"；同时在母约 §3.5 或票面 §9 立一条判据：构建期提示不得断言某次 Run 的实际结果（除引用配置值与默认值）。本轮不动实现——review 阶段只出结论，且文案改动需要一句能守住它的断言，那属 test-design。"
+      },
+      {
+        "id": "S15-SPEC-2",
+        "title": "母约判据 8 的字面触发集为空（未裁决，本片按票面读法实现）",
+        "location": "docs/design/v3-platform.md:220-221",
+        "evidence": "判据 7 原文「合法环需由条件边构成，无条件边成环 = 错误」；判据 8 原文「stepLimit 校验：存在无条件环时若未设 stepLimit → 警告」。能被 7 放行的环必然含条件边，故 8 的「存在无条件环」永远与「Validate 通过」互斥。实现取票面 B7 的「合法条件环」，即把 8 读作「能被放行的环」；这不是我能单方裁决的规格矛盾。",
+        "severity": "hard（规格层，需要人工写回母约措辞）",
+        "fix": "母约 :221 改为「存在环（判据 7 放行但会被谓词恒真推爆）时若未显式设 stepLimit → 警告」，并记 R15-DIVERGE-1 已闭环。"
+      },
+      {
+        "id": "S15-SPEC-3",
+        "title": "本片的 REFACTOR 改了判据 7 的代码路径，属跨族改动（授权面待确认）",
+        "location": "pkg/hno/graph/graph.go:355-360（判据 7 委托给共享 helper）",
+        "evidence": "票面 §5 授权的是「新增同包测试文件」，B7 的范围内没有要求动 B5 的实现。合并本身有净收益（去掉 28 行重复），且 B5 族 11 个 Test 函数与 -count=5 -race 全绿背书，但「谁有权在 B7 的周期里重构 B5 的落点」这件事没有写下来的授权。",
+        "severity": "judgement",
+        "fix": "要么在票面/交付文档承认「共享遍历收口属当前 REFACTOR 权限」，要么把跨族合并划成独立 behavior-preserving-hardening 工作项。二者都能接受，静默默认不行。"
+      },
+      {
+        "id": "S15-SPEC-4",
+        "title": "矩阵存活项＝规格未覆盖面（照实登记，不当作测试失败）",
+        "location": "artifact:docs/design/v3-p1-graph-slice15-refactor.json matrixFoundGap",
+        "evidence": "变异 (h)（同一次询问交出多条 error）与 (i)（文案里的环名写死）都在 7 行全绿下存活；另外 (f)（起点改用 map 序）让判据 7 与 8 共用的遍历漂动，却只有 B7 的 T6 判红——graph_test.go:710/:1252 的锚点是「前缀 + 环上节点名集合」的 Contains，环被旋转报出时两个节点名仍在。也就是说：告警条数、环名真实性、判据 7 文案的顺序稳定性，三处都没有规格在管。",
+        "severity": "judgement",
+        "fix": "三条各自登记为待裁决（S15-REFACTOR-1/2/3）：条数建议钉成「恰好一条」；环名真实性建议加一行「告警点名的节点必须构成图里的一条环」；判据 7 稳定性要么加顺序敏感锚点，要么把 doc 的承诺降格为「报出环上的节点」。"
+      },
+      {
+        "id": "S15-SPEC-5",
+        "title": "既有未裁决/遗留项本片未触碰，继续 carried",
+        "location": "R15-UNADJ-1/2、B7-AMEND-1、S14-SPEC-1/2/3/4、S14-STD-1/2/5",
+        "evidence": "R15-UNADJ-1（非法图上 Warnings 该说什么）本轮由 S15-SPEC-1 的实测推进了一步但没有裁决；R15-UNADJ-2、S14-SPEC-1（谓词 panic 归属：谓词在生产者 goroutine 里跑，被 scheduler.go runNode 的 recover 兜住还是逃逸需实测）、S14-SPEC-4/B8（WithMaxConcurrency 文档 vs 全包 0 读点，发布阻塞候选）状态不变。",
+        "severity": "carried"
+      }
+    ]
+  },
+  "measuredDuringReview": {
+    "why": "独立性降级下唯一的补偿手段：能用实跑判定的判断就不用走查支撑。",
+    "probe": "artifact:/tmp/p1-cycle15/review/main.go（仓库外独立 module，replace 指向本仓库，只用导出面）",
+    "receiptRef": "receipt:ec3b42ef-6008-400c-ac50-d945df7fe197",
+    "observations": [
+      "合法条件环 + 未设上限 → Validate nil、Warnings 1 条、errors.Is(w, ErrStepLimitExceeded)=false（支撑 S15-STD-1）。",
+      "无条件环（非法图）→ Validate 致命错误与「Run stops only when the default stepLimit=1000」同时出现（支撑 S15-SPEC-1 (1)）。",
+      "环图 + WithStepLimit(0) → Validate 拒绝预算、Warnings 0 条：致命语义独占（记为观察，不作缺陷）。",
+      "20000 节点链 + 条件回边、未设上限 → Validate nil 22.516ms、首次 Warnings 6.171ms、再 20 次 104.765ms、文案 260134 字节，无栈溢出（支撑 S15-STD-5/6；递归 DFS 在 20000 层深度上安全，这条此前只是猜测）。"
+    ],
+    "notMeasured": "golangci-lint 未安装（command -v golangci-lint 失败），make lint 本轮未运行；结论不含 lint 干净这一项。"
+  },
+  "verdict": {
+    "result": "request-changes",
+    "blocking": ["S15-SPEC-1（文案对 Run 的假断言，最小修法：改成条件句并立一条措辞判据）", "S15-STD-5（260KB 级用户可见文案，需要渲染上限）"],
+    "nonBlockingButMustBeAdjudicated": ["S15-STD-1", "S15-SPEC-2", "S15-SPEC-3", "S15-SPEC-4", "R15-UNADJ-1/2", "B7-AMEND-1", "S14-SPEC-1/2/4"],
+    "authorNote": "两条 blocking 都不需要动 B7 的行为判据：一条删/换半句文案，一条给环的渲染加上限。二者都各缺一句能守住它的断言，因此正确的下一步是新的 test-design Command，而不是我在 review 阶段直接改实现。"
+  },
+  "nextSliceOrder": [
+    "1) B7 文案回修（S15-SPEC-1 + S15-STD-5）：新 test-design 立「提示不得断言 Run 结果」与「环渲染有界」两条判据，再走 TDD。",
+    "2) S14-STD-1/5 + S15-STD-2/3/4 合并成一个 hardening 工作项（测试夹具里的重复 deadline runner、helper 签名与隐性不变式注释）。",
+    "3) B8 WithMaxConcurrency：要么实现，要么显式降级文档（S14-SPEC-4，发布阻塞候选）。",
+    "4) B11 Typed 的覆盖补齐。",
+    "5) 人工写回：母约 :221 判据 8 措辞（S15-SPEC-2）、谓词 panic 归属（S14-SPEC-1）、告警条数与环名真实性（S15-REFACTOR-1/2）。"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-slice15-refactor.json",
+    "artifact:docs/design/v3-p1-graph-slice15-green.json",
+    "artifact:docs/design/v3-p1-graph-slice15-red.json",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice15.json",
+    "artifact:docs/design/v3-testability-decision-p1-graph-slice15.json",
+    "file:pkg/hno/graph/graph.go",
+    "file:pkg/hno/graph/p1r15_warnings_test.go",
+    "receipt:ec3b42ef-6008-400c-ac50-d945df7fe197"
+  ]
+}

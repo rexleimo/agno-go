@@ -1,0 +1,123 @@
+{
+  "schema": "rex.tdd-green-record.v1",
+  "workItemKey": "work-p1-graph-engine-r9-output-contract",
+  "activationId": "b0469c9c-438d-4ac7-b3b5-34bd3bcedd87",
+  "stageId": "green",
+  "contractRef": "docs/design/v3-test-scope-p1-graph-slice9.json",
+  "implementationDiff": {
+    "files": [
+      "pkg/hno/graph/graph.go"
+    ],
+    "changed": [
+      {
+        "what": "Validate 在入口存在性检查之后增加输出声明存在性检查",
+        "code": "if _, ok := g.nodes[g.output]; !ok { return fmt.Errorf(\"graph: output node %q does not exist\", g.output) }",
+        "lines": "pkg/hno/graph/graph.go:225-227（GREEN 之后）",
+        "why-minimal": "复用与入口检查完全同构的一次 map 查找，不新增类型、不新增导出 API、不改调度器。Run 已在最前调用 Validate 并原样传达错误，因此拒绝面自动覆盖两个公共入口。"
+      },
+      {
+        "what": "Validate 的 GoDoc 从「四项」改为「五项」并列入输出项",
+        "lines": "pkg/hno/graph/graph.go:216-220",
+        "why-minimal": "注释必须与函数体同真，否则本轮自己制造 slice8 S8-STD-1 那一类失效注释。"
+      },
+      {
+        "what": "SetOutput 的 GoDoc 说明「名字不合法会被 Validate 拒绝」",
+        "lines": "pkg/hno/graph/graph.go:208-210",
+        "why-minimal": "这是调用方本轮新获得的可观察契约，只能写在入口方法上。"
+      }
+    ],
+    "untouched": "pkg/hno/graph/scheduler.go 与 GREEN 之前逐字节相同（哈希仍 87854ffbb7629f9adeb2d45fbb74d91f2032b99d）；测试文件在 RED 之后未被修改（哈希仍 e314979c341a8033df1ed60f6096e3d1c5236384）。",
+    "numstatAgainstFixedPoint": "pkg/hno/graph/graph.go 96 16；pkg/hno/graph/graph_test.go 634 0；pkg/hno/graph/scheduler.go 51 11（后两者中的测试增量 545→634 全部来自本轮新增的 RED 测试，删除行数仍为 0）",
+    "lineRefNote": "slice9 的 RED 账本与 testability 决定里引用的 pkg/hno/graph/graph.go:219-238 是 GREEN 之前 Validate 的行范围；加入输出检查后该函数为 221-243，两处指向同一函数体，不是矛盾。"
+  },
+  "green": {
+    "command": "go test ./pkg/hno/graph/... -run TestP1G_ValidateRejectsMissingOrUnknownOutput -count=1 -v",
+    "cwd": "/Users/rex/codes/agno-go",
+    "exitStatus": 0,
+    "receiptRef": "receipt:d09d0e0f-e349-4d61-8a94-75777ee00170",
+    "behaviorsNowObserved": [
+      "A1 never-declared 行绿：Validate 返回 graph: output node \"\" does not exist，Run 返回 err!=nil 且 res==nil",
+      "A2 not-a-node 行绿：Validate 返回 graph: output node \"ghost\" does not exist，Run 同步拒绝",
+      "A3 对照绿：合法输出节点的 Output() 仍等于其返回值",
+      "A4 对照绿：合法输出节点返回 nil 时图仍合法、Run 仍成功，且 Value(\"n\") 的 ok 为 true"
+    ],
+    "noAssertionWeakened": "GREEN 期间未改任何断言、未删用例、未加跳过；实现变更前后测试文件哈希一致。"
+  },
+  "mutationAttribution": [
+    {
+      "id": "M1-absent-check",
+      "mutation": "删掉新加的输出存在性检查（回到本轮之前的实现）",
+      "killedBy": "TestP1G_ValidateRejectsMissingOrUnknownOutput 的 never-declared 与 not-a-node 两行",
+      "expectedExit": 1,
+      "receiptRef": "receipt:795383c7-f346-4a7a-8739-78d32d706a2f",
+      "note": "同一条命令、同一份测试文件；这条即本轮的行为级 RED，也是「实现缺失」这一变异体的杀伤证据。",
+      "unique": false
+    },
+    {
+      "id": "M2-degraded-to-non-empty",
+      "mutation": "把 g.nodes[g.output] 查找降级为 g.output == \"\" 判空",
+      "killedBy": "not-a-node 单行判红（graph_test.go:533），其余三行全绿",
+      "expectedExit": 1,
+      "receiptRef": "receipt:2665050f-2d1a-4963-8f1b-57a8e5a09f7d",
+      "unique": true,
+      "why": "证明契约 falsePassProhibitions 第一条被真实守住：新校验是「节点存在性」，不是「字符串非空」。"
+    },
+    {
+      "id": "M3-over-tightened-on-value",
+      "mutation": "在 consume 收敛处加 if s.result.output == nil 即报错（按输出值判非法）",
+      "killedBy": "对照行「合法输出节点返回 nil 不是非法声明」判红（graph_test.go:578），三条拒绝/成功行全绿",
+      "expectedExit": 1,
+      "receiptRef": "receipt:f6e70495-a388-4b60-9647-65d9f9cf9e5e",
+      "unique": true,
+      "why": "A4 对照不是装饰：它对「校验越界到输出值」这一类实现有独立检测力。"
+    }
+  ],
+  "mutationHygiene": "变异前把 graph.go/scheduler.go 备份到 /tmp/p1-cycle9/*.green，每次跑完立即还原并核对 git hash-object：还原后 eeb07f1c27a12fcf082d37e92b89c153e7e6fb80 / 87854ffbb7629f9adeb2d45fbb74d91f2032b99d / e314979c341a8033df1ed60f6096e3d1c5236384，与 GREEN 记录逐字节一致。",
+  "affectedBoundary": {
+    "receiptRef": "receipt:43b9efbc-2e14-47ed-b635-1eb8fb7a85e5",
+    "checks": [
+      "go build ./...",
+      "go vet ./pkg/hno/graph/...",
+      "gofmt -l pkg/hno/graph 为空",
+      "go test ./pkg/hno/graph/... -count=1 -race",
+      "go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1"
+    ],
+    "packageCounts": "pkg/hno/graph 全包 43 PASS / 0 FAIL",
+    "importers": "仓库内无其它包 import pkg/hno/graph（grep 无命中），因此本轮新增构建期拒绝不会打断任何既有调用方。"
+  },
+  "downstreamScenario": {
+    "module": "/tmp/p1-invariants-r9（仓库外，独立 go.mod + replace 指回本仓库，只用导出面）",
+    "receiptRef": "receipt:5ffde403-20f4-45ef-8c0a-b3715f840774",
+    "exitStatus": 0,
+    "observed": [
+      "legal-dag OK ran=2 output=B",
+      "legal-conditional OK ran=3 output=D",
+      "legal-nil-output OK ran=2 output=<nil>",
+      "output-never-declared OK rejected with zero node executions (graph: output node \"\" does not exist)",
+      "output-not-a-node OK rejected with zero node executions (graph: output node \"ghost\" does not exist)",
+      "其余 7 行拒绝与 slice8 相同：rejected with zero node executions",
+      "output-unreachable GAP accepted: err=<nil> output=<nil> completed=[a b] executed=2",
+      "INVARIANTS-OK"
+    ],
+    "changedVsSlice8": "slice8 里两行 GAP（output-not-a-node / output-never-declared）本轮依据新契约改判为 reject 断言并真实判绿；同时新增 legal-nil-output 接受行，把「不得按输出值收紧」这条边界搬到包外公共入口再验一次。"
+  },
+  "stillOpen": {
+    "measured": "输出节点已注册但本次执行未到达它 → 依旧 err==nil、Output()==nil（上面 output-unreachable 行，executed=2）。",
+    "disposition": "属 §3.5 第 4 项「不可达节点」，契约 explicitNonGoals 已把它排除在本切片之外，登记为下一轮 B6-不可达 RED 的首个观察面。",
+    "notHiddenAsPass": "该行在场景模块里以 GAP 前缀打印且不计入 failures，是测量而非断言。"
+  },
+  "owedFromEarlier": {
+    "A5-s8-std-5": "悬空端点表驱动行的 Run 面补判 res==nil —— 契约列为本切片 in-scope 行为，但它是纯测试强度、且需要单点变异证据；留到 REFACTOR 阶段与结构折叠分开处理，不在 GREEN 里混做。",
+    "others": "S8-STD-2/3/4、S8-SPEC-2/3、C6-STD-1/3/4、B4/B5/B2 等仍挂账，见 slice8 审查 verdict。"
+  },
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-slice9-green.json",
+    "receipt:d09d0e0f-e349-4d61-8a94-75777ee00170",
+    "receipt:795383c7-f346-4a7a-8739-78d32d706a2f",
+    "receipt:2665050f-2d1a-4963-8f1b-57a8e5a09f7d",
+    "receipt:f6e70495-a388-4b60-9647-65d9f9cf9e5e",
+    "receipt:43b9efbc-2e14-47ed-b635-1eb8fb7a85e5",
+    "receipt:5ffde403-20f4-45ef-8c0a-b3715f840774",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice9.json#completionCriteria"
+  ]
+}

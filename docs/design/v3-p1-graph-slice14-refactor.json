@@ -1,0 +1,114 @@
+{
+  "schema": "rex.tdd.stage-ledger.v1",
+  "workItemKey": "work-p1-graph-r14-panic-to-error",
+  "workflowActivationId": "2accb916-dddf-4677-989a-9287610c6514",
+  "activationId": "d227e859-09db-4d51-abb1-547eecc8f82c",
+  "capabilityId": "software.testing.tdd",
+  "stage": "refactor",
+  "recordedAt": "2026-09-27T13:35:00Z",
+  "previousStageCarried": "GREEN 已接受：实现字节 scheduler.go=61c7ba6d…，graph.go 零改动，族级通过回执 receipt:3200a119-0b65-4bf3-a8d7-15d09811d1bf，包级 -race 回执 receipt:5affbe76-bc9f-4b1a-9752-04c77c4d2de6。本阶段实现字节保持不变（矩阵结束后实测 hash 仍为 61c7ba6d…）。",
+  "refactorApplied": {
+    "implementation": "无。scheduler.go 与 graph.go 在本阶段一字未改，矩阵跑完复核 hash-object 仍等于 GREEN 登记值。",
+    "testSide": "只有一处清晰度修改：契约 T2 的 runtime error 行原本用 len(in)-len(in) 造零再除，是为了绕开常量折叠而写的取巧式，读起来像谜题。改为向 nil map 赋值（writes[\"boom\"] = \"boom\"）——同样是真实 runtime.Error，且正是宿主里最高频的那一类（漏初始化的 map），不再需要任何算术花招。行名随之改为 runtime-error-nil-map，注释同步。",
+    "testFileHash": {
+      "before": "86f4425bc5a20f98eb9a98a0f355dee56fc298d6",
+      "after": "0ed607dbc01955864276212fa61e0902577ce7b8"
+    },
+    "behaviorStillConstrained": "改的是崩溃的产生方式，不是断言：三条 T2 行的期望仍是「Run 交出非 nil error 且不交出 Result」，且矩阵里 M3 的指定击杀行仍包含本行。"
+  },
+  "mutationMatrix": {
+    "method": "只在 scheduler.go 上造错实现（测试字节全程不动），每个 mutant 跑其指定击杀行 3 次；行与行单独 -run，因为 panic 会终止测试二进制，族级命令只能观察到第一条死亡。判定标准：该 mutant 的指定击杀行在每一次试验里都非零退出，即记为击杀（不要求全族红集相同——那是切片 13 已修正过的判据）。脚本 /tmp/p1-cycle14/matrix.py，退出码 0。",
+    "mutants": [
+      {
+        "id": "M1",
+        "wrongImplementation": "recover 了但把失败咽下：out, err = nil, nil",
+        "designatedKiller": ["TestP1R14_NodePanicBecomesRunError"],
+        "trials": "exits=[1,1,1]",
+        "result": "KILLED"
+      },
+      {
+        "id": "M2",
+        "wrongImplementation": "恢复出错误却没交给唯一消费者（goroutine 直接 return）：running 永不归零",
+        "designatedKiller": ["TestP1R14_PanicWhileSiblingInFlightStillReturns"],
+        "trials": "exits=[1,1,1]",
+        "result": "KILLED",
+        "note": "这条正是契约 T4 立项时指定的假想错实现，矩阵证明 T4 确实抓得住它。"
+      },
+      {
+        "id": "M3",
+        "wrongImplementation": "只对 panic(string) 生效，其他值 re-panic",
+        "designatedKiller": ["…/error-value", "…/runtime-error-nil-map"],
+        "trials": "两行各 exits=[1,1,1]",
+        "result": "KILLED",
+        "note": "证明 T2 的三行不是重复：只覆盖 string 的实现在 string 行绿、在两行红。"
+      },
+      {
+        "id": "M4",
+        "wrongImplementation": "错误文案丢掉节点名（graph: node panicked while running: %v）",
+        "designatedKiller": ["TestP1R14_PanicErrorNamesThePanickingNode"],
+        "trials": "exits=[1,1,1]",
+        "result": "KILLED"
+      },
+      {
+        "id": "M5",
+        "wrongImplementation": "把输出节点也写进现场（node \"bad\" (output node \"ok\") panicked…）",
+        "designatedKiller": ["TestP1R14_PanicErrorNamesThePanickingNode"],
+        "trials": "exits=[1,1,1]",
+        "result": "KILLED",
+        "note": "与 M4 是相反方向的错（少点名 vs 多点名），两向都被 quotedNames 集合判据抓住——这正是沿用切片 12 名字牙齿法想要的效果。"
+      },
+      {
+        "id": "M6",
+        "wrongImplementation": "节点自身 return 的 error 也被并进 panic 文案（用 %w 保留 errors.Is）",
+        "designatedKiller": ["TestP1R14_NodeReturnedErrorKeepsItsIdentity"],
+        "trials": "exits=[1,1,1]",
+        "result": "KILLED",
+        "note": "这是全矩阵最刁的一条：errors.Is 因 %w 仍成立，只有「普通错误不得被写成 panic 文案」那半个断言能杀它，对照行 T6 因此不是装饰。"
+      },
+      {
+        "id": "M7",
+        "wrongImplementation": "屏障放错层：去掉生产者帧里的 recover，改在 Run 上 defer recover",
+        "designatedKiller": ["TestP1R14_NodePanicBecomesRunError"],
+        "trials": "exits=[1,1,1]",
+        "result": "KILLED",
+        "note": "调用方 goroutine 上的 recover 接不到别的 goroutine 的 panic —— 这条被杀说明测试真的在验证母约 §3.3:182 指定的那一层，而不是「反正有人兜住」。"
+      }
+    ],
+    "survivors": "无（7/7 击杀）。",
+    "matrixFoundGap": "本轮没有因矩阵而新增行为行：设计阶段已按同一批错实现假想把 T4/T6 写进契约，矩阵的作用是确认它们真的有牙齿。T8（节点 defer 先跑完）未列入 mutant 的指定击杀行——诚实说明：本轮没能构造出一个可信的单行错实现来击杀它（任何位于节点帧之上的 recover 都会让 defer 先跑完），所以 T8 目前是没有变异证据的守卫行，它的价值是把「屏障必须站在节点帧之外」写进可执行文档。"
+  },
+  "testDiffReview": {
+    "question": "测试差异约束的是用户可观察行为，还是实现细节？",
+    "answer": "公共入口只用 graph.New/AddNode/NodeFunc/AddEdge/SetEntry/SetOutput/Run；断言只用 Run 的两个返回值、测试自备的计数器、以及 err.Error() 的引号集合。没有读 scheduler 字段、queue 长度、running 计数或 goroutine 数（票面 §1 禁观察面），没有新增导出面，没有 mock。",
+    "implementationCouplingChecked": [
+      "T3 断言文案含 \"panic\" 一词与节点名 —— 这是对「错误可定位」这一用户可观察性质的约束，不是对 fmt 格式串的约束：任何等价文案（改词但保留节点名与 panic 语义）都仍绿，M4/M5 证明它会为真正的归属错误而红。",
+      "T8 的计数器由测试自己的节点体提供，读的是「panic 展开时节点清理是否已跑完」这一调用方语义，不依赖 recover 的具体写法。",
+      "T4 用 channel gate 制造真实的在途状态，deadline 只作为「永不返回」的判定兜底，未用于任何定序（票面 §4.1）。"
+    ],
+    "falsePassProhibitionRechecked": "没有删断言、没有 skip、没有放宽期望、没有只测 helper。RED 阶段那条 t.Skip 想法（把 runtime error 塞进表里预置）已在成文时自我否决，最终形态是让崩溃在节点体内现场发生。"
+  },
+  "structuralCriteriaFinal": {
+    "B12_zeroLock": "非测试文件 sync. 出现次数 0（实测）。恢复值只经 queueItem → 唯一消费者，崩溃 goroutine 不写 scheduler 字段。",
+    "B13_size": "非空非测试 LOC 551（切片 13 收尾为 536，本片 +15），上限 1500。",
+    "toolchain": "gofmt -l 无输出、go vet ./pkg/hno/graph/... 干净、go test ./pkg/hno/graph/... -count=1 -race 全绿（1.122s）。",
+    "existingTestBytes": "graph_test.go=425ea030…、p1r13_step_limit_test.go=bc4ab8e7… 与切片 13 登记值全等：既有测试零改动。",
+    "publicBoundary": "仓库外探针复核（/tmp/p1-cycle14）：node-panic 与 sibling-panic 从 exit=1 进程死亡变为 exit=0 且 Run 返回命名节点的错误；pred-panic 仍 exit=1 —— 契约 R14-REJECT-1 拒绝扩权的那一面行为未变，属被测量确认而非推断。"
+  },
+  "processIncident": {
+    "id": "S14-PROC-1",
+    "what": "矩阵脚本因自己漏了一个 kill 键而中途抛异常，把 M6 的变异字节留在了工作树里（scheduler.go 一度是 65815209…）。",
+    "howDetected": "下一次核对 hash 时发现不等于登记值 —— 这正是「进场即快照基线字节」这条流程债还掉之后才可能立刻发现的问题：切片 13 登记的做法让恢复有了可比对的锚。",
+    "cure": "手工反向编辑还原后实测 hash 回到 61c7ba6d…；脚本改为 try/finally 无条件 restore()，并在结尾自校验 hash。规则写进脚本注释：变异工具崩溃时默认动作必须是还原，而不是保留现场。",
+    "carried": "登记为已修，不再欠。"
+  },
+  "owed": {
+    "thisSlice": "T8 缺变异证据（见 matrixFoundGap）；谓词 panic 逃给调用方这一事实在公共文档里没有说明（母约 §3.3:182 只指派生产者）。",
+    "stillOpenFromP1": "B7 Warnings() 判据 8（本包断言数为 0）；B8 WithMaxConcurrency 导出即空转（S13-SPEC-4，发布阻塞）；B11 Typed 覆盖（断言数为 0）；S13-STD-1/2/5 测试形状与注释项；P0 遗留 judgement 项（内核 Stop 枚举拆分）另立工作项。"
+  },
+  "finalReceipts": {
+    "refactorCheck": "receipt:a2820f9f-fdd5-4dae-be95-90e3abef224a（场景命令 go test ./pkg/hno/graph/... -run TestP1R14 -count=1 -timeout 25s -v，exit 0，测试字节 0ed607db…）",
+    "greenCarried": "receipt:3200a119-0b65-4bf3-a8d7-15d09811d1bf",
+    "raceSuite": "receipt:5affbe76-bc9f-4b1a-9752-04c77c4d2de6",
+    "redFamily": "receipt:e8978e57-4568-49a9-8669-c5344d628b1b"
+  }
+}

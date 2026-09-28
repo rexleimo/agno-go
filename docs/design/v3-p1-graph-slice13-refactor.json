@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.tdd-refactor-record.v1",
+  "workItemKey": "work-p1-graph-r13-step-limit-enforcement",
+  "activationId": "96d7d121-ae44-4d64-890c-7153f8daaa94",
+  "stageId": "refactor",
+  "capabilityId": "software.testing.tdd",
+  "recordedAt": "2026-09-27T13:05:10Z",
+  "scopeContract": "artifact:docs/design/v3-test-scope-p1-graph-slice13.json",
+  "redRecord": "artifact:docs/design/v3-p1-graph-slice13-red.json",
+  "greenRecord": "artifact:docs/design/v3-p1-graph-slice13-green.json",
+
+  "productionChangeDuringRefactor": {
+    "changed": false,
+    "proof": "pkg/hno/graph/graph.go 仍为 git blob a189a8692c0364266352e83ad3debeed738f6608、scheduler.go 仍为 18a98a6069e0477953369ef81ad0071a012b9779 —— 与 GREEN 收尾字节逐字节相同（变异矩阵每次注入后都写回并断言这两个值，脚本结束时再测一次）。",
+    "decision": "没有做整理：本片新增逻辑一共 61 行，dispatch 的判定与计数各一行，New 的默认落点三行，声明类拒绝一个私有 helper。唯一的重复候选是 runBounded 与既有 runWithinLimit 的形状相似，但两者判据相反（一个把「不自退出」当构建期拒绝信号，另一个要求 Run 自己带哨兵回来），合并会把两条判据揉成一句含糊的话 —— 按「没有明确收益时保留简单实现」留下。"
+  },
+
+  "structuralCriteriaReMeasured": {
+    "B12-zero-lock": "pkg/hno/graph 非测试文件里 sync. 出现 0 次；steps 只由消费者 goroutine 自增（scheduler.go:45 的唯一写者清单已补上它）。",
+    "B13-size": "两个生产文件非空行 536 行，票面上限 1500。",
+    "gofmt": "gofmt -l pkg/hno/graph/ 无输出",
+    "vet": "go vet ./pkg/hno/graph/... 退出 0",
+    "coverage": "整包 go test -cover 94.5%（切片 11 记录的是 89.7%）；被本轮改动/新增的函数逐个看：New 100%、rejectInvalidStepLimit 100%、scheduler.Run 100%、dispatch 100%、consume 92.3%。",
+    "existingTestsUntouched": "graph_test.go 仍为 blob 425ea0303e1d5c5c8e95bacf57663ae94a4309ee（0 增 0 删）。"
+  },
+
+  "mutationMatrix": {
+    "script": "/tmp/p1-cycle13/matrix.py（仓库外，7 个变异 × 各 3 次重复）",
+    "criterion": "变异体被「指定杀手行」在每一次重复里都判红才算杀死；其它行的增减只作观察。特别说明：早期版本把「整套红集合三次一致」当判据，于是 M3 会让 T2 的精确计数与 goroutine 调度赛跑（变异体可以在最后一步的节点体还没跑上时就返回超限），那是变异体的性质而不是测试的性质，不能反过来记成测试没牙齿。",
+    "pseudoMutantCheck": "7 个变异全部给出可行级断言失败，无一个停留在编译失败（「非变异」）；每次注入后立刻写回基线并断言哈希全等。",
+    "baseline": "注入前整族 8 行全绿、退出 0（三次重复的基线运行都是 failed=[]）。",
+    "survivors": [],
+    "mutants": [
+      {"id": "M1-complete-counting", "shape": "把 steps++ 从派发处搬到 complete()", "killedBy": ["T1b"], "trials": "3/3 稳定"},
+      {"id": "M2-gt-not-ge", "shape": "s.steps > s.stepLimit（多放一步）", "killedBy": ["T1", "T1b", "T2", "T4"], "trials": "3/3 稳定，红集合完全一致"},
+      {"id": "M3-check-after-spawn", "shape": "先 spawn 再判超限", "killedBy": ["T1c"], "observed": "T1/T4 也一起红，T2 只在部分重复里红（变异体自身时序），T1c 三次全红", "trials": "3/3 由 T1c 杀死"},
+      {"id": "M4-no-default-budget", "shape": "删掉 New 里的 defaultStepLimit 落点", "killedBy": ["T2"], "trials": "3/3 稳定"},
+      {"id": "M5-no-declaration-check", "shape": "删掉 Validate 里的 rejectInvalidStepLimit 调用", "killedBy": ["T6"], "trials": "3/3 稳定"},
+      {"id": "M6-budget-not-per-run", "shape": "计数改成包级变量（预算挂在进程/图上）", "killedBy": ["T4"], "observed": "T1c/T2/T3/T5 连带变红，符合「全局预算会污染后续 Run 与对照行」的预期", "trials": "3/3 稳定"},
+      {"id": "M7-cancel-masked-as-limit", "shape": "consume 的 ctx.Done 分支返回包装 ErrStepLimitExceeded 的错误", "killedBy": ["T5"], "trials": "3/3 稳定"}
+    ]
+  },
+
+  "matrixFoundGap": {
+    "row": "T1c TestP1R13_ExactlyBudgetedGraphStillSucceeds（REFACTOR 期间新增，3 步链 + WithStepLimit(3) 必须成功）",
+    "how": "第一轮矩阵里 M3（先派发再判）在 T1b 上存活。分析后确认：M3 与正确实现在「超限图」上给出的启动数完全一样，只有「正好用满预算就收敛」的图能分辨 —— 那种图会被 M3 说成超限失败。原行为族没有这一形状，于是安全阀「提前介入」这个用户可观察错误没有担保。",
+    "inScopeJustification": "契约 T1 的原文包含「被启动的激活数恰好是 n（上限既不提前也不放宽）」。这条行钉的就是「不提前」半边，因此它不是新增范围，而是把 T1 已经承诺、却没有被任何行覆盖的那一半补上。范围变更未发生：票面 B4、契约 T1 文字均未改。",
+    "effect": "补行后 M3 由 T1c 三次全红杀死，整套矩阵存活数归零。",
+    "greenRecordStillValid": "GREEN 的回执（receipt:40242247-…）是在 7 行族、同一份生产字节上取得的，仍然成立；最终 8 行字节由本阶段的回执覆盖（见 finalReceipts）。"
+  },
+
+  "testDiffReview": {
+    "files": {
+      "pkg/hno/graph/p1r13_step_limit_test.go": "新增文件，342 行、8 个 TestP1R13_* 行函数、36 个断言点，最终 blob bc4ab8e71527809e23a12590a078add8f35d68d1（/tmp/p1-cycle13/p1r13_step_limit_test.go.final 同值）",
+      "pkg/hno/graph/graph_test.go": "0 变更（425ea030 未动）：没有删除、跳过、放宽或改写任何既有断言",
+      "deletions": "本片对既有测试的删除行数为 0"
+    },
+    "publicEntryOnly": "全部断言都落在导出面：graph.New / WithStepLimit / AddNode / AddEdge / AddConditional / SetEntry / SetOutput / Validate / Run / Result.Output / Result.Completed / NodeFunc / ErrStepLimitExceeded，以及调用方自己提供的节点体计数。scheduler 字段、queue 长度、goroutine 数、内部计时一次都没读。",
+    "timingDiscipline": "time.Sleep 出现 0 次。两处 time.After（:72、:274）只作「永不返回」的兜底判红，不用来给并发定序；批次时序由 T1b 的 channel gate（x 阻塞到测试结束）决定，属于票面 §4.1 要求的显式握手。",
+    "noMockSubstitute": "没有任何行用「helper 被调用过」代替行为断言；计数都来自真实执行过的节点体。",
+    "assertionsThatRace": "记录一条曾被本轮实测抓出的假红形状：GREEN 阶段 T1b 原本读「entry+x+y 总启动数」，而 spawn 只是启动 goroutine，被派发的节点不保证在 Run 返回前已经跑上节点体 —— 正确实现也会给出 1。已换成时序无关形状（详见 GREEN 记录 testSideChangeDisclosure），并由 M1/M3 两个变异证明新形状仍然咬得住。",
+    "controlsKept": "T3（预算充足的收敛环仍成功）与 T5（取消仍归一化为 context.Canceled）在两处变异（M6/M7）下会红，证明它们不是常绿的装饰行。"
+  },
+
+  "finalReceipts": [
+    {
+      "command": "go test ./pkg/hno/graph/... -run TestP1R13 -count=1 -timeout 25s -v",
+      "exitCode": 0,
+      "receiptRef": "receipt:fc469f1d-5212-45c0-99f9-b9a58cfd289e",
+      "note": "最终 8 行族全绿，在最终字节上取得。"
+    },
+    {
+      "command": "go test ./pkg/hno/graph/... -count=1 -race -timeout 120s",
+      "exitCode": 0,
+      "receiptRef": "receipt:1a970e0a-3a90-4c38-988a-137b22ddc6c3",
+      "note": "整包（既有 11 个 TestP1G_* + 本族 8 行）竞态检测零退出。"
+    }
+  ],
+
+  "nextStageExpectation": "review 阶段的有边界差异 = GREEN 记录里的字节链（graph.go e75d58d5→a189a869、scheduler.go 87854ffb→18a98a60、graph_test.go 未变）+ 本片唯一测试文件 0→bc4ab8e7。审查需要独立复核三件事：T1c 的「契约内」论证是否成立、runBounded 与 runWithinLimit 并存的判据差异是否真的不可合并、以及 M2/M3 的期望集修正是不是把结论改宽松了。",
+
+  "debtCarried": [
+    "B7 Warnings() 仍是桩（graph.go:414）；判据 8「含合法条件环且未显式设置上限时告警」现在有了可依赖的落点（cfg.stepLimitSet 已在 New 里被区分使用），下一片实现它时无需再改预算语义。",
+    "B8 WithMaxConcurrency 仍不被调度器读取（graph.go:65）。",
+    "B10 节点 panic 仍会击穿进程（包内 recover( 出现 0 次）—— P1 残留风险最高的一条。",
+    "S10-STD-3 结构化拒绝错误（当前多处测试靠解析 error.Error() 字符串）。",
+    "流程缺陷：进入 GREEN 前必须把生产字节复制到 /tmp，本轮 scheduler.go 的边界靠反向编辑 + 哈希复核才立起来。",
+    "S13-AMEND-1：WithStepLimit(n<=0) 的拒绝是作者裁断，母约写回前不算有规格背书（写回受 rex-self-sediment-gate 阻挡）。"
+  ],
+
+  "evidenceRefs": [
+    "receipt:fc469f1d-5212-45c0-99f9-b9a58cfd289e",
+    "receipt:1a970e0a-3a90-4c38-988a-137b22ddc6c3",
+    "artifact:docs/design/v3-p1-graph-slice13-refactor.json",
+    "artifact:/tmp/p1-cycle13/matrix.py",
+    "artifact:/tmp/p1-cycle13/p1r13_step_limit_test.go.final"
+  ]
+}

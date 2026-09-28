@@ -1,0 +1,231 @@
+{
+ "schemaVersion": 1,
+ "kind": "rex.tdd-refactor-ledger.v1",
+ "workItemKey": "work-p1-graph-r15b-warning-text",
+ "activationId": "a2339064-524f-4d98-b0da-2fdb6283af8a",
+ "capabilityId": "software.testing.tdd",
+ "stageId": "refactor",
+ "recordedAt": "2026-09-27T16:45:40Z",
+ "contract": "artifact:docs/design/v3-test-scope-p1-graph-slice15b.json",
+ "previousStageEvidenceChecked": {
+  "greenLedger": "artifact:docs/design/v3-p1-graph-r15b-green.json",
+  "greenReceipt": "d4b5b46b-d5b5-4e5f-a07d-70102f728bea（exit 0，绑定场景命令）",
+  "nextStageConditionQuoted": "REFACTOR 只能在测试保持通过的前提下整理重复/命名/边界，并按契约 completionCriteria 跑变异矩阵 (α)–(ζ)……每条变异必须实跑并指明指定杀手行；指定杀手行未在其每轮判红即判该变异未被可靠杀死。REFACTOR 的回执仍必须是同一条场景命令、零退出。",
+  "howMet": "矩阵 6 条全部实跑 3 轮，全部 KILLED；回执 57b5ff39 用同一条命令、exit 0。"
+ },
+ "refactorChange": {
+  "file": "pkg/hno/graph/graph.go",
+  "greenHash": "fbf0e84c0505c189309a2a9f234f59875fd54744",
+  "refactorHash": "9684e49efb85f6870784cc75a469739669e0a05b",
+  "what": "把 cycleOf 里的 `maxRenderedCycleNames-2` 抽成有名常量 cycleHeadWhenBounded，并写清那一格余量的实际作用；另在 Warnings 文档里补上两条文案约束（GREEN 阶段已做，本轮未再动）。测试文件一字未改。",
+  "stat": "+5 / -1 行，2 个 hunk（@@ -57,6 +57,11 @@ 常量与其文档、@@ -383,7 +388,7 @@ 使用点）",
+  "diffProof": "GREEN 字节由当前文件逆向两处编辑重建，重建结果的 git blob 哈希 = fbf0e84c0505c189309a2a9f234f59875fd54744，与 GREEN 登记逐字符相同，所以下面这段 diff 是真实的 GREEN→REFACTOR 差异。",
+  "diffText": "--- /tmp/p1-cycle15/green/graph.go.green\t2026-09-28 00:45:26\n+++ pkg/hno/graph/graph.go\t2026-09-28 00:44:59\n@@ -57,6 +57,11 @@\n // 长环改为「点名开头 + 省略 + 说出规模」。\n const maxRenderedCycleNames = 6\n \n+// cycleHeadWhenBounded 是环被截断时保留的开头点名格数（收尾另占一格）。留出的一格不是余量：\n+// 被截的文案最多点 5 个名，完整写出的文案最多点 6 个，于是「点名数正好顶满上限」本身就说明\n+// 这条环没有被省略——两种形状不会互相冒充。\n+const cycleHeadWhenBounded = maxRenderedCycleNames - 2\n+\n // config 保存调度参数；stepLimitSet 区分「用户显式设置」与「默认值」，\n // 构建期告警（判据 8）只对未显式设置的环图发出。\n type config struct {\n@@ -383,7 +388,7 @@\n \tbounded := len(nodes)+1 > maxRenderedCycleNames\n \tshown := nodes\n \tif bounded {\n-\t\tshown = nodes[:maxRenderedCycleNames-2]\n+\t\tshown = nodes[:cycleHeadWhenBounded]\n \t}\n \n \tvar sb strings.Builder\n",
+  "behaviorPreservingMeasured": "外部探针 /tmp/p1-cycle15/greentext 在重构前后逐字节一致：环长 2→149 字节/点名 3；4→171/5；5→182/点名 6；6→188/点名 5；400→190/5；20000→192/5。「完整写出的最多 6 个点名、被截的最多 5 个」这条新写进注释的取舍由这组数字背书（回应切片 15 的教训：注释也要被测量）。",
+  "rejectedRefactors": [
+   "没有把 cycleOf 的两个 return 合成一个带 flag 的分支：合完之后分支密度更高、可读性没有净收益（仓库标准：没有明确收益时保留简单实现）",
+   "没有把 quotedNodeNames/digitRuns 两个正则合并或提到生产代码：它们是测试侧的观察工具，提上去就是把测试缝做成公共面"
+  ]
+ },
+ "mutationMatrix": {
+  "script": "/tmp/p1-cycle15/matrix15b.py（结果 JSON：/tmp/p1-cycle15/matrix-15b.json）",
+  "baseHashAtMatrixRun": "9684e49efb85f6870784cc75a469739669e0a05b",
+  "trialsPerMutant": 3,
+  "discipline": "try/finally 无条件恢复 + 每轮恢复后逐字节校验 git blob 哈希；编译/vet 失败按基础设施失败处理，不算杀死；杀死 = 指定杀手行在 3 轮里每轮都判红。",
+  "processIncidents": [
+   "epsilon 第一次跑出的是构建失败（invalid character U+005C）：变异模板里的转义把 Go 源码写坏了。按纪律判为基础设施失败、重新设计成 Go 反引号原文字符串后重跑，才得到杀死。这一条不计入杀死次数，也不谎称一次通过。",
+   "矩阵在 GREEN 字节（fbf0e84c）与 REFACTOR 字节（9684e49e）上各完整跑过一遍；登记的是 REFACTOR 字节那次（baseHash 字段可核对）。"
+  ],
+  "results": [
+   {
+    "mutant": "alpha-去掉默认数值",
+    "designatedKillers": [
+     "TestP1R15B_WarningNamesTheKnobAndItsDefaultNumber"
+    ],
+    "failedRowsEveryTrial": [
+     [
+      "TestP1R15B_WarningNamesTheKnobAndItsDefaultNumber"
+     ],
+     [
+      "TestP1R15B_WarningNamesTheKnobAndItsDefaultNumber"
+     ],
+     [
+      "TestP1R15B_WarningNamesTheKnobAndItsDefaultNumber"
+     ]
+    ],
+    "extraRedRows": [],
+    "killedEveryTrial": true
+   },
+   {
+    "mutant": "beta-把 Run stops only when 写回",
+    "designatedKillers": [
+     "TestP1R15B_WarningMakesNoClaimAboutRun",
+     "TestP1R15B_InvalidGraphWarningAlsoMakesNoRunClaim"
+    ],
+    "failedRowsEveryTrial": [
+     [
+      "TestP1R15B_WarningMakesNoClaimAboutRun",
+      "TestP1R15B_InvalidGraphWarningAlsoMakesNoRunClaim"
+     ],
+     [
+      "TestP1R15B_WarningMakesNoClaimAboutRun",
+      "TestP1R15B_InvalidGraphWarningAlsoMakesNoRunClaim"
+     ],
+     [
+      "TestP1R15B_WarningMakesNoClaimAboutRun",
+      "TestP1R15B_InvalidGraphWarningAlsoMakesNoRunClaim"
+     ]
+    ],
+    "extraRedRows": [],
+    "killedEveryTrial": true
+   },
+   {
+    "mutant": "gamma-去掉渲染界",
+    "designatedKillers": [
+     "TestP1R15B_LongCycleWarningIsBoundedAndStillLocatable"
+    ],
+    "failedRowsEveryTrial": [
+     [
+      "TestP1R15B_LongCycleWarningIsBoundedAndStillLocatable"
+     ],
+     [
+      "TestP1R15B_LongCycleWarningIsBoundedAndStillLocatable"
+     ],
+     [
+      "TestP1R15B_LongCycleWarningIsBoundedAndStillLocatable"
+     ]
+    ],
+    "extraRedRows": [],
+    "killedEveryTrial": true
+   },
+   {
+    "mutant": "delta-界取 2（短环也被截）",
+    "designatedKillers": [
+     "TestP1R15B_ShortCycleStaysFullyRendered",
+     "TestP1R15B_JudgementSevenMessageUnchanged"
+    ],
+    "failedRowsEveryTrial": [
+     [
+      "TestP1R15B_ShortCycleStaysFullyRendered",
+      "TestP1R15B_JudgementSevenMessageUnchanged"
+     ],
+     [
+      "TestP1R15B_ShortCycleStaysFullyRendered",
+      "TestP1R15B_JudgementSevenMessageUnchanged"
+     ],
+     [
+      "TestP1R15B_ShortCycleStaysFullyRendered",
+      "TestP1R15B_JudgementSevenMessageUnchanged"
+     ]
+    ],
+    "extraRedRows": [],
+    "killedEveryTrial": true
+   },
+   {
+    "mutant": "epsilon-环名换成常量",
+    "designatedKillers": [
+     "TestP1R15B_ShortCycleStaysFullyRendered",
+     "TestP1R15B_NamedNodesComeFromTheGraph"
+    ],
+    "failedRowsEveryTrial": [
+     [
+      "TestP1R15B_LongCycleWarningIsBoundedAndStillLocatable",
+      "TestP1R15B_ShortCycleStaysFullyRendered",
+      "TestP1R15B_NamedNodesComeFromTheGraph"
+     ],
+     [
+      "TestP1R15B_LongCycleWarningIsBoundedAndStillLocatable",
+      "TestP1R15B_ShortCycleStaysFullyRendered",
+      "TestP1R15B_NamedNodesComeFromTheGraph"
+     ],
+     [
+      "TestP1R15B_LongCycleWarningIsBoundedAndStillLocatable",
+      "TestP1R15B_ShortCycleStaysFullyRendered",
+      "TestP1R15B_NamedNodesComeFromTheGraph"
+     ]
+    ],
+    "extraRedRows": [
+     "TestP1R15B_LongCycleWarningIsBoundedAndStillLocatable"
+    ],
+    "killedEveryTrial": true
+   },
+   {
+    "mutant": "zeta-界取 500（形同未加）",
+    "designatedKillers": [
+     "TestP1R15B_LongCycleWarningIsBoundedAndStillLocatable"
+    ],
+    "failedRowsEveryTrial": [
+     [
+      "TestP1R15B_LongCycleWarningIsBoundedAndStillLocatable"
+     ],
+     [
+      "TestP1R15B_LongCycleWarningIsBoundedAndStillLocatable"
+     ],
+     [
+      "TestP1R15B_LongCycleWarningIsBoundedAndStillLocatable"
+     ]
+    ],
+    "extraRedRows": [],
+    "killedEveryTrial": true
+   }
+  ],
+  "allKilled": true,
+  "contractMapping": {
+   "alpha": "U1 teethMutant（去掉默认数值）",
+   "beta": "U2/U3 teethMutant（把 Run stops only when 写回）",
+   "gamma": "U4 teethMutant（去掉渲染界）",
+   "delta": "U5/U7 teethMutant（界取 2：短环也被截，收尾与判据 7 的锚点同时丢）",
+   "epsilon": "U6 teethMutant（环名换成常量，即切片 15 当年的存活变异 (i)）",
+   "zeta": "U4 的「形同未加」界（取 500：400 节点的环仍整条列出）"
+  },
+  "greenAtRedRowsNowProven": "U1（α）、U5（δ/ε）、U6（ε）、U7（δ）四行在 RED 阶段是 green-at-red，本轮由对应变异证明它们确有牙齿；没有一行是靠「只测 mock/helper」通过的。",
+  "resultJsonOutsideRepo": "/tmp/p1-cycle15/matrix-15b.json（仓库外探针产物，仅作可复跑说明，不作为提交引用）"
+ },
+ "structuralCriteriaReMeasured": {
+  "command": "for f in pkg/hno/graph/*.go; do case $f in *_test.go) continue;; esac; grep -v '^[[:space:]]*$' $f; done | wc -l",
+  "value": 618,
+  "chain": "588（切片 15 REFACTOR 收尾）→ 614（本片 GREEN）→ 618（本片 REFACTOR，+4 行常量文档）",
+  "ticketCeiling": "票面 §9 上限 1500，未触及",
+  "sync": "grep -c 'sync\\.' graph.go scheduler.go → 0 / 0",
+  "testFunctionsTotal": 41,
+  "suiteRepeat": "go test ./pkg/hno/graph -count=5 -race → ok（契约 completionCriteria 第 3 条）"
+ },
+ "testDiffReview": {
+  "file": "pkg/hno/graph/p1r15b_warning_text_test.go",
+  "hash": "0285ab35729ed3d50359e0fd407edb2d8b1c1a2a（RED 起未再改动，262 行 / 7 个 Test 函数）",
+  "constraintsStillBehavioral": "7 行全部只经 New/AddNode/AddEdge/AddConditional/SetEntry/SetOutput/Validate/Warnings 观察读回的文本；没有读 cfg、没有调 cycleOf/firstCycleOf、没有对整条文案做全文相等快照（U5 只对短环的引用子串要求逐字，这正是契约要的属性）。",
+  "noWeakening": [
+   "无 t.Skip、无 testing.Short、无 TODO 占位（grep 无输出）",
+   "界取的是契约给的常数（≤6 点名 / <1024 字节），没有把期望改成当前错误输出",
+   "U3 的「提示为空也算通过」不是放宽，而是契约明确的中立条款（R15-UNADJ-1 未裁决），行内仍对每一条实际存在的提示判红",
+   "夹具前提用 t.Fatalf 守住（Validate 结果、告警在场），前提变了报的是前提而不是断言"
+  ],
+  "duplicatesChecked": "与 p1r15_warnings_test.go 共用 conditionalCycleGraph / stepLimitWarnings / isStepLimitCycleWarning，未复制粘贴夹具；U7 与 graph_test.go 的 B5 行在文案锚点上有意重叠，理由是本片改的是两者共用的渲染器，契约里已把这条写成护栏行的存在依据。",
+  "testOnlyHelpers": "onlyWarningOfThisFamily / statesNumber / declaredCycleNodes / longCycleName / truncateForEvidence 全部只服务测试，没有为此新增任何产品侧出口。"
+ },
+ "receipts": {
+  "red": "receipt:d7dbd5e8-da12-47bc-8f4b-7ade388dccbf（exit 1）",
+  "green": "receipt:d4b5b46b-d5b5-4e5f-a07d-70102f728bea（exit 0）",
+  "refactor": "receipt:57b5ff39-330a-42b5-8639-8642b1516743（exit 0，stdoutSha256=513e98453afac98e6c5222e5e9178a7cb63f0890cda1211d58413dc620c9f2b3，observedAt 2026-09-27T16:45:26.788Z）",
+  "sameScenarioCommand": "go test ./pkg/hno/graph -run TestP1R15B_ -count=1 -race -v"
+ },
+ "untouchedHashesVerified": {
+  "pkg/hno/graph/scheduler.go": "61c7ba6db72b65eda938c099968e7409fc944d73",
+  "pkg/hno/graph/graph_test.go": "425ea0303e1d5c5c8e95bacf57663ae94a4309ee",
+  "pkg/hno/graph/p1r13_step_limit_test.go": "bc4ab8e71527809e23a12590a078add8f35d68d1",
+  "pkg/hno/graph/p1r14_panic_barrier_test.go": "0ed607dbc01955864276212fa61e0902577ce7b8",
+  "pkg/hno/graph/p1r15_warnings_test.go": "3ea06d27abd3994130e593d297951c895729a4dd"
+ },
+ "openGapsForReview": [
+  "条数与排序仍未裁决（S15-REFACTOR-1）：onlyWarningOfThisFamily 取「至少一条里的第一条」，把这条取舍暴露给 review，不静默钉成恰好一条。",
+  "非法图上到底该不该出提示（R15-UNADJ-1）仍未决；本轮实测非法图侧确实出一条，U3 只保证它不预测执行。",
+  "判据 7 的致命文案仍含「so Run cannot terminate」——那是无条件环、且可达性检查先行，与本片的规则不冲突；但这是同一条规则的另一个应用点，交由 review 判断是否也该立一行。",
+  "golangci-lint 仍未安装（command -v golangci-lint 失败），make lint 本轮未运行。"
+ ],
+ "nextStageCondition": "review 两轴独立：Spec 轴核对 U1–U7 是否逐条落地、契约非目标有没有被越界（尤其 R15-UNADJ-1 与 S15-STD-1）、写回项（母约 §3.5 判据 8 的两条）是否登记；Standards 轴核对共享渲染器改动的爆炸半径（判据 7 文案）、常量命名与注释是否诚实、矩阵是否有存活变异。审查仍为作者自查并显式披露独立性降级（用户此前拒绝对 P1 派发独立审查子代理）。",
+ "evidenceRefs": [
+  "artifact:docs/design/v3-p1-graph-r15b-refactor.json",
+  "artifact:docs/design/v3-p1-graph-r15b-green.json",
+  "artifact:docs/design/v3-p1-graph-r15b-red.json"
+ ]
+}

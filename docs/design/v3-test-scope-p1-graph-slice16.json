@@ -1,0 +1,222 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p1-graph-r16-max-concurrency",
+  "activationId": "94cead5a-0811-4c66-bfdd-1f91cbdd9bbb",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-27T17:05:00Z",
+  "userGoal": "让 graph.WithMaxConcurrency(n) 成为真的旋钮：n>0 时同时在途的节点数不得超过 n，超出上限的激活留在先进先出队列里，完成一个自动派发一个，且派发顺序是声明顺序；n<=0 时保持文档承诺的「不限」。票面 B8（v3-test-scope-p1-graph.md:67 + :92 行 4）指定的可观察判据是「节点内记录 [name,start,end] 轨迹，断区间不重叠 + 后启动者观测到前者已完成」，并且明确要求用节点内 gate 握手而不是 sleep 定序（:75）。",
+  "whyThisSlice": "这是 P1 剩下的唯一「导出了但完全没有行为」的公共面：三次 review 连续挂号（v3-p1-graph-slice10-review-verdict.json 的 S10-STD-4、slice13 的 S13-SPEC-4、slice14 的 S14-SPEC-4），15b 的收尾清单也把它列为 P1 后续。它不是风格问题——导出文档（graph.go:73-74）向调用方承诺了一条不存在的语义，而本轮现场探针把这条承诺否证到字节级（M-1/M-2/M-3）。留「文档说有、代码没有」不是可接受结局，因此本契约只在「实现它」与「显式降级文档」之间选前者：票面 :67 已给出验收判据，说明行为本身是产品要的东西，不是待清理的意外。",
+  "measuredBeforeDesign": [
+    {
+      "id": "M-1",
+      "what": "旋钮写进去就再没人读：调度器里 maxConcurrency 的出现次数为 0",
+      "command": "sh /tmp/p1-b8/struct.sh",
+      "receiptRef": "receipt:4ea5322f-20b8-4e05-82d1-fce0c5f8c5cb",
+      "observed": "scheduler_maxConcurrency_reads=0；graph_maxConcurrency_sites=68:\tmaxConcurrency int;76:\treturn func(c *config) { c.maxConcurrency = n };。即全非测试代码只有声明(:68)与赋值(:76)两处，零读取点。test_withmaxconcurrency_sites=0（本包测试对这个导出口一个引用都没有）。",
+      "conclusion": "WithMaxConcurrency 是零效果旋钮，且当前没有任何测试能揭示它是空承诺。"
+    },
+    {
+      "id": "M-2",
+      "what": "现场否证文档承诺：WithMaxConcurrency(1) 下三个兄弟节点同时在飞",
+      "command": "cd /tmp/p1-b8/maxconc && go run .",
+      "observed": "err=<nil> completed=[a b c entry] peakInFlight=3 elapsed=20ms（该探针用自包含忙等撑出在飞窗口）。",
+      "conclusion": "文档的「限制同时在途的节点数」与实际行为相反。"
+    },
+    {
+      "id": "M-3",
+      "what": "候选判据的复现性（决定本契约把哪一行立成主 RED）",
+      "command": "cd /tmp/p1-b8/observe && go run .",
+      "receiptRef": "receipt:dfd3fcf5-f981-42fb-8a20-85dee8a1aa9d",
+      "observed": "n 个兄弟、WithMaxConcurrency(1)、每个节点用无缓冲 channel 向单一登记器同步登记 start/end，1000 轮/档：peak>=2 的比例 n=2 → 99.5%、n=3 → 100%、n=4 → 100%（maxPeak 分别 2/3/4）；「首个登记恰好是声明序第一个」只有 0.7%/2.4%/2.1%；「最后声明者入口查询已含 end:a」为 0.1%/0%/0.8%。另一次同命令运行的「n 个 start 全部先于任何 end」为 98.1%/98.2%/38.7%。该探针输出的是重复试验比例，逐次不同，receipt 记录的是其中一次运行的 stdout 哈希 7ad2eefa6820554c85de09826b91d4083a9d893be2cbabcd8ec33c1af2e694b0，本字段引用的是我在同一命令下观察到的多次运行值。",
+      "conclusion": "「峰值在飞 > 1」在兄弟数 >=3 时是 1000/1000 稳定可复现的判据，因此本契约把它立为主 RED 行（C1）；单靠「轨迹是否整条串行」或「后者入口能否看到前者完成」在兄弟数变化时有 0.5%~1.8% 的漏检，所以 C2/C3 保留票面原话但要求逐轮实测复现率，不许把漏检写成期望放宽。"
+    },
+    {
+      "id": "M-6",
+      "what": "把候选判据落到真实测试缝之后的逐轮复现率（completionCriteria 第 2 条要求的那次测量）",
+      "command": "go test ./pkg/hno/graph -run TestP1R16_ -count=20 -race -v",
+      "observed": "夹具为 pkg/hno/graph/p1r16_max_concurrency_test.go（8 个 Test 函数，哈希 c4bf463898b197db97fbbed1904ef3f000b8631f）：C1 峰值判据 20/20 FAIL、C2 逐字串行轨迹 20/20 FAIL、C3 入口观测 20/20 FAIL、C6 峰值 ≤2 判据 20/20 FAIL（实测峰值 4/5/6），四条 red 行没有一轮漏判；C4/C5/C7 各 20/20 PASS、C8 的两个子判据 20/20 PASS（护栏行如实标注 green-at-red）；全程 race detected 出现 0 次。此前 4 兄弟版本的 C6 只有 18/20（无上限时个别轮次自然没放出 3 个以上），因此把兄弟数钉成 6 —— 这是加强夹具，不是放宽期望。",
+      "conclusion": "四条 red 行的红是可复现的、由公共入口观察的行为缺失，不是调度抖动撞出来的运气。M-3 的概率性判断由这一条实测表取代。"
+    },
+    {
+      "id": "M-4",
+      "what": "上限必须在消费者一侧做，否则会破坏本包的零锁形状",
+      "command": "sed -n '103,132p' pkg/hno/graph/scheduler.go（同 struct.sh 的 dispatch_loop 字段）",
+      "receiptRef": "receipt:4ea5322f-20b8-4e05-82d1-fce0c5f8c5cb",
+      "observed": "dispatch() 是 `for len(s.pending) > 0 { 判步数 → 取 pending[0] → steps++ → spawn }`，一次排空整个 pending；running 由消费者 ++/--，生产者 goroutine 只向 queue 发送。sync_dot_graph=0、sync_dot_scheduler=0、recover_scheduler=1、loc_nonblank_nontest=618、testfunc_total=41。",
+      "conclusion": "pending/running 都只由消费者写（scheduler.go:43-46 的形状），因此「running 达到上限就停止本轮排空、把队头留在 pending 里等下一次 completion」这条钳制不需要任何锁或原子量 —— 母约 :190 的 `maxConcurrency > 0 && len(runs) >= maxConcurrency → 进 pending` 可以原样落在 dispatch 的循环头，且票面 §9 的结构判据（sync. 计数 0）必须继续成立。"
+    },
+    {
+      "id": "M-5",
+      "what": "本包已有的「逃逸阀」测试惯例，用于把停摆变成判红而不是挂住",
+      "command": "grep -n 'time.After' pkg/hno/graph/*_test.go",
+      "observed": "graph_test.go:623、p1r13_step_limit_test.go:72 与 :274、p1r14_panic_barrier_test.go:46 都在测试侧 goroutine 里用 `select { case <-done: case <-time.After(bound): }` 把「Run 没有回来」转成 t.Fatalf；节点体内不用 sleep 定序。",
+      "conclusion": "本契约沿用同一形状：有界等待只用来把停摆显式化为失败，绝不用来给并发定序（票面 :75）。C1-C3 的期望值来自登记轨迹的内容，不来自「有没有超时」。"
+    }
+  ],
+  "acceptanceMapping": [
+    {
+      "row": "C1",
+      "behavior": "WithMaxConcurrency(1) 下 entry 声明的三个兄弟节点 a、s1、s2 任意时刻至多一个在途（文档承诺「限制同时在途的节点数」的最小直译）",
+      "observable": "节点体内第一句向单一登记器同步登记 start:<name>、最后一句登记 end:<name>；Run 返回后由登记器交出的轨迹算出的峰值在飞数必须为 1（今天实测 3）；同一张图的 Completed() 仍是 7 次激活（entry + 3 个兄弟 + done 被三个兄弟各激活一次），上限生效不得让节点丢掉",
+      "publicEntry": "graph.New(WithMaxConcurrency(1)) → AddNode/NodeFunc → AddEdge(entry→a, entry→s1, entry→s2) → SetEntry/SetOutput → Run → 测试侧轨迹",
+      "specAnchor": "票面 :26 + :67 + :92 行 4 + 母约 :143/:190 + graph.go:73-74 的导出文档",
+      "statusAtRed": "red（M-6：20/20 FAIL，实测峰值 3）",
+      "teethMutant": "α 把上限判据删掉或写成永不成立 → C1 红（回到今天形态）；β 判据取反/写成 running <= cap 之类恒真 → C1 红；ζ 只在首轮排空时判上限、complete 之后的派发不再判 → 三兄弟仍会在第一个 completion 后一起放出 → C1 红"
+    },
+    {
+      "row": "C2",
+      "behavior": "上限打满时新激活进入先进先出队列，完成一个自动派发一个，且派发顺序为声明顺序（票面 :67 前半句的直译：a、b 的执行区间不重叠）",
+      "observable": "C1 同一张图的登记轨迹逐字为 start:a → end:a → start:s1 → end:s1 → start:s2 → end:s2（在 cap=1 下这等价于「不重叠 + 声明序」两者同时成立），且 Completed()/Output() 与不带上限的同一拓扑逐字相同",
+      "publicEntry": "同 C1 + Result.Completed / Result.Output",
+      "specAnchor": "票面 :67（区间不重叠 + 激活顺序为声明顺序）+ 母约 :190（FIFO 派发）",
+      "statusAtRed": "red（M-6：20/20 FAIL；探针侧 M-3 也显示首个登记即声明序首个仅 0.7%~2.4%）",
+      "teethMutant": "η 派发时从队尾取（LIFO）→ C2 的逐字顺序红，而 C1 仍绿（两条各管一头）；γ 完全不钳制 → C1/C2 同红"
+    },
+    {
+      "row": "C3",
+      "behavior": "后启动的节点能观测到前序节点已经完成（票面 :92 的后半句），并把这一观测经公共出口交出",
+      "observable": "s1 在入口向登记器查询已完成集合，把结果作为节点返回值；测试断 Result.Value(\"s1\") 含 end:a 且不含任何在途兄弟的 start 未配对项（今天实测该观测里 0/1000 含 end:a）",
+      "publicEntry": "同 C1 + Result.Value",
+      "specAnchor": "票面 :92 行 4「后启动者观测到前者已完成」",
+      "statusAtRed": "red（M-6：20/20 FAIL；探针侧 M-3 的漏检 0~0.8% 在真实缝上没有出现）",
+      "teethMutant": "把派发点改成「spawn 之前不等待前一激活真正完成」（例如让 running-- 早于登记 end 的语义变化）→ C3 红；仅在 C1 上加钳制但把 pending 队头放回队尾 → C2 红而 C3 可能绿，两半各管一头"
+    },
+    {
+      "row": "C4",
+      "behavior": "WithMaxConcurrency(0) 就是文档承诺的「不限」：三个兄弟可以同时在飞，钳制不得被 0 触发",
+      "observable": "同一拓扑、n=3 个兄弟，每个节点登记 start 后等待「已登记 start 数达到 3」这个 channel gate（带 M-5 的有界逃逸阀）；三者的 Result.Value 都不得是 gate 超时标记，且峰值在飞 = 3",
+      "publicEntry": "graph.New(WithMaxConcurrency(0)) → 同 C1 → Run → Result.Value / 轨迹",
+      "specAnchor": "票面 :26 与母约 :143 的「0 = 不限」+ graph.go:73",
+      "statusAtRed": "green-at-red（今天旋钮无读取点，因此天然不限；这一行是把文档承诺钉住的护栏行）",
+      "teethMutant": "δ 把 0 当成 0 个槽（判据写成 running >= cap 而没有 cap>0 前置守卫）→ C4 红：图永不收敛，逃逸阀把停摆报成失败；同一变异也让 C1/C2 期望的图卡死，因此 C4 是唯一专门钉这一半的行"
+    },
+    {
+      "row": "C5",
+      "behavior": "负数上限不得让 Run 停摆，其效果与「不限」一致（依据母约 :190 的前置守卫 maxConcurrency > 0；本切片不新增构建期拒绝）",
+      "observable": "WithMaxConcurrency(-1) 的图与 C4 同样通过三方 gate 握手，且 Completed()/Output() 与不带选项的基线逐字相同",
+      "publicEntry": "graph.New(WithMaxConcurrency(-1)) → 同 C1 → Run",
+      "specAnchor": "母约 :190 的 `maxConcurrency > 0 && ...`；票面对 n<0 未置一词 → 见 unadjudicatedCarried 的 R16-UNADJ-1",
+      "statusAtRed": "green-at-red（护栏行；钉住「实现者不得把钳制写成不带正数守卫的比较」这一条）",
+      "teethMutant": "δ（0 当 0 槽）同时杀 C5；把负数在 Validate 里拒掉 → C5 红（本切片明确不授权那种新行为，若宿主/用户改判需新的 test-design）"
+    },
+    {
+      "row": "C6",
+      "behavior": "上限是「不得超过 n」而不是「只能串行」：WithMaxConcurrency(2) 下六个兄弟的峰值在飞不超过 2，且六个全部完成（不饿死）",
+      "observable": "峰值在飞 <= 2；六个兄弟的 start/end 全部成对出现在轨迹里；Completed() 与不限基线相同。兄弟数取 6 是 M-6 那次逐轮测量的结果：4 个兄弟时今天的实现有 2/20 轮自然没越过 2，判据不够硬。",
+      "publicEntry": "graph.New(WithMaxConcurrency(2)) → entry→a,s1,s2,s3,s4,s5 → 各自 → done → Run",
+      "specAnchor": "母约 :190（打满进 pending，完成一个派发一个）+ 票面 :67 的上限语义",
+      "statusAtRed": "red（M-6：20/20 FAIL，实测峰值 4/5/6）",
+      "teethMutant": "ε 把上限实现成恒为 1（或对任何 cap 都串行）→ C6 的「六个全部完成 + 峰值 ≤ 2」仍绿，但 C7 红 —— 这行存在的理由就是补上 C6 管不到的下界；把上限放大成 3 或 cap+1 → 轨迹峰值越过 2 → C6 红；把钳制做成「留在 pending 里但再也不派发」→ 六个兄弟无法全部成对 → C6 红"
+    },
+    {
+      "row": "C7",
+      "behavior": "上限取得过小同样违约：WithMaxConcurrency(2) 且只有两个兄弟时，两者必须能真正同时在飞（这条防止「把 cap 实现成 1」这类过紧实现蒙过 C6）",
+      "observable": "两个兄弟各自登记 start 后等待「已登记 start 数达到 2」的 gate（带 M-5 逃逸阀），Result.Value 都不得是超时标记",
+      "publicEntry": "graph.New(WithMaxConcurrency(2)) → entry→a,s1 → done → Run → Result.Value",
+      "specAnchor": "母约 :190 的「上限 = 同时在途数」双向语义；本契约把 C6 的上界与 C7 的下界分开，是因为公共出口无法在 n>2 的批量里判定同批内的启动次序（见 observabilityLimit）",
+      "statusAtRed": "green-at-red（护栏行：今天不限，两个兄弟自然同时在飞）",
+      "teethMutant": "ε cap 实现成 1（或对任何 cap 都串行）→ C7 红而 C6 绿，正是这行的存在理由；δ 把 2 当 0 → C7 红"
+    },
+    {
+      "row": "C8",
+      "behavior": "并发上限不得改写步数上限的语义：步数仍按「消费者真正派发一个激活」计，等待队列本身不消耗预算，越界的那个激活根本不被启动",
+      "observable": "两个子判据同用一张 entry→a、entry→b、a→done、b→done 的图。(1) WithMaxConcurrency(1)+WithStepLimit(2)：Run 返回 errors.Is(ErrStepLimitExceeded) 且文案说出上限 2，同时在有界观测窗口内 a 的执行尝试表里不存在 b（今天的实现里 b 也不会被启动，这一半是钉住实现方向：钳制必须做成「不 spawn」，不是「spawn 后在 goroutine 里排队等待」）。(2) WithMaxConcurrency(1)+WithStepLimit(5)：这张图恰好需要 5 次激活（entry、a、b、done、done），必须收敛并返回与不带上限的同一拓扑相同的 Completed()/Output()；若实现把等待队列计入步数，这条会在第 5 步之前就报错 → 红。",
+      "publicEntry": "graph.New(WithMaxConcurrency(1), WithStepLimit(n)) → entry→a,b → a,b→done → Run（errors.Is）+ 测试侧尝试登记表 + Result.Completed / Output",
+      "specAnchor": "切片 13 立下的「计步发生在把激活交给节点之前」（v3-test-scope-p1-graph-slice13.json + scheduler.go:103-107 注释）+ 票面 :66 B4 族 + 母约 :190",
+      "statusAtRed": "green-at-red（护栏行：现有 dispatch 在每次 spawn 前判步数；这一行钉住实现上限时不得把钳制做成「先 spawn 再判」，也不得把 pending 计入 steps）",
+      "teethMutant": "θ 把等待队列计入 steps → C8 的子判据 (2) 红（C6/C1 对此无感）；把上限实现成「一次性把 pending 全放进 spawn、只让 goroutine 排队」→ b 被启动 → C8 的子判据 (1) 红，同时 C1/C2 也红"
+    },
+    {
+      "row": "C9",
+      "behavior": "对照行（不新增判据，只要求不被本片改坏）：上限之外的既有语义一字不动，且零锁结构判据继续成立",
+      "observable": "graph.go 与 scheduler.go 的 `sync.` 计数仍为 0、`recover(` 仍为 1；非空非测试行数记录实测值且 <= 票面 §9 的 1500 上限；本包既有 41 个 Test 函数全部保持通过（本片结束后总数 49）；全部并发行在 `-race` 下运行（票面 :117）",
+      "publicEntry": "sh /tmp/p1-b8/struct.sh + go test -count=1 -race ./pkg/hno/graph/...",
+      "specAnchor": "票面 :90 行「sync. 计数 0（结构判据）+ 并行/Join/限流行为在 -race 下绿」+ :117 + §9",
+      "statusAtRed": "green-at-red（护栏行，由命令输出背书，不承担新增行为）",
+      "teethMutant": "实现者若加一把 mutex 或改用 atomic 计数来守 cap → sync. 计数离开 0 → C9 红（结构性拒绝，而不是评审口头劝阻）"
+    }
+  ],
+  "observabilityLimit": "本包没有对外的逐节点状态回调（母约 :190 提到的 NodePending 状态在公共面上不存在，Result.Completed() 又刻意按字典序返回，graph.go:105-108）。因此「先进先出」只在 cap=1 的全串行情形下可由公共出口逐字判定（C2）；cap>1 时同一批内两个 goroutine 的实际起始次序不由调度器决定，测试不得对其作断言，也不得为看得更清楚而新增导出面 —— 后者归 R16-UNADJ-2。",
+  "minimalVerticalSlice": "C1 单独一条就是足以代表本片目标的切片：它只用 WithMaxConcurrency + Run + 节点内登记这三样公共东西，今天的真实值（峰值 3）与期望值（峰值 1）都是实测数字（M-3 在兄弟数 3 时 1000/1000 稳定复现），不需要读取任何私有字段就能判红；而它一旦要变绿，就必须把「打满留在队列、完成一个派发一个」这条钳制真正放进消费者唯一的写点，从而逼出 C2/C6 所需的 FIFO 形状。",
+  "allowedTestSeam": {
+    "files": [
+      "pkg/hno/graph/p1r16_max_concurrency_test.go（新增，package graph_test 外部测试包）",
+      "本片不改任何既有测试文件；graph_test.go / p1r13 / p1r14 / p1r15 / p1r15b 与 scheduler.go 保持字节不变"
+    ],
+    "publicEntries": "graph.New / WithMaxConcurrency / WithStepLimit / AddNode / NodeFunc / AddEdge / SetEntry / SetOutput / Validate / Run / Result.Completed / Result.Value / Result.Output / ErrStepLimitExceeded（经 errors.Is）",
+    "testSideInstrumentation": "节点体内第一句/最后一句通过无缓冲 channel 向测试自己启动的单一登记器 goroutine 同步登记 start:<name> 与 end:<name>（无缓冲 = 登记本身就是一次握手，因此登记顺序就是真实发生顺序，且节点返回前它的事件必已被登记器收下）；入口观测经同一登记器的查询通道取回已完成集合快照，并把快照字符串作为节点返回值，从而经 Result.Value 这个公共出口交出。峰值在飞由该轨迹的 start/end 配对算出。另有一张带缓冲的「执行尝试」登记表（首句非阻塞写入）专供 C8 证明「某激活从未被 spawn」，用有界观测窗口 drain 后判缺席。节点体内的确定性忙等只把区间撑到可被别的 goroutine 观测，不参与定序。全部断言在 -race 下运行。",
+    "forbiddenObservation": "不得读 cfg、config、scheduler、pending、running、steps 等私有标识或字段；不得直接调用 dispatch/spawn/complete；不得新增导出的准入回调、NodePending 类状态或任何 test-only 产品出口；不得用 time.Sleep 给并发定序（票面 :75）；有界等待（time.After）只允许作为「把停摆报成失败」的逃逸阀（M-5 的仓库惯例），且任何一行的绿都不得建立在「没超时就算过」上；不得断言节点 goroutine 的实际起始次序（cap>1 时那不由调度器决定，见 observabilityLimit）。"
+  },
+  "explicitNonGoals": [
+    "不动 B8 之外的判据：Join 路由（B2/B3）、取消归一化（B9）、Typed（B11）、Warnings 文案（B7 与切片 15b）一律不碰；15b 挂号的「文案不得预测执行」规则也不在本片处理。",
+    "不引入优先级、加权、按节点/按子图分别限流、工作池或重试：票面只要「同时在途 ≤ n + FIFO」。",
+    "不新增任何导出标识（Option、哨兵 error、回调、状态枚举都算新增公共面）；cap 的非法取值处置沿用母约 :190 的 `maxConcurrency > 0` 前置守卫，不在 Validate 里新增拒绝，那属于未授权的新行为。",
+    "不改 stepLimit 的取值校验与默认值，也不改 Result.Completed() 的字典序契约。",
+    "不做 memoize/批量派发性能优化：本片的判据是行为上界，不是吞吐。"
+  ],
+  "outOfScopeBehaviors": [
+    "上限与外部并发（模型调用、工具执行）的关系：本包只管节点在途数。",
+    "跨 Run 的配额或全局限流：票面 :67 的语义域是单次 Run。",
+    "cap>1 时同一批内的启动次序（见 observabilityLimit）。"
+  ],
+  "completionCriteria": [
+    "C1-C8 每行都有独立可失败的 Test 函数（本片共新增 8 个，包内 Test 函数总数由 41 变为 49），且每行标注自己的 teethMutant 与 statusAtRed；red 行（C1、C2、C3、C6）与 green-at-red 行（C4、C5、C7、C8、C9）在证据里分开陈述，不许把护栏行写成新增行为，也不许把 red 行的漏检率写成期望放宽。C9 是命令背书的结构性护栏行，刻意不写成「测试读自身源码」的自指断言 —— 那种测试担保的是文件文本而不是用户行为。",
+    "逐轮实测复现：改动前对聚焦测试命令跑 -count=20 -race，四条 red 行必须在 20 轮里每轮都判红 —— 这一条已经做到并记在 M-6（C1/C2/C3/C6 各 20/20 FAIL，race 检测 0 次）。GREEN 之后同一命令仍须 20/20 通过；若某行在任一阶段达不到 20/20，先加强夹具或如实改标为 green-at-red 并另找能判红的行，不得删断言、放宽期望或把当前错误值回填成期望。",
+    "变异矩阵至少含：α 删/恒假上限判据、β 恒真判据、γ 完全不钳制、δ 无 cap>0 前置守卫（0 当 0 槽）、ε cap 实现成 1、ζ 只在首轮判上限、η LIFO 派发、θ 把等待队列计入步数。每条变异都实跑，指明指定杀手行，指定杀手行必须在该变异每一轮都判红；恢复无条件（try/finally）并对 graph.go/scheduler.go 与测试文件做哈希自检。任一指定杀手行未每轮判红即判该变异未被可靠杀死，照实登记进 review。",
+    "结构判据由命令输出背书：sh /tmp/p1-b8/struct.sh 在改动后重跑，sync_dot_graph=0、sync_dot_scheduler=0、recover_scheduler=1 保持不变，loc_nonblank_nontest 记录实测值（今天 618，上限 1500），testfunc_total 从 41 增至 41+本片新增行数。",
+    "go test -count=1 -race ./pkg/hno/graph/... 零退出，且既有 41 个 Test 函数全部保持；三个既有测试文件与 scheduler.go 之外的文件字节不变（本片只动 scheduler.go 与新增 graph.go 的取值落点，需要动哪个以最小实现为准，diff 边界在 green 证据里逐字节登记）。",
+    "若矩阵或实跑发现某行没有任何可信变异能碰到它，登记为缺口并挂到 review，不静默放宽或删除该行。"
+  ],
+  "forbiddenShortcuts": [
+    "不得用「文档改成不说 FIFO」来代替实现（本契约已在 whyThisSlice 里排除该选项，票面 :67 也要求行为）。",
+    "不得为了让 C2 绿而给节点加 sleep 或对 goroutine 起始次序作断言；不得为了让 C4/C5/C7 绿而把 gate 握手换成「只要 Run 回来了就算过」。",
+    "不得用 t.Skip、只断言 helper/Mock 被调用、或把「峰值在飞」改成一个数字常量比对。",
+    "不得为了可观察性新增导出准入回调（那会把本片变成公共面变更，需另开 test-design）。",
+    "不得顺手实现 B9/B11 或改 Warnings 文案。"
+  ],
+  "unadjudicatedCarried": [
+    "R16-UNADJ-1 负数上限该归一化为「不限」（本契约按母约 :190 的前置守卫如此落）还是在 Validate 里拒绝（与 WithStepLimit 的 rejectInvalidStepLimit 对称）—— 需票面/母约写回裁决。",
+    "R16-UNADJ-2 是否需要把准入过程做成公共可观察（母约 :190 的 NodePending 状态在本包没有出口），若需要则是另一次带新公共面的 test-design。",
+    "15b 遗留：S15B 的「文案不预测执行」只有 token 级担保（η 变异存活），需新的 test-design 激活。",
+    "R15-UNADJ-1/2、S15-REFACTOR-1/3、S14-SPEC-1/2/3、S13-STD 族、B7-AMEND-1、S15-STD-1 等既挂项状态不变。",
+    "P1 剩余验收行：B9 取消归一化、B11 Typed。"
+  ],
+  "retires": [
+    "S10-STD-4 / S13-SPEC-4 / S14-SPEC-4 中关于 WithMaxConcurrency 的那一半（导出即空转、文档承诺无落点）→ C1-C7 立断言后闭环。",
+    "v3-p1-graph-r15b-review-verdict.json 收尾项「B8 WithMaxConcurrency 落地或显式降级」→ 本片选择落地，由 C1-C9 担保。",
+    "v3-p1-graph-review-verdict.json 各轮重复登记的票面判据 4（maxConcurrency 打满进 FIFO，完成后自动派发）缺口。"
+  ],
+  "sedimentCarried": [
+    "切片 13 的计步语义（派发前计步、越界激活不启动）保持有效，本片由 C8 钉住它与上限的正交性。",
+    "切片 14 的节点 panic→error 屏障（scheduler.go:141-148）不得被上限改动绕过：被钳制在 pending 里的激活不产生 goroutine，因而也不产生 recover 面。",
+    "切片 15/15b 的 Warnings 与文案判据不受本片影响：本片不改 Warnings()，也不把上限状态写进告警文案。",
+    "测试形状沿用 /tmp 里的外部 module 探针 + 仓库内聚焦命令两条腿；矩阵脚本方法（每轮注入-执行-无条件恢复-哈希自检）从 /tmp/p1-cycle15 复用。"
+  ],
+  "baselinePlan": {
+    "kind": "behavior-delta",
+    "why": "本片要新增的用户可观察行为今天确实不存在且可稳定复现为失败：WithMaxConcurrency(1) 下三个兄弟同时在飞（M-2 峰值 3、M-3 在兄弟数 3 时 peak>=2 为 1000/1000），派发顺序也不是声明序（M-3 首个登记即声明序首个仅 0.7%~2.4%）。判据全部经公共入口 WithMaxConcurrency + Run + Result.Value/Completed 观察，不依赖任何私有读取。",
+    "notHardeningBecause": "不是 behavior-preserving：调用方可观察到的东西本身要变（在途数从「不限」变成「≤ n」、轨迹从乱序变成串行）。只有 C4/C5/C7/C8/C9 是护栏行，它们不能替代 C1-C3/C6 的行为差异。",
+    "notBlockedBecause": "验收条件全部可在真实公共场景观察：外部 module 里用导出面搭图、跑 Run、读节点侧轨迹与 Result 出口；停摆风险由 M-5 的有界逃逸阀显式化，不需要新旋钮。",
+    "redCandidateRow": "C1",
+    "expectedFocusedCommand": "go test ./pkg/hno/graph -run TestP1R16_ -count=1 -race -v"
+  },
+  "writeBackOwed": [
+    "票面 :67 的验收列补两句：上限生效性以「测试侧单一登记器观测的峰值在飞 ≤ n」判定；「激活顺序为声明顺序」只在 n=1 的全串行情形可由公共出口逐字判定（n>1 时同批起始次序不由调度器决定）。",
+    "票面 :26 或母约 :143 的括注补「n < 0 与 n = 0 同样按不限处理，源自母约 :190 的 maxConcurrency > 0 前置守卫」——这是本契约替未定义输入做的派生决定，需票面 owner 确认（R16-UNADJ-1）。",
+    "母约 :190 的 tryDispatchPending() 与本包实际形状（消费者在 dispatch 循环头停住、把队头留在 pending 等下一次 completion）措辞对齐，避免规格里出现一个不存在的方法名。"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-test-scope-p1-graph.md#B8",
+    "artifact:docs/design/v3-platform.md#190",
+    "artifact:docs/design/v3-p1-graph-slice13-review-verdict.json",
+    "artifact:docs/design/v3-p1-graph-slice14-review-verdict.json",
+    "artifact:docs/design/v3-p1-graph-r15b-review-verdict.json",
+    "receipt:4ea5322f-20b8-4e05-82d1-fce0c5f8c5cb",
+    "receipt:dfd3fcf5-f981-42fb-8a20-85dee8a1aa9d",
+    "file:pkg/hno/graph/graph.go",
+    "file:pkg/hno/graph/scheduler.go",
+    "file:pkg/hno/graph/graph_test.go"
+  ]
+}

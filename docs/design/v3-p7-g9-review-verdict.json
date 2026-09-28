@@ -1,0 +1,114 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p7-g9-observability",
+  "activationId": "pending（本片未走 rex 工作项派发回填，契约 activationId 同此状态）",
+  "capabilityId": "software.review.standards-spec",
+  "stageId": "review",
+  "recordedAt": "2026-09-28T12:00:00Z",
+  "independenceDisclosure": "本片实现由负责人 2026-09-28 并行工作指示派发的子代理（dispatched subagent）完成，审查为同一子代理自查，非独立审查者。后果如实写下：实现与审查同源，最容易漏的是「接线语义与既有零件既有担保之间的相互作用」，因此本轮把审查结论尽量落在实测上（两段 RED/GREEN receipt、11 条变异矩阵含 2 条实测等价登记、防碰巧绿、契约逐条对账、逐文件字节复核），可复现命令逐字写出。",
+  "fixedPoint": {
+    "note": "本切片的 fixed point 是契约 baselineBytes（切片 24 后收口态），不是某个 commit。切片 2–25 的成果至今未提交（HEAD 仍是 0387000），且基线 blob 从未 git hash-object -w 入库，所以 git diff <fixedPoint>...HEAD 在本切片物理上不可得。S18-SPEC-2（未提交、无提交授权）继续携带；本片未对工作树执行任何 git 写操作。",
+    "runnerTest": "15d85c1f4545d395496dc6079bada97241c95c26",
+    "stateGo": "194c899275e3f5b61c0c8589bad0ffb2dfd5beb6",
+    "stopGo": "a62d85e74c0cd9681122b34fe52995ab6a5e166b",
+    "toolBatchGo": "219844923f570e4a27936d358b3b6c1e85dfeead",
+    "toolLimitRunTest": "ab2d2d2853d8a7270c64c61b66cc9aa7e16ea40c",
+    "carriedFinding": "S18-SPEC-2 仍在；工作树内存在兄弟切片（graph/run/agent/docs）的在途改动，本片测试只跑 ./pkg/hno/runner/... 与 ./pkg/hno/observability/...，邻近回归三组照跑且 exit 0"
+  },
+  "diffRef": {
+    "how": "逐文件 baseline→final 清单（非三点 git diff，理由见 fixedPoint.note）",
+    "changedFiles": [
+      {
+        "path": "pkg/hno/runner/runner.go",
+        "before": "970c701dd90b5229b625ac4c0aed9b8ab38a94ef",
+        "afterRefactor": "18fe1f80bc9256289c9550c8056e08cf3a81888b",
+        "scope": "Config 增两个可选字段（Retry/Breaker）+ Runner 四个私有字段 + New 接线（provider/modelName）+ StateAwaitModel 调用点换 r.invokeTurn（redProtocol 第二段恰一行）"
+      },
+      {
+        "path": "pkg/hno/runner/resilience.go",
+        "before": null,
+        "afterRefactor": "2d6c944c9a3717c00667c81e17db7277cf33b472",
+        "scope": "本片新缝：clampAttempts guard 钳制 + invokeTurn（breaker 门禁 → 每尝试 chat span → 重试循环 → 一次逻辑熔断记账），全私有、零锁（sync.=0）"
+      },
+      {
+        "path": "pkg/hno/runner/p7g9_resilience_test.go",
+        "before": null,
+        "afterRefactor": "1c25b730d4f9a7ea6516118935ed4c0384bcdc72",
+        "scope": "本片新测试，D1–D13（契约 allowedTestSeam.add；两段 redProtocol 之间逐字节零改动）"
+      },
+      {
+        "path": "scripts/mutation/p7g9-observability.mjs",
+        "before": null,
+        "scope": "本片变异执行体：9 杀红 + 2 实测等价登记（骨架沿 p2g3，扩展为允许跨 runner.go/resilience.go 的多文件变异，测试文件不在变异面内）"
+      }
+    ],
+    "unchangedFiles": "既有 runner 测试两份（runner_test.go 15d85c1f…、tool_limit_run_test.go ab2d2d28…）与 runner 的 state.go 194c8992…/stop.go a62d85e7…/tool_batch.go 21984492…，以及 observability 九文件（breaker ac4fb9b8…、cost 3ef5556a…、cost_test 0c29f6d3…、prompt_cache 1d460fd0…、ratelimit 92a23db3…、resilience_test 55b4ff38…、retry f2c2568e…、tracing ccf7014a…、tracing_test d83c09f5…）——逐文件 git hash-object --no-filters 复核与契约 baselineBytes 全同；models/types 亦零字节改动",
+    "nonTestLoc": "基线 488 -> 最终 582（判据 ≤700；runner.go 400 + resilience.go 69 + 既有 113；M2 副本实测 582，实落地同数）",
+    "exportedSymbols": "23 -> 23（判据恰 23，零新增导出：新增全部为私有——2 个 Config 字段、4 个私有字段、clampAttempts 与 invokeTurn 两个私有函数）",
+    "syncCount": "0 -> 0（resilience.go sync. 计数 0；breaker 由调用方持有传入，runner 不新增锁）"
+  },
+  "standardsAxis": {
+    "gates": [
+      { "gate": "go build ./pkg/hno/runner/... ./pkg/hno/observability/...", "result": "exit 0" },
+      { "gate": "go test ./pkg/hno/runner/... ./pkg/hno/observability/... -count=1", "result": "ok，exit 0（receipt:afbe63e4-6205-438b-8c88-772cd6a60168）" },
+      { "gate": "go test -race ./pkg/hno/runner/... ./pkg/hno/observability/... -count=1", "result": "ok，exit 0，无 DATA RACE（receipt:c17f4bd4-ca29-4008-b933-da49b26277ff）" },
+      { "gate": "go vet ./pkg/hno/runner/... ./pkg/hno/observability/...", "result": "exit 0" },
+      { "gate": "gofmt -l pkg/hno/runner pkg/hno/observability", "result": "无输出" },
+      { "gate": "邻近回归 go test ./pkg/hno/agent/... ./pkg/hno/graph/... ./internal/session/contract/... -count=1", "result": "三组 ok，exit 0（receipt:8e7b5d10-7120-4112-bc59-b9ce7101ebac；agent 经 newKernel 构造 runner.Config，加法字段未破坏其编译与行为）" },
+      { "gate": "防碰巧绿：绑定命令 -count=30 -race", "result": "ok，exit 0（receipt:908c02ff-499c-4b68-abb0-31056ac97e0d）" },
+      { "gate": "防碰巧绿：两包整包 -count=5 -race", "result": "ok，exit 0（receipt:26bc6f79-0c68-4599-bc5b-4682d68d9d65）" }
+    ],
+    "forbiddenShortcutsAudit": "逐条核对契约 forbiddenShortcuts：缝挂在 Run 调用点而非 New() 默认 Invoker 回退（m8 证 D12 杀）；breaker-open 裸哨兵 + Run 唯一 wrap、无新 StopReason、无双前缀（e2 实测证现状全绿、双前缀靠设计裁决修正）；MaxAttempts<1 缝内钳制未裸传（m1 证透传即 D4 静默成功）；门禁在循环外、记账每回合一次（m3/m2 证）；红来自公共面形状（第一段 9 行行为红，零 reflect 架空、零编译失败）；observability 与既有测试字节零改动；无 time.Sleep 时序断言（D6 冷却等待为毫秒级下界，只断放行行为与次数）。"
+  },
+  "specAxis": {
+    "coverageMapping": "契约 D1–D13 逐行有 Test、逐行有实现落点（green 文档 §4）、逐行有牙齿归属（refactor 文档 §2 表）：m1–m9 九条杀红覆盖判据 2 点名的全部形态；e1/e2 实测等价登记。",
+    "redAuthenticity": "redProtocol 第一段的 RED（receipt:aa8c6103…）9 行判红全部落在设计期 M1 实测的「韧性/span 缺位」形状上（次数错、无门禁、零 span、无耗尽语义），D2/D4/D6/D11 四行反向对照天然绿；零编译失败、零环境失败。第二段接线后 13/13 全绿，两段之间测试文件零改动（差异恰为调用点一行）。"
+  },
+  "findings": [
+    {
+      "id": "S25-SPEC-1",
+      "severity": "observation-limit",
+      "title": "breaker-open 的单前缀形状未被任何 D 行钉住（实测）",
+      "detail": "变异 e2 实测：仅在 ErrOpen 返回处预包 `model invoke: %w`（M2 抓到的历史缺陷形态）时 D1–D13 全绿——errors.Is 穿透 %w 链仍可达 ErrOpen，D5/D7 钉错误身份与调用冻结、不钉错误串形状（对比：重试路径的前缀形状由 D3 的计数断言钉住，m7 杀红实证）。该缺陷靠契约 designConsequence 第 5 条的设计裁决（缝内裸哨兵）修正，而非测试钉住。要钉它需要一行「breaker-open 错误串前缀恰出现一次」的新契约，本片不追加。"
+    },
+    {
+      "id": "S25-SPEC-2",
+      "severity": "observation-limit",
+      "title": "D6（熔断恢复）对记账取反不构成独立杀红",
+      "detail": "变异 m4（Success/Failure 取反）在 D6 上等价：失败被记成 Success 时熔断根本不开，「开断后的恢复」无从观察。D6 的牙齿依赖 D5 先钉住「会开断」，二者是契约自述的成对行（D5 钉「没关门」、D6 钉「关了必须能开」）；m4 由 D5/D7 杀。登记为成对行的固有观察上限，不追加新行。"
+    },
+    {
+      "id": "S25-STD-1",
+      "severity": "carried",
+      "title": "S25-DEFER-1 与 S22-LAYER-1 按契约 carriedItems 原样携带",
+      "detail": "run/agent 级 span（observability.StartAgentSpan 的 invoke_agent + runID 归集）不在本片，落点 pkg/hno/agent 的 P7 第 2 片——P7 验收行「span 覆盖 run/agent/model/tool」在第 2 片落地前为部分满足（母约 §10 P7 行已附 span 覆盖状态表）。graph 节点级重试（S22-LAYER-1）与 runner 回合级重试不共享类型、不互相感知（本片零 import pkg/hno/graph，已复核）；组合时尝试次数相乘，跨层总尝试上限是未来独立裁决。S23-SPEC-1（StreamMode 生产者接线）不受影响：invokeTurn 缝在 TurnInvoker 边界、先于任何事件生产语义，生产者片不得把韧性再包一层。"
+    },
+    {
+      "id": "S25-STD-2",
+      "severity": "carried",
+      "title": "lint 欠项与未提交状态沿用",
+      "detail": "golangci-lint / make lint 至今未运行（S19-STD-6 沿用）；切片 2–25 未提交（S18-SPEC-2 沿用）。本片全部字节在 gofmt 与 go vet 通过的状态上收口。"
+    }
+  ],
+  "completionAudit": {
+    "contractCriteria": "8 条 completionCriteria 逐条对账见 refactor 文档 §3，全部满足；写回两处已落：母约 §2.1 G9 概念行（已交付注记）与 §10 交付表 P7 行（第 1 片交付 + span 覆盖状态表 + S25-DEFER-1）；证据文档四份（red-observation/green/refactor/verdict）。交付票 criterion 2「不修改 runner 公共接口」的采纳解释（加法可选字段、零新导出符号、既有调用方零破坏——agent 的 newKernel 照常编译且邻近回归 exit 0）按契约 writeBackOwed 登记于此，待负责人确认或改判；若改判为字面读法，接线挪 agent/kernel.go，本契约 D 行的 publicEntry 随迁，测试行本身不变。状态文档（v3-p1-graph-status.md）由编排方落笔，本片未触碰。",
+    "nextFrontier": "P7 第 2 片：run/agent 级 span 接线（pkg/hno/agent，Agent 有 name/runID，span 在 Agent.Run 入口开、包住整条 kernel 调用）；RateLimiter / cost.Estimate / PromptCache 的接线各自成片。"
+  },
+  "verdict": "pass",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-test-scope-p7-g9-observability.json",
+    "artifact:docs/design/v3-red-observation-p7g9.md",
+    "artifact:docs/design/v3-p7-g9-green.md",
+    "artifact:docs/design/v3-p7-g9-refactor.md",
+    "artifact:docs/design/v3-platform.md#87",
+    "artifact:docs/design/v3-platform.md#534",
+    "receipt:aa8c6103-3d91-4a2f-ba74-1e9050c90275",
+    "receipt:669c0c6d-251d-46d9-8d06-5390310c0d7e",
+    "receipt:afbe63e4-6205-438b-8c88-772cd6a60168",
+    "receipt:c17f4bd4-ca29-4008-b933-da49b26277ff",
+    "receipt:8e7b5d10-7120-4112-bc59-b9ce7101ebac",
+    "receipt:908c02ff-499c-4b68-abb0-31056ac97e0d",
+    "receipt:26bc6f79-0c68-4599-bc5b-4682d68d9d65"
+  ]
+}

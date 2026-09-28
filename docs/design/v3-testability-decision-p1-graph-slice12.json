@@ -1,0 +1,42 @@
+{
+  "schema": "rex.testability-decision.v1",
+  "workItemKey": "work-p1-graph-r12-unreachable-name-teeth",
+  "activationId": "44951411-0736-4921-b560-c2d4923e2bdd",
+  "stageId": "decide-testability",
+  "kind": "behavior-preserving-hardening",
+  "decisionRef": "artifact:docs/design/v3-testability-decision-p1-graph-slice12.json#decision",
+  "contractRef": "artifact:docs/design/v3-test-scope-p1-graph-slice12.json#inScopeBehaviors",
+
+  "decision": {
+    "summary": "没有诚实 RED：公共面今天就是「一次只点一个字典序最小的不可达节点名」，加固只是把这条已声明的行为从文档变成担保。缺口在断言强度而不是实现——审查实测变异 MU9（把全部不可达名字拼进同一条错误消息）在切片 11 收尾字节上两次运行 exit=0 / 0 条 FAIL。因此按 behavior-preserving-hardening 走基线→加固→牙齿复测，不伪造 RED。",
+    "whyNotBehaviorDelta": "要让这条行为「变红」，必须先把它改坏（例如临时把实现改成聚合输出）再测——那是恢复 RED 的事故路径，且这里连「事前不存在实现」都不是：实现已交付且正确。契约 slice11 的 amendment 也没有变化，测试范围没有被反向改写。",
+    "hardeningObligations": [
+      "加固后的测试必须在同一份字节上把 MU9 判红，并给出被判红的行名与站点。",
+      "MU1–MU8 与 MU10 在同一份测试字节上仍全部判红（防止为钉住「只点一个名字」而把别的判定挤松）。",
+      "断言只增不减：行名集合、期望文案、站点计数逐项对照记录；禁止 t.Skip、禁止放宽既有期望、禁止把期望改成聚合形式。",
+      "同一条基线命令在加固后仍零退出；整包 -race、pkg/hno/agent、pkg/hno/runner、go build ./... 零退出；gofmt/vet 干净；覆盖率不低于 91.1%。",
+      "S10-STD-1 的注释错位关闭：文档注释贴在 looping 上，noCount 另有自己的说明。"
+    ],
+    "stopCondition": "若加固过程发现必须改变公共面（文案、拒绝集或导出 API）才能让 MU9 判红，立即停止并向 rex-harness 报告测试范围变更需求，不自行扩范围。"
+  },
+
+  "baseline": {
+    "publicEntry": "graph.New().AddNode(...).AddEdge(...).AddConditional(...).SetEntry(...).SetOutput(...).Validate() 与 .Run(ctx, in) 的返回值，外加 Result.Output()/Completed()/Value(name)；测试文件是外部包 graph_test，只用导出面。",
+    "setup": "工作树为切片 11 收尾态且本轮未改动任何文件：pkg/hno/graph/graph.go e75d58d529af2dad7e7f3cbc25ffdff8129f802b、pkg/hno/graph/graph_test.go d60690eb8d606b116ba4f6898b06555f9edd0289、pkg/hno/graph/scheduler.go 87854ffbb7629f9adeb2d45fbb74d91f2032b99d。基线在切片 11 的同一聚焦场景命令上采集。",
+    "command": {
+      "executable": "go",
+      "args": ["test", "./pkg/hno/graph/...", "-run", "TestP1G_ValidateRejectsUnreachableNodes", "-count=1", "-timeout", "25s", "-v"],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "加固前的既有公共行为应当已经成立：TestP1G_ValidateRejectsUnreachableNodes 的 4 条非法行（orphan-registered/unreachable-chain/unreachable-many/unreachable-output）与 4 组对照全部通过、零退出，Validate 与 Run 对同一缺陷给出同一条 graph: unreachable node 文案，且节点执行计数为 0。",
+    "observed": "退出码 0；实测 12 行 PASS（父测试 + 4 非法行 + 4 组对照 + 对照内 4 条既有次序行），0 行 FAIL、0 行 SKIP，末行 ok github.com/rexleimo/agno-go/pkg/hno/graph 0.154s。基线成立。",
+    "receiptRef": "receipt:f6f02288-6d8b-4d5a-b7d2-af75407fb91a"
+  },
+
+  "evidenceOfGap": {
+    "mutation": "MU9 —— 把 return fmt.Errorf(..., missing[0], g.entry) 改成把 sort 后的 missing 全部拼进同一条消息",
+    "script": "/tmp/p1-cycle11/matrix4.py",
+    "observed": "两次运行 exit=0 / 0 条 FAIL / 0 个站点，即聚合式实现完全通过现有测试；同批 MU10（相连即算可达）被 4 行判红（graph_test.go:1051/1131/1134），说明缺口特定于「点名数量」这一面。",
+    "verdictFinding": "artifact:docs/design/v3-p1-graph-slice11-review-verdict.json#axes.spec.findings[0]"
+  }
+}

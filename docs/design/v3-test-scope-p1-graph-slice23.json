@@ -1,0 +1,246 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p4-run-g4-streammode-protocol",
+  "activationId": "pending",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-28T02:30:00Z",
+  "contractRef": "docs/design/v3-test-scope-p1-graph-slice23.json",
+  "slice": 23,
+  "series": "P4 第 1 片（母约 §5 G4：StreamMode 七模式统一流式协议的协议层），依赖 P0 已满足",
+  "userGoal": "把今天的两事件流（run_content/run_completed）扩成七模式统一流式协议的协议层：StreamMode 七常量、六个新事件类型（NodeStarted/NodeCompleted/TaskError/Checkpoint/StateUpdate/Custom）各自带 canonical JSON 与构造函数、Events 编解码对新类型精确还原且对旧类型与未知种类逐字节不变形；agent 侧新增 RunStreamMode 选择器（本片 StreamMessages 可用，其余模式 fail-closed 报错），RunStream 成为它的 StreamMessages 包装。",
+  "whyThisSlice": "母约交付表 :515 把 G4（P4，依赖 P0）与 P2/P3 并行排在关键路径上，P0/P1/P2 均已满足；BC-2 已核实 RunStream 签名变更在 pkg/+cmd/+examples/ 无外部消费方。本片只做协议层：事件类型与模式常量是后续所有流式生产者（graph 节点事件桥接、检查点、自定义写入）的公共依赖，先立协议再接生产者，避免每个生产者自带一套事件形状。",
+  "measuredBeforeDesign": [
+    {
+      "id": "M1-今天的公共面形状（结构扫描 + 副本探针 + agent 基线）",
+      "scene": "/tmp/g4m1（go.mod module github.com/rexleimo/agno-go，pkg/hno/run 为仓库字节逐字节副本，cmd/probe 只调导出 API）；仓库内 agent+run 基线",
+      "commands": [
+        "go -C /tmp/g4m1 run ./cmd/probe",
+        "go doc -all ./pkg/hno/run | grep -icE 'StreamMode|NodeStarted|NodeCompleted|TaskError|Checkpoint|StateUpdate|CustomEvent'",
+        "go test ./pkg/hno/agent/... ./pkg/hno/run/... -count=1"
+      ],
+      "observations": [
+        "SHAPE-2：node_started 载荷今天解码为 *run.GenericRunEvent（载荷保留但无具体类型）—— 协议缺口是真的（receipt:0ce9c662-cd8e-4dca-a693-be6fa8e475e0，exit 0）。",
+        "SHAPE-3：run_content 的 canonical JSON 形状量得 golden：event/created_at + run_id/agent_id/sequence/role/content（本片落地后逐字段不得变）。",
+        "SHAPE-4：完全未知的 kind 落 GenericRunEvent 兜底 —— 既有反向锚，落地后不得破。",
+        "结构扫描：上述七个关键词在 go doc -all 中命中 0；run 包导出符号 38。agent+run 基线 exit 0（receipt:9fa91ca0-760f-49fe-96a6-8553ae30ab81）。"
+      ]
+    },
+    {
+      "id": "M2-可行性实验（候选缝整体落在仓库副本上，仓库字节未动）",
+      "scene": "/tmp/g4exp（副本 + modes.go 七常量 + stream_events.go 六类型/构造函数/canonical JSON + events_json.go 的 decodeEvent 扩展与次序重排；cmd/probe 七个观察面）",
+      "commands": [
+        "go -C /tmp/g4exp test ./pkg/hno/run -count=1",
+        "go -C /tmp/g4exp test ./pkg/hno/run -count=1 -race",
+        "go -C /tmp/g4exp run ./cmd/probe",
+        "go -C /tmp/g4exp doc -all ./pkg/hno/run | grep -cE '^(func|type|var|const) '"
+      ],
+      "observations": [
+        "带缝副本上 run 包既有测试 0 判红：-count=1（receipt:87cde5ee-af4c-4b77-ae16-0c536fca1204）、-race（receipt:fefd9ba8-5989-4f35-823d-5676e8a17ccb）均 exit 0 —— 旧事件的编解码行为与测试锚不被新缝打破。",
+        "七个观察面全绿（receipt:dd2da628-bf50-4660-a587-8942fc4450ba，exit 0）：OBS-1 七模式 iota 序按母约草图；OBS-2 构造函数盖章 EventType；OBS-3 新旧混合数组往返七个事件全部还原为具体类型；OBS-4 旧事件 JSON 形状与 M1 golden 逐字段一致；OBS-5 未知 kind 仍 GenericRunEvent；OBS-6 team_run_content 归一化不破；OBS-7 时间戳非零。",
+        "M2 过程抓出两个真实协议缺陷（探针 receipt:d1234a72-…、a83e432f-… 各 exit 1），已反哺为本片 D 行：其一，字面量构造的事件 eventType 为空，MarshalJSON 原样吐空 event 字段 → 解码被旧归一化吃掉 —— 因此必须有构造函数盖章 + 序列化侧 canonical 兜底（D2/D4 的由来）；其二，node_completed 含 completed 子串，被 decodeEvent 既有 contains 归一化抢先吃进 RunCompletedEvent —— 因此精确匹配必须排在 contains 归一化之前（D4/D12 的次序语义）。",
+        "结构代价（副本实测）：run 包导出符号 38 → 77（+StreamMode 类型与 7 常量、6 事件类型 wire 名常量、6 类型 + 12 个 JSON 方法、6 构造函数、stampOr helper）；全文件 LOC 1211。实验结束时仓库逐字节复核未动（events_json.go 23679344…、graph/policy.go 6d71fa47…）。"
+      ]
+    }
+  ],
+  "designConsequence": "五条协议语义在本片定形：（1）新事件 wire 名取精确匹配（node_started/node_completed/task_error/checkpoint/state_update/custom），decodeEvent 中精确匹配先于 contains 归一化求值 —— contains 是旧载荷的宽容历史行为，不得再吞噬新的精确名（M2 缺陷二的教训）；（2）每个新事件类型提供 New* 构造函数（沿用 NewRunContentEvent 模式：种类与时间戳在构造时盖章），MarshalJSON 对空种类兜底 canonical 名（M2 缺陷一的教训），两层防御任何一层都不可省；（3）RunStreamMode(ctx, in, modes ...run.StreamMode) 的本片语义：无模式 = 默认 StreamMessages（与 RunStream 同形）；含 StreamMessages 时产出与 RunStream 完全一致的事件序列；含任何其余模式 → 返回 ErrUnsupportedStreamMode 包装的错误、不启动流（fail-closed，不静默降级成零事件流）——其余模式的生产者接线在各自后续片落地时解禁；（4）RunStream 保留原签名原行为，成为 RunStreamMode(StreamMessages) 的纯包装（BC-2 已核实爆炸半径）；（5）新事件载荷字段保持协议最小集（RunID/Node/Attempt/Input|Output/Message/Label/Payload/Patch/Subtype/Data），生产者桥接不在本片。",
+  "redProtocol": "本片与切片 22 同构：新增公共面符号。第一段落 API 面（常量、类型声明、RunStreamMode 签名与 StreamMessages 语义），此时 D2/D4/D11 按今天的形状真实判红（EventType 空、往返落错型），D3/D5/D6/D7/D8/D9/D10 反向对照绿；第二段落构造函数、per-type JSON、decodeEvent 扩展与次序重排转绿。两段各自留 receipt。",
+  "acceptanceMapping": [
+    {
+      "row": "D1",
+      "behavior": "七个 StreamMode 常量存在且 iota 序按母约草图（Values<Updates<Messages<Tasks<Checkpoints<Debug<Custom）",
+      "publicEntry": "run.StreamMode 常量族",
+      "assertion": "七常量两两比较与序数断言（今天符号不存在，编译期即红——本片唯二允许的编译红之一，见 redProtocol 注）",
+      "independentlyFailable": "对漏定义/乱序判红"
+    },
+    {
+      "row": "D2",
+      "behavior": "六个新事件类型的 New* 构造函数盖章种类与时间戳：EventType() 各归其名、Timestamp() 非零",
+      "publicEntry": "NewNodeStartedEvent 等 6 个构造函数 → BaseRunOutputEvent",
+      "assertion": "六类型经构造函数断言 EventType 与 Timestamp（今天无构造函数，字面量构造 EventType 为空，M2 缺陷一，故实现前必红）",
+      "independentlyFailable": "对漏盖种类/时间戳的实现判红"
+    },
+    {
+      "row": "D3",
+      "behavior": "旧事件 JSON 形状逐字段不变（golden：M1 SHAPE-3 的 run_content 形状 + 既有 events_test 全部锚）",
+      "publicEntry": "Events MarshalJSON/UnmarshalJSON 对 RunContentEvent/RunCompletedEvent",
+      "assertion": "golden 字段集断言（event/created_at/run_id/agent_id/sequence/role/content）——反向对照，实现前后都必须绿",
+      "independentlyFailable": "对改写旧 wire 形状的实现判红"
+    },
+    {
+      "row": "D4",
+      "behavior": "六个新事件经 Events 编解码往返还原为同型同值（typed，不落 GenericRunEvent/旧类型），尤其 node_completed 不得被 contains 归一化吃进 RunCompletedEvent",
+      "publicEntry": "Events UnmarshalJSON → decodeEvent",
+      "assertion": "七事件混合数组往返后逐个类型断言（今天 node_started 落 GenericRunEvent、node_completed 落 RunCompletedEvent，M1/M2 实测，故实现前必红）",
+      "independentlyFailable": "对次序倒置（contains 先于精确）与漏定义 wire 名的实现判红"
+    },
+    {
+      "row": "D5",
+      "behavior": "完全未知的 kind 仍由 GenericRunEvent 兜底保留载荷（反向钉）",
+      "publicEntry": "decodeEvent 的 default 分支",
+      "assertion": "unknown 种类往返后 %T 为 *run.GenericRunEvent 且载荷可取——实现前后都绿",
+      "independentlyFailable": "对把未知种类判错的处理判红"
+    },
+    {
+      "row": "D6",
+      "behavior": "既有 contains 归一化的两个现存用例不破：team_run_content → RunContentEvent；run_completed → RunCompletedEvent",
+      "publicEntry": "decodeEvent 既有分支",
+      "assertion": "两子用例类型断言——实现前后都绿（次序重排后仍须成立）",
+      "independentlyFailable": "对次序重排时误伤旧归一化的实现判红"
+    },
+    {
+      "row": "D7",
+      "behavior": "RunStream 原签名原行为不变（agent 包既有 RunStream 测试零改动全过）",
+      "publicEntry": "Agent.RunStream",
+      "assertion": "既有测试零改动通过（反向对照）",
+      "independentlyFailable": "对破坏既有流式行为的实现判红"
+    },
+    {
+      "row": "D8",
+      "behavior": "RunStreamMode(ctx, in, StreamMessages) 产出与 RunStream 完全一致的事件序列（同一稳定 stub、同一输入）",
+      "publicEntry": "Agent.RunStreamMode",
+      "assertion": "两条路径的事件序列逐事件同型同内容（今天 RunStreamMode 不存在，API 面落地后即可绿）",
+      "independentlyFailable": "对两种路径分叉的实现判红"
+    },
+    {
+      "row": "D9",
+      "behavior": "RunStream(ctx, in) 等价于 RunStreamMode(ctx, in, StreamMessages)（包装关系）",
+      "publicEntry": "Agent.RunStream / RunStreamMode",
+      "assertion": "同一 stub 下两调用的事件序列一致",
+      "independentlyFailable": "对 RunStream 另起炉灶的实现判红"
+    },
+    {
+      "row": "D10",
+      "behavior": "RunStreamMode 传入其余任一模式（Values/Updates/Tasks/Checkpoints/Debug/Custom）→ 返回可 errors.Is 到 ErrUnsupportedStreamMode 的错误且不启动流；无模式默认 StreamMessages",
+      "publicEntry": "Agent.RunStreamMode + run.ErrUnsupportedStreamMode",
+      "assertion": "六模式各一子用例 errors.Is 成立、无事件通道产出；无模式子用例与 D8 同形（fail-closed 语义，今天无此 API，落地即可断）",
+      "independentlyFailable": "对静默降级为零事件流的实现判红"
+    },
+    {
+      "row": "D11",
+      "behavior": "新旧混合事件数组的 JSON 往返：七个事件逐个还原具体类型与载荷值（组合兼容性）",
+      "publicEntry": "Events MarshalJSON/UnmarshalJSON",
+      "assertion": "往返后七事件 %T 与关键字段断言（今天必红：新事件落错型）",
+      "independentlyFailable": "对混合数组丢事件/丢型的实现判红"
+    },
+    {
+      "row": "D12",
+      "behavior": "decodeEvent 分派次序语义钉死：精确 canonical 名先于 contains 归一化，且归一化对旧名字仍宽容（大小写/空白 trim 行为不变）",
+      "publicEntry": "decodeEvent 内部次序（经公共面观察：node_completed 与 team_run_content 两个方向）",
+      "assertion": "D4/D6 的两方向子用例共同钉住（M2 缺陷二的直接产物）",
+      "independentlyFailable": "对次序回退的实现判红（m-变异：把精确块挪回 contains 之后）"
+    }
+  ],
+  "minimalVerticalSlice": "D2 + D4 + D8 + D10 四行（构造函数盖章、typed 往返、RunStreamMode 消息模式、不支持模式 fail-closed），D1/D3/D5/D6/D7/D9/D11/D12 是结构补强与反向对照。理由：协议层的风险全部集中在「新事件能否无损进出 JSON 且不碰坏旧形状」与「选择器不静默撒谎」两件事上，四行正好各钉一头。",
+  "allowedTestSeam": {
+    "add": [
+      "pkg/hno/run/streammode_test.go（package run_test 或 run，覆盖 D1–D6/D11/D12：模式常量、构造函数、JSON 往返、混合数组、分派次序）",
+      "pkg/hno/agent/runstreammode_test.go（package agent_test，覆盖 D8–D10：RunStreamMode 三态与 RunStream 包装关系，沿用 agent 包既有的稳定模型 stub）"
+    ],
+    "modify": [
+      "无。既有测试文件一份都不许动 —— M2 已证 run 包既有测试在带缝副本上 0 判红；agent 侧 RunStream 行为由既有测试锚定。若实现迫使既有断言改写，回到本契约而不是改测试。"
+    ],
+    "retires": [],
+    "sourceSeam": "pkg/hno/run/modes.go（新文件：StreamMode + 七常量 + 六 wire 名常量 + ErrUnsupportedStreamMode）、pkg/hno/run/stream_events.go（新文件：六类型 + 构造函数 + canonical JSON）、pkg/hno/run/events_json.go（decodeEvent 扩展 + 次序重排）、pkg/hno/agent/agent.go（RunStreamMode + RunStream 改包装）。events.go 旧类型零改动。"
+  },
+  "forbiddenObservations": [
+    "agent 内部循环私有字段、channel 容量、goroutine 数（票面 :40 同族）——事件序列经公共 channel 观察即可",
+    "time.Sleep 定序；RunStreamMode 一致性断言用同一 stub 的确定性输出，不比较时间戳数值本身（只断非零）",
+    "为测试导出事件内部状态或新增只服务测试的产品出口",
+    "断言新事件载荷的具体业务语义（生产者接线在后续片，本片只钉协议形状）"
+  ],
+  "baselineBytes": {
+    "pkg/hno/run/context.go": "07ca1c3202379087cb8671f04c319664fb172f74",
+    "pkg/hno/run/events.go": "d8150162cbfd1aca62d867f02b61345da7114984",
+    "pkg/hno/run/events_json.go": "23679344909a99ff014b851bb2e30452a2f5f6cc",
+    "pkg/hno/run/events_test.go": "295b7307150f5f100133108a1ae9d2218be950c0",
+    "pkg/hno/run/loop.go": "2cd6d212bf5dcf1efa043e18b3109d3cc6aa399f",
+    "pkg/hno/run/loop_extend_test.go": "fcb7f6e3b02ea289d504a8285eda614aa41bb737",
+    "pkg/hno/run/loop_test.go": "be2c91a76542feea733c72f7415e318fd5f266b2",
+    "pkg/hno/agent/agent.go": "9baf32449c52a590d4014f8f2b5017374aaff0b5",
+    "counters": {
+      "runExportedSymbols": 38,
+      "expectedRunExportedSymbols": 77,
+      "copyLocAllFiles": 1211,
+      "locCeiling": "run 包全文件 ≤2000；agent 包既有文件净增 ≤80 行（仅 RunStreamMode 与包装）"
+    },
+    "correctionNote": "初版哈希配对错位（采集命令用 paste 把 git hash-object 的 glob 顺序对上了 ls 的字母序，整体错开一行；agent/agent.go 错配成 context.go 的哈希）。切片 23 实现期间由实现者发现并上报，主代理逐文件单独实测后改回真值（未改动文件复核全同）。教训与票面 §6 同源：成对采集要用同一条命令同一种序，或逐文件单独取。"
+  },
+  "carriedItems": [
+    {
+      "id": "R19-Q2",
+      "ref": "artifact:docs/design/v3-adjudication-r19-q2-send-join.md（本片同期登记的裁决材料）",
+      "carriedIntoDesign": "母约 §6 map-reduce 示例（单前驱名 AddJoin）与 §3.5 第 6 项的冲突属 G5 Send 那片的设计门槛，与本片（G4 协议层）无代码交点。裁决材料已单独成文：冲突原文、实测证据、三个选项的后果与推荐。G5 契约起草前必须先有负责人对该材料的裁决。"
+    },
+    {
+      "id": "S23-SPEC-1",
+      "ref": "本契约 designConsequence 第 3/5 条",
+      "carriedIntoDesign": "StreamValues/Updates/Tasks/Checkpoints/Debug/Custom 六个模式的运行期语义（谁发事件、何时发）由各自生产者接线片钉：graph 节点事件桥接（Values/Updates 的天然生产者）、检查点生产者、节点内自定义写入入口。本片只交付协议类型与选择器，六个模式在 RunStreamMode 上 fail-closed（D10）。"
+    },
+    {
+      "id": "S23-STD-1",
+      "ref": "状态文档 §5",
+      "carriedIntoDesign": "切片 22 收口时登记过一次不可复现的裸 FAIL（refactor 文档 §2.1）。本片绑定命令若再现，按同一处置：先 -v 全量捕获与 goroutine 泄漏探针，再判形状。"
+    }
+  ],
+  "explicitNonGoals": [
+    "G5 Send 与 R19-Q2 的裁决本身（材料已登记，裁决属负责人；实现属 G5 那片）。",
+    "G6 Durability/StepLimit、G8 Store 长期记忆。",
+    "六个新模式的生产者接线：graph→run 的节点事件桥接、检查点生产者、节点内自定义写入入口（StreamValues/Updates/Tasks/Checkpoints/Custom 的运行期语义各自成片）。",
+    "StreamDebug 的并集发射语义（依赖 Tasks/Checkpoints 生产者，随其落地）。",
+    "改写 events_json.go 的既有 contains 归一化行为本身（只允许新增精确匹配并重排次序，旧行为逐字保留）。",
+    "为 agent 之外的 Team/Workflow 暴露模式选择 API（它们今天经 Loop 消费 Events，增量兼容已由母约核实，本片不动它们）。"
+  ],
+  "completionCriteria": [
+    "1. redProtocol 两段各自留 receipt：第一段（常量/类型声明/RunStreamMode）D2/D4/D11 判红；第二段（构造函数、JSON、decodeEvent 扩展重排）全绿。两段之间测试文件零改动。",
+    "2. 每行牙齿由变异证明，至少覆盖：精确匹配块整体摘掉（退回 contains）、精确/contains 次序回退、MarshalJSON 空 kind 兜底摘掉、RunStreamMode 的模式校验摘掉（静默降级）、RunStream 改为不再等价于 messages 模式、构造函数漏盖种类。等价变异如实登记。",
+    "3. 既有测试文件零改动（run 3 份 + agent 既有测试），逐文件 git hash-object 复核并登记。",
+    "4. 门禁全 exit 0：go build ./...、go test ./pkg/hno/run/... ./pkg/hno/agent/... -count=1 与 -race、go vet 两包、gofmt -l；邻近回归（runner/team/workflow/session-contract）exit 0。",
+    "5. 结构判据：run 包导出符号恰 77（副本实测口径）；run 包全文件 LOC ≤2000；agent/agent.go 净增 ≤80 行；零新增锁（新增文件 grep sync. 计数登记）。",
+    "6. 绑定命令在最终字节上重跑并取新回执；-race 无 DATA RACE。",
+    "7. 完成后回写：母约 §5 标注协议层已交付（切片 23）并记录七模式解禁状态表（Messages 已接、其余 fail-closed 待生产者片）；交付表 P4 行记本片；状态文档 §4 记录交付。",
+    "8. 防碰巧绿：run+agent 两包 -count=5 -race 一次 exit 0。"
+  ],
+  "forbiddenShortcuts": [
+    "只加类型不加构造函数（M2 缺陷一证明字面量构造的事件在 wire 上是哑的）。",
+    "把新 wire 名塞进 contains 归一化（如 Contains(kind,completed) 加特判）而不重排次序 —— 那会让下一个含 completed 子串的新名字重蹈覆辙（D12 钉死次序）。",
+    "RunStreamMode 对不支持模式静默返回空事件流（必须 fail-closed 报错，D10）。",
+    "为让 D8/D9 一致性断言通过而在测试里比较时间戳数值（时间戳只断非零；一致性按事件序列同型同内容断）。",
+    "改写既有 events_test.go 的任何断言来给新分派让路（M2 证明不需要）。",
+    "把 RunStream 改成委托以外的新实现路径（必须纯包装，D9）。"
+  ],
+  "observabilityLimit": [
+    "模式常量的『语义』（Values 吐什么、Checkpoints 何时吐）本片不可观察——生产者未接线，公共面只有常量存在、序数与 ErrUnsupportedStreamMode。",
+    "RunStreamMode 一致性断言依赖 agent 包既有 stub 的确定性：事件序列同型同内容可断，时间戳数值不可断。",
+    "decodeEvent 的次序由 D4/D6 两方向联合钉住，单独任何一方向都不充分（次序回退的变异必须同时杀红两条）。",
+    "GenericRunEvent 对未知载荷的保真度以 JSON 往返可取回为限（既有行为，本片不加深）。"
+  ],
+  "verificationCommands": [
+    "go test ./pkg/hno/run ./pkg/hno/agent -run 'TestP4G4_' -count=1 -race -v   # 本片唯一绑定场景命令，所有 receipt 逐字用这条（cwd 仓库根，直接取）",
+    "go build ./... ; go test ./pkg/hno/run/... ./pkg/hno/agent/... -count=1 ; go test -race ./pkg/hno/run/... ./pkg/hno/agent/... -count=1 ; go vet ./pkg/hno/run/... ./pkg/hno/agent/... ; gofmt -l pkg/hno/run pkg/hno/agent",
+    "go test ./pkg/hno/runner/... ./pkg/hno/team/... ./pkg/hno/workflow/... ./internal/session/contract/... -count=1",
+    "go doc -all ./pkg/hno/run | grep -cE '^(func|type|var|const) '   # 必须恰为 77（副本实测口径）",
+    "grep -rn 'sync\\.' pkg/hno/run/modes.go pkg/hno/run/stream_events.go | wc -l   # 新增文件 0"
+  ],
+  "writeBackOwed": [
+    "母约 §5：标注协议层已交付（切片 23），七模式解禁状态表（Messages 已接；其余六模式 fail-closed 待生产者片）；交付表 P4 行记本片（协议层交付）。",
+    "状态文档 §4：P4/G4 交付记录；§5 携带项更新（S23-SPEC-1 六模式生产者接线清单）。",
+    "裁决材料 docs/design/v3-adjudication-r19-q2-send-join.md 的裁决结果（负责人落笔后）由 G5 契约引用。"
+  ],
+  "adjudicationOptions": [],
+  "notes": "本契约为 design-tests 阶段产物（activationId 待工作项派发后回填）。M1/M2 实验全程在 /tmp 副本进行，仓库字节逐字节未动（events_json.go 23679344…、policy.go 6d71fa47… 复核）；未对工作树执行任何 git 写操作。R19-Q2 裁决材料随本契约同期登记。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-platform.md#5",
+    "artifact:docs/design/v3-platform.md#6",
+    "artifact:docs/design/v3-platform.md#515",
+    "artifact:docs/design/v3-adjudication-r19-q2-send-join.md",
+    "receipt:0ce9c662-cd8e-4dca-a693-be6fa8e475e0",
+    "receipt:9fa91ca0-760f-49fe-96a6-8553ae30ab81",
+    "receipt:d1234a72-4f4b-49e0-bce2-d66b85e7c129",
+    "receipt:a83e432f-41ad-4865-bc8d-5aaffa9c5b63",
+    "receipt:87cde5ee-af4c-4b77-ae16-0c536fca1204",
+    "receipt:dd2da628-bf50-4660-a587-8942fc4450ba",
+    "receipt:fefd9ba8-5989-4f35-823d-5676e8a17ccb"
+  ]
+}

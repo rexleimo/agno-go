@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.tdd-green-ledger.v1",
+  "workItemKey": "work-p1-graph-r16-max-concurrency",
+  "activationId": "eac4f8b0-943f-404a-9618-0639aff2920d",
+  "capabilityId": "software.testing.tdd",
+  "stageId": "green",
+  "recordedAt": "2026-09-27T17:26:15Z",
+  "contract": "artifact:docs/design/v3-test-scope-p1-graph-slice16.json",
+  "previousStageEvidenceChecked": {
+    "redReceipt": "receipt:727d1c4e-7795-4b93-a61d-9bfea17fc817",
+    "clause": "RED ledger 的 nextStageCondition：GREEN 只允许动 scheduler.dispatch() 的循环头与把 cap 读进 scheduler 所需的最小连接，禁止 mutex/atomic、禁止新增导出标识、禁止在 Validate 里拒负数；必须让 C1/C2/C3/C6 转绿且不改红 C4/C5/C7/C8；回执仍是同一条绑定命令、零退出。",
+    "verified": "本文件的 implementationDiff 逐块对应那条边界：唯一的行为改动是 dispatch() 循环头新增的两行守卫，其余是 scheduler 字段与进入 Run 时的一次取值、以及 WithMaxConcurrency 的公共注释。测试文件与五个既有测试文件字节不变，契约一字未改。"
+  },
+  "focusedCommand": {
+    "executable": "go",
+    "args": ["test", "./pkg/hno/graph", "-run", "TestP1R16_", "-count=1", "-race", "-v"],
+    "cwd": "/Users/rex/codes/agno-go"
+  },
+  "greenReceipt": "receipt:89c6adbc-a734-4a80-af21-eee2af9f16dd",
+  "greenReceiptFacts": {
+    "exitCode": 0,
+    "stdoutSha256": "8324bcf2e8c43ffa66605b0d1527e6541502a9da92892fac28aeb062c32d8dc9",
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855（空）",
+    "observedAt": "2026-09-27T17:24:52.429Z",
+    "storedAt": ".rex-harness/receipts/89c6adbc-a734-4a80-af21-eee2af9f16dd.json",
+    "perRowTally": "绑定命令的 -v 输出：8 个 Test 函数全部 PASS（C1 PeakInFlightRespectsCap / C2 CapOneSerializesInDeclarationOrder / C3 LaterSiblingObservesEarlierCompletion / C4 ZeroMeansUnlimited / C5 NegativeDoesNotStall / C6 CapBoundsPeakAcrossBiggerFanout / C7 CapTwoActuallyAdmitsTwo / C8 CapDoesNotConsumeStepBudget），零退出"
+  },
+  "userObservableBehaviorNowDelivered": [
+    "C1：WithMaxConcurrency(1) 的三兄弟图，登记轨迹算出的同时在途峰值从实测 3 变成 1，Completed() 仍是 7 次激活（没有节点因钳制而丢掉）。",
+    "C2：同一张图的轨迹逐字为 [start a, end a, start s1, end s1, start s2, end s2]——上限为 1 时区间不重叠且放行顺序就是边的声明顺序；Output()/Completed() 与不带上限的基线相同。",
+    "C3：后放行的兄弟在节点体入口就能观测到前序已完成（Result.Value(\"s1\") 含 \"end a\"），且看不到还在排队的 start s2。",
+    "C6：6 兄弟 + cap=2 的峰值从实测 6 变成 ≤ 2，六对 start/end 全部成对出现。",
+    "C4/C5/C7/C8：0 与负数仍表示不限（图照常三方握手收敛、结果与基线逐字相同）；cap=2 确实同时放行 2 个；等待队列不消耗步数预算，且预算用尽时越界的激活根本不被启动。"
+  ],
+  "implementationDiff": {
+    "scope": "切片 16 有界差异 = 决定阶段记录的字节 → 本轮字节。改动前哈希（git hash-object --no-filters）：graph.go 9684e49efb85f6870784cc75a469739669e0a05b、scheduler.go 61c7ba6db72b65eda938c099968e7409fc944d73；改动后：graph.go dca23943fd9cade4766ceeffe43b47477b815a61、scheduler.go f2d7fb4b10e9c133f9bbe8b566da40ea8e96d55e。",
+    "diffFaithfulnessProof": "这两个「改动前」哈希不在对象库里（当时只记录了哈希、未 -w 写入），因此本文件所附 patch 的旧侧由逐处反向撤销本轮改动重建，重建结果重新计算哈希后与记录值逐字符相同（graph.go 9684e49e…、scheduler.go 61c7ba6d…）。这同时反证了一件事：本轮对这两个文件的改动恰好就是 patch 里那四处，没有夹带任何其它编辑。",
+    "hunkCount": 4,
+    "behaviorHunks": [
+      {
+        "file": "pkg/hno/graph/scheduler.go",
+        "where": "scheduler.dispatch() 循环头",
+        "change": "新增守卫 `if s.maxConcurrency > 0 && s.running >= s.maxConcurrency { return nil }`，位置在步数上限判定之后、取队头之前。",
+        "why": "这是本片的唯一行为改动：打满时不再排空 pending，越界的激活留在队头等下一次完成，于是「同时在途 ≤ n」与「FIFO 放行顺序」同时成立。判据写在循环头（而非循环之外）是 ζ 变异（只在首轮判上限）的杀手；先判 stepLimit 再判 cap，保住的正是 C8 钉住的两半——预算用尽时报错且不再启动任何东西，而留在队列里的激活不消耗步数。",
+        "locks": "无：running/pending/steps 只由唯一消费者读写，「停在这里」就是消费者让出队列的方式，C9 的 sync. 计数仍为 0。"
+      },
+      {
+        "file": "pkg/hno/graph/scheduler.go",
+        "where": "scheduler 结构体字段 + Graph.Run 构造处",
+        "change": "新增私有字段 maxConcurrency int，并在进入 Run 时从 g.cfg.maxConcurrency 取一次值。",
+        "why": "cap 必须落到 scheduler，否则守卫读不到值；取一次值与 stepLimit 同构，满足「Run 开始之后改 builder 不能改写本次额度」这条既有不变式。不新增导出标识。"
+      },
+      {
+        "file": "pkg/hno/graph/scheduler.go",
+        "where": "dispatch 的函数注释",
+        "change": "首句从「按声明顺序全部派发」改为「按声明顺序派发，打满执行槽就停下等下一次完成」，并补一段说明钳制为何停在派发之前、为何不需要锁。",
+        "why": "原注释描述的是被本片改掉的行为；留着它就是在文档里写一句代码做不到的话（切片 15b 对文案犯过的同一类错）。"
+      },
+      {
+        "file": "pkg/hno/graph/graph.go",
+        "where": "WithMaxConcurrency 的 GoDoc",
+        "change": "「0 表示不限」→「0 或负数表示不限」，并写明这里刻意不做取值校验、依据是母约 §3.3:190 的 maxConcurrency > 0 守卫，负数是否算非法声明指向 R16-UNADJ-1。",
+        "why": "C5 现在把「负数也不限、也不被拒」钉成了断言，注释必须与已测语义一致；同时把与 WithStepLimit（拒绝非正数）的不对称写清归属，避免下一个读者把它当成遗漏顺手「修掉」。注释改动，不是行为改动。"
+      }
+    ],
+    "patch": [
+      "diff --git a/pkg/hno/graph/graph.go b/pkg/hno/graph/graph.go",
+      "index 9684e49..dca2394 100644",
+      "--- a/pkg/hno/graph/graph.go",
+      "+++ b/pkg/hno/graph/graph.go",
+      "@@ -69,10 +69,12 @@ type config struct {",
+      "-// WithMaxConcurrency 限制同时在途的节点数，0 表示不限。",
+      "+// WithMaxConcurrency 限制同时在途的节点数，0 或负数表示不限。",
+      " // 打满时新激活进入 FIFO 等待队列，完成一个自动派发一个。",
+      "+// 与 WithStepLimit 不同，这里不校验取值：判据是 maxConcurrency > 0 才设槽，",
+      "+// 于是「不限」是这条守卫直接给出的语义而非遗漏（负数是否算非法声明另见 R16-UNADJ-1）。",
+      " func WithMaxConcurrency(n int) Option {",
+      " \treturn func(c *config) { c.maxConcurrency = n }",
+      " }",
+      "\n",
+      "diff --git a/pkg/hno/graph/scheduler.go b/pkg/hno/graph/scheduler.go",
+      "index 61c7ba6..f2d7fb4 100644",
+      "@@ scheduler struct @@",
+      " \tstepLimit int // 进入 Run 时从 builder 取一次值，之后改图不能改写本次预算",
+      "+\t// maxConcurrency 是同时在途激活数的上限，0 或负数表示不限（母约 §3.3:190 的",
+      "+\t// maxConcurrency > 0 前置守卫）。它同样只在进入 Run 时取一次值。",
+      "+\tmaxConcurrency int",
+      "}@@ Graph.Run @@",
+      " \t\tstepLimit: g.cfg.stepLimit,",
+      "+\t\t// 上限取的是快照里的值：与 stepLimit 一样，进入 Run 之后再改 builder 不能改写",
+      "+\t\t// 本次 Run 的并发额度。",
+      "+\t\tmaxConcurrency: g.cfg.maxConcurrency,",
+      "@@ dispatch @@",
+      "-// dispatch 把等待队列按声明顺序全部派发，每派发一次激活消耗一步预算。",
+      "+// dispatch 把等待队列按声明顺序派发，打满执行槽就停下等下一次完成，每派发一次激活消耗一步预算。",
+      "+// 并发上限同理停在派发之前：越界的激活留在 pending 头部，既不消耗槽位也不消耗步数预算。",
+      "+// 这里不需要任何锁——running/pending/steps 只由唯一消费者读写……只在首轮判上限的实现会在第一个 completion 之后把整批一次放出。",
+      " \tfor len(s.pending) > 0 {",
+      " \t\tif s.steps >= s.stepLimit { ... }",
+      "+\t\tif s.maxConcurrency > 0 && s.running >= s.maxConcurrency {",
+      "+\t\t\treturn nil",
+      "+\t\t}",
+      " \t\tact := s.pending[0]"
+    ],
+    "patchNote": "上面这份 patch 为紧凑可读做了两处压缩：省略未变的上下文行、并在被省略的注释段落处以「……」接续（完整逐字 patch 同时保存在 /tmp/p1-b8/greendiff/d.patch）。它没有增删任何一行实质改动，且其旧侧哈希与提交时记录值一致。真正以命令输出背书的是下面 verification 一节的哈希与计数。"
+  },
+  "verification": {
+    "focusedBoundCommand": "绑定命令（-count=1 -race -v）零退出，8/8 PASS，见 greenReceipt",
+    "perRoundReproducibility": "go test ./pkg/hno/graph -run TestP1R16_ -count=20 -race -v：8 个 Test 函数各 20/20 PASS（契约 completionCriteria 第 2 条要求 GREEN 后同一命令仍须 20/20，四条 red 行 C1/C2/C3/C6 与四条护栏行都达到），DATA RACE 计数 0，整条命令 exit=0。记录 /tmp/p1-b8/green20.txt",
+    "wholePackage": "go test ./pkg/hno/graph -count=1 -race → ok github.com/rexleimo/agno-go/pkg/hno/graph 1.606s（既有 41 个 Test 函数全部保持通过，无一被本片改红）",
+    "build": "go build ./... 零退出",
+    "gofmt": "gofmt -l pkg/hno/graph/ 无输出",
+    "vet": "go vet ./pkg/hno/graph/ 零退出",
+    "structure": "sh /tmp/p1-b8/struct.sh：sync_dot_graph=0、sync_dot_scheduler=0（C9 要求零锁，未加 mutex/atomic）、recover_scheduler=1、testfunc_total=49、loc_nonblank_nontest=634（票面 §9 上限 1500）、scheduler_maxConcurrency_reads=5（RED 阶段为 0，即旋钮从「无读取点」变为「真读取」的直接计数证据）",
+    "testFilesUntouched": "p1r16_max_concurrency_test.go c4bf463898b197db97fbbed1904ef3f000b8631f（与 RED 阶段一致，GREEN 未回改测试）、graph_test.go 425ea030…、p1r13 bc4ab8e7…、p1r14 0ed607db…、p1r15 3ea06d27…、p1r15b 0285ab35…（五个既有测试文件字节不变）"
+  },
+  "nonGoalsRespected": [
+    "未新增导出标识：新增的是 scheduler 的私有字段；无哨兵 error、无回调、无状态枚举（R16-UNADJ-2 仍未落地）。",
+    "未在 Validate 里新增对负数/零上限的拒绝：R16-UNADJ-1 保持未裁决，C5 绿即证明这条路没有被偷偷走。",
+    "未引入优先级/加权/按节点限流/工作池/重试，也没做 memoize 或批量派发优化。",
+    "未触碰 Join 路由（edgeJoin 仍不可路由并被 Validate 拒绝）、取消归一化（B9）、Typed（B11）、Warnings 文案（B7/切片 15b）。",
+    "未改 stepLimit 的取值校验与默认值，未改 Result.Completed() 的字典序契约。"
+  ],
+  "mutationMatrixStatus": "α–θ 八条变异的实跑与指定杀手行归属按计划放在 REFACTOR 之后（契约 completionCriteria 第 3 条）。本阶段不声称变异已被杀死：GREEN 只交付了「行为已实现且逐轮 20/20 通过、既有族无回归」这一层证据。特别地，η（LIFO）与 ε（cap 恒为 1）这两条要靠 C2/C7 各杀一半，矩阵必须证明两条都被覆盖，否则如实登记为缺口。",
+  "nextStageCondition": "REFACTOR 阶段在测试保持通过的前提下审查这处守卫的命名与边界（例如 cap 与 stepLimit 两条「停在派发之前」的判据是否该收成同一处），并跑 α–θ 变异矩阵；测试差异须确认仍约束 C1–C9 的用户可观察行为而不是实现细节。回执仍须是绑定命令、零退出。不得为了「让代码更漂亮」而引入 mutex 或新增导出面。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-r16-green.json",
+    "receipt:89c6adbc-a734-4a80-af21-eee2af9f16dd",
+    "receipt:727d1c4e-7795-4b93-a61d-9bfea17fc817",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice16.json",
+    "artifact:docs/design/v3-p1-graph-r16-red.json"
+  ]
+}

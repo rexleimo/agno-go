@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p5-session-sidecar",
+  "activationId": "pending",
+  "capabilityId": "software.review.standards-spec",
+  "stageId": "review",
+  "recordedAt": "2026-09-28T09:00:00Z",
+  "independenceDisclosure": "实现由派发子代理执行（用户 2026-09-28 明确允许并行子代理），子代理在 GREEN 中途被系统取消；主代理接手补完（PendingInterrupts 6 行展平）并执行全部收尾（门禁/变异/证据/写回）。两轴审查由主代理承担 —— 相对前序切片多一层「实现者与审查者分离」的实践，但两者仍同属一个会话，独立性缺口如实登记。所有结论尽量落在实测上（中间态回执、12 条变异、8 锚逐字节对账、契约逐条对账）。",
+  "fixedPoint": {
+    "note": "本切片的 fixed point 是契约 baselineBytes（8 个 marshal 边界锚 + 切片 27 收口字节），不是某个 commit。切片 2–28 未提交（S18-SPEC-2 沿用）。子代理取消事件使本片多一个中间态回执（531c79d9…，接手时 6 过/2 挂）—— 它是 D3 行的真实红证据，也是取消事件的可验证痕迹。",
+    "anchorsAtClose": "8/8 逐字节全同（契约 anchors 表；逐文件 git hash-object 对账记录于 green 文档 §3）",
+    "graphMustStayFiles": "send.go dcd04661… / policy.go 6d71fa47… / durability.go 11075cfe… / hitl.go 75756a14… / graph.go efa9a4ba… / scheduler.go dfd6c1ba… 逐字节未动（restore.go 为契约 sourceSeam 条件性新增入口 feebb799…，44 行）"
+  },
+  "diffRef": {
+    "how": "逐文件清单（非三点 git diff，理由同前序切片 fixedPoint.note）",
+    "changedFiles": [
+      { "path": "pkg/hno/session/sidecar/sidecar.go", "before": null, "afterRefactor": "（sidecar 包文件级 a773337c…，246 行）", "scope": "Sidecar 接口 + MemorySidecar + 记录类型 + 三派生视图 + Snapshot/RestoreSnapshot" },
+      { "path": "internal/hitlbridge/bridge.go", "before": null, "afterRefactor": "（bridge 包文件级 1afa3f13…，134 行）", "scope": "Capture/Install/ResumeSaved + fail-open/fail-closed 分流 + 记录生命周期" },
+      { "path": "pkg/hno/graph/restore.go", "before": null, "afterRefactor": "feebb79925ef159a40e09fbd00b8f2a320b54f06", "scope": "契约 sourceSeam 条件性入口：Suspension.ResumeAccount 读侧 + RestorePending 装回（44 行）" },
+      { "path": "pkg/hno/session/sidecar/p5g7_sidecar_test.go", "before": null, "afterRefactor": "（191 行）", "scope": "D1–D3/D10 测试" },
+      { "path": "internal/hitlbridge/p5g7_wiring_test.go", "before": null, "afterRefactor": "（407 行）", "scope": "D4–D9 测试（含跨进程恢复双档端到端）" },
+      { "path": "scripts/mutation/p5s28-sidecar.mjs", "before": null, "scope": "本片变异执行体，10 杀红 + 2 等价" }
+    ],
+    "unchangedFiles": "既有全部测试文件零改动；8 个边界锚逐字节全同（D10/OPT-1 不变量）",
+    "nonTestLoc": "新包 380（契约 ≤450 口径内）+ restore.go 44",
+    "exportedSymbols": "sidecar 18 / bridge 3（恰等契约 counters）",
+    "syncCount": "新缝 0（MemorySidecar 自有 RWMutex 为契约允许项）"
+  },
+  "standardsAxis": {
+    "gates": [
+      { "gate": "go build ./...", "result": "exit 0" },
+      { "gate": "绑定命令 -count=1 -race", "result": "8/8 PASS，exit 0（receipt:2a7761b3-85f6-4b04-a58f-a91323b0374a）" },
+      { "gate": "go vet 两新包 / gofmt -l 三处", "result": "干净" },
+      { "gate": "邻近面 agent/runner/session-contract/session 全家 -count=1", "result": "全 ok，exit 0（receipt:66e68495-c5a5-4cf5-aef9-8d008fe4fd98）" },
+      { "gate": "防碰巧绿：绑定 count=30 -race", "result": "ok（receipt:b09c9acb-253f-4897-8657-11c504f3b02a）" },
+      { "gate": "防碰巧绿：sidecar+bridge+graph 整包 count=5 -race", "result": "ok（receipt:3c595bef-2bfa-4e89-98f5-ced59d46d37d）" },
+      { "gate": "8 边界锚 git hash-object 对账", "result": "8/8 逐字节全同（D10/OPT-1 不变量）" }
+    ],
+    "forbiddenShortcutsAudit": "逐条核对契约 forbiddenShortcuts：侧车不路由过 Storage.Update（ByteIdentity + m1 证）；挂起记录部分接受被拒（m3/m5 证）；安装不覆盖活挂起（m4 证）；成功后清除（m6 证）；事件失败不阻塞、挂起失败必上交（m1/m2 证）；未改写既有断言（既有测试零改动）。"
+  },
+  "specAxis": {
+    "coverageMapping": "契约 D1–D10 逐行有 Test、逐行有实现落点（green 文档 §4）、逐行有牙齿（refactor 文档 §2：m1–m10 全杀红；e1/e2 等价登记）。母约 P5 三条验收全落：跨进程恢复=D4/D5/D6/D7（双档端到端），重复 Resume 幂等=D5/D8（跨重启版），契约测试绿=D10（8 锚 + 允许包基线）。",
+    "redAuthenticity": "阶段 1 RED receipt 因子代理取消未及落盘（披露）；接手中间态回执 531c79d9…（6 过/2 挂）记录了 D3 行的真实红（PendingInterrupts 存根返回 nil），变异 m9 在 GREEN 字节上精确复现该红形态 —— 红-绿-红闭环完整。"
+  },
+  "findings": [
+    {
+      "id": "S28-SPEC-1",
+      "severity": "carried",
+      "title": "真实 DB 适配是下一步薄层",
+      "detail": "MemorySidecar 的 Snapshot/RestoreSnapshot 已证明记录形状可无损经通用 JSON 往返；真实 DB 适配（独立列/表）按契约登记为下一步，不在本片。"
+    },
+    {
+      "id": "S28-STD-1",
+      "severity": "process",
+      "title": "子代理取消事件与 salvage 纪律",
+      "detail": "长任务子代理会被系统随时取消。本片因「契约+预演副本先行」使 salvage 成本仅 6 行代码；取消前已落盘的文件与中间态回执构成完整审计链。教训登记：派发长实现任务时，契约与预演副本是抗取消的结构。"
+    },
+    {
+      "id": "S28-STD-2",
+      "severity": "carried",
+      "title": "R17 环境性复发贯穿变异矩阵 B 侧",
+      "detail": "变异运行期间 TestP1R17_* 多次环境性判红（宿主负载），字节复核未变，按 S24-STD-2 处置登记；R17 夹具负载加固片仍欠。"
+    }
+  ],
+  "completionAudit": {
+    "contractCriteria": "8 条 completionCriteria 逐条对账见 refactor 文档 §3（判据 1 带取消事件披露，其余全满足）；写回完成：母约 §9/§10 P5 行标注第 2 片交付、D1 裁决材料补落地指针、状态文档由编排方收口。",
+    "p5Closure": "P5（G7 事件化+HITL）两条验收至此全部落地：审批场景跨进程恢复（切片 27 引擎核心 + 切片 28 侧车/桥接，双档端到端实测）、重复 Resume 幂等（跨重启实测）、契约测试绿（8 锚逐字节 + 允许包基线）—— P5 关闭。剩余前沿：P6（G10，契约起草被取消待重启）、P7 第 2 片（run/agent span）、G8（等 D2 裁决）。"
+  },
+  "verdict": "pass",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-test-scope-p1-graph-slice28.json",
+    "artifact:docs/design/v3-red-observation-p5s28.md",
+    "artifact:docs/design/v3-p5-s28-green.md",
+    "artifact:docs/design/v3-p5-s28-refactor.md",
+    "artifact:docs/design/v3-adjudication-d1-session-events.md",
+    "artifact:docs/design/v3-platform.md#9",
+    "receipt:531c79d9-7cad-452a-a6f5-24fa3cfdaa34",
+    "receipt:2a7761b3-85f6-4b04-a58f-a91323b0374a",
+    "receipt:66e68495-c5a5-4cf5-aef9-8d008fe4fd98",
+    "receipt:b09c9acb-253f-4897-8657-11c504f3b02a",
+    "receipt:3c595bef-2bfa-4e89-98f5-ced59d46d37d"
+  ]
+}

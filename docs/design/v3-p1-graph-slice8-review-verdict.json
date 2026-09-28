@@ -1,0 +1,184 @@
+{
+  "schema": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p1-graph-engine-r8-teeth-rework",
+  "activationId": "108791f2-30e0-43de-82cd-f387119c214e",
+  "stageId": "review",
+  "fixedPoint": "0387000",
+  "diffRef": {
+    "command": "git diff --numstat 0387000 -- pkg/hno/graph/graph_test.go",
+    "observed": "pkg/hno/graph/graph_test.go  545  0",
+    "reviewedFiles": [
+      "pkg/hno/graph/graph_test.go",
+      "docs/design/v3-test-scope-p1-graph-slice8.json",
+      "docs/design/v3-p1-graph-slice8-baseline.json",
+      "docs/design/v3-p1-graph-slice8-hardening.json",
+      "docs/design/v3-p1-graph-slice8-invariant-review.json"
+    ],
+    "outOfScopeButPresent": "pkg/hno/graph/graph.go 与 scheduler.go 的未提交改动来自切片 1–7，已各自审查过；本轮只审切片 8 对它们的依赖是否成立。"
+  },
+  "specSources": [
+    "docs/design/v3-test-scope-p1-graph-slice8.json（本切片行为契约 A1..A5 / explicitNonGoals / falsePassProhibitions / completionCriteria）",
+    "docs/design/v3-test-scope-p1-graph.md §12.1 R1/R2、§12.2 非目标、B6 校验清单",
+    "docs/design/v3-platform.md:210-224 §3.5 构建期校验必查 8 项"
+  ],
+  "standardsSources": [
+    "AGENTS.md Coding Style（无意义内联注释禁止、注释须与代码同真）",
+    "AGENTS.md Testing Guidelines（表驱动、公共入口断言、不得为通过而放宽断言）",
+    "Fowler 基线 12 条（本文件末尾逐条判定）"
+  ],
+  "independence": {
+    "reviewedBy": "主 Agent 本人（作者）",
+    "independentReviewerUsed": false,
+    "why": "作者于本轮拒绝派发独立审查子代理；因此本轮为自审，独立性弱于 cycle7 的外部审查。",
+    "mitigation": "每条 finding 都给出可复测的位置或命令，且 spec 轴新增项 R8-IV-1/S8-SPEC-1 由真实场景模块测出（非阅读推断）：receipt:ae945dd1-649c-4b93-8e81-7d0535ec75b6（按「必须拒绝」断言时真实非零退出）、receipt:3247c3de-a0f8-4f6c-811b-59876239b1f3（改判为 GAP 报告行后的实测数值与 INVARIANTS-OK）。"
+  },
+  "axes": {
+    "standards": {
+      "findings": [
+        {
+          "id": "S8-STD-1",
+          "smell": "注释与代码不同真（仓库标准硬违规）",
+          "location": "pkg/hno/graph/graph_test.go:637（审查时）",
+          "evidence": "注释写「reference 是 :494 那次已完成 Run 的不可变 Result」，而 `reference := mustRun(t, newGraph(nil))` 实测在 :550。",
+          "severity": "hard",
+          "fix": "改为按语句本身锚定而非行号。",
+          "status": "已在审查后修正并复测：行号锚点改成语义锚点，gofmt/vet/test 全绿 receipt:970a2010-59cb-46cd-b865-05c6dc33259e；文件哈希 0c5076ffac3abf6fcac9f6d061f60b6d37b30f27 → 08783b5e422c28589204947a7ccea5489e48707b，生产文件哈希未变。"
+        },
+        {
+          "id": "S8-STD-2",
+          "smell": "Duplicated Code",
+          "location": "pkg/hno/graph/graph_test.go:92、:352、:368、:438、:485；identity fixture 重复 6 处",
+          "evidence": "「遍历短语列表并 strings.Contains」的同一形状出现 5 次，其中 :352 与 :368 是逐字相同的字面量列表；`identity := func(_ context.Context, in any) (any, error) { return in, nil }` 重复 6 次。",
+          "severity": "judgement",
+          "fix": "抽 `assertRejectNames(t, err, phrases...)` 与共享骨架构造器；契约 explicitNonGoals 明令本切片不得做表驱动折叠，故按契约延后。",
+          "status": "owed（记入 nextOwed，非本轮违规放行）"
+        },
+        {
+          "id": "S8-STD-3",
+          "smell": "Primitive Obsession / 文案耦合",
+          "location": "pkg/hno/graph/graph_test.go:75、:352、:438、:485",
+          "evidence": "断言钉的是 error.Error() 的散文子串。若把 from/to 两名在文案里互换，H1 与 H2 仍全绿（三个短语都还在）；反向地，任何同义改写文案都会假红。",
+          "severity": "judgement",
+          "fix": "结构化拒绝错误（kind/side/node 字段），把文案断言降级为可读性冒烟。属 behavior-delta，须下一切片先取 RED。",
+          "status": "owed"
+        },
+        {
+          "id": "S8-STD-4",
+          "smell": "Mysterious Name",
+          "location": "pkg/hno/graph/graph_test.go:509",
+          "evidence": "测试名 `...FromConcurrentMutation`，但场景是入口节点函数体内部的同步改图（单 goroutine 的 in-flight），并无并发。",
+          "severity": "judgement",
+          "fix": "改名为 `...FromInFlightMutation`（cycle7 已记，仍未做）。",
+          "status": "owed"
+        },
+        {
+          "id": "S8-STD-5",
+          "smell": "断言面不完整",
+          "location": "pkg/hno/graph/graph_test.go:444",
+          "evidence": "悬空端点表驱动行只判 `runErr == nil`：`if _, runErr := g.Run(...)` 丢弃了 Result，而同文件 :365 与 :495 都额外断言 `res != nil` 判红。fail-closed 的「拒绝时不给调用方结果」这一面在端点轴上没人钉。",
+          "severity": "hard",
+          "fix": "该行改为取回 res 并补 `res != nil → t.Errorf`；补红后需证明它能杀死一个「拒绝时仍返回空 Result」的变异体。",
+          "status": "blocking → 归入下一加固轮"
+        }
+      ],
+      "smellsChecked": {
+        "Mysterious Name": "有发现（S8-STD-4）",
+        "Duplicated Code": "有发现（S8-STD-2）",
+        "Feature Envy": "未见：测试只经 graph 包导出面读数据",
+        "Data Clumps": "边缘：(name/build/wantPhrases) 三元组反复出现，尚可接受；折叠时一并处理",
+        "Primitive Obsession": "有发现（S8-STD-3）",
+        "Repeated Switches": "未见：测试侧无种类 switch（生产侧 edgeKind switch 属切片 1–7 已审范围）",
+        "Shotgun Surgery": "未见：本轮无「一处逻辑改动散射多处」",
+        "Divergent Change": "未见：测试文件只因契约切片一个原因增长",
+        "Speculative Generality": "未见：未新增抽象层或预留钩子",
+        "Message Chains": "未见：最长链为 g.Run(...).Output()",
+        "Middle Man": "未见",
+        "Refused Bequest": "不适用：无继承结构"
+      }
+    },
+    "spec": {
+      "findings": [
+        {
+          "id": "S8-SPEC-1",
+          "type": "规格遗漏 + 实现缺口（同一族静默失败）",
+          "location": "pkg/hno/graph/graph.go:219-238 Validate；docs/design/v3-platform.md:212-223 §3.5 必查 8 项",
+          "evidence": "§3.5 的 8 项必查里钉了入口（第 3 项）却没有钉输出。真实场景实测：`SetOutput(\"ghost\")` 与「从不调用 SetOutput」两张图都 `Validate() == nil`、`Run` 返回 `err=<nil> output=<nil> completed=[a b] executed=2`，调用方无法区分「输出节点本身返回 nil」与「输出声明从来不合法」。",
+          "severity": "hard",
+          "fix": "先改母约（§3.5/B6 增列「输出节点未声明或不存在 → Validate 非 nil」，并把 §12.2 的非目标次序对齐），再按 behavior-delta 单独取 RED 实现。本加固轮不得新增用户可观察拒绝行为，故不在本轮修。",
+          "status": "blocking（下一切片首项，已在 invariant 账本登记为 R8-IV-1）"
+        },
+        {
+          "id": "S8-SPEC-2",
+          "type": "完成判据部分满足",
+          "location": "docs/design/v3-test-scope-p1-graph-slice8.json#completionCriteria 中「每断言归因到变异体」；docs/design/v3-p1-graph-slice8-hardening.json#changes H3/H4",
+          "evidence": "M-C 的杀伤回执 receipt:82faa9ea-e0ee-4fe7-a176-906383434e53 同批报了 10 项失败，无法把该变异体唯一归因到新加的那一条断言；账本已在 limitations 里承认 non-unique。",
+          "severity": "judgement",
+          "fix": "下一轮改为逐断言单点变异（每次只删一条新断言并证其变红），或在契约里把「归因唯一」降级为「新断言所在行为被杀死」。",
+          "status": "owed"
+        },
+        {
+          "id": "S8-SPEC-3",
+          "type": "断言语义坍缩",
+          "location": "pkg/hno/graph/graph_test.go:473",
+          "evidence": "`never-declared` 行断言文案含 `\"\"`，它由 `%q` 渲染空串天然满足：真正被钉住的是「入口缺失会被拒绝」，而不是「未声明与被声明为 `\"\"` 可区分」。若有人日后允许节点名为空串，该行不再能区分两者。",
+          "severity": "judgement",
+          "fix": "B6 的「重复节点名」项落地时补一行 `SetEntry(\"\")` 与一行空名节点，令两者可分。",
+          "status": "owed（与 B6 剩余项同轮）"
+        },
+        {
+          "id": "S8-SPEC-4",
+          "type": "契约符合性确认",
+          "evidence": "A1/A2 有唯一归因的杀伤回执（M-A receipt:746268d0、M-B receipt:c481f8f5）；A4/A5 由正向对照 M-D receipt:4bf1ce43 与覆盖率块 0→1（receipt:6a34ef4b → receipt:cc8f921a）支撑；explicitNonGoals 全部守住：生产文件哈希仍是 3483783f1e787c96ca6c236341664d095acec5c0 / 87854ffbb7629f9adeb2d45fbb74d91f2032b99d，未引入结构化错误，未做表驱动折叠；对 fixed point 的测试删除行数为 0，断言点 10→47。",
+          "severity": "none",
+          "status": "confirmed"
+        },
+        {
+          "id": "S8-SPEC-5",
+          "type": "范围蔓延检查",
+          "evidence": "新增物只有 docs/design 下 4 份 JSON 账本与仓库外 /tmp 场景模块，未新增产品出口、未新增导出的测试专用 API。",
+          "severity": "none",
+          "status": "no-creep"
+        }
+      ]
+    }
+  },
+  "postReviewCorrections": [
+    {
+      "ref": "S8-STD-1",
+      "kind": "comment-only",
+      "detail": "graph_test.go:637 行号锚点换成语义锚点，生产字节未动。",
+      "hashBefore": "0c5076ffac3abf6fcac9f6d061f60b6d37b30f27",
+      "hashAfter": "08783b5e422c28589204947a7ccea5489e48707b",
+      "receipt": "receipt:970a2010-59cb-46cd-b865-05c6dc33259e"
+    }
+  ],
+  "blocking": [
+    "S8-SPEC-1：输出声明从不校验（母约 §3.5 亦漏列）——须先改契约再取 RED。",
+    "S8-STD-5：悬空端点行的 Run 面只判 err，未判 Result==nil。"
+  ],
+  "owed": [
+    "逐断言单点变异归因（S8-SPEC-2）。",
+    "结构化拒绝错误，替换文案子串断言（S8-STD-3）。",
+    "assertRejectNames 抽取 + 5 个隔离子测试表驱动折叠（S8-STD-2，契约本轮禁止，下一轮解禁）。",
+    "测试改名 FromConcurrentMutation → FromInFlightMutation（S8-STD-4）。",
+    "B6 剩余项与 S8-SPEC-3 空名可分性同轮。",
+    "scheduler.go:70 活读 g.entry（cycle5 C6-STD-4）与 C6-STD-1/3 注释诚实性。",
+    "能力轮：B4 stepLimit、B5 环检测、B2 Join 路由、C5-SPEC-1/2、C4-STD-2(2)。"
+  ],
+  "verdict": "切片 8 自身的完成判据成立（三个被测零检测力位点已恢复牙齿，且逐位点有非零/零退出回执与覆盖率佐证，生产行为字节未变）。本家族不闭结：2 项 blocking、7 项 owed，其中 S8-SPEC-1 是先改契约再取 RED 的新行为缺口，不属于加固可修范围。另需承认独立性缺陷：本轮为作者自审，cycle7 那种外部审查强度未复现。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-slice8-review-verdict.json",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice8.json",
+    "artifact:docs/design/v3-p1-graph-slice8-hardening.json",
+    "artifact:docs/design/v3-p1-graph-slice8-invariant-review.json",
+    "receipt:970a2010-59cb-46cd-b865-05c6dc33259e",
+    "receipt:3247c3de-a0f8-4f6c-811b-59876239b1f3",
+    "receipt:ae945dd1-649c-4b93-8e81-7d0535ec75b6",
+    "receipt:74291a1b-79c0-453b-9f34-a981708035de",
+    "receipt:746268d0-17f3-40a4-9bb5-fa7441eff54c",
+    "receipt:c481f8f5-67b4-499b-9c0f-c0890812e255",
+    "receipt:82faa9ea-e0ee-4fe7-a176-906383434e53",
+    "receipt:4bf1ce43-228a-4855-a896-2772048e9135",
+    "receipt:cc8f921a-7318-4a45-a7c6-7e8e65953dd1"
+  ]
+}

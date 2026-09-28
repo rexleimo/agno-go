@@ -1,0 +1,237 @@
+{
+ "schemaVersion": 1,
+ "kind": "rex.test-scope-contract.v1",
+ "workItemKey": "work-p1-graph-r17-cancel-normalization",
+ "activationId": "2c2825ee-6713-45ed-8531-81a076871352",
+ "capabilityId": "software.testing.design",
+ "stageId": "design-tests",
+ "recordedAt": "2026-09-27T18:04:26Z",
+ "contractRef": "artifact:docs/design/v3-test-scope-p1-graph-slice17.json",
+ "userGoal": "票面 B9（v3-test-scope-p1-graph.md:68）：节点阻塞期间 cancel ctx 时，Run 交出的错误必须满足 errors.Is(err, context.Canceled)，「不得伪装成节点业务错误」。本轮现场实测把这条判据的具体缺口定位到消费者的一处写点：取消发生在「消费者刚从 select 取走一个完成事件、正在 complete()+dispatch() 派发一大批后继」的窗口里时，Run 交出的既不是取消语义也不是节点错误，而是 ErrStepLimitExceeded（40/40 确定性），或者在预算充足时按 Go select 的随机挑选交出节点自造的业务错误（40 轮里 8~9 轮，约 20%）。要把「取消期间取消优先」变成有测试担保的行为。",
+ "whyThisSlice": "这是 P1 票面上 B8 之后仅剩的两行之一（另一行是 B11 Typed），而且是切片 16 审查亲自排下的顺序：v3-p1-graph-r16-review-verdict.json 的 nextSliceOrder 写明「B9 依赖本片的在途计数语义，建议先 B9」。它不是清洁工任务：切片 16 新加的并发上限让「消费者什么时候回到 select」变成由 cap 决定的事，M-6 的对照行（cap=5 时同一夹具 40/40 交出 context.Canceled、不限时 40/40 交出 ErrStepLimitExceeded）说明两片的语义已经缠在一起。第二个理由是诚实性：既有 41+8 个 Test 函数里唯一碰取消的 TestP1R13_CancellationIsNotReportedAsStepLimit（p1r13_step_limit_test.go:236）让节点原样交回 ctx.Err()，且步数预算 1000 从未被触及，因此它管不到本轮量出来的两条路径——「有测试」和「这条行为有担保」不是一回事。",
+ "measuredBeforeDesign": [
+  {
+   "id": "M-1",
+   "what": "票面 B9 的直译场景今天是绿的：节点阻塞期间 cancel ctx，无论节点交回 ctx.Err()、自造业务哨兵、还是包装了另一个哨兵的错误，Run 都交出 context.Canceled，且从不挂死",
+   "command": "cd /tmp/p1-b9/cancel && go run .（V1–V9，每行 300 轮）",
+   "receiptRef": "receipt:a92fe511-f131-4865-aef7-fb40813790fc",
+   "observed": "V1(节点交回 ctx.Err())/V2(交回业务哨兵)/V3(包装 io.ErrUnexpectedEOF)/V4(取消延迟 2ms)/V5(8 个兄弟全交业务哨兵)/V6(cap=1 且队列有积压)/V7/V8 全部 canceled=300 business_only=0 both=0 neither=0 hang=0。对照行 V9（不取消，节点立刻交业务哨兵）business_only=300/300，取消语义没有反向污染合法的业务错误。",
+   "conclusion": "「节点阻塞期间取消」这一句字面场景已经成立，因此本契约的红色不能伪造在这一层；D4 作为 green-at-red 护栏行登记，它钉的是「今天对，但没有任何断言在管」。"
+  },
+  {
+   "id": "M-2",
+   "what": "结构性事实：调度器只在消费者 parked 时咨询一次取消",
+   "command": "sh /tmp/p1-b9/struct.sh",
+   "receiptRef": "contract-local:struct 计数（与 M-6 同行登记，脚本输出记在 verificationCommands）",
+   "observed": "scheduler.go 里 ctx.Err()/ctx.Done() 出现 2 次，两处都在 consume 的 select 上（:97 case <-ctx.Done()、:98 return ctx.Err()）。dispatch 的循环体（:119-133）与取到 item.err 之后的出口（:101-103）都不咨询 ctx；running==0 的成功出口（:92-95）同样不咨询。sync_dot_graph=0、sync_dot_scheduler=0、recover_scheduler=1、loc_nonblank_nontest=634、testfunc_total=49。",
+   "conclusion": "取消语义完全取决于「消费者是否正好 parked 在 select 上」。一旦它忙于派发，取消就被忽略到下一轮，而下一轮先撞上的是别的判据。"
+  },
+  {
+   "id": "M-3",
+   "what": "确定性红：取消落在派发窗口内且步数预算在此之后耗尽 → Run 交出 ErrStepLimitExceeded",
+   "command": "cd /tmp/p1-b9/steplimit && go run .（M-6 表，每格 40 轮）",
+   "receiptRef": "receipt:304cee79-22f3-4e96-aa53-7fc46141b0f4",
+   "observed": "夹具 entry→{failer, spawner}、spawner→2000 个后继→exit，事件驱动：观察到第一个后继节点启动后才 cancel()。limit=100/succ=2000/cap=0 → ErrStepLimitExceeded=40/40（节点交回 ctx.Err() 与交回业务哨兵两种都是 40/40，取消时平均已启动 33.5/28.8 个后继，远未到收敛）。limit=500/succ=20000 → ErrStepLimitExceeded=40/40。对照行 limit=100 但 cap=5 → context.Canceled=40/40（上限把派发停在 5 个在途，消费者几乎立刻回到 select，于是取消赢了）。",
+   "conclusion": "这一条不依赖 select 的随机挑选：消费者在 dispatch 里继续消耗步数预算直到撞上安全阀，取消从未被咨询。已取消的调用方被告知「图跑飞了」，与切片 13 T5「取消不得被报成步数超限」的意图直接冲突。这是 D1。"
+  },
+  {
+   "id": "M-4",
+   "what": "竞态红：同一窗口里预算充足时，节点自造的业务错误会顶掉取消语义",
+   "command": "cd /tmp/p1-b9/aftercancel && go run .（每格 40 轮）；同一夹具在 cd /tmp/p1-b9/steplimit 的 limit=1000000/business 行独立复现",
+   "receiptRef": "receipt:f624d629-c04b-429e-ac62-a8ac16c54756（另见 receipt:304cee79-22f3-4e96-aa53-7fc46141b0f4 的最后一行）",
+   "observed": "succ=2000 事件驱动取消：Run 出口 canceled=32 / 节点业务错误=8（20%）；succ=20000：canceled=33 / 业务错误=7（17.5%）；M-6 的 limit=1000000+business 行独立量到 9/40（22.5%），错误文本就是 \"store: connection reset by peer\"。三个独立格子落在 17.5%~22.5% 同一量级。",
+   "conclusion": "这是票面 :68 用「不得伪装成节点业务错误」六个字点名的那个失败模式，且今天没有任何测试能抓住它。这是 D2。红色判据形式取「跨轮 0 容忍」，理由见 raceAssertionForm。"
+  },
+  {
+   "id": "M-5",
+   "what": "取消之后引擎仍在照常派发新激活（事实登记，不在本切片判据内）",
+   "command": "cd /tmp/p1-b9/aftercancel && go run .",
+   "receiptRef": "receipt:f624d629-c04b-429e-ac62-a8ac16c54756",
+   "observed": "等到第一个后继节点启动后 cancel：succ=2000 时每轮平均 1998.8 个激活（单轮最大 1999）在取消时刻之后才开始运行，占该批后继的 99.9%；succ=20000 时平均 19996.8。反面对照（不等首节点、立即取消）为 0/2000，因为消费者还 parked 着就被 ctx 唤醒。",
+   "conclusion": "「取消后不再启动新激活」是真实存在的另一条行为，但票面 B9 只规定错误的取消语义，它属于新增可观察行为 → 挂 R17-UNADJ-1，本切片不实现也不许顺手实现。此项与 D1/D2 的关系必须在 review 里讲清楚：最小修复只把「已经取到的结果」归类正确，不改变「还会派发多少」。"
+  },
+  {
+   "id": "M-6",
+   "what": "预先取消（进入 Run 之前 ctx 已取消）已经是绿的",
+   "command": "cd /tmp/p1-b9/precancel && go run .",
+   "receiptRef": "receipt:58bfee06-5430-443c-aaf8-c6f8f982d785",
+   "observed": "plain / lowlimit(stepLimit=1) / cap(maxConcurrency=1) 三种形状下 preCancel 全部 context.Canceled=60/60，且未出现 Result 非 nil 的出口。同一探针里「10µs 后才取消」的格子给出 plain nil(成功)+Result非nil=29/60、lowlimit ErrStepLimitExceeded=49/60 —— 这些数字不构成缺陷证据：那张图只有 3 个节点，取消时刻它可能已经合法收敛，而 stepLimit=1 的图本就不可能收敛。",
+   "conclusion": "两点用法：preCancel 作 D3 护栏行（今天绿，钉住「归一化不得把预先取消改成别的东西」）；后半段作为反面教材写进 raceAssertionForm —— 任何「取消后不得交出成功 Result」式的断言都必须自带「取消时图尚未收敛」的前提证明，否则它测的是 sleep 运气而不是行为。"
+  },
+  {
+   "id": "M-7",
+   "what": "曾经设想的「取消后不得留下悬挂生产者 goroutine」判据不成立：观察面被票面禁止",
+   "command": "grep -n '不允许的观察面' docs/design/v3-test-scope-p1-graph.md",
+   "receiptRef": "artifact:docs/design/v3-test-scope-p1-graph.md#L40",
+   "observed": "票面 :40 逐字：「**不允许的观察面**：scheduler 内部字段、`queue` 长度、goroutine 数、私有类型断言、内部计时。」",
+   "conclusion": "本切片不写任何 goroutine 数/ runtime.NumGoroutine 断言，也不为此新增导出面。切片 16 收尾时我把「无悬挂 goroutine」列为 B9 待办的一部分，本轮据票面 :40 撤回该项（记在 explicitNonGoals，而不是静默丢掉）。"
+  }
+ ],
+ "raceAssertionForm": {
+  "form": "竞态行（D2）的判据是「跨轮 0 容忍」：同一夹具连续跑 K 轮，每一轮 Run 都必须交出满足 errors.Is(err, context.Canceled) 的错误；任何一轮交出节点业务错误即整行判红。",
+  "whyNotPercentage": "不得把期望写成「≤x% 的轮次允许顶替」——那是把今天 17.5%~22.5% 的实测漏检率回填成容差，属于「把当前错误输出改成期望」的假通过形态。",
+  "reproducibilityDisclosure": "漏检率对机器负载敏感，必须如实登记：用「绝对 sleep 把取消塞进派发窗口」的夹具在空载实测下 6 个 gap 档位 500 轮全部 business=0（receipt:779d7ce5-f015-4183-84e5-c6e136bc5d66），而同样的窗口改用事件驱动（观察到第一个后继节点启动后才取消）就稳定量到 8~9/40。因此 D2 的夹具必须事件驱动，绝对 sleep 只能作为有界逃逸阀（把停摆报成失败）使用。",
+  "vacuousPassGuard": "每一轮在判错误语义之前必须先自证「取消时刻图尚未收敛」：节点侧登记已启动的后继数，且该数必须严格小于该批后继总数（M-3/M-4 实测 33.5/2000、1998.8/2000 都满足）。少了这一步，一次「图其实已经跑完」的空转会让 0 容忍断言白白通过（M-6 后半段就是这个陷阱）。",
+  "greenMustBeDeterministic": "GREEN 之后这一行不是「概率变低」而是恒绿：修复点是「消费者已经从 queue 取走了结果」这个确定时刻上的 ctx 咨询，而夹具里失败节点只有在 ctx.Done 之后才交回错误，所以取到它的项时 ctx.Err() 必然非 nil。行必须在改动前 -count=20 每轮判红、改动后每轮判绿，达不到就把该行改标 green-at-red 并另找能判红的行，不许放宽。"
+ },
+ "acceptanceMapping": [
+  {
+   "row": "D1",
+   "behavior": "取消发生在「消费者正在派发一大批后继」的窗口里、且步数预算是在取消之后才耗尽时，Run 交出的必须是取消语义，不得是 ErrStepLimitExceeded（票面 :68 前半句「取消语义为 context.Canceled」）",
+   "observable": "WithStepLimit(100) 的图：entry→{failer, spawner}，spawner→2000 后继→exit；节点侧登记「取消时已启动的后继数」并断言它严格小于 2000（前提：取消时图尚未收敛）。每一轮 Run 的 err 必须满足 errors.Is(err, context.Canceled) 为真，且 errors.Is(err, graph.ErrStepLimitExceeded) 为假，且 Result 为 nil。今天实测 40/40 交出 ErrStepLimitExceeded（M-3）",
+   "publicEntry": "graph.New(WithStepLimit(100)) / AddNode / NodeFunc / AddEdge / SetEntry / SetOutput / Run / ErrStepLimitExceeded（经 errors.Is）+ 测试侧节点登记",
+   "specAnchor": "票面 :68 B9 + 票面 :63 B4（步数安全阀只在未取消的推进语义里成立）+ 切片 13 T5 的既有意图（p1r13_step_limit_test.go:236 TestP1R13_CancellationIsNotReportedAsStepLimit）+ scheduler.go:119-133/101-103（M-2 的零咨询事实）",
+   "statusAtRed": "red（确定性；M-3 的两个变体各 40/40）",
+   "teethMutant": "κ 只在 select 上咨询 ctx、不在 dispatch 的步数判据之前咨询 → D1 红（回到今天形态）；λ 把咨询点放成「先看 ctx 再看 steps」但读的是进 Run 时的快照而非实时 ctx.Err() → D1 红；μ 反过来把 ctx 检查塞成无条件 return ctx.Err()（连未取消的步数超限也报成取消）→ D6/B4 族红"
+  },
+  {
+   "row": "D2",
+   "behavior": "同一窗口里，节点因被取消而自造的业务形状错误不得顶掉取消语义（票面 :68 后半句「不得伪装成节点业务错误」的逐字落点）",
+   "observable": "同 D1 夹具，但 WithStepLimit 足够大（1000000）使安全阀够不着，failer 在 <-ctx.Done() 之后返回测试自己的哨兵 errBusiness。跨 K 轮 0 容忍：每轮 err 必须 errors.Is(err, context.Canceled) 为真，且每轮都先自证取消时未收敛。今天实测 8/40、7/40、9/40 交出 \"store: connection reset by peer\"（M-4）",
+   "publicEntry": "graph.New / WithStepLimit / AddNode / NodeFunc / AddEdge / SetEntry / SetOutput / Run + 测试侧哨兵错误与节点登记",
+   "specAnchor": "票面 :68 B9 后半句 + :75（不得用 sleep 定序，故夹具取事件驱动 gate）+ scheduler.go:101-103 的 `return nil, item.err`",
+   "statusAtRed": "red（竞态；判据形式与可复现性披露见 raceAssertionForm）",
+   "teethMutant": "ν 取到 item.err 后原样 return（不看 ctx）→ D2 红（今天形态）；ξ 只在 ctx 从未取消过的分支里看 item.err，但用 s.ctx 之外的另一份 ctx 判取消 → D2 红；μ 无条件返回 ctx.Err() → D6 红（这条保证 D2 不是靠「一切错误都算取消」蒙过去的）"
+  },
+  {
+   "row": "D3",
+   "behavior": "进入 Run 之前 ctx 就已经取消：必须交出取消语义，且不得同时交出 Result（归一化不得把这条已成立的路径改坏）",
+   "observable": "plain / WithStepLimit(1) / WithMaxConcurrency(1) 三种形状各跑若干轮，err 必须 errors.Is(err, context.Canceled)、Result 为 nil、并在有界阀内返回",
+   "publicEntry": "同 D1 + context.WithCancel 后立即 cancel 再传入 Run",
+   "specAnchor": "票面 :68 B9（Run 返回错误且取消语义）+ M-6 实测 60/60",
+   "statusAtRed": "green-at-red（护栏行：今天对，但没有任何断言在管预先取消这一入口）",
+   "teethMutant": "ο 在 Run 入口按 stepLimit 抢先判失败（把已取消的 Run 报成 ErrStepLimitExceeded）→ D3 红；去掉 select 的 ctx 分支 → D3 红"
+  },
+  {
+   "row": "D4",
+   "behavior": "票面直译场景的三种节点出口都必须归一为取消语义，且不得挂死",
+   "observable": "单节点阻塞图，节点分别交回 ctx.Err() / 测试业务哨兵 / fmt.Errorf 包装 io.ErrUnexpectedEOF，每种若干轮：errors.Is(err, context.Canceled) 为真、Result 为 nil、有界阀内返回",
+   "publicEntry": "同 D1",
+   "specAnchor": "票面 :68 + M-1（V1/V2/V3/V4/V5 各 300/300 canceled、hang=0）",
+   "statusAtRed": "green-at-red（如实登记：本行不是 RED，它把票面那句字面场景变成被断言的属性）",
+   "teethMutant": "π 把归一化写成「只有 ctx.Err()==context.Canceled 才算取消」并在派生 ctx 上取到 DeadlineExceeded → D4 的红在超时变体上成立；ν（不咨询 ctx）在 D4 的第二、三种节点出口上不会立刻红，因为消费者 parked —— 这正是 M-1 已绿的原因，故本行牙齿弱于 D1/D2，必须在 review 里如实说明"
+  },
+  {
+   "row": "D5",
+   "behavior": "并发上限打满、等待队列有积压时取消，同样必须交出取消语义（B8 与 B9 的交叠面，也是 M-3 的对照机制）",
+   "observable": "WithMaxConcurrency(1) + entry→{a,s1,s2} 阻塞图：取消后 err 必须 errors.Is(err, context.Canceled)、Result 为 nil、有界返回；另取 M-3 的对照形状（cap=5 + 大批后继）断言 limit=100 下仍是取消语义而不是步数超限",
+   "publicEntry": "graph.New(WithMaxConcurrency(n), WithStepLimit(m)) → 同 D1 → Run",
+   "specAnchor": "票面 :68 + :67/:92（B8 的 FIFO 停发语义）+ v3-p1-graph-r16-review-verdict.json nextSliceOrder + M-3 的 cap=5 对照行 40/40",
+   "statusAtRed": "green-at-red（M-1 的 V6/V7 与 M-3 的 cap=5 行都是绿的；它是「修复不得只在不限并发时生效」的护栏）",
+   "teethMutant": "ρ 把 ctx 咨询放在「pending 为空」分支之后（有积压时不咨询）→ D5 红；σ 取消时把等待队列里的激活继续放出直到撞 limit → D5 与 D1 同时红"
+  },
+  {
+   "row": "D6",
+   "behavior": "反向护栏：没有被取消时，节点的业务错误必须原样交出，且不得被归一化成 context.Canceled",
+   "observable": "节点立刻返回测试哨兵 errBusiness、ctx 全程不取消：errors.Is(err, errBusiness) 为真且 errors.Is(err, context.Canceled) 为假，Result 为 nil；再加一行未取消的正常收敛图：Output()/Completed() 与不带任何取消的基线逐字相同",
+   "publicEntry": "同 D1（不调用 cancel）",
+   "specAnchor": "票面 :68 的适用范围（取消语义只在被取消时成立）+ :60 B1 的收敛出口 + M-1 的 V9 行 300/300 business_only",
+   "statusAtRed": "green-at-red（本行是 D1/D2 的反向牙齿：没有它，「一切错误都返回 ctx.Err()」这种实现能把两行红都变绿）",
+   "teethMutant": "μ 无条件先返回 ctx.Err() → 本行红（且 B4 族也红，因为它会把 ErrStepLimitExceeded 吞掉）"
+  },
+  {
+   "row": "D7",
+   "behavior": "结构判据不回归：取消归一化必须在单消费者零锁模型里完成，不得引入锁、原子计数或新的导出面",
+   "observable": "命令背书：非测试文件里 sync. 计数保持 0、scheduler.go 的 recover( 计数保持 1、非测试 LOC ≤ 1500（今天 634）、包内 Test 函数总数从 49 增至 49+本片新增行数、go vet 无输出。本片不得新增任何导出标识符",
+   "publicEntry": "命令（sh /tmp/p1-b9/struct.sh、go vet ./pkg/hno/graph/...、go build ./...），不是 Go 测试 —— 避免「测试读自身源码」的自指断言",
+   "specAnchor": "票面 :71（B12）+ :90 判据 2 + :63（B4）+ 母约 §3.3 的单消费者模型 + :40 禁止观察面",
+   "statusAtRed": "命令背书的护栏行（契约里就写明它不承担新增行为）",
+   "teethMutant": "τ 用 sync.Mutex 保护 running 或在节点里加原子计数 → 结构命令红；υ 为「方便观察取消」新增导出面 → go vet 不报，但 diff 审查与「本片不得新增导出标识符」的完成判据红"
+  }
+ ],
+ "observabilityLimit": "本包没有任何「当前是否已取消」的公共查询出口，Result 也不带取消标记（母约 :190 提到的 NodePending 在公共面上不存在）。因此归一化的全部判据只能落在 Run 返回的 error 上：errors.Is 对 context.Canceled / graph.ErrStepLimitExceeded / 测试自有哨兵的判定结果，加上 Result 是否为 nil。D2 这类竞态行只能取「跨轮 0 容忍 + 每轮自证未收敛」的形状（见 raceAssertionForm），并且必须披露漏检率对负载敏感。不得为看得更清楚而新增导出面（准入回调、取消状态查询、NodePending 类），那会把本片变成公共面变更、需另开 test-design。",
+ "minimalVerticalSlice": "D1 单独一条就足以代表本片目标：它是确定性的（40/40，M-3），只用 WithStepLimit + 图构建 + Run + errors.Is 与节点侧登记这些公共东西，不需要读任何私有字段就能判红，也不必依赖 select 的运气；而它一旦要变绿，就必须把「取消优先于其它判据」放进步数判据所在的那个写点，从而逼出 D2 的 item.err 出口（同一函数、同一次咨询）。D6 是它的反向牙齿，二者合起来才构成「取消赢、未取消时业务错误照旧」这条完整语义，但切片仍然是 D1 一条。",
+ "allowedTestSeam": {
+  "files": [
+   "pkg/hno/graph/p1r17_cancel_normalization_test.go（新增，package graph_test 外部测试包，Test 函数一律以 TestP1R17_ 前缀）",
+   "本片不改任何既有测试文件：graph_test.go / p1r13 / p1r14 / p1r15 / p1r15b / p1r16 保持字节不变（哈希见 baselineBytes）"
+  ],
+  "publicEntries": "graph.New / WithStepLimit / WithMaxConcurrency / AddNode / NodeFunc / AddEdge / SetEntry / SetOutput / Validate / Run / Result.Output / Result.Completed / Result.Value / ErrStepLimitExceeded（经 errors.Is）/ context.WithCancel + errors.Is(err, context.Canceled)",
+  "testSideInstrumentation": "节点体内用无缓冲 channel 向测试自己启动的单一登记器同步登记 start:<name>（票面 :75 要求的 gate 握手，不用 sleep 定序）；D1/D2 的「取消时刻图尚未收敛」前提由登记器交出的已启动后继数与后继总数比较得出，该数字只用于自证前提，不作为期望值断言。竞态轮的取消时机由「观察到第一个后继节点已启动」这个事件触发，不由绝对时钟决定。所有断言在 -race 下运行，每轮都有界逃逸阀把停摆报成失败。",
+  "forbiddenObservation": "不得读 cfg、config、scheduler、pending、running、steps 等私有标识或字段；不得直接调用 dispatch/spawn/complete；不得断言 goroutine 数、runtime.NumGoroutine 或 queue 长度（票面 :40 明令禁止，见 M-7）；不得为可观察性新增导出面；不得用 time.Sleep 给并发定序（:75），sleep 只允许作为有界逃逸阀；不得把「没超时」当成通过；不得断言后继节点的相对起始次序（那不由调度器决定）。"
+ },
+ "baselineBytes": {
+  "pkg/hno/graph/scheduler.go": "f2d7fb4b10e9c133f9bbe8b566da40ea8e96d55e",
+  "pkg/hno/graph/graph.go": "dca23943fd9cade4766ceeffe43b47477b815a61",
+  "pkg/hno/graph/graph_test.go": "425ea0303e1d5c5c8e95bacf57663ae94a4309ee",
+  "pkg/hno/graph/p1r13_step_limit_test.go": "bc4ab8e71527809e23a12590a078add8f35d68d1",
+  "pkg/hno/graph/p1r14_panic_barrier_test.go": "0ed607dbc01955864276212fa61e0902577ce7b8",
+  "pkg/hno/graph/p1r15_warnings_test.go": "3ea06d27abd3994130e593d297951c895729a4dd",
+  "pkg/hno/graph/p1r15b_warning_text_test.go": "0285ab35729ed3d50359e0fd407edb2d8b1c1a2a",
+  "pkg/hno/graph/p1r16_max_concurrency_test.go": "6934a4f2ae9ed2d80a59a30ead56b3de6bcc4296"
+ },
+ "explicitNonGoals": [
+  "不改变「取消后还会不会派发新激活」：M-5 实测 2000 个后继里平均 1998.8 个在取消之后才启动，这是真问题，但票面 B9 只规定 Run 交出的错误的取消语义，停止派发是新增可观察行为 → R17-UNADJ-1。GREEN 只把已经取到的结果归类正确，不许顺手改派发策略，也不许为了少派发而改判据顺序之外的东西。",
+  "不写任何 goroutine 数 / queue 长度 / 内部计时的断言（票面 :40 禁止观察面，M-7）。切片 16 收尾时我曾把「取消后不得留下悬挂生产者 goroutine」列为 B9 待办，本轮据 :40 撤回并在此登记。",
+  "不新增导出面（取消状态查询、准入回调、NodePending 类状态、test-only 出口）。",
+  "不改判据 7 的文案、不改 Warnings 文案（切片 15/15b 的范围）、不动 WithMaxConcurrency 的取值校验（R16-UNADJ-1 仍挂号）、不实现 B11 Typed。",
+  "不改 ErrStepLimitExceeded 本身的判定集合与文案：未取消时撞上预算仍然是它（D6 与 B4 族背书）；本片只规定「已取消时它不得顶掉取消语义」。",
+  "不把归一化做成「节点错误信息的丢弃」的强制要求：是否让节点哨兵仍然 errors.Is 可判定属设计选择 → R17-UNADJ-2，契约只要求 errors.Is(err, context.Canceled) 为真，因此 D1/D2 不得写成断言 errors.Is(err, errBusiness) 为假。"
+ ],
+ "outOfScopeBehaviors": [
+  "超时语义（context.DeadlineExceeded）的归一化：票面 :68 只点名取消。若实现顺带覆盖，须由 D3/D4 的变体真实担保才算数，否则挂号。",
+  "Result 的部分内容语义（取消时已完成集合该不该交出）：票面未规定，本片只断言 Result 为 nil 与既有 T5 一致。",
+  "节点自身忽略 ctx、永不返回时的强制中止（超时/取消的传播深度）：属 §3.5 判据之外的执行策略。"
+ ],
+ "completionCriteria": [
+  "D1–D6 每行都有独立可失败的 Test 函数（本片共新增 6 个，包内 Test 函数总数由 49 变为 55），D7 由命令背书且不写成自指断言；每行标注自己的 teethMutant 与 statusAtRed。red 行（D1、D2）与 green-at-red 行（D3、D4、D5、D6）在证据里分开陈述，不许把护栏行写成新增行为，也不许把竞态行的漏检率写成期望放宽。",
+  "逐轮实测复现：改动前对聚焦测试命令跑 -count=20 -race，D1 必须 20/20 判红（M-3 是 40/40 确定性）；D2 必须每轮判红且每轮的「未收敛」前提成立——若某一轮 D2 因运气没抓到顶替，该行仍然按「本轮实测漏检率」如实记录，不得靠减少轮数或放宽成百分比把它写成绿。改动后同一命令须 20/20 通过。",
+  "变异矩阵至少含：κ 不咨询 ctx（今天形态）、λ 用快照 ctx 值、μ 无条件返回 ctx.Err()、ν 取到 item.err 直接 return、ξ 用错 ctx 实例、ο 入口抢先判 limit、ρ 只在 pending 空时咨询、σ 取消后继续派发到撞 limit、τ 引入锁/原子、υ 新增导出面。每条变异实跑并指明指定杀手行，指定杀手行必须在该变异每一轮都判红；恢复无条件（try/finally）并对 scheduler.go/graph.go 与测试文件做哈希自检。任一指定杀手行未每轮判红即判该变异未被可靠杀死，照实登记进 review。",
+  "结构判据由命令输出背书：sh /tmp/p1-b9/struct.sh 改动后重跑，sync_dot_graph=0、sync_dot_scheduler=0、recover_scheduler=1 不变，loc_nonblank_nontest 记录实测值（今天 634，上限 1500），testfunc_total 49→55，ctx_checks_in_scheduler 从 2 增加（增加量在 green 证据里登记，它是「取消被咨询的写点数」的结构性旁证）。",
+  "go test -count=1 -race ./pkg/hno/graph/... 零退出，既有 49 个 Test 函数全部保持（含 TestP1R13_CancellationIsNotReportedAsStepLimit 与 B4/步数族），六个既有测试文件字节不变（baselineBytes 逐字比对）；go build ./... 与 go vet ./pkg/hno/graph/... 干净；golangci-lint 若环境里没有则如实登记「未运行」，不得写成通过。",
+  "若矩阵或实跑发现某行没有任何可信变异能碰到它（D4 已被预告为牙齿偏弱），登记为缺口并挂到 review，不静默放宽或删除该行。"
+ ],
+ "forbiddenShortcuts": [
+  "不得把 D2 的 0 容忍写成「≤N% 轮次允许顶替」，也不得减少轮数直到某轮碰巧全绿。",
+  "不得删掉「取消时图尚未收敛」的前提自证：那是 D1/D2 与 M-6 陷阱（图其实已合法收敛）之间唯一的分界。",
+  "不得用 t.Skip、t.Parallel 掩盖轮次，不得只断言 helper/登记器被调用，不得把 errors.Is 判据换成对错误字符串的相等比对（字符串会随文案漂移，且今天的 ErrStepLimitExceeded 文本里也含数字 100）。",
+  "不得为了让 D1 绿而把 ctx 检查放进节点体、spawn 之后或任何「先跑完再报错」的位置——票面要的是取消优先，不是取消后补一句。",
+  "不得为实现归一化而新增导出面或读取私有字段；不得顺手实现 M-5 的停止派发。",
+  "不得为了让 D6 绿而放弃 D1/D2 的红色判据（两行是同一件事的正反面，缺任一边的实现都不算修对）。"
+ ],
+ "unadjudicatedCarried": [
+  {"ref": "R17-UNADJ-1", "issue": "取消之后引擎仍派发到 99.9% 的后继（M-5 实测）——该不该在取消后停止派发新激活、等待队列里的激活怎么处理", "whyOpen": "票面 :68 只规定错误的取消语义；停止派发是新的用户可观察行为（节点不再启动），需人类裁决或新的 test-design，本片不预支", "carriedFrom": "本轮现场实测 M-5"},
+  {"ref": "R17-UNADJ-2", "issue": "归一化后的错误是否仍要让节点哨兵可 errors.Is 判定（multi-%w 保留 vs 只留取消）", "whyOpen": "票面说「不得伪装成节点业务错误」，没说不得「附带」节点错误；契约选择只要求取消语义在场，把这一点留给实现与 review", "carriedFrom": "票面 :68 的措辞边界"},
+  {"ref": "R17-UNADJ-3", "issue": "取消与合法节点业务错误同时发生（节点因真实原因失败、调用方随后取消）谁优先", "whyOpen": "D1/D2 的夹具里节点错误都只在 ctx.Done 之后产生，天然不存在这层歧义；真实世界存在，判据未定义。D6 只覆盖「完全没取消」的一端", "carriedFrom": "D2 夹具的适用边界，必须写进 review 以免被当成已解决"},
+  {"ref": "S16-STD-1", "issue": "切片 16 dispatch 的 `return nil` 可写作 `break`（1 行）", "whyOpen": "风格项，未裁决；本片会改到同一函数，改或不改都必须在 green 证据里显式说明，不许无声混入", "carriedFrom": "v3-p1-graph-r16-review-verdict.json"},
+  {"ref": "R16-UNADJ-1", "issue": "WithMaxConcurrency 负数是否算非法声明", "whyOpen": "仍挂号；D5 用 cap=1/5 都是正数，不触碰该裁决", "carriedFrom": "切片 16 契约 explicitNonGoals"},
+  {"ref": "R16-UNADJ-2", "issue": "准入顺序 / NodePending 是否有公共观察面", "whyOpen": "本片同样不新增导出面，故不解决它，只是再次证明它需要裁决（observabilityLimit）", "carriedFrom": "切片 16 契约"},
+  {"ref": "S15-STD-1", "issue": "graph 包是否需要导出哨兵错误供调用方判别节点业务错误", "whyOpen": "与 R17-UNADJ-2 直接相关：若哨兵导出，归一化的形状要一并考虑，仍等裁决", "carriedFrom": "切片 15 审查"},
+  {"ref": "B9-TICKET-Wording", "issue": "票面 :68 只写「不得伪装成节点业务错误」，未写与 ErrStepLimitExceeded 的次序，而 M-3 证明确定性违例正是后者", "whyOpen": "本契约把「取消优先于其它判据」作为 :68 前半句「取消语义为 context.Canceled」的直译，需回写票面确认", "carriedFrom": "M-3 与票面 :68 的落差"}
+ ],
+ "retires": [
+  "切片 16 审查 nextSliceOrder 里为 B9 预写的「等待队列的收尾」不再当作待办猜测：M-3/M-4/M-5 已把它拆成 D1/D2（本片判据）与 R17-UNADJ-1（未授权的新行为）。",
+  "本摘要项撤回：切片 16 收尾记录里「取消后不得留下悬挂的生产者 goroutine」这一 B9 待办项 —— 依票面 :40 它是禁止观察面（M-7），不再作为本切片判据。",
+  "「票面直译场景无担保」这一说法作废：D4 之后它有断言在管（虽然牙齿偏弱，见 D4 的 honestNote）。"
+ ],
+ "sedimentCarried": [
+  "B4/步数族（p1r13 的 T1–T4）：本片不得回归，D6 是它与归一化的接口；TestP1R13_CancellationIsNotReportedAsStepLimit（T5）是本片 D1 的同族前例，但它管不到派发窗口，见 whyThisSlice。",
+  "B8/并发上限族（p1r16 C1–C9，字节 6934a4f2…）：D5 依赖 cap 打满的停发语义，M-3 的 cap=5 对照行就是它的机制证据。",
+  "判据 7 与告警文案族（p1r15 / p1r15b）：本片完全不碰。",
+  "仓库惯例：外部测试包 package graph_test、节点侧无缓冲登记器握手、有界逃逸阀把停摆报成失败、结构判据用命令而非自指测试（切片 12/16 的先例）。"
+ ],
+ "verificationCommands": [
+  "go test ./pkg/hno/graph -run TestP1R17_ -count=1 -race -v（本片绑定的场景命令，RED/GREEN/REFACTOR 的每个 receipt 只能用这一条）",
+  "go test ./pkg/hno/graph -run TestP1R17_ -count=20 -race（逐轮复现判据）",
+  "go test -count=1 -race ./pkg/hno/graph/...（既有 49 个 Test 函数不回归）",
+  "go build ./... && go vet ./pkg/hno/graph/...",
+  "sh /tmp/p1-b9/struct.sh（sync. 计数、recover 计数、ctx 咨询点、LOC、Test 函数数）",
+  "git hash-object --no-filters pkg/hno/graph/*.go（baselineBytes 逐字比对）"
+ ],
+ "writeBackOwed": [
+  "票面 docs/design/v3-test-scope-p1-graph.md:68 的 B9 行需补写「取消优先于步数安全阀与节点错误」的次序判据（今天只写了不得伪装成节点业务错误，而实测确定性违例是 ErrStepLimitExceeded 顶掉取消，见 M-3 / B9-TICKET-Wording）。",
+  "母约 docs/design/v3-platform.md §3.3 的消费者伪码需登记：dispatch 之前/取到 item 之后各有一次 ctx 咨询，否则单靠 select 分支无法保证取消优先（M-2 的 2 处咨询点事实）。",
+  "票面 §4 若接受 R17-UNADJ-1（取消后停止派发），需要新增一行行为并另开 test-design，不能并进 B9。"
+ ],
+ "evidenceRefs": [
+  "artifact:docs/design/v3-test-scope-p1-graph-slice17.json",
+  "artifact:docs/design/v3-test-scope-p1-graph.md#L68",
+  "artifact:docs/design/v3-test-scope-p1-graph.md#L40",
+  "artifact:docs/design/v3-p1-graph-r16-review-verdict.json",
+  "receipt:a92fe511-f131-4865-aef7-fb40813790fc",
+  "receipt:304cee79-22f3-4e96-aa53-7fc46141b0f4",
+  "receipt:f624d629-c04b-429e-ac62-a8ac16c54756",
+  "receipt:779d7ce5-f015-4183-84e5-c6e136bc5d66",
+  "receipt:58bfee06-5430-443c-aaf8-c6f8f982d785"
+ ]
+}

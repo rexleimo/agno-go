@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "kind": "blocked",
+  "decisionRef": "artifact:docs/design/v3-testability-decision-p1r20.json",
+  "workItemKey": "work-p1-graph-r20-dead-end-sink",
+  "activationId": "05385c4b-481a-4922-9f8b-92f997affc94",
+  "capabilityId": "software.testing.design",
+  "stageId": "decide-testability",
+  "decidedAt": "2026-09-27T21:16:00Z",
+  "contract": "artifact:docs/design/v3-test-scope-p1-graph-slice20.json",
+  "reason": "票面 §4 B6 第 5 项（母约 §3.5 第 5 项）的字面判据与本引擎 §3.4 的路由模型不相容，因此本片没有任何可在真实公共场景观察的验收条件：判据一旦成立就必然与既有担保对撞，而把它收窄到不对撞又必然退化成空集或半截规则。三轮副本实测（仓库字节全程未动）：(1) 今天 `entry→sink`、`SetOutput(\"entry\")` 收到 `Validate() = <nil>` 且 `Run` 静默成功交出 `output=x completed=[entry sink]` —— 缺口是真的；(2) 把票面字面判据（注册了、没有任何出边、不是输出 → 判红）加到仓库副本 `/tmp/sinkexp`，同一条 `go -C /tmp/sinkexp test ./pkg/hno/graph -count=1` 从基线 exit 0（receipt:7f442439-8bce-4f23-b44f-a5e6d0ca0375）变成 exit 1（receipt:dd11883e-75ad-4d88-844e-2139f94a2f6c），`-v` 里 12 个顶层 Test 判红；(3) 换成最窄的非空限定版（只判「无条件边的目标 + 无出边 + 非输出」），副本 `cmd/probe` 实测它确实抓住 `entry→sink`（`graph: dead-end node \"sink\" has no outgoing edge and is not the output`）并放行条件边两个终点（`Validate() = <nil>`），但同一副本命令仍 exit 1、10 个顶层 Test 判红（receipt:f594bc89-77f3-4ca3-bcb2-16fdc621d5ec）。判红不是文案次序问题，是既有担保本身：判红的子用例名就是 `TestP1G_ConditionalAndDefaultRouting/unconditional-fanout`，`graph_test.go:236` 的断言原文「按 §3.4 合法的路由图被 Validate 拒绝」点名的节点是无条件扇出终点 `\"b\"`；`p1r13_step_limit_test.go:135` 写的是「合法的扇出图被构建期拒绝」，点名 `\"x\"`；`p1r14_panic_barrier_test.go:149` 的 `bad` 节点被先判成死端，调用方拿到构建期文案而不是运行期 panic 文案；`p1r17_cancel_normalization_test.go:475` 的夹具被同样方式拒绝。结论：§3.4 规则 1（无条件扇出）按设计就允许「某个节点的输出没有任何消费者」，而有 10 个既有顶层 Test 在担保这一点。该判据要么需要新的公共面表达力（终点声明），要么需要重新解释票面，两者都不是本片权限，也不该由实现反向决定。",
+  "missingAcceptance": "缺的是负责人对「§3.5 第 5 项如何与本引擎的路由模型共存」的一次裁决，三个候选已带数字登记在契约 adjudicationOptions：OPT-A 作废该行并登记「本引擎允许无条件扇出终点与分支终点」（零代码改动，B6 只剩第 2 项）；OPT-B 引入显式终点（LangGraph 式 `graph.END`），判据改写为「既无出边、也不是输出、也没有指向 END 的可达节点 → 拒绝」（导出符号 24→25、需一条新票面行、既有夹具里的隐式终点要显式化，涉及多份测试文件需逐片授权）；OPT-C 降级为告警（与 §3.5 第 8 项同族走 `Warnings()`，可零既有冲突取红，但判据措辞从「拒绝」变「告警」）。任选其一后需要一次新的 `rex-test-design` Command 把契约改写成可执行的测试范围；在此之前本片不得进入 rex-tdd —— 现在写出的任何 `TestP1R20_*` 要么因为改既有断言而越权，要么因为把判据收窄而假通过。另需一并裁决的相邻项：B6 第 2 项（重复节点名，与 `TestP1G_RunIsolatesTopologyFromConcurrentMutation` 的 `graph_test.go:953` 担保的静默覆盖语义正面对撞）、`R19-Q1`（汇聚前驱没跑且再无待派激活时 `Run` 交出 `err==nil` 而 `Output()==nil`）、`S19-STD-1`（交给节点的聚合 map 与调度器累加器是同一对象，切片 19 已实测）。",
+  "redCandidate": null,
+  "baseline": null,
+  "blockType": "acceptance-unobservable",
+  "noRedJustification": "不是「找不到红」，而是「任何诚实的红都要求先修改票面或修改既有担保」。若按票面字面写 D1（死端图被 `Validate()` 点名拒绝），RED 会在实现之前就把 12 个既有 Test 打红（实测 receipt:dd11883e…），那不是本片的红，而是票面冲突的红；若写限定版 D1，它抓住 M1 的 A 格却仍打红 10 个既有 Test（receipt:f594bc89…）；若为了绿而继续收窄到「只有既无出边又不可达才判红」，该判据与既有不可达检查同义、是空集，属契约 forbiddenShortcuts 明令禁止的假通过。behavior-delta 与 behavior-preserving-hardening 两个前提在这里都不成立：前者要求新行为能经公共入口真实复现为失败且不越出票面，后者要求没有新用户可观察行为。",
+  "measurements": [
+    "M1 仓库外探针 /tmp/r19q1/sink（replace 引本仓 pkg/hno/graph，只调公共 API，跑在切片 19 写回字节 graph.go 4cb363b729cddf7541df8d1b1900c8240dff93f2 / scheduler.go c878a6c74cad89bbdfc773c21c58952d3944630d 上）：A 死端汇点 `Validate() = <nil>` 且 `Run` 成功；B 反向对照（`entry→{a,b}`+`AddJoin([\"a\",\"b\"],\"j\")`+`SetOutput(\"j\")`）`Validate() = <nil>`；C 反向对照（`entry→out`、`SetOutput(\"out\")`）`Validate() = <nil>`。",
+    "M2 副本 + 票面字面判据：12 个顶层 Test 判红（基线 exit 0 receipt:7f442439-8bce-4f23-b44f-a5e6d0ca0375 → exit 1 receipt:dd11883e-75ad-4d88-844e-2139f94a2f6c），同一候选检查放在不可达检查之前时为 16 个。",
+    "M3 副本 + 最窄非空限定版：抓住 A 格、放行条件终点，仍 10 个顶层 Test 判红（receipt:f594bc89-77f3-4ca3-bcb2-16fdc621d5ec）。",
+    "副本实验结束后逐文件恢复并与仓库比对：两边 `git hash-object --no-filters pkg/hno/graph/*.go` 的 md5 同为 1250071191a7ddb896141a43bdeb3319，副本复跑 exit 0；仓库工作树未被实验改动。"
+  ],
+  "receiptRefs": [
+    "receipt:7f442439-8bce-4f23-b44f-a5e6d0ca0375",
+    "receipt:dd11883e-75ad-4d88-844e-2139f94a2f6c",
+    "receipt:f594bc89-77f3-4ca3-bcb2-16fdc621d5ec",
+    "receipt:73a2c954-adb0-4b83-8c3c-e67849d23536"
+  ],
+  "scenarioCommandNote": "副本三轮实验用同一条命令 `go -C /tmp/sinkexp test ./pkg/hno/graph -count=1`（回执里 executable=`go`、args 头两格 `-C /tmp/sinkexp`、cwd 记录为仓库根 /Users/rex/codes/agno-go），三条回执逐字节同形，只在副本 graph.go 是否含候选检查上不同。仓库内 `TestP1R20_` 的绑定场景命令（`go test ./pkg/hno/graph -run TestP1R20_ -count=1 -race -v`）本片未运行过，因为本片没有新增测试文件 —— 没有该命令的执行回执，也就没有任何数字被假装成它的观察结果。`receipt:73a2c954…` 是切片 19 写回字节上的既有门禁回执，只用于说明 baseline 是绿的。",
+  "integrityDisclosure": "本片 design-tests 阶段第一版契约里写的 `receipt:efa1ac82-…` 与 `receipt:b917dd0a-…` 在 `.rex-harness/receipts/` 中不存在（`grep -rn` 零命中），是未实际取回执就写下的引用。现已在副本上重跑实验、取真实回执（receiptRefs 前三条）替换，契约与状态文档同步改写并在 `v3-p1-graph-status.md` §6 登记。12 / 10 / 16 三个数字本轮全部为实测。同时登记第二处自纠：第一版把冲突根因写成「条件边/兜底边的分支终点」，实测显示无条件扇出的终点也被同一判据命中，故限定版同样救不回来。",
+  "independenceDisclosure": "本轮仍是作者自查：无独立复核者，也没有派发审查子代理（P1 的独立审查派发此前已被负责人拒绝）。所有数字由命令输出与文件哈希支撑，但判读由同一方做出。",
+  "expectedDisposition": "blocked 应令工作项 replan，而不是重派发同一个 decide-testability Command；本片不伪造 RED、不进入 rex-tdd、不改票面。"
+}

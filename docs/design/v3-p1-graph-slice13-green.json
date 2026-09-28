@@ -1,0 +1,163 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.tdd-green-record.v1",
+  "workItemKey": "work-p1-graph-r13-step-limit-enforcement",
+  "activationId": "96d7d121-ae44-4d64-890c-7153f8daaa94",
+  "stageId": "green",
+  "capabilityId": "software.testing.tdd",
+  "recordedAt": "2026-09-27T12:57:55Z",
+  "scopeContract": "artifact:docs/design/v3-test-scope-p1-graph-slice13.json",
+  "redRecord": "artifact:docs/design/v3-p1-graph-slice13-red.json",
+  "passingTest": {
+    "command": {
+      "exact": "go test ./pkg/hno/graph/... -run TestP1R13 -count=1 -timeout 25s -v",
+      "args": [
+        "test",
+        "./pkg/hno/graph/...",
+        "-run",
+        "TestP1R13",
+        "-count=1",
+        "-timeout",
+        "25s",
+        "-v"
+      ],
+      "cwd": "/Users/rex/codes/agno-go",
+      "exitCode": 0,
+      "receiptRef": "receipt:40242247-e668-4afe-b8b7-1b62039e5b34",
+      "note": "该回执是在最终字节上重取的：首次零退出回执 receipt:e6a8d852-… 之后又改了一处纯注释（rejectUnconditionalCycles 的边界句指向真实落点），注释不影响语义但影响被证明的字节，所以按最终字节重跑重取。"
+    },
+    "rows": {
+      "total": 7,
+      "passed": 7,
+      "detail": "StepLimitStopsBreakableCycle / LimitRefusesActivationsAtDispatch / StepLimitDefaultsWhenUnset / EachRunGetsItsOwnBudget / CancellationIsNotReportedAsStepLimit / ConvergingCycleStillSucceeds / NonPositiveStepLimitRejectedAtBuildTime 全 PASS，包耗时 0.405s"
+    },
+    "supporting": [
+      {
+        "command": "go test ./pkg/hno/graph/... -count=1 -race -timeout 120s",
+        "exitCode": 0,
+        "receiptRef": "receipt:bacff121-d99f-4fe3-b097-dff64b24b132",
+        "note": "整包含既有 11 个 TestP1G_* 函数，全部零退出；新哨兵没有把任何既有对照行改判（票面 §5 禁止改动既有测试）。"
+      },
+      {
+        "command": "go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1 -timeout 180s",
+        "exitCode": 0,
+        "receiptRef": "receipt:88bc9ed2-81bc-4c06-90f7-3524c33a8812",
+        "note": "邻居包回归：本票不得触碰 agent/runner，实测其既有测试仍零退出。"
+      }
+    ],
+    "gates": {
+      "gofmt": "gofmt -l pkg/hno/graph/ 无输出",
+      "vet": "go vet ./pkg/hno/graph/... 退出 0"
+    }
+  },
+  "publicScenarioBeforeAfter": {
+    "program": "/tmp/p1-cycle13-scenario（仓库外、只用导出面的 Go 程序，graph.New + WithStepLimit + NodeFunc + Run）",
+    "before": "声明 limit=3 的恒真环在 300ms 期限里产生 75816 次节点激活，err=context deadline exceeded（决策阶段 receipt:d9657435-…）",
+    "after": "explicit-limit-3  err=graph: step limit 3 reached before the graph converged: graph: step limit exceeded  isStepLimit=true  res==nil=true  starts=3",
+    "afterDefault": "default-limit-unset  err=graph: step limit 1000 reached …  isStepLimit=true  res==nil=true  starts=1000",
+    "programExit": 0,
+    "whyItMatters": "这不是测试夹具里的数字，而是调用方在自己进程里看到的行为：安全阀从「导出的空承诺」变成「恰好 n 次启动处收口且不交出 Result」。"
+  },
+  "diffBoundary": {
+    "gitHead": "0387000",
+    "whyNotThreeDotDiff": "HEAD 0387000 是 P1 切片 1–2 的快照（graph.go 178 行 / scheduler.go 115 行 / graph_test.go 98 行），工作树已推进到切片 13。git diff HEAD 对 pkg/hno/graph 给出 +264/+1250/+81，覆盖切片 3–13 的累计量，不是本片的有边界差异。",
+    "method": "工作树字节链 + 仓库外逐字节对照，且「before」字节经 git hash-object 复核为与登记值全等：",
+    "before": {
+      "graph.go": "e75d58d529af2dad7e7f3cbc25ffdff8129f802b（= /tmp/p1-cycle12/graph.go.baseline，切片 11 REFACTOR 收尾字节）",
+      "scheduler.go": "87854ffbb7629f9adeb2d45fbb74d91f2032b99d（登记自切片 6，之前没有文件备份；本轮按本次 5 处反向编辑重建，重建字节 hash-object 全等于该登记值，故边界可信）",
+      "graph_test.go": "425ea0303e1d5c5c8e95bacf57663ae94a4309ee（本片未改，实测仍为该值）"
+    },
+    "after": {
+      "graph.go": "a189a8692c0364266352e83ad3debeed738f6608（426 行）",
+      "scheduler.go": "18a98a6069e0477953369ef81ad0071a012b9779（170 行）",
+      "p1r13_step_limit_test.go": "b24471670d9aff79d330e9ce7aa25c0a6681cb47（新增文件，307 行）"
+    },
+    "numstat": {
+      "graph.go": "+31 / -4",
+      "scheduler.go": "+32 / -17",
+      "graph_test.go": "0 / 0",
+      "diffFiles": [
+        "/tmp/p1-cycle13/graph-go-slice13-green.diff",
+        "/tmp/p1-cycle13/scheduler-go-slice13-green.diff"
+      ]
+    },
+    "baselineCopiesForNextStage": [
+      "/tmp/p1-cycle13/graph.go.green",
+      "/tmp/p1-cycle13/scheduler.go.green",
+      "/tmp/p1-cycle13/p1r13_step_limit_test.go.green"
+    ],
+    "processFinding": "登记一条流程缺陷：scheduler.go 自切片 6 起被当作基线却从未落过文件备份，本轮只能靠「反向编辑 + 哈希复核」重建边界。后续每片进入 GREEN 前先把生产字节复制到 /tmp，边界不再依赖重建。"
+  },
+  "implementationChanges": [
+    {
+      "where": "pkg/hno/graph/graph.go:51-53",
+      "what": "新增私有常量 defaultStepLimit = 1000",
+      "why": "母约 §7:354 与 WithStepLimit 的导出文档都承诺了这个默认值，它必须有一个唯一的落点。"
+    },
+    {
+      "where": "pkg/hno/graph/graph.go:68-71",
+      "what": "WithStepLimit 的导出文档补上「n 必须是正数，否则 Validate 连同声明一起拒掉」",
+      "why": "让导出的承诺与实际行为一致，不留下「0 是不是不限」这种二义。"
+    },
+    {
+      "where": "pkg/hno/graph/graph.go:160-169（New）",
+      "what": "选项应用完之后，未显式设置时把 defaultStepLimit 落进 cfg",
+      "why": "预算在这里定形，调度器永远读到一个可用数字，不必自己猜零值含义；stepLimitSet 保留给尚未实现的判据 8 告警。"
+    },
+    {
+      "where": "pkg/hno/graph/graph.go:238 + 267-279",
+      "what": "Validate 先调 rejectInvalidStepLimit，非正的显式上限按声明类拒绝，文案点名 WithStepLimit(值)",
+      "why": "只判「显式写过且非正」：没写过这条声明的图（例如零值 Graph）不该收到一句关于自己没写过的旋钮的拒绝，它的真实问题由后面的拓扑检查说出。"
+    },
+    {
+      "where": "pkg/hno/graph/graph.go:353-354（rejectUnconditionalCycles 边界句）",
+      "what": "把「那类环由步数上限兜住，归 §7/G6」改为指向真实落点 scheduler.dispatch",
+      "why": "兜住它的机制本轮真的存在了，注释继续写成「归别人」会把一个已闭环的责任说成缺口。"
+    },
+    {
+      "where": "pkg/hno/graph/scheduler.go:55-56 + 45",
+      "what": "scheduler 新增 steps / stepLimit 两个消费者私有字段，并把单消费者唯一写者清单补上 steps",
+      "why": "零锁论证依赖「谁写这个字段」：steps 只在消费者 goroutine 里自增，因此不需要任何锁（B12 仍成立）。"
+    },
+    {
+      "where": "pkg/hno/graph/scheduler.go:74（Run）",
+      "what": "构造 scheduler 时按值取入 g.cfg.stepLimit",
+      "why": "预算属于单次 Run 且是进入 Run 时的快照——既满足 T4 的「每次 Run 各自一份预算」，也不给运行中改图留后门。"
+    },
+    {
+      "where": "pkg/hno/graph/scheduler.go:103-119（dispatch）",
+      "what": "dispatch 改为返回 error：每次从 pending 取出一条激活之前先判 steps>=stepLimit，超限即返回包装 ErrStepLimitExceeded 的错误，然后 steps 自增再 spawn",
+      "why": "计步点决定安全阀的语义：按「已完成数」计会让一整批并发激活被整体放行（T1b 钉的就是这一点）。包装里带上实际生效的上限，是为了默认 1000 在生产里被踩到时能一眼看出踩的是哪条预算；%w 保证 errors.Is(err, ErrStepLimitExceeded) 仍是票面 B4 的形状。"
+    },
+    {
+      "where": "pkg/hno/graph/scheduler.go:83-85（consume）",
+      "what": "dispatch 的错误直接向上交出（Result 为 nil）",
+      "why": "票面 B4 要求超限时 Output() 不可用；同时 defer close(s.done) 会让仍在节点里的兄弟激活的回报被丢弃，不留悬挂生产者。"
+    }
+  ],
+  "testSideChangeDisclosure": {
+    "row": "T1b TestP1R13_LimitRefusesActivationsAtDispatch",
+    "changedDuringGreen": true,
+    "what": "删掉了「entry+x+y 总启动数 == 2」这一读，改为让第一个后继 x 阻塞、只断言 Run 能在 x 仍在节点里时带着哨兵回来 + 被拒的兄弟 y 一次都没启动。",
+    "why": "原读法与 goroutine 调度赛跑：spawn 只是启动 goroutine，被派发的 x 不保证在 Run 返回前已经跑上节点体，于是正确实现也会给出总数 1（本轮实测正是如此）。那是假红发生器，不是用户可观察行为。",
+    "notWeakening": "断言的目标（并发批次不得整体放行）没变，只是换成时序无关的形状：完成数计步的实现要么让 x、y 都跑起来，要么根本回不来，两者都让本行判红。REFACTOR 的变异矩阵会用一个「按已完成数计步」的变异体来证明这条红仍然咬得住。",
+    "redKindForThisRow": "本行的 RED 已在改造前的形状下真实观察到（receipt:02e230a0-…，err=<nil>）；形状改造后其红需要由变异矩阵补证，不宣称天然红覆盖新形状。"
+  },
+  "scopeDiscipline": {
+    "untouchedNonGoals": [
+      "graph.go:414 Warnings() 仍是 return nil 桩 —— 票面 B7 判据 8 告警未实现（本片 nonGoals）",
+      "graph.go:65 WithMaxConcurrency 仍不被调度器读取 —— 票面 B8 FIFO 等待队列未实现（本片 nonGoals）",
+      "pkg/hno/graph 两个生产文件里 recover( 出现次数为 0 —— 票面 B10 panic→error 未实现（本片 nonGoals，且是本包目前残留风险最高的一条）"
+    ],
+    "noExistingTestTouched": "graph_test.go 字节未变（425ea030…）；无删除、无跳过、无放宽。",
+    "debtRegistration": "B7/B8/B10 与 S10-STD-3（结构化拒绝错误）继续挂在 P1 欠账清单上，本票未顺带实现。"
+  },
+  "evidenceRefs": [
+    "receipt:40242247-e668-4afe-b8b7-1b62039e5b34",
+    "receipt:bacff121-d99f-4fe3-b097-dff64b24b132",
+    "receipt:88bc9ed2-81bc-4c06-90f7-3524c33a8812",
+    "artifact:docs/design/v3-p1-graph-slice13-green.json",
+    "artifact:/tmp/p1-cycle13/graph-go-slice13-green.diff",
+    "artifact:/tmp/p1-cycle13/scheduler-go-slice13-green.diff"
+  ]
+}

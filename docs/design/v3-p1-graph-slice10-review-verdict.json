@@ -1,0 +1,212 @@
+{
+  "schema": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p1-graph-engine-r10-cycle-termination",
+  "activationId": "325307f4-3408-4207-bfd0-36fa84247b8c",
+  "stageId": "review",
+  "slice": "P1 graph engine slice 10 — 无条件环构建期拒绝（§3.5 第 7 项）",
+  "reviewedAt": "2026-09-27T10:01Z",
+  "fixedPoint": {
+    "ref": "0387000",
+    "subject": "feat(graph): land zero-lock scheduler with build-time edge validation",
+    "resolves": true,
+    "threeDotDiffEmpty": true,
+    "boundaryNote": "git log 0387000..HEAD 为空且 git diff 0387000...HEAD 为空——切片 2–10 全部只在工作树里（未提交）。因此差异边界按「工作树 vs 0387000 的 pkg/hno/graph」冻结，并用逐文件 blob 哈希而不是三点 diff 表达：git diff 0387000 --stat -- pkg/hno/graph → graph.go +204、graph_test.go +869、scheduler.go +62、合计 1108 insertions / 27 deletions（这是切片 2–10 的累计面，不是本轮面）。",
+    "slice10Boundary": "本轮增量边界另按哈希链冻结：graph.go 02122d9d(0387000) → … → b4e6051e(切片 9 收尾，见 v3-p1-graph-review-verdict.json#cycle9.measuredDelta) → 6ab6388a(GREEN) → e790d40c(现在)；graph_test.go 基线 → 2d0625d5(RED) → a14299e6(现在)；scheduler.go 全程 87854ffb 未变（本轮拒绝完全发生在 Validate，调度器零改动）。本轮测试新增面为 graph_test.go:597-824。"
+  },
+  "independence": {
+    "mode": "author-self-review",
+    "why": "用户此前明确拒绝派发独立审查子代理，因此本轮不重新派发，也不把结论说成独立复核。",
+    "mitigation": "为部分补偿缺失的第三方视角，本轮所有关键判定都用现场执行而不是读代码取得：变异矩阵在 post-refactor 字节上重跑、取消时序与 goroutine 回收用仓库外模块实测、不可达节点/不可达环的差异用第二支探针实测、覆盖率与 vet/gofmt 取工具输出。",
+    "residualRisk": "规格误读的风险仍未被独立视角覆盖——尤其 AR1「兜底边有条件替代即可断开」这一解释，只有作者读过契约。"
+  },
+  "standards": {
+    "sources": [
+      "AGENTS.md「Coding Style & Naming Conventions」：Document exported symbols with GoDoc comments / 错误用 fmt.Errorf(\"context: %w\", err) 并保持小写 / No inline comments unless clarifying novel logic",
+      "AGENTS.md「Testing Guidelines」：Target ≥70 % coverage in core packages / Keep tests table-driven and colocated",
+      "smell 基线 12 条（Fowler ch.3）逐条检查"
+    ],
+    "toolChecks": "gofmt -l pkg/hno/graph 无输出；go vet ./pkg/hno/graph/... 净；go test -coverprofile 得 89.7 %（≥70 % 达标），且 Validate / alwaysTakenAdjacency / rejectUnconditionalCycles / cycleOf 四个函数各自 100.0 %。",
+    "findings": [
+      {
+        "id": "S10-STD-1",
+        "smell": "Misplaced Doc Comment（违反仓库 GoDoc 约定）",
+        "location": "pkg/hno/graph/graph_test.go:815-824",
+        "evidence": "// looping 返回一个把「自己被执行了一次」记进 count 的最小节点体。… 注释之后紧跟的是 func noCount() {}（:817），func looping(...) 在 :819。",
+        "severity": "hard",
+        "impact": "按 Go 的文档关联规则，这段注释归给 noCount，于是 noCount 拿到一段描述计数闭包的文档，而真正需要解释「为什么只用于零副作用断言」的 looping 变成无文档。两个函数同时被误述。",
+        "fix": "把 noCount 移到该注释之前并自带一行说明（例如「noCount 是对照行用的空计数回调」），或直接给 looping 的注释与函数体之间不再插入第三个声明。"
+      },
+      {
+        "id": "S10-STD-2",
+        "smell": "Repeated Switches",
+        "location": "pkg/hno/graph/graph.go:256 与 :263",
+        "evidence": "if e.kind == edgeConditional 与 if e.kind == edgeUnconditional || (e.kind == edgeDefault && !breakable[e.from])；同一类型上已有的种类判定簇在 :118 routable()、:124 requiresPredicate()、:132 label()。",
+        "severity": "judgement",
+        "impact": "「这种边会被必定路由吗」这个问题现在有两个答案位置：一个在 edgeKind 的方法上，一个在 Graph 的方法里内联。日后新增边种类（join、Send）时必须记得同时改这里，否则新种类会静默按「可断开」处理。",
+        "fix": "加 func (k edgeKind) alwaysTaken(hasConditionalAlternative bool) bool，让 routable/requiresPredicate/label/alwaysTaken 同处一族，alwaysTakenAdjacency 只做收集。注意不要为「将来的种类」抽象出钩子——只收拢已存在的四个问题。"
+      },
+      {
+        "id": "S10-STD-3",
+        "smell": "Primitive Obsession（字符串化拒绝）",
+        "location": "pkg/hno/graph/graph.go:297 与 pkg/hno/graph/graph_test.go:710、716-720、733-737",
+        "evidence": "拒绝以 fmt.Errorf(\"graph: unconditional cycle %s: ...\") 返回；测试用 strings.Contains(err.Error(), \"graph: unconditional cycle\") 在两个入口各判 5 行，共 10 处新增锚点。",
+        "severity": "judgement",
+        "blocking": true,
+        "impact": "调用方无法用类型判断「这是环拒绝」，只能匹配文案；本轮把该文案在 10 个断言位钉死，等于给后续引入结构化拒绝错误（cycle9 在册的 R9-STD-3/R9-STD-4）加了一圈必须同步改的测试面。这是旧发现的加价，不是新缺陷。",
+        "fix": "下一个切片引入携带 Kind 的 *GraphError（errors.As 可判），同时保留现有文案以兼容本轮断言；文案与 Kind 由同一处常量产生，避免再次分叉。"
+      },
+      {
+        "id": "S10-STD-4",
+        "smell": "Speculative Generality（导出的空转能力）",
+        "location": "pkg/hno/graph/graph.go:17、50-55、58-61、64-68",
+        "evidence": "grep -n 'stepLimit\\|WithStepLimit' pkg/hno/graph/*.go（排除 _test.go）只命中定义处：ErrStepLimitExceeded(:17)、stepLimit/stepLimitSet(:54-55)、WithStepLimit(:64-68)。同一形状重复出现第二次：grep 'maxConcurrency' 只有 :53 声明与 :61 写入，非测试代码无任何读取点，因此 WithMaxConcurrency(:58-61) 也是零效果旋钮。",
+        "severity": "judgement",
+        "blocking": true,
+        "impact": "公开面广告了两个无效果的旋钮。本轮之后 stepLimit 更具误导性：不可断开的环已被构建期拒掉，剩下能跑飞的恰是谓词恒真的条件环，而那正是 WithStepLimit 声称要管、实测完全不管的形状（设计阶段实测 821,456 次执行）。两个死旋钮同族重复，说明这是流程缺口而不是一次性疏漏。",
+        "fix": "立刻二选一：G6/P3 的步数强制排在下一个 P1 切片之前；或在 WithStepLimit、ErrStepLimitExceeded、WithMaxConcurrency 的 GoDoc 上写明「当前不生效」，把「已导出」与「已担保」分开。结构性防线（针对重复同类）：加一条包内测试，断言每个导出 Option 所写的字段至少被一处非测试代码读取，未落地的一律不导出（字段保持私有直到实现）。"
+      },
+      {
+        "id": "S10-STD-5",
+        "smell": "Mysterious Name — 本切片内已闭环",
+        "location": "pkg/hno/graph/graph.go:249-253",
+        "evidence": "REFACTOR 前为 alwaysTaken，现名 alwaysTakenAdjacency，文档补上「按声明顺序保留目标」。",
+        "severity": "judgement",
+        "impact": "无遗留：旧名让人误判返回值可当集合使用，现名说清持有的是邻接表。",
+        "fix": "无需动作。记录此条是为了说明它被复查过而不是漏查。"
+      },
+      {
+        "id": "S10-STD-6",
+        "smell": "命名诚实度（测试函数名只说一个观察面）",
+        "location": "pkg/hno/graph/graph_test.go:631-635",
+        "evidence": "函数名 TestP1G_ValidateRejectsUnconditionalCycle，但注释与断言同时覆盖 A4 的 Run 面（:722-737）。",
+        "severity": "judgement",
+        "impact": "只读测试名单会以为 Run 面另有覆盖；实际拒绝一致性就在同一函数里。",
+        "fix": "下个切片（新的聚焦命令绑定后）改名为 TestP1G_UnconditionalCycleRejectedAtBothEntries。本轮不改：该名字已绑定在 testability-decision 的 redCandidate.command argv 上，改名会让 RED 回执与命令不再逐字一致。"
+      },
+      {
+        "id": "S10-STD-7",
+        "smell": "Duplicated Code / Shotgun Surgery（校验项清单以散文形式重复）",
+        "location": "pkg/hno/graph/graph.go:219-224",
+        "evidence": "Validate 的注释逐条目列出「当前覆盖 §3.5 …六项：入口缺失、输出缺失…、以及由必定被走的边构成的环（第 7 项）」，本轮为此把「五项」改成「六项」。",
+        "severity": "judgement",
+        "impact": "已发生过的 rot：cycle9 记录过同族注释的行号引用因相邻切片插入而漂移。清单每切片改一次、且没有任何测试担保它与实际检查项一致。",
+        "fix": "把「已覆盖哪几项」移到账本 JSON（唯一真源），注释只留「§3.5 的子集，未落地项见 docs/design 契约」，删去可数出来的条目枚举。"
+      },
+      {
+        "id": "S10-STD-8",
+        "smell": "其余基线条目",
+        "items": {
+          "Feature Envy": "未见——rejectUnconditionalCycles 只读 g.edges/g.nodes，数据本就属于 Graph。",
+          "Data Clumps": "未见——(kind, from, to, p) 已在 edgeDecl 里，本轮未新增一起漂移的裸参数组。",
+          "Divergent Change": "未见——graph.go 的构造面与校验面同属「声明是否可执行」这一个变化原因；350 行尚未到需要拆分的证据强度。",
+          "Message Chains": "未见——最长链是 g.alwaysTakenAdjacency()[name]，无 a.b().c().d()。",
+          "Middle Man": "未见——cycleOf 做真实的路径还原，不是转发。",
+          "Refused Bequest": "未见——本轮无继承/接口实现变更。",
+          "对照行夹具重复": "三条对照子测试各自重建 3 节点图（:745-752、:774-781、:796-800），形态相似但按契约必须各自独立失败，判定为有意重复，不计为 Duplicated Code。"
+        }
+      }
+    ]
+  },
+  "spec": {
+    "sources": [
+      "docs/design/v3-platform.md:210-221（§3.5 构建期校验 8 项，母约）",
+      "docs/design/v3-test-scope-p1-graph-slice10.json#acceptanceMapping（A1–A6、NG、AR1–AR3）",
+      "docs/design/v3-p1-graph-slice10-green.json#decision（本轮实现与牙齿矩阵）"
+    ],
+    "findings": [
+      {
+        "id": "S10-SPEC-1",
+        "kind": "规格要求但整个 P1 未覆盖（非本轮引入）",
+        "location": "docs/design/v3-platform.md:214 与 pkg/hno/graph/graph.go:198-200",
+        "evidence": "母约：「全部在 Add* 时增量检查，Run 前全量复查」。实现：declare 只有 g.edges = append(...) 与 return g，任何 Add*/Set* 都不检查；本轮的环检查同样只挂在 Validate（:246）。",
+        "severity": "hard",
+        "blocking": true,
+        "impact": "§3.5 的一半（增量检查）在 10 个切片后仍然为零，而 slice10 契约的 A1–A6 只钉了 Validate/Run 两个面，所以这个缺口是被契约继承下来的，不是被实现遗漏的。调用方在 AddEdge 那一刻拿不到任何错误。",
+        "fix": "需要一次显式的测试设计决策：Add* 返回 (*Graph, error)、还是 panic、还是维持 builder 语义但规定「首次可读观察点就是 Validate」。三者都是新的用户可观察行为，不能塞进 REFACTOR。在决策前不得给 §3.5 记「已交付」。"
+      },
+      {
+        "id": "S10-SPEC-2",
+        "kind": "规格自相矛盾（本轮让它变得可见）",
+        "location": "docs/design/v3-platform.md:220-221",
+        "evidence": "第 7 项「无条件边成环 = 错误」与第 8 项「stepLimit 校验：存在无条件环时若未设 stepLimit → 警告」互斥：第 7 项落地后不存在「有未设 stepLimit 的无条件环」还能走到警告阶段的图。",
+        "severity": "hard",
+        "blocking": true,
+        "impact": "任何按字面实现第 8 项的人都会写出永不可达的警告分支（当前 Warnings() 恒返回 nil 已经是这种状态）。",
+        "fix": "母约改写第 8 项为「谓词可能恒真的条件环：未设 stepLimit → 警告」，或删去该项并把步数上限归 §7/G6 的强制项。文档写回受 rex-self-sediment-gate 阻断，需求已记在 slice 契约的 contractAmendmentNeeded。"
+      },
+      {
+        "id": "S10-SPEC-3",
+        "kind": "实现比母约更严、且内部不自洽（实测）",
+        "location": "pkg/hno/graph/graph.go:279-317 相对 v3-platform.md:219（第 4 项不可达节点）",
+        "evidence": "仓库外探针 /tmp/p1-r10-unreach 实测：不可达孤立节点 validate=<nil>（放行）；不可达的无条件环 validate=graph: unconditional cycle \"c\" -> \"d\" -> \"c\": every edge on it is always taken, so Run cannot terminate，Run 同步拒绝。",
+        "severity": "hard",
+        "blocking": true,
+        "impact": "当前引擎拒绝一个永远不会执行的声明（不可达环，零风险），却放行母约明确要求报错的不可达节点（真实风险：写了没接线）。两者都出自「环检查不做可达性过滤」这一个未裁定点。",
+        "fix": "下一切片在两条路里裁定并写回契约：(a) 环检查先按入口 BFS 取可达子图（与第 4 项同时落地才自洽）；(b) 保持「图里有不可断开的环就整体不合法」，理由是这类声明本身就是意图错误。不得用测试悄悄固化其中之一而不裁定。"
+      },
+      {
+        "id": "S10-SPEC-4",
+        "kind": "超出冻结契约表的行（判断性，非产品面扩大）",
+        "location": "pkg/hno/graph/graph_test.go:678-693（with-always-true-exit）",
+        "evidence": "契约 A1–A3 列出的不合法形状是自环、二/三节点环、无条件+兜底回环；测试另有第五行「不可断开环 + 一条恒真条件出边」也判不合法。",
+        "severity": "judgement",
+        "impact": "该行方向与第 7 项字面一致（无条件边成环即错误，恒真条件边不能赦免），未新增导出面，但它是被实现者补进契约表之外的判断，需要契约所有者确认而不是默认接受。",
+        "fix": "向 slice 契约登记为 contractAmendment：把「恒真谓词不构成可断开证据」明确写进 A 系列（或明确排除并挂号给 G6）。"
+      },
+      {
+        "id": "S10-SPEC-5",
+        "kind": "已交付并复核",
+        "location": "docs/design/v3-test-scope-p1-graph-slice10.json#acceptanceMapping 对 v3-platform.md:220 第 7 项",
+        "evidence": "A1–A6 全部有对应断言且实测通过：5 条不合法行（含 A2 的自环/二节点/三节点独立成行）+ Run 面 err!=nil、res==nil、executions==0 + 1s 期限 + -timeout 25s 护栏 + 3 条 A5 对照（Completed 精确等值 [a a b b end]、[a a b b end]、[a b]）。取消时序另经探针复核：谓词恒真的条件环被 cancel 后 err=context canceled，goroutine 由 3 回到基线 1，不泄漏。",
+        "severity": "none",
+        "impact": "§3.5 第 7 项的字面要求（不可断开的环构建期被拒、合法环继续放行）本轮成立。",
+        "fix": "无需动作。"
+      },
+      {
+        "id": "S10-SPEC-6",
+        "kind": "范围蔓延检查",
+        "evidence": "未新增导出 API（git diff 0387000 的导出面里 cycleOf/alwaysTakenAdjacency/rejectUnconditionalCycles 全为私有）；scheduler.go 与固定点之后各切片逐字节一致（87854ffb）；无 test-only 产品出口。",
+        "severity": "none",
+        "impact": "未发现超出契约的产品行为。",
+        "fix": "无需动作。"
+      }
+    ]
+  },
+  "summary": {
+    "standardsFindings": 7,
+    "specFindings": 6,
+    "blocking": [
+      "S10-STD-3（字符串化拒绝，且已被 10 个断言位加价）",
+      "S10-STD-4（WithStepLimit / ErrStepLimitExceeded 导出但零效果，本轮之后更易误导）",
+      "S10-SPEC-1（§3.5「Add* 增量检查」整半未交付，且从未进入任何切片契约）",
+      "S10-SPEC-2（第 7 项与第 8 项自相矛盾，需母约写回）",
+      "S10-SPEC-3（不可达环被拒 / 不可达节点被放行的不自洽，需显式裁定）"
+    ],
+    "mostSevere": {
+      "standards": "S10-STD-4：两个导出旋钮（WithStepLimit / WithMaxConcurrency）零效果，而本轮拒绝恰好把最需要步数上限的形状留在了不生效的一侧。",
+      "spec": "S10-SPEC-1：母约 §3.5 的「全部在 Add* 时增量检查」至今为零，说明 P1 家族即使收下第 7 项也不能闭结。"
+    },
+    "slice10Acceptance": "A1–A6 判为已交付（S10-SPEC-5 的实测证据），本轮不判 blocked。",
+    "familyVerdict": "本家族不闭结：S10-SPEC-1 与 S10-SPEC-3 必须先在下一个测试设计切片里裁定，S10-STD-4 必须在下一切片之前给出「生效或写明不生效」的处置。",
+    "owedCarriedForward": [
+      "R9-SPEC-1 空节点名绕过（SetOutput 注释已明确挂号）",
+      "R9-SPEC-2 重复 AddNode 静默覆盖（§3.5 第 2 项）",
+      "R9-STD-3/4 结构化拒绝错误类型（本轮由 S10-STD-3 加价）",
+      "§3.5 母约写回（输出轴、第 7/8 项冲突、可达性、AR1 措辞）",
+      "G6/P3 WithStepLimit 强制执行（恒真条件环实测 2 秒 567,297 次执行）"
+    ],
+    "countingRule": "S10-STD-5（REFACTOR 内已闭环）与 S10-STD-8（12 条 smell 的逐条清单，含「未见」）不计入 7 条发现；S10-SPEC-5/6 是「已交付」与「无蔓延」的复核记录，计入 specFindings 但不计入缺陷。"
+  },
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-slice10-review-verdict.json#standards",
+    "artifact:docs/design/v3-p1-graph-slice10-review-verdict.json#spec",
+    "artifact:docs/design/v3-p1-graph-slice10-refactor.json#mutationRecheckAfterRefactor",
+    "receipt:1c2ce19f-1d31-4d10-9acd-04994f6ccff6",
+    "receipt:e6a10676-1780-4171-99fa-e97ecaa96cf7",
+    "receipt:2a4e5486-fec9-4a75-a921-b983cd79c9b2",
+    "receipt:ee558379-44c4-4f16-a501-6f6d4a4ff4fa",
+    "receipt:951c13e2-55ea-4697-acc2-f0ad06b62449",
+    "measurement:/tmp/p1-r10-leak（cancel 时序与 goroutine 回收）",
+    "measurement:/tmp/p1-r10-unreach（不可达节点 vs 不可达环）"
+  ]
+}

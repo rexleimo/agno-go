@@ -1,0 +1,165 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p1-graph-r19-join-barrier",
+  "activationId": "559f65af-faa3-4d4d-a893-97631b23db89",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-27T20:04:30Z",
+  "contractRef": "artifact:docs/design/v3-test-scope-p1-graph-slice19.json",
+  "slice": "19",
+  "userGoal": "落地票面 B2（docs/design/v3-test-scope-p1-graph.md:61）：pkg/hno/graph 支持「并行扇出 + Join 汇聚屏障」这张图 —— entry→{a,b}→join 能真实跑起来，join 恰好执行一次，它收到的输入含 a、b 两者的输出并按前驱名键控，a 与 b 都先于 join 完成。这是 adk/LangGraph 都有的汇聚语义，也是 P1 剩下的唯一未落地路由种类；没有它，图引擎无法表达任何 fan-in 形态（并行取数后合并、多路评审后汇总），P3 的动态扇出与 P6 的编译承载都缺地基。",
+  "whyThisSlice": "B2 是票面 §4 表里唯一从未被任何切片取过红的行为行：切片 4–18 的契约只在 outOfScope 里重申它，§11.3 的 RED 次序表从未被逐片勾销（根因与逐行背书见 docs/design/v3-p1-graph-status.md §2/§3）。选它而不是先做 B6 余下两项，是因为「非输出节点无出边」这条 sink 判据的形状取决于 Join 最终怎么建边 —— `AddJoin(from,to)` 现在把 from 逐个 declare 成出边（graph.go:215-220），路由落地后 sink 检查才不会误拒「只经由 Join 出发的前驱」。先定路由形状，再补构建期判据，顺序由依赖决定，不由难易决定。",
+  "measuredBeforeDesign": [
+    "夹具 /tmp/p1-audit（module replace 指向本仓库，`go run .` 实测）：`entry→{a,b}→join` 交出 `Validate() = graph: join edge from \"a\" to \"join\" is declared but not routable by this engine`，`Run` 原样拒绝且 `res=nil`。即 B2 今天在公共面上完全不可用，RED 必然是确定性红而不是竞争红。",
+    "同一夹具：`AddJoin([\"a\"],\"merge\")`（单前驱）交出的也是那句 `not routable`，不是「前驱数不足」—— B6 第 6 项在 Join 路由落地前无法与「未路由拒绝」区分。",
+    "代码事实：`edgeKind.routable()`（graph.go:137-139）是白名单，`edgeJoin` 落在拒绝侧；`scheduler.go` 全文 0 处 join 字样（grep 实测），`successors`（:194-215）的 switch 只有 unconditional/conditional/default 三支。",
+    "结果投影事实：`Result.values` 已按节点名键控（scheduler.go:181 `s.result.values[item.name]=item.out`），聚合输入可用消费者已持有的状态构造，无需新增锁或新增可变状态写入者 —— B12 的零锁不变式不被本片触碰。",
+    "字节基线：graph.go a8e46a3a2f0baaa699ae60f26498c6f5c1c851cb、scheduler.go 0ce6c3b332ddc768c1c5a10d6c1591fc88d67a2a、graph_test.go 425ea0303e1d5c5c8e95bacf57663ae94a4309ee（该片唯一允许编辑的既有测试文件，见 allowedTestSeam.retires）。"
+  ],
+  "acceptanceMapping": [
+    {
+      "row": "D1",
+      "behavior": "join 在本次 Run 中恰好执行一次（即使它有两个前驱、两个前驱在不同时刻完成）",
+      "publicEntry": "graph.New/AddNode/AddEdge/AddJoin/SetEntry/SetOutput → Run → Result.Completed()",
+      "assertion": "join 节点体内对自身的执行计数只允许为 1；`Result.Completed()` 里 join 出现一次。断言写成「计数 != 1 即判红」，不是「>= 1」。",
+      "expectedAtRed": "RED（今天整图被 Validate 拒绝，节点根本没跑）",
+      "whyItRepresentsTheGoal": "这是朴素实现最容易写错的形状：把 Join 当成无条件边路由，则 a 完成激活 join 一次、b 完成再激活一次 ⇒ 两次执行。屏障的价值恰好在于「凑齐之前不激活」，所以本行是 B2 的判别行，也是本片最小纵向切片。"
+    },
+    {
+      "row": "D2",
+      "behavior": "join 收到的输入包含 a、b 两者的输出，并按前驱名键控",
+      "publicEntry": "同上；join 节点体把收到的 `in` 原样投影为自己的输出，经 Result.Output()/Value(\"join\") 读出",
+      "assertion": "节点内记录的输入须可断言为「含键 \"a\" 且其值等于 Result.Value(\"a\")，含键 \"b\" 且其值等于 Result.Value(\"b\")」；缺任一键或值错位即判红。",
+      "expectedAtRed": "RED",
+      "whyItRepresentsTheGoal": "票面 :61 的「（按前驱名键控）」是唯一的聚合形状声明。只聚合值不键名、或只交最后一个前驱的实现都能让 D1 判绿，本行把它们分开。"
+    },
+    {
+      "row": "D3",
+      "behavior": "a 与 b 均先于 join 完成",
+      "publicEntry": "同上；a、b 节点体在完成时向一个测试自有的 channel 发信号，join 节点体在收到两个信号之后才返回",
+      "assertion": "join 若在收到两个完成信号之前被激活，它按契约交出错误并由 `Run` 传达为 err != nil —— 即顺序前提由测试自己担保，不靠读实现状态。另断 `Run` 返回的 `Completed()` 含 a、b。",
+      "expectedAtRed": "RED",
+      "whyItRepresentsTheGoal": "票面 :77 明令禁止「等固定时长再聚合」，也禁止用 sleep 定序（:75）；本行用测试自有握手表达先后，不触碰 :40 禁止面。"
+    },
+    {
+      "row": "D4",
+      "behavior": "join 的输出成为图的输出（屏障与既有结果投影集成）",
+      "publicEntry": "SetOutput(\"join\") → Run → Result.Output()",
+      "assertion": "`Output()` 等于 join 节点返回值；不得是最后一个前驱的值，也不得是 nil 而 err==nil。",
+      "expectedAtRed": "RED",
+      "whyItRepresentsTheGoal": "票面 §7 与切片 9 反复钉住「err==nil 而 Output()==nil 的静默通道」；汇聚落地后这条通道必须由新形状重新关一次。"
+    },
+    {
+      "row": "D5",
+      "behavior": "含合法 Join 的图在构建期被放行（R1 的拒绝集合按种类收缩）",
+      "publicEntry": "Validate()",
+      "assertion": "`Validate()` 返回 nil；同时保留 R1 的反向对照：仍含未路由种类的图必须继续被拒（本片不改那条不变式，只收缩 Join 这一个种类）。",
+      "expectedAtRed": "RED（今天交出 not routable）",
+      "whyItRepresentsTheGoal": "票面 :161-168 的 R1 不变式写明「随逐类实现，被拒绝的集合会缩小，但未实现声明不被静默接受永不放松」。本行是这次收缩的正面证据。"
+    },
+    {
+      "row": "D6",
+      "behavior": "Join 声明的前驱数 < 2 在构建期被拒且可定位（票面 B6 第 6 项）",
+      "publicEntry": "AddJoin 传单元素或空切片 → Validate()",
+      "assertion": "`Validate()` 非 nil，错误文本能定位到那条汇聚声明（点名汇聚目标节点，沿用 §11.1 的先例：可定位不要求新导出哨兵）；且不得退化成今天那句 `not routable`。",
+      "expectedAtRed": "RED（今天交出的是 not routable 那句，形状不同）",
+      "whyItRepresentsTheGoal": "票面 :65 把「Join 前驱数 < 2」列为必查项，而 measuredBeforeDesign 已实测它在路由落地前不可区分。"
+    },
+    {
+      "row": "D7",
+      "behavior": "声明过的 Join 前驱本次没有执行 ⇒ 屏障永不凑齐，Run 以步数安全阀结束而不是静默交出错误结果",
+      "publicEntry": "一张 `entry --cond(false)--> a`、`entry-->b`、`AddJoin([a,b],join)` 的图 + WithStepLimit(小值) → Run → errors.Is(err, graph.ErrStepLimitExceeded)",
+      "assertion": "`Run` 返回非 nil 且 `errors.Is(err, ErrStepLimitExceeded)` 为真；`Result` 为 nil；不得挂死（用 R13/R17 已在用的有界阀观察形状：在阀内未返回即判红）；不得交出 err==nil 的 Result。",
+      "expectedAtRed": "RED",
+      "whyItRepresentsTheGoal": "这是 Join 落地新引入的失败模式：凑不齐就永远等。票面 B4 的安全阀是唯一已授权的兜底，本行把它对汇聚的适用性钉成可观察行为。"
+    }
+  ],
+  "minimalVerticalSlice": {
+    "row": "D1",
+    "command": "go test ./pkg/hno/graph -run TestP1R19_ -count=1 -race -v",
+    "whyEnough": "D1 需要「图能跑 + 汇聚屏障真的挡住」两件事同时成立才可能判绿，而后者正是 B2 区别于既有三种边种类的全部新增不变量；D2–D4 是在同一份屏障状态上换观察角度（键名、先后、投影），D5–D7 是它的构建期与失败模式边界。因此 D1 从红到绿所逼迫的实现，与整片所要的实现是同一个，切片不引入第二套并发不变式（与票面 §8 选 B1 作为 P1 最小切片的理由同构）。"
+  },
+  "allowedTestSeam": {
+    "primary": "外部包 `package graph_test`，只用导出 API 观察：`graph.New` / `WithStepLimit` / `AddNode` / `NodeFunc` / `AddEdge` / `AddConditional` / `AddDefault` / `AddJoin` / `SetEntry` / `SetOutput` / `Validate` / `Run`，以及 `Result.Output()` / `Result.Value()` / `Result.Completed()` 与 `errors.Is`。新文件 pkg/hno/graph/p1r19_join_barrier_test.go。",
+    "whyNotNarrower": "B2 声明的是端到端图行为，公共入口 Run 足以独立复现每一行，无需下探到包内。",
+    "forbiddenSurfaces": "票面 :40 逐条禁止：scheduler 内部字段（pending/running/queue/plan/result 私有状态）、queue 长度、goroutine 数、对私有类型的类型断言、内部计时。本片额外禁止把「join 等待了几个前驱」这类内部计数当断言 —— 顺序前提只能由测试自有握手（D3）表达。",
+    "retires": "唯一被授权的既有测试改动：graph_test.go:60-105 `TestP1G_UnsupportedEdgeDeclarationsAreRejected` 的表里 `join-only` 那一格。依据是票面 :168「随着 R2/B2 逐类实现，被拒绝的集合会缩小」与 :147 的 RED 次序表；处理方式是把该格替换为「Join 已路由，不再出现在拒绝表里」，并**保留同表的反向对照断言**（含未路由种类的图仍被拒、合法图仍放行）。不得整块删除该 Test，不得删除它的反向子用例。"
+  },
+  "baselineBytes": {
+    "pkg/hno/graph/graph.go": "a8e46a3a2f0baaa699ae60f26498c6f5c1c851cb",
+    "pkg/hno/graph/scheduler.go": "0ce6c3b332ddc768c1c5a10d6c1591fc88d67a2a",
+    "pkg/hno/graph/graph_test.go": "425ea0303e1d5c5c8e95bacf57663ae94a4309ee",
+    "pkg/hno/graph/p1r13_step_limit_test.go": "bc4ab8e71527809e23a12590a078add8f35d68d1",
+    "pkg/hno/graph/p1r14_panic_barrier_test.go": "0ed607dbc01955864276212fa61e0902577ce7b8",
+    "pkg/hno/graph/p1r15_warnings_test.go": "3ea06d27abd3994130e593d297951c895729a4dd",
+    "pkg/hno/graph/p1r15b_warning_text_test.go": "0285ab35729ed3d50359e0fd407edb2d8b1c1a2a",
+    "pkg/hno/graph/p1r16_max_concurrency_test.go": "6934a4f2ae9ed2d80a59a30ead56b3de6bcc4296",
+    "pkg/hno/graph/p1r17_cancel_normalization_test.go": "cbc8b692a84ed5ce23b461a8ed40b9ba3870d386",
+    "pkg/hno/graph/p1r18_typed_test.go": "10bce61bd70f2b78a968d585cc81919e8fe68293"
+  },
+  "explicitNonGoals": [
+    "B6 余下两项（重复节点名的构建期拒绝、非输出节点无出边的 sink 拒绝）留给切片 20。重复名当前是**静默覆盖**且有既有测试担保（graph_test.go:949「运行中覆盖同名节点不得改变本次输出」），改判据等于改票面公共面语义，需新的 rex-test-design 周期，不得借本片顺带改写。",
+    "不改调度器的取消归一化三咨询点（票面 §13.1，scheduler.go:99-100/:105/:133）。Join 的等待必须仍能被取消看见，但那是既有护栏的复用，本片不新增取消语义，也不得把「屏障永不凑齐」实现成新的挂死点。",
+    "不做 LangGraph 的 `Send` 动态扇出、不做 InputSchema/OutputSchema 校验（票面 §3 已划到 v3.1）、不做 Cache/Timeout/Trace（P2）、不做跨会话 Store。",
+    "不新增导出符号：`AddJoin` 已存在，聚合输入用 `map[string]any` 走既有 `Node.Run(ctx, any)` 引擎契约，不引入 JoinInput 之类的导出类型。导出符号计数须保持在 24。",
+    "不实现「一个目标被多次 AddJoin 声明」「Join 与 Default 边混合」等拓扑；票面 §4 未要求，本片不为它们写断言也不为它们改实现。"
+  ],
+  "outOfScopeBehaviors": [
+    "Join 与前驱业务错误的细粒度语义：任一前驱交出错误时 `Run` 原样传达（scheduler.go:108-110 的既有路径），本片只担保不挂死、不静默放行，不新增「部分前驱失败时汇聚怎么办」的策略。",
+    "并发额度与屏障的交叉（WithMaxConcurrency(1) + Join 的派发次序），留待 P1 闭合后的加固片。"
+  ],
+  "completionCriteria": [
+    "1. D1–D7 每行有一个可独立失败的 Test（表驱动子用例也算，但每个子用例须能单独判红），并在 RED 阶段观察到与缺失行为一致的失败。",
+    "2. 每行的断言牙齿由变异证明：至少存在一条写坏该行为的变异使该行判红；等价变异与不可达形态须如实登记为观察上限，不得算作杀红。",
+    "3. 构建失败（`[build failed]`）不计为判红；判红只认 `-v` 输出里的 `--- FAIL: TestP1R19_*` 名字，退出码单独记录。",
+    "4. 既有 8 份测试文件除 allowedTestSeam.retires 那一格外零改动（逐文件 `git hash-object --no-filters` 复核）。",
+    "5. 票面 §7 四条门禁在最终字节上全 exit 0：`go build ./...`、`go test ./pkg/hno/graph/... -count=1`、`go test -race ./pkg/hno/graph/... -count=1`、`go vet ./pkg/hno/graph/...`；`gofmt -l pkg/hno/graph` 无输出。",
+    "6. 结构判据不放宽：`sync.` 计数仍为 0（B12）、非测试 LOC ≤ 1500（B13，基线 729）、`go doc -all` 导出符号仍为 24。",
+    "7. 邻近回归不红：`go test ./pkg/hno/agent/... ./pkg/hno/runner/... ./internal/session/contract/... -count=1` exit 0。",
+    "8. 完成后回写票面：§4 的 B2 行按交付精确化，并新增 §15 记录屏障的激活条件、聚合输入形状与本片牙齿归属；`docs/design/v3-p1-graph-status.md` §2 的 B2 行勾销。"
+  ],
+  "forbiddenShortcuts": [
+    "不得用 `time.Sleep` 或「等固定时长再聚合」实现/测试屏障（票面 :75、:77）。",
+    "不得把 D1 的「恰好一次」放宽为「至少一次」或「不超过 N 次」。",
+    "不得让 D2 只断「join 收到过非 nil 输入」而不键控到前驱名。",
+    "不得为了 D5 判绿而整块删除 graph_test.go 的 R1 拒绝表或它的反向对照子用例。",
+    "不得通过删除断言、`t.Skip`、把期望改成当前实际输出来获得 GREEN。",
+    "不得只验证测试自己的 mock/helper；每行断言必须落在 `Run`/`Validate`/`Result` 的公共观察面上。",
+    "不得读取或断言票面 :40 列出的内部面来替代公共面证据。"
+  ],
+  "observabilityLimit": "D3 的先后判断由测试自有握手担保：join 节点在收到两个完成信号前返回错误 ⇒ 若实现过早激活 join，判红的是这个错误，不是内部时序读数。因此「join 恰好在凑齐的那一刻被激活」这一精度不可观察，可观察的是「凑齐之前被激活就会被抓住」。D7 的「不挂死」同样只在有界阀的精度上可观察（与切片 17 的 D5 同形状，登记为先例而非缺陷）。",
+  "unadjudicatedCarried": [
+    "R18-Q1 / R18-Q2（切片 18 留下的两项产品决策，负责人裁决）",
+    "S18-SPEC-2：HEAD 0387000 只含首片存根，切片 2–18 的字节未提交；本轮无提交授权",
+    "R17-GAP-1/2/3、R18-GAP-1、S17-SPEC-3/R17-UNADJ-1",
+    "S17-STD-5 / S18-STD-6：struct.sh、mutants.mjs、/tmp/p1-audit 仍在 /tmp，判据不可由他人重放",
+    "golangci-lint 从未运行"
+  ],
+  "sedimentCarried": "票面 §13（切片 17 写回）与 §14（切片 18 写回）已生效；`docs/design/v3-p1-graph-status.md` 是本片的 measuredBeforeDesign 依据。",
+  "verificationCommands": [
+    "go test ./pkg/hno/graph -run TestP1R19_ -count=1 -race -v   # 本片唯一绑定场景命令，所有 receipt 逐字用这条",
+    "go build ./... ; go test ./pkg/hno/graph/... -count=1 ; go test -race ./pkg/hno/graph/... -count=1 ; go vet ./pkg/hno/graph/... ; gofmt -l pkg/hno/graph",
+    "grep -o 'sync\\.' pkg/hno/graph/graph.go pkg/hno/graph/scheduler.go | wc -l   # 必须 0",
+    "find pkg/hno/graph -name '*.go' -not -name '*_test.go' | xargs wc -l          # 必须 ≤ 1500",
+    "go doc -all ./pkg/hno/graph | grep -cE '^(func|type|var|const) '              # 必须仍为 24"
+  ],
+  "writeBackOwed": [
+    "票面 :61 B2 行改为交付后的精确措辞（屏障激活条件 = 全部声明前驱在本次 Run 完成；聚合输入 = 按前驱名键控的 map；凑不齐时的兜底 = 步数安全阀），并新增 §15 记录三要素与本片的牙齿归属。",
+    "graph.go:210-214 的 `AddJoin` 注释按契约承诺改写为真实激活语义（注释里那句「路由尚未实现」在 GREEN 后即为假话）。",
+    "母约 docs/design/v3-platform.md §3.4 规则 3（Join 目标仅当所有前驱 Completed 才激活，聚合前驱输出）标注为已落地并指向票面 §15。",
+    "docs/design/v3-p1-graph-status.md §2 的 B2 行按实测勾销。"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-status.md",
+    "artifact:docs/design/v3-test-scope-p1-graph.md:61",
+    "artifact:docs/design/v3-test-scope-p1-graph.md:161",
+    "artifact:docs/design/v3-test-scope-p1-graph.md:168",
+    "artifact:docs/design/v3-test-scope-p1-graph.md:77",
+    "artifact:/tmp/p1-audit/main.go",
+    "artifact:pkg/hno/graph/graph.go:137",
+    "artifact:pkg/hno/graph/scheduler.go:194",
+    "artifact:docs/design/v3-test-scope-p1-graph.md:65",
+    "artifact:docs/design/v3-test-scope-p1-graph.md:40"
+  ]
+}

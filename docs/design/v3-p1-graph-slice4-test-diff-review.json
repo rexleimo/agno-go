@@ -1,0 +1,71 @@
+{
+  "kind": "rex.test-diff-review.v1",
+  "decisionRef": "artifact:test-diff-review:p1-graph-engine-slice4-r2",
+  "workItemKey": "work-p1-graph-engine-r2-routing",
+  "stage": "refactor",
+  "fixedPoint": "03870005e0f6cb6108cdfd0625b62e5af295f099",
+  "testDiff": {
+    "file": "pkg/hno/graph/graph_test.go",
+    "added": "TestP1G_ConditionalAndDefaultRouting（5 个目标子用例 + 1 个规则 1 对照子用例）",
+    "existingTestsTouched": "无。切片 1/2/3 的测试函数与断言行在本次 diff 中零改动（git diff 对 graph_test.go 为纯新增区段）",
+    "observationSurface": [
+      "Result.Completed() 用 reflect.DeepEqual 做全等断言（字典序切片，未降级为集合包含）",
+      "Result.Output() 断言的是「哪个 sink 被执行 + 它收到的上游值」拼接串，因此一条断言同时覆盖路由目标与传值",
+      "Result.Value(name) 的第二个返回值用于断言未执行的节点不得留下输出",
+      "用户自带 Predicate 收到的实参值，与 Result.Value(\"a\") 比对，并显式排除「实参等于图入口输入」"
+    ],
+    "implementationDetailLeakage": [
+      "无未导出符号引用：nodes/edges/edgeDecl/edgeKind/successors/scheduler/cfg 在测试文件中出现次数为 0",
+      "不断言错误类型，只断言 Validate/Run 返回非 nil",
+      "S5 有一处 len(seen) != 1 的调用次数断言。审查判定可接受：被计数的是调用方自己传入的 Predicate，且 §3.4 规则 2 的语义本身就是「对该节点本次输出判定一次」；它在此只用于让 seen[0] 的含义确定，主断言仍是实参值。若后续实现改成多次判定，该断言会判红——这属于契约内的可观察行为，不是实现细节锁定。"
+    ],
+    "weakeningCheck": "对照契约 slice4 的 falsePassProhibitions 逐条核验：无删除断言、无跳过用例、无放宽期望、无把期望改成当前错误输出。Completed() 的期望值全部来自 §3.4 规则推导（S1 [a b] / S2 [a c] / S3 [a b d] / S4 [a b] / C1 [a b c]），非按实现回填。"
+  },
+  "refactorChanges": [
+    "边表统一：把切片 1 的 edge{from,to} 与切片 3 的 unroutedDecl{kind,from,to} 合并成单一 edgeDecl{kind,from,to,p}，由 edgeKind 驱动路由与校验。闭掉 cycle-3 的 C3-STD-3（kind 裸字符串 / 新增边类型需三处同改），并且让 §3.5 的悬空端点检查自动覆盖所有边种类（同一循环扫同一张表，而非每类边各写一遍）。",
+    "routable() 从黑名单改为白名单（只放行 unconditional/conditional/default）。GREEN 初稿写的是 k != edgeJoin，与其自身注释「新增种类默认落在拒绝一侧」相反：若日后新增 edgeSend 而忘记改这里，它会被自动判定为可路由并被调度器静默忽略——正是 R1 要消灭的形态。REFACTOR 纠正为白名单，行为在今日等价。",
+    "label() 补 edgeJoin 分支、default 改为不冒充具体种类（原写法会把任何未来种类标成 join edge）。",
+    "GoDoc：AddConditional/AddDefault 改为陈述真实的 §3.4 规则 2/4 语义（含「多条条件边互不排斥」与「已有具体边命中时兜底不得触发」）；AddJoin 明确写「汇聚屏障路由尚未实现，其声明会被 Validate 判非法、Run 直接拒绝」，不再承诺未实现的激活语义。闭 C3-STD-1。"
+  ],
+  "greenEvidence": {
+    "red": "receipt:fe1b6446-bf78-4af1-8750-249c60d979c4 exit 1（5 个子用例分别终止于 graph_test.go:225 的 Validate 拒绝与 :260 的 Run 拒绝，失败原因即「条件边/兜底边不被路由」）",
+    "green": "receipt:e0f2e299-ae5c-4df0-91c9-43b98353c9df exit 0",
+    "refactor": "receipt:6b3281ad-1b4c-440b-9369-4ab268030e66 exit 0（14 条 PASS，含切片 1/2/3 全部既有用例）",
+    "race": "receipt:9849b135-e4bf-4161-9a76-1af3e11fbb5c exit 0",
+    "build": "receipt:837cbac0-fd70-4aa3-a35f-68694437bf01 exit 0",
+    "gofmt": "gofmt -l pkg/hno/graph 无输出",
+    "vet": "go vet ./pkg/hno/graph/... 净"
+  },
+  "mutationEvidence": [
+    {
+      "id": "MUTANT-A",
+      "mutation": "successors 结尾的「具体边命中即返回」判定删除，改成无条件 return append(concrete, fallback...)（即把 Default 实现成「总是并上」）",
+      "kill": "receipt:97f837d5-2bef-4ea1-bd7e-7e7f5a0335a9 exit 1 —— predicate-hit-suppresses-default 与 unconditional-edge-suppresses-default 双双判红，报 Completed() = [a b c], want [a b] 且「节点 \"c\" 不应被执行，却留下了输出值」",
+      "restore": "sha256 8cfba9c8… 与变异前逐字节一致"
+    },
+    {
+      "id": "MUTANT-B",
+      "mutation": "条件边分支加上 len(concrete) == 0 前置，实现成「命中第一条即停」的互斥选择",
+      "kill": "receipt:85e5d6db-9967-40e2-ae5e-b226c1e7a498 exit 1 —— multiple-predicates-all-fire 判红，报 Completed() = [a b], want [a b d] 且 Output() = <nil>, want d<-a-out",
+      "restore": "同上哈希一致"
+    },
+    {
+      "id": "MUTANT-C",
+      "mutation": "routable() 改成恒 true，即让未实现的 Join 声明被静默接受",
+      "kill": "receipt:d3a2e3fa-1c52-4b99-b079-5eb5a41d4e4b exit 1 —— 切片 3 的 join-only 子用例判红，报 graph_test.go:87「声明了引擎未路由的边，Validate 却判定合法」。R1 的 fail-closed 不变式在路由扩展后仍然有牙",
+      "restore": "sha256 3a9747fd… 与变异前逐字节一致"
+    }
+  ],
+  "structuralCriteria": {
+    "nonTestLOC": "graph.go 242 + scheduler.go 129 = 371（上限 1500）",
+    "zeroLock": "grep -c 'sync\\.' → graph.go 0 / scheduler.go 0；-race 绿",
+    "diffBoundary": "git diff --stat -- pkg/hno/graph → 3 files changed, 325 insertions(+), 23 deletions(-)（原始 diff 410 行，artifact:/tmp/p1-green/slice4-r2-diff.txt）；仅 graph.go / graph_test.go / scheduler.go 三个文件，其他包零改动",
+    "probeCleanup": "审查期间临时探针 pkg/hno/graph/scratch_slice4_probe_test.go 已删除，删除后 go test ./pkg/hno/graph/... -count=1 仍 ok"
+  },
+  "owedRedForNextSlice": {
+    "gap": "边表统一带来一处真实的可观察行为扩展，但它没有专属测试：§3.5 的悬空端点检查现在覆盖全部边种类，而不再只覆盖无条件边。临时探针实测（用例已删除，不作为交付证据）：AddConditional(a,ghost) → Validate()=graph: conditional edge to node \"ghost\" does not exist 且 Run 同文拒绝；AddDefault(a,ghost2) → graph: default edge to node \"ghost2\" does not exist；AddJoin([ghost3],a) → graph: join edge from node \"ghost3\" does not exist。",
+    "whyItMatters": "这不是可有可无的一致性：R2 之后条件边真的会激活 e.to，若悬空条件边不被拒绝，未知节点名会走进 spawn 的 map 查表并再次触发切片 2 消灭的 nil 指针 SIGSEGV。因此该检查是 R2 的安全前提，而不只是校验覆盖面扩张。",
+    "disposition": "不追溯补一条「今日即绿」的测试来冒充 TDD。下一切片（B6：§3.5 余下校验）的第一条 RED 必须取在这里——把 dangling 检查限制回无条件边（e.kind == edgeUnconditional）应被判红，从而用恢复式 RED 为这条已存在的行为取得真实检测力，并在同一张表里覆盖重复节点名 / 不可达 / 非输出汇点 / Join 前驱数。",
+    "cycle3CarryOver": "cycle-3 的 C3-STD-2（conditional/default 行为变更无担保）随本切片闭；C3-SPEC-2（重复节点名静默覆盖）、C3-SPEC-3（stepLimit 安全阀缺失）、C3-SPEC-4（Add* 增量校验缺失）、C3-SPEC-5（节点 panic 击穿宿主）、C3-SPEC-6（§3.5 需补记自加护栏）在本切片零进展，仍为阻断项。"
+  }
+}

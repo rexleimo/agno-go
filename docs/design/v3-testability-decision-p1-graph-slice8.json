@@ -1,0 +1,57 @@
+{
+  "schema": "rex.testability-decision.v1",
+  "workItemKey": "work-p1-graph-engine-r8-teeth-rework",
+  "activationId": "aad3cb04-df5d-4059-b429-106ab27c2b31",
+  "stageId": "decide-testability",
+  "kind": "behavior-preserving-hardening",
+  "decisionRef": "artifact:docs/design/v3-testability-decision-p1-graph-slice8.json#decision",
+  "baseline": {
+    "publicEntry": "graph.New().AddNode(...).AddEdge(...).SetEntry(...).SetOutput(...).Validate() / .Run(ctx, in)，经 go test ./pkg/hno/graph/... -run TestP1G 驱动的 35 个公共入口断言",
+    "setup": "工作树为切片 7 冻结态：graph.go 3483783f1e787c96ca6c236341664d095acec5c0、scheduler.go 87854ffbb7629f9adeb2d45fbb74d91f2032b99d、graph_test.go 0ebcadebed389afe7aa842a6958f3116dc7a9af2；未做任何本轮改动。",
+    "command": {
+      "executable": "go",
+      "args": ["test", "./pkg/hno/graph/...", "-run", "TestP1G", "-count=1", "-v"],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "加固前的既有公共行为应当已经成立：35 个断言全绿、零退出，且 Result.Completed()/Output() 与导出 API 的拒绝语义与切片 1–7 的契约一致。",
+    "observed": "退出码 0；-v 输出实测 35 行 --- PASS、0 行 FAIL、0 行 SKIP，末行 ok github.com/rexleimo/agno-go/pkg/hno/graph 3.103s。基线成立。",
+    "receiptRef": "receipt:de41c46d-5832-413e-9f21-81a48c50923f"
+  },
+  "summary": "本轮没有新用户可观察行为：入口缺失的构建期拒绝、不可路由种类的拒绝、以及输出解析语义都已在生产中实现，现有公共入口在正确实现下不可能失败，因此不存在诚实的 natural RED。风险在于『测试发现不了它们坏掉』，属可测试性加固：先记真实零退出基线，再加固测试面，用变异证明牙齿。",
+  "whyNotBehaviorDelta": "behavior-delta 要求『新的用户可观察行为』能在稳定公共入口真实复现为失败。本轮五项在范围行为（A1 入口拒绝可定位、A2 不可路由原因短语、A3 输出解析到被指名的 output 节点、A4 一次性捕获不被终身冻结实现蒙过、A5 台账诚实）都由已实现的代码承担，公共入口在正确实现下全绿；若把『删除生产校验后判红』伪装成 RED，那是变异证明（加固轮的 teeth 检查），不是行为差异的 RED，不得记为 failing-test-observed。",
+  "hardeningObligations": [
+    "变异 M-A：删除 graph.go:220-222 的入口存在性分支 —— 加固前实测全绿（receipt:b16b68fd-220c-4f3e-9679-95f111774bdf，35/35 PASS），加固后必须非零判红。",
+    "变异 M-B：删除 graph.go:234 的 not-routable 原因短语 —— 加固前实测全绿，加固后必须判红。",
+    "变异 M-C：scheduler.go:123 的 `item.name == s.plan.output` 反转为 `!=` —— 夹具常量 D-OUT 必须把它抓住；若既有断言同时抓住，如实记录完整击杀集，不宣称独占。",
+    "变异 M-D：Run 之后图终身冻结（缓存并复用 plan）—— 必须由 :570 的绝对期望判红，从而证明删除 :574-577 没有削弱担保。",
+    "覆盖佐证：加固后 go test -coverprofile 中 graph.go:220.36,222.3 块计数必须从 0 变为非 0。",
+    "受影响边界：全套件、-race、go vet、gofmt、go build ./...、邻近包 ./pkg/hno/agent/... ./pkg/hno/runner/... 零退出；下游模块场景 /tmp/p1-baseline-r7 复跑 BASELINE-OK。",
+    "纯度：graph.go / scheduler.go 哈希在实验结束时仍等于冻结值；测试文件相对 0387000 的删除行仅限 A4 那条被证明惰性的断言。"
+  ],
+  "blockedConditions": "若 M-A/M-B 加固后仍全绿，或覆盖块计数仍为 0，则本轮判据不成立，必须停在当前阶段并报告 blocked，不得以『断言已经写上去了』推进。",
+  "notChosen": [
+    {
+      "option": "behavior-delta",
+      "reason": "无新增用户可观察行为；公共入口在正确实现下不会失败，任何『RED』只能靠破坏生产代码得到，那是变异而非行为差异。"
+    },
+    {
+      "option": "blocked",
+      "reason": "验收条件全部可在真实公共入口观察（Validate/Run 的错误与 Result 两面，外加下游模块场景），并有零退出基线回执，不构成不可观察。"
+    }
+  ],
+  "deferredToLaterSlices": [
+    "结构化拒绝错误（typed error 携带 Kind/Endpoint/NodeName）：行为差异切片，需自己的 RED 与导出面决策（cycle7 排序 (2)）。",
+    "C7-SPEC-5 的 D3（第五种 edgeKind 落 label() 的 default:）：根治点是 typed error + 每条原因短语一行表。",
+    "C6-STD-1/C6-STD-3/C6-STD-4 的注释与 entry 活读（B7-6 承前端口）。",
+    "C7-STD-2 的 5 份隔离子用例表驱动化与 assertReasonMentions 抽取（结构轮）。",
+    "母约 §3.3/§3.5 回写（B7-7，PreToolUse gate 阻断）。"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-testability-decision-p1-graph-slice8.json#decision",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice8.json#userGoal",
+    "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle7.blocking",
+    "receipt:de41c46d-5832-413e-9f21-81a48c50923f",
+    "receipt:b16b68fd-220c-4f3e-9679-95f111774bdf",
+    "receipt:37eb1423-1f85-449a-8212-42be72c1e2ec"
+  ]
+}

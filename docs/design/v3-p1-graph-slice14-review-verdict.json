@@ -1,0 +1,223 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p1-graph-r14-panic-to-error",
+  "activationId": "e1901718-ef58-464e-9654-1ba64ba8186d",
+  "commandTokenAtReview": "f5fbe30e-95ff-4d30-9d01-648a859cc9f9",
+  "reviewedSlice": "P1 切片 14 = 票面 B10（节点体内 panic 转成 Run 的非 nil error）",
+  "reviewedAt": "2026-09-27T13:44:00Z",
+
+  "independence": {
+    "level": "author-self-review（独立性降级，显式披露）",
+    "why": "用户此前已拒绝对 P1 派发独立审查子代理（工具调用被拒），因此宿主 Command 的「独立对照」这一维度未达成，本轮仍是作者自查。",
+    "mitigation": [
+      "两轴每条 finding 都带 file:line 位置与被引证据，不接受只写结论的条目。",
+      "审查期间跑了 2 次现场探针（never-deliver 变异、panic(nil) 探针），而不是只读代码——读代码得到的判断在本文里标为 inferred，实测得到的标为 measured。",
+      "对登记过的自身证据做可复现性回算，结果发现一条标签含糊（S14-STD-6），照实报出而不是悄悄改数。"
+    ],
+    "residualRisk": "作者盲区未被外部视角打掉：本片最可能的误判面是「屏障放在生产者帧」这个范围裁决本身；该裁决已作为 S14-SPEC-1 交给规格层复核，而不是在本轮自我确认。"
+  },
+
+  "fixedPoint": {
+    "declared": "切片 13 收尾字节：graph.go a189a8692c0364266352e83ad3debeed738f6608 / scheduler.go 18a98a6069e0477953369ef81ad0071a012b9779 / graph_test.go 425ea0303e1d5c5c8e95bacf57663ae94a4309ee / p1r13_step_limit_test.go bc4ab8e71527809e23a12590a078add8f35d68d1",
+    "resolutionMethod": "这组值是 working-tree 内容哈希，对应的 blob 未进入对象库，因此不可作为 git rev 解析（git diff <hash>...HEAD 在本仓库拿不到 fixed-point）。可用基线是切片 13 留下的快照文件 /tmp/p1-cycle14/scheduler.go.baseline，实测 `git hash-object` = 18a98a6069e0477953369ef81ad0071a012b9779，与登记逐字节全等；graph.go 基线快照 15522 字节，当前字节哈希仍为 a189a869…，故本轮 graph.go 零改动成立。",
+    "currentBytes": {
+      "pkg/hno/graph/scheduler.go": "61c7ba6db72b65eda938c099968e7409fc944d73",
+      "pkg/hno/graph/p1r14_panic_barrier_test.go": "0ed607dbc01955864276212fa61e0902577ce7b8",
+      "pkg/hno/graph/graph.go": "a189a8692c0364266352e83ad3debeed738f6608",
+      "pkg/hno/graph/graph_test.go": "425ea0303e1d5c5c8e95bacf57663ae94a4309ee",
+      "pkg/hno/graph/p1r13_step_limit_test.go": "bc4ab8e71527809e23a12590a078add8f35d68d1"
+    }
+  },
+
+  "diffUnderReview": {
+    "nonEmpty": true,
+    "implementation": "artifact:/tmp/p1-cycle14/scheduler-go-slice14-green.diff（+18/−2，单一 hunk 改 spawn 调用点 + 新增 runNode）",
+    "implementationGraphGo": "artifact:/tmp/p1-cycle14/graph-go-slice14-green.diff 为 0 字节，即 builder 侧确无改动",
+    "test": "新增整文件 pkg/hno/graph/p1r14_panic_barrier_test.go（281 行，8 个 top-level 测试 / 11 个断言体含 T2 三条子行）",
+    "existingTestsTouched": "无（graph_test.go 与 p1r13_step_limit_test.go 哈希与登记全等）"
+  },
+
+  "specSources": [
+    "artifact:docs/design/v3-test-scope-p1-graph.md#B10（第 69 行：节点内 panic(\"boom\")：Run 返回非 nil error，进程不崩，测试不中断）",
+    "artifact:docs/design/v3-platform.md#3.3-182（母约唯一一句 panic：生产者只做三件事——跑节点、recover panic 成 error、往 queue 发送；从不读 queue，从不碰任何 scheduler 字段）",
+    "artifact:docs/design/v3-test-scope-p1-graph.md#4.1（第 75 行：不得用 time.Sleep 给并发定序）",
+    "artifact:docs/design/v3-test-scope-p1-graph.md#12.1-R1（第 165 行：两条路径都不得 panic，也不得返回 Output()==nil 且 err==nil 的 Result）",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice14.json（本周期测试范围契约 T1–T8）",
+    "artifact:docs/design/v3-testability-decision-p1-graph-slice14.json（behavior-delta 决定与 explicitlyNot）"
+  ],
+  "standardsSource": [
+    "artifact:AGENTS.md（Coding Style：tabs / 导出符号 GoDoc / 错误包装 fmt.Errorf %w / 消息小写；Testing：Keep tests table-driven、colocated、稳定替身）",
+    "smell 基线 12 条（rex-code-review 内建，始终生效）"
+  ],
+
+  "axes": {
+    "standards": {
+      "axisResult": "pass-with-findings",
+      "findingCount": 6,
+      "checkedSmells": [
+        {
+          "id": "S14-STD-1",
+          "smell": "Duplicated Code",
+          "severity": "judgement",
+          "location": "pkg/hno/graph/graph_test.go:604-628（runWithinLimit）、pkg/hno/graph/p1r13_step_limit_test.go:53-76（runBounded）、pkg/hno/graph/p1r14_panic_barrier_test.go:32-50（runWithinGrace）",
+          "evidence": "同包第三个副本共享同一形态：`type outcome struct { res *graph.Result; err error }` → 容量 1 的 buffered chan → `go func(){ res, err := g.Run(...) }` → `select { case o := <-done: … case <-time.After(…): t.Fatalf }`。三处只有一个真实差异：到点时的失败文案（以及各家族刻意相反的判据，p1r13_step_limit_test.go:45-49 已把「为什么不能复用」写清）。",
+          "cure": "把这 12 行的 runner 形态收成一个包级夹具 runWithin(t, g, in, budget, failMsg)，各行为族只留一个 supplying 失败文案的薄包装；文案差异是保留三个入口的正当理由，形态复制不是。"
+        },
+        {
+          "id": "S14-STD-2",
+          "smell": "测试牙齿分布不均（duplicated-code 的直接后果，也是本片最实质的可归属缺口）",
+          "severity": "judgement",
+          "location": "pkg/hno/graph/p1r14_panic_barrier_test.go:68（T1 直调 g.Run）、:110（T2 三条子行直调 g.Run），对照 :135/:177/:203/:207/:232/:250/:271 走 runWithinGrace",
+          "evidence": "measured。为「recover 了但忘了向唯一消费者投递」实现造变异（把 scheduler.go:127-130 的 select 换成 `_ = item`，变异哈希 11c22ec5…，脚本 trap 无条件还原并回验 61c7ba6d…）：T1 报 `panic: test timed out after 25s`（25.384s，失败指向测试二进制的总时限，不指向缺失的投递）；同一实现下 T3 报 `--- FAIL: TestP1R14_PanicErrorNamesThePanickingNode (2.00s) … Run 在 2s 内没有返回：panic 被吞掉又没有交给唯一消费者时，running 永不归零`。即夹具自己的注释（:47）写明了这一危险，而唯一对应票面主句 B10 的 T1/T2 恰好没有用它。另记：REFACTOR 的 M1–M7 矩阵里没有这一类变异，矩阵漏掉的这一格由本探针补上。",
+          "cure": "T1/T2 改走 runWithinGrace（in 已是它的形参，断言一字不减、期望值一字不放宽）；并把「吞值不投递」补进后续变异矩阵。"
+        },
+        {
+          "id": "S14-STD-3",
+          "smell": "Primitive Obsession（断言侧对错误文案的字符串耦合）",
+          "severity": "judgement",
+          "location": "pkg/hno/graph/p1r14_panic_barrier_test.go:139-150 对 pkg/hno/graph/scheduler.go:144",
+          "evidence": "T3 用 quotedNames(err.Error()) 数 \"bad\" 恰好一次、并要 strings.Contains(err.Error(), \"panic\")；被测事实来自 `fmt.Errorf(\"graph: node %q panicked while running: %v\", …)` 的措辞与 %q 引号形状。文案改成 node 'bad' crashed 之类，票面 B10 一字未违而 T3 判红。用引号集合而非 Contains 是切片 12 立下的名字牙齿（:124-125 已注明），耦合的是消息文本本身而非名字归属这件事。",
+          "cure": "二选一并写进规格：(a) 维持字符串耦合，但把「panic 错误须点名节点且须含 panic 字样」这条回流进母约 §3.3（与 S14-SPEC-3 同一笔债）；(b) 将来引入 `*NodePanicError`（携带 Node()）后改用 errors.As，撤掉文案断言。本片 decision.explicitlyNot 已显式拒绝新增导出哨兵，故当前只能选 (a)，但必须选一个，不能默默留着。"
+        },
+        {
+          "id": "S14-STD-4",
+          "smell": "不变式靠约定而非结构维持（Shotgun Surgery 的前瞻面）",
+          "severity": "judgement",
+          "location": "pkg/hno/graph/scheduler.go:147（全包唯一的节点执行点）与 :125（runNode 唯一调用者）",
+          "evidence": "屏障覆盖面取决于「每个执行节点的地方都记得走 runNode」。当前实测只有 1 个执行点、1 个调用者，`grep -n \"\\.Run(\" pkg/hno/graph/graph.go pkg/hno/graph/scheduler.go` 只命中 scheduler.go:147，故约定成立；但没有任何结构或测试阻止未来第二个 spawn 站点直连 s.plan.nodes[...]，届时票面 B10 会在无人改测试的情况下失效。",
+          "cure": "把「非测试文件中节点执行点恰好 1 处」作为一条可 grep 复现的结构判据加进每片的 structuralCriteria（与 B12 的 `sync.` 计数 0 同一量级成本），让新增执行点必须显式登记。"
+        },
+        {
+          "id": "S14-STD-5",
+          "smell": "资源清理不彻底（相对两个同族夹具的回退）",
+          "severity": "judgement",
+          "location": "pkg/hno/graph/p1r14_panic_barrier_test.go:40（`g.Run(context.Background(), in)`）",
+          "evidence": "runWithinGrace 是唯一不取消 ctx 的 runner：graph_test.go:607 用 WithCancel、p1r13_step_limit_test.go:56 用 WithTimeout，本夹具用 Background，于是到点判红后那条孤儿 Run 无任何停止信号。T4 恰好靠 :161 的 `defer close(release)` 才让 slow 节点解身；换成一个只认 ctx.Done 的节点体就会留下活到二进制的 goroutine。",
+          "cure": "夹具内部自造 `ctx, cancel := context.WithCancel(...)` 并 `t.Cleanup(cancel)`（或 WithTimeout(budget)），把兜底时限同时变成停止信号。"
+        },
+        {
+          "id": "S14-STD-6",
+          "smell": "登记证据不可复现（Mysterious Name 的度量面）",
+          "severity": "hard（对象是账本，不是产品代码）",
+          "location": "artifact:docs/design/v3-p1-graph-slice14-green.json#structuralCriteria.B13_size",
+          "evidence": "登记写「非空非测试 LOC 551」而未附命令。本轮回算：`awk '!/^[[:space:]]*$/ && !/^[[:space:]]*\\/\\//'`（剔注释）得 411；`awk '!/^[[:space:]]*$/'`（含注释）得 551。即 551 真实可复现，但「非测试 LOC」这个标签会让人以为剔除了注释行，读者不猜就复现不出来。",
+          "cure": "后续切片把判据的精确命令随数值一起登记（B12/B13 都应如此）；数值本身无需改动，551 与 411 都远小于票面 1500 上限。"
+        }
+      ],
+      "smellsCheckedAndAbsent": [
+        "Mysterious Name — 未见：runNode/spawn/queueItem/activation 均自述职责，测试夹具名 runWithinGrace/panicking 与行为一致；panicReturnGrace 的注释显式声明它「不是定序手段」，避免了名字说谎。",
+        "Data Clumps — 未见：本片新增的 out/err 一对已被 queueItem 承载，act.name/act.in 已被 activation 承载，没有出现新的三参数同进同出。",
+        "Feature Envy — 低度存在，不构成 finding，故不单列修复：runNode 读 s.plan.nodes[act.name] 与 s.ctx 多于读 scheduler 自身可变状态，理论上可下移为 plan.run(act)；本轮不改，因为把恢复点搬到 plan 会削弱「屏障恰在生产者帧」这一可 grep 的论证。",
+        "Repeated Switches — 未见违反：edgeKind 的 switch 有两处（graph.go:136-143 构建期文案、scheduler.go:171-180 路由），各自只因一个原因变化，未出现同一决策在 diff 内第三次复制。",
+        "Middle Man — 未见：runNode 不是转发（它加了恢复语义与具名返回值），spawn 也未只做转发。",
+        "Speculative Generality — 未见：没有新增导出面、哨兵、配置键或钩子；panicReturnGrace 与 inGraphBody 都被本片的真实行使用。",
+        "Shotgun Surgery — 未见：一个逻辑变更落在 1 个产品文件 + 1 个测试文件，未散射。",
+        "Divergent Change — 未见：scheduler.go 本片只因「宿主保护」一个原因变化。",
+        "Message Chains — 未见：测试最长链是 res.Output()/res.Completed()，两跳且属公共面。",
+        "Refused Bequest — 不适用：本片无继承/接口实现扩张。"
+      ],
+      "repoStandardCompliance": [
+        "make fmt 等价的 gofmt -l pkg/hno/graph/ 实测无输出（干净）；go vet ./pkg/hno/graph/ 实测 exit 0。",
+        "AGENTS.md「Keep tests table-driven」：本行为族 8 个 top-level 测试里只有 T2 是表驱动（:86-94）。判为 judgement 且不改：本片每行必须能被 `-run` 单独点名以取得可归属回执，合并成一张大表会让 T1–T8 的 RED 无法逐条归属，与票面 §5 的切片对齐诉求冲突。",
+        "AGENTS.md「Document exported symbols」：本片零新增导出符号，无缺口。",
+        "错误消息小写 + fmt.Errorf 上下文包装：scheduler.go:144 形如 `graph: node %q panicked while running: %v`，前缀小写、包名打头，与 :111 既有文案同形。注意它是 %v 而非 %w——panic 值不是 error，无法 %w；这带来 S14-STD-3 的耦合面，也带来「不承诺 panic 值身份」这一已登记的取舍。",
+        "票面 §4.1「不用 sleep 定序」：全文件 0 处 time.Sleep；T4 用 channel gate 握手（:159-171），time.After 只作悬挂后备。"
+      ]
+    },
+
+    "spec": {
+      "axisResult": "pass-with-findings",
+      "findingCount": 5,
+      "findings": [
+        {
+          "id": "S14-SPEC-0",
+          "type": "规格满足（正面确认，非 finding）",
+          "severity": "info",
+          "location": "票面 v3-test-scope-p1-graph.md:69 ↔ pkg/hno/graph/scheduler.go:124-131,141-148",
+          "evidence": "B10 三个子句逐一实测：Run 交出非 nil error（`graph: node \"a\" panicked while running: boom-string` 等）；进程不崩（同一二进制跑完 8 行，`go test -race -count=1 -run TestP1R14 ./pkg/hno/graph/` exit 0，receipt 25804ac8）；测试不中断（无 abort，包级继续）。母约 §3.3:182 的「生产者三件事」逐字成立：跑节点(:147)、recover 成 error(:142-146)、往 queue 发送(:127-130)；`sync.` 计数实测 0，崩溃 goroutine 经具名返回值→queueItem 交出结果，未写任何 scheduler 字段（running 的加减仍只在消费者侧 :94/:123）。",
+          "cure": "无需修复。"
+        },
+        {
+          "id": "S14-SPEC-1",
+          "type": "规格缺口（本片范围裁决留给规格层的未指派面）",
+          "severity": "hard",
+          "location": "docs/design/v3-platform.md:182 ↔ pkg/hno/graph/scheduler.go:175（`e.p(out)` 在消费者/调用方 goroutine 上执行）",
+          "evidence": "母约把恢复职责只写给「每节点 goroutine」，票面 B10 只说「节点内 panic」，没有任何条款说明条件边谓词 panic 归谁。design 阶段的 R14-REJECT-1 据 goroutine 归属把屏障精确停在生产者帧，并实测了未改动面：/tmp/p1-cycle14/pred-panic.out 与 after-pred-panic.out 显示谓词 panic 前后都按同步传播路径走（调用方 recover 仍可用），本片没有、也不该把它改成 error。缺口不在实现而在文字：读者可能把「引擎已挡住 panic」误当成宿主级全面保护。",
+          "cure": "人工裁决一句写进母约 §3.3：「谓词/消费者侧 panic 不在引擎保护范围内，由调用方 goroutine 自行承担」，或相反地新开一票把它转成 error。本轮不自行扩范围。"
+        },
+        {
+          "id": "S14-SPEC-2",
+          "type": "断言严于规格（已在 RED 账本披露，复核其披露是否足够）",
+          "severity": "judgement",
+          "location": "pkg/hno/graph/p1r14_panic_barrier_test.go:72,114,181,254 对 docs/design/v3-test-scope-p1-graph.md:165",
+          "evidence": "票面 B10 只要求「非 nil error」；R1 条款只禁止 `Output()==nil 且 err==nil` 这一种半交结果形状。测试额外钉住「失败时 Result 整体为 nil」，比两条治理条款都紧。当前实现确实返回 nil, err（scheduler.go:96 等路径），所以不构成错判；但它会把未来「失败也交出部分已完成节点」的设计变更无声判红。",
+          "cure": "保留断言，把这条收紧写进契约的 acceptanceMapping 并回流票面（与 S14-RED-D1 的披露合并成一句治理条款），让将来的判红带上归属。"
+        },
+        {
+          "id": "S14-SPEC-3",
+          "type": "周期内新增要求缺少治理归属",
+          "severity": "judgement",
+          "location": "artifact:docs/design/v3-test-scope-p1-graph-slice14.json#T3（S14-AMEND-1）对 docs/design/v3-platform.md:182 / 票面 :69",
+          "evidence": "「错误必须点名崩溃节点、不得牵连无辜节点」既不在票面 B10 也不在母约 §3.3，只存在于本周期契约。理由是诚实的（扇出图里不点名的 panic 错误等于没点名），但它现在是本契约单方面持有的判据，任何按票面实现的后来者都会与 T3 冲突。",
+          "cure": "写回母约或票面作为显式验收判据（一笔债务，与 S14-STD-3 的选项 (a) 同源）；若人工判定不成立，则撤掉 T3 而不是留着未登记的断言。"
+        },
+        {
+          "id": "S14-SPEC-4",
+          "type": "导出口径与实现相违（携带项，非本片引入）",
+          "severity": "hard",
+          "location": "pkg/hno/graph/graph.go:63-66 ↔ pkg/hno/graph/scheduler.go:108-119",
+          "evidence": "WithMaxConcurrency 的文档承诺「限制同时在途的节点数……打满时新激活进入 FIFO 等待队列，完成一个自动派发一个」。实测该承诺无落点：maxConcurrency 在 graph.go:58 声明、:66 赋值，全包 grep 再无任何读取点；dispatch(:109-117) 把 pending 一次性全部 spawn，running 无上限。票面 B8 明确未做。graph.go 哈希与 fixed-point 全等（a189a869…），slice14 的 graph.go diff 为 0 字节，故本片未引入、也未修复。",
+          "cure": "P1 收尾前二选一：实现 B8（FIFO + 在途上限，用 channel gate 断言不重叠），或把文档降级为「当前不生效，保留给 B8」。一个静默失效的导出口径按票面 §12.1 R1 的精神属发布阻塞，不应随切片放行而消音。"
+        }
+      ],
+      "scopeCreepCheck": {
+        "result": "未见超范围",
+        "evidence": "graph.go 零改动（哈希全等 + 0 字节 diff）；无新导出符号、无新哨兵、无新配置键；decision.explicitlyNot 明列不做谓词恢复、不做 ErrNodePanicked、不碰 B7/B8/B11，三项均经 grep 复核为 0 改动。recover( 计数从 0→1 且只有 1 处，符合「不扩大到把调度器内部 bug 一起吞掉」这条红线。"
+      },
+      "measuredDuringReview": [
+        "panic(nil) 覆盖性（顺手把一条推测换成实测）：/tmp/p1-cycle14/nilpanic 探针在 go.mod 声明 1.24.11 / go1.26.3 下打印 `panic(nil): err=graph: node \"a\" panicked while running: panic called with nil argument res=<nil>`，exit 0。母约的「recover panic 成 error」对 panic(nil) 成立，因为该 Go 版本已把 panic(nil) 转成 *runtime.PanicNilError，`v != nil` 判定不再漏它；T2 无需新增行。残余：若工具链降到 1.21 以下，`v != nil` 会漏掉 panic(nil)——不是当前风险，登记备查。",
+        "never-deliver 变异（见 S14-STD-2）：T3 在 2.00s 精确判红、T1 拖到 25s 总时限，二者的差异就是「有夹具」与「无夹具」的差异。"
+      ]
+    }
+  },
+
+  "owed": [
+    "S14-STD-2 的夹具统一 + 把「吞值不投递」补进变异矩阵（无产品改动，测试侧）。",
+    "S14-STD-1/5 一并做：runWithin 夹具收口，顺带补上 ctx 取消。",
+    "S14-SPEC-3 + S14-STD-3(a) + S14-SPEC-2 的规格回流：需人工拍一次，同一笔写回母约。",
+    "S14-SPEC-1 谓词 panic 归属需人工裁决。",
+    "S14-SPEC-4 B8：实现或显式降级文档（发布阻塞，按切片 13 的排序建议在 B7 之后处理）。"
+  ],
+
+  "verdict": {
+    "result": "pass",
+    "blocking": [],
+    "statement": "切片 14 的有边界差异满足票面 B10 的三个子句与母约 §3.3:182 对生产者的职责描述，且每一条都不是走查出来的：Run 交出点名节点的 error、同一条命令下 8 行测试跑完 exit 0、`sync.` 计数仍为 0、panic(nil) 这条边缘也在本次审查里现测为已覆盖。屏障只站在生产者帧这一裁决既有结构证据（全包唯一节点执行点），也没有把调度器内部 bug 一起吞掉——recover( 恰好 1 处。放行不附带产品侧修复义务：6 条 Standards finding 全在测试与账本形状上（最实的是 S14-STD-2，我用变异实测出票面主句所在的 T1/T2 缺了同族夹具，判红要 25s 且不归属，修法是换夹具不是改断言）；规格侧两条 hard 都不由本片引入也不由本片掩盖——谓词 panic 的归属（S14-SPEC-1）是母约没写的一句话，WithMaxConcurrency（S14-SPEC-4）仍是 P1 收尾前必须了断的发布阻塞。独立性如实降级：本轮为作者自查，宿主 Command 的『独立对照』未达成，缓解手段是现场跑了 2 次探针并回算了自己登记过的度量（因此抓出 S14-STD-6 这条标签含糊的账本项）。",
+    "nextSliceOrder": [
+      "B7 Warnings（判据 8，机制已备好，0 断言面）",
+      "S14-STD-2 + S14-STD-1/5 一并清（测试形状，无行为风险）",
+      "规格回流一笔：S14-SPEC-1 / S14-SPEC-3 / S14-SPEC-2 交人工裁决并写回母约",
+      "B8 WithMaxConcurrency：实现或显式降级文档（发布阻塞）",
+      "B11 Typed 覆盖"
+    ]
+  },
+
+  "evidenceRefs": [
+    "receipt:25804ac8-c431-4eb7-823a-ee159f115087",
+    "artifact:/tmp/p1-cycle14/scheduler-go-slice14-green.diff",
+    "artifact:/tmp/p1-cycle14/graph-go-slice14-green.diff",
+    "artifact:/tmp/p1-cycle14/scheduler.go.baseline",
+    "artifact:/tmp/p1-cycle14/review-probe-deliver.sh",
+    "artifact:/tmp/p1-cycle14/nilpanic/main.go",
+    "artifact:/tmp/p1-cycle14/pred-panic.out",
+    "artifact:/tmp/p1-cycle14/after-pred-panic.out",
+    "artifact:docs/design/v3-p1-graph-slice14-red.json",
+    "artifact:docs/design/v3-p1-graph-slice14-green.json",
+    "artifact:docs/design/v3-p1-graph-slice14-refactor.json",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice14.json",
+    "artifact:docs/design/v3-testability-decision-p1-graph-slice14.json",
+    "file:pkg/hno/graph/scheduler.go#L124-L148",
+    "file:pkg/hno/graph/p1r14_panic_barrier_test.go#L32-L50"
+  ]
+}

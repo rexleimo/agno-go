@@ -1,0 +1,93 @@
+{
+  "schema": "rex.hardening-invariant-review.v1",
+  "workItemKey": "work-p1-graph-engine-r8-teeth-rework",
+  "activationId": "71c5cfe2-858d-49ad-b844-2275ea4b5aaa",
+  "stageId": "verify-invariants",
+  "reviewedDiff": {
+    "fixedPoint": "0387000",
+    "files": [
+      "pkg/hno/graph/graph_test.go"
+    ],
+    "numstatAgainstFixedPoint": "pkg/hno/graph/graph_test.go 545 0",
+    "deletedLineCountInTestDiff": 0,
+    "productionFilesTouchedByThisHardening": "none"
+  },
+  "sideEffectPath": {
+    "claim": "节点执行、plan 复制与 goroutine 派生只能在 Validate 返回 nil 之后发生；被拒绝的声明不留任何节点副作用。",
+    "codePath": [
+      "pkg/hno/graph/scheduler.go:60-62 Run 首行调用 g.Validate()，非 nil 立即 return nil, err",
+      "pkg/hno/graph/scheduler.go:63-72 只有校验通过后才 capturePlan/分配 Result/构造 pending 队列并进入 consume",
+      "pkg/hno/graph/graph.go:219-238 Validate 只读 g.nodes 与 g.edges，写入为零"
+    ],
+    "publicScenario": "独立下游模块 /tmp/p1-invariants-r8 用计数节点（graph.NodeFunc 体内自增）从公共入口观察：合法图 Validate 后计数为 0、Run 后等于节点数；9 张被拒图在 Validate 与 Run 两面计数均为 0，且 Run 返回 err!=nil 与 res==nil。",
+    "observed": [
+      "legal-dag OK validate-executes-nothing, run=2",
+      "legal-conditional OK validate-executes-nothing, run=3",
+      "entry-never-declared OK rejected with zero node executions",
+      "entry-not-a-node OK rejected with zero node executions",
+      "dangling-unconditional OK rejected with zero node executions",
+      "dangling-conditional OK rejected with zero node executions",
+      "dangling-default OK rejected with zero node executions",
+      "nil-predicate OK rejected with zero node executions",
+      "join-not-routable OK rejected with zero node executions",
+      "INVARIANTS-OK exit 0"
+    ],
+    "receiptPass": "receipt:3247c3de-a0f8-4f6c-811b-59876239b1f3"
+  },
+  "testDiffReview": {
+    "package": "graph_test（外部测试包，非白盒）",
+    "whiteBoxReferences": 0,
+    "skipOrEnvGates": 0,
+    "assertionSites": {
+      "before": 10,
+      "after": 47,
+      "note": "计数为 t.Errorf/t.Fatalf 出现次数；只增不减，且对 0387000 的删除行数为 0。"
+    },
+    "exportedSymbolsAddedToProduction": 0,
+    "localReplacements": "相对 slice8 冻结基线的 14 行删除逐行归因见 v3-p1-graph-slice8-hardening.json#testDiffAccounting，每一行都由更强断言替换并被对应变异体杀死（M-A..M-D）。",
+    "receipt": "receipt:74291a1b-79c0-453b-9f34-a981708035de"
+  },
+  "invariantsPreserved": [
+    "fail-closed：不可路由/缺少路由输入的声明在构建期被拒，Run 同步拒绝且不执行任何节点。",
+    "单次 Run 读进入时捕获的拓扑快照；运行中改图不推翻构建期结论（M-D 正向对照证明本轮加固没有削弱这条守卫）。",
+    "Result 三面对照（err / Completed / Output）继续作为唯一观察面，未新增任何 test-only 产品出口。",
+    "测试只用公共入口，断言强度单调上升，无用例被删除、跳过或放宽。"
+  ],
+  "newFinding": {
+    "id": "R8-IV-1",
+    "title": "输出节点声明从不被 Validate 检查：SetOutput 指向不存在节点或未调用 SetOutput 时，引擎跑出 err==nil 的空输出 Result",
+    "severity": "hard",
+    "measured": [
+      "output-not-a-node GAP accepted: err=<nil> output=<nil> completed=[a b] executed=2",
+      "output-never-declared GAP accepted: err=<nil> output=<nil> completed=[a b] executed=2"
+    ],
+    "whyItMatters": "调用方无法区分「输出节点本身返回 nil」与「输出节点名从来不是合法声明」，与 C4-SPEC-2 属同一族静默失败，只是发生在输出轴而非边轴。",
+    "relationToReviewedInvariant": "不违反本轮审查的 check-before-effect 不变式：两种情形下 Validate 合法通过，节点执行发生在通过之后，没有绕过校验的副作用。因此它是规格完整性缺口，不是加固回退。",
+    "discoveryEvidence": "receipt:ae945dd1-649c-4b93-8e81-7d0535ec75b6（首版场景把这两例按必须拒绝断言，真实非零退出，随后依据测得的 err/output/executed 数值改判为 GAP 报告行，未静默删除检查）",
+    "disposition": "本加固周期不修：新增用户可观察拒绝行为属 behavior-delta，须由下一切片先取得 RED。已登记为下一切片首项（见 nextOwed）。"
+  },
+  "carriedOpenItems": [
+    "pkg/hno/graph/scheduler.go:70 pending 用活读 g.entry 而非 plan 快照（并发写风险，cycle5 审查 C6-STD-4 遗留）。",
+    "M-C 变异体杀伤不唯一（同批 10 项失败），归因强度弱于 M-A/M-B。",
+    "源/目标角色互换的悬空声明仍然静默：需要结构化拒绝错误才能覆盖。",
+    "graph.go 中 stepLimit / maxConcurrency / ErrStepLimitExceeded / Warnings()==nil 为死代码，label() 的 default 分支覆盖率 0%。",
+    "5 个隔离子测试尚未表驱动折叠，assertReasonMentions 辅助函数缺位。",
+    "测试名 TestP1G_RunIsolatesTopologyFromConcurrentMutation 与「运行中」语义不符，待改名。"
+  ],
+  "nextOwed": [
+    "输出声明存在性校验：behavior-delta，公共入口 Validate+Run 双面断言，先取真实失败 RED。",
+    "结构化拒绝错误（kind/field/declRef）以覆盖角色互换与种类穷尽性空洞。",
+    "注释诚实性修复（C6-STD-1/3、C6-STD-4）与 scheduler.go:70 快照读取。",
+    "隔离子测试表驱动折叠 + 拒绝文案断言提取。",
+    "能力轮：B4 stepLimit、B5 环检测、B2 Join 路由、C5-SPEC-1/2、C4-STD-2(2)。"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-slice8-invariant-review.json",
+    "artifact:/tmp/p1-invariants-r8/main.go",
+    "receipt:3247c3de-a0f8-4f6c-811b-59876239b1f3",
+    "receipt:74291a1b-79c0-453b-9f34-a981708035de",
+    "receipt:ae945dd1-649c-4b93-8e81-7d0535ec75b6",
+    "artifact:docs/design/v3-p1-graph-slice8-hardening.json#testDiffAccounting",
+    "artifact:docs/design/v3-p1-graph-slice8-hardening.json#changes"
+  ]
+}

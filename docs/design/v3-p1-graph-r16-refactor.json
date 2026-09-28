@@ -1,0 +1,109 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.tdd-refactor-ledger.v1",
+  "workItemKey": "work-p1-graph-r16-max-concurrency",
+  "activationId": "eac4f8b0-943f-404a-9618-0639aff2920d",
+  "capabilityId": "software.testing.tdd",
+  "stageId": "refactor",
+  "recordedAt": "2026-09-27T17:34:05Z",
+  "contract": "artifact:docs/design/v3-test-scope-p1-graph-slice16.json",
+  "previousStageEvidenceChecked": {
+    "red": "receipt:727d1c4e-7795-4b93-a61d-9bfea17fc817（绑定命令 exit 1，C1/C2/C3/C6 四行判红）",
+    "green": "receipt:89c6adbc-a734-4a80-af21-eee2af9f16dd（绑定命令 exit 0，8/8 PASS；逐轮 20/20 记录在 GREEN ledger 的 verification.perRoundReproducibility）",
+    "clause": "GREEN ledger 的 nextStageCondition：REFACTOR 在不改红任何行为断言的前提下审查守卫的命名与边界，并实跑 α–θ 变异矩阵、指明每条变异的指定杀手行；测试差异须确认仍约束 C1–C9 的用户可观察行为而不是实现细节；回执仍是绑定命令且零退出。",
+    "verified": "本文件即该条件的执行记录。生产字节自 GREEN 起未再变动（scheduler.go f2d7fb4b10e9c133f9bbe8b566da40ea8e96d55e、graph.go dca23943fd9cade4766ceeffe43b47477b815a61，矩阵脚本的 finally 恢复后逐字符自检通过）；测试文件唯一改动是 C5 一处加强，且反向撤销后可复现 RED 阶段哈希 c4bf463898b197db97fbbed1904ef3f000b8631f。"
+  },
+  "refactorDecision": {
+    "codeChanged": false,
+    "considered": [
+      "把 cap 守卫与 stepLimit 守卫合成一个「能不能派发」的判断（例如 dispatch 里再抽一层 admit()）。",
+      "把 maxConcurrency 的读取挪进 capturePlan，与拓扑快照同处。",
+      "为 cap 引入 0/负数的显式规范化（cfg 里就把 -1 变成 0），从而让守卫写成单一比较。"
+    ],
+    "rejectedBecause": [
+      "两条判据回答的是不同问题且错误语义不同：越界预算要报错并裹 ErrStepLimitExceeded（安全阀），越界并发只是让路、等下一次完成。合并成一层谓词会把「谁先判」这个次序隐进抽象里，而次序正是 C8 两半的判据所在（先判预算才会在 cap 打满时仍然按预算停下），把它变成不可见的实现细节等于让下一次重构能在无人看守处调换它。三条同类的「停在派发之前」判据放在一起，可读性高于一个 admit() 抽象。",
+      "capturePlan 复制的是拓扑（节点集、边声明、输出名），并发额度不是拓扑；把它塞进快照会让那个类型的职责变模糊，而两处都已经在进入 Run 时取值一次，语义一致。",
+      "规范化负数为 0 会制造一个公共面上看不见的差别（-1 与 0 变成同一个值），而 R16-UNADJ-1 尚未裁决负数是否算非法声明。现在保持「非正数都走 maxConcurrency > 0 这一条守卫」的原形，将来若裁决为非法，改动点仍然只有一处。"
+    ],
+    "kept": "调度器侧的改动保持 GREEN 的形状：一个私有字段 + 一次取值 + 循环头三行守卫。矩阵证明这五行没有一行是冗余的：α/β/γ/ζ 各从不同角度破坏守卫都被 C1/C2/C3/C6 每轮抓住，δ 破坏正数前置守卫被 C4/C5 抓住，ε 破坏 cap 的取值被 C7 抓住，η 破坏 FIFO 取头被 C2 抓住，θ 破坏计步归属被 C8 抓住。"
+  },
+  "testDiffReview": {
+    "file": "pkg/hno/graph/p1r16_max_concurrency_test.go",
+    "beforeHash": "c4bf463898b197db97fbbed1904ef3f000b8631f（RED 阶段字节）",
+    "afterHash": "6934a4f2ae9ed2d80a59a30ead56b3de6bcc4296",
+    "proofOfLocality": "把本阶段新增的两处内容（Output() 相等断言、以及把 v, _ := res.Value(name) 换成带 !ok 判红的三行）逐字撤销后，文件重新计算的 blob 哈希与 RED 阶段记录值逐字符相同。因此测试差异恰好只有 C5 一处，其余 7 个 Test 函数一字未动。",
+    "whatChanged": "TestP1R16_NegativeDoesNotStall（契约 C5）新增两条断言：(1) 与不限基线的 Output() 相等；(2) 三个兄弟各自的 Result.Value 必须存在（不存在即 t.Fatalf），再判其值不含 gate-timeout。",
+    "whyNotWeakening": "两条都是加判据，没有删除、跳过或放宽任何既有断言；C1/C2/C3/C4/C6/C7/C8 的期望值一字未改，也没有把任何期望改成当前输出。",
+    "whyFaithfulToContract": "契约 C5 的 observable 原文是「WithMaxConcurrency(-1) 的图与 C4 同样通过三方 gate 握手，且 Completed()/Output() 与不带选项的基线逐字相同」。改前的实现漏掉了两处：Output() 从未比较，而 gate 握手只判了「值里不含超时标记」，没判「这个节点到底有没有产出」。后者是一次 vacuous 通过——基线跑在同一份（可能被变异过的）实现上，一旦钳制把 0/负数也当成 0 个槽，两侧同为空，相等性判据就两边皆空而成立。补上在场性判红才是契约本来就要求的那件事。",
+    "gapFoundByMatrix": "变异 δ（缺 maxConcurrency > 0 前置守卫）第一次实跑时 SURVIVED：C4 20/20 判红但 C5 0/20（契约 C5 行的 teeth 写的是「δ 同时杀 C5」，实测不成立）。按契约 completionCriteria 第 5 条，这里没有把 C5 改标成 green-at-red 了事，也没有删行，而是先加强夹具再复跑：修复后 δ 记为 KILLED（C4 20/20、C5 20/20），C5 的牙齿缺口关闭。",
+    "stillNotAsserting": "本片仍不断言 goroutine 的真实启动时刻，也不读私有字段（cfg/stepLimitSet/defaultStepLimit 均未出现），环渲染、告警文案与调度器内部计数都在判据之外。允许缝未扩大：无新增导出面被测试使用。"
+  },
+  "mutationMatrix": {
+    "protocol": "driver /tmp/p1-b8/matrix16.py：每条变异单独注入 scheduler.go（断言锚点恰好命中 1 次），运行绑定命令的 20 轮形态 `go test ./pkg/hno/graph -run TestP1R16_ -count=20 -race -v`，按 Test 函数统计 --- FAIL 出现次数；指定杀手行必须 20/20 判红才算 KILLED；恢复在 finally 里无条件执行，结束后对 scheduler.go/graph.go 做 blob 哈希自检。编译或没有测试运行记为 INVALID（基础设施），不计为杀死。",
+    "rounds": 20,
+    "restoreSelfCheck": "restored scheduler.go=f2d7fb4b10e9c133f9bbe8b566da40ea8e96d55e, graph.go=dca23943fd9cade4766ceeffe43b47477b815a61, selfcheck_ok=True",
+    "results": [
+      {"tag": "α", "mutation": "上限判据恒假（s.maxConcurrency > 0 && running >= cap && cap < 0）", "designatedKillers": {"C1": "20/20", "C2": "20/20", "C3": "20/20", "C6": "20/20"}, "status": "KILLED", "alsoRed": "无额外行（C4/C5/C7/C8 在恒假下仍与不限语义一致）"},
+      {"tag": "β", "mutation": "判据恒真（s.maxConcurrency > 0 && running >= 0）", "designatedKillers": {"C1": "20/20"}, "status": "KILLED", "alsoRed": "C2/C3/C6/C7/C8 同红（正 cap 时一个都不派，退化到基线比较也失效）"},
+      {"tag": "γ", "mutation": "完全不钳制（整段守卫删除 = RED 形态）", "designatedKillers": {"C1": "20/20", "C2": "20/20", "C3": "20/20", "C6": "20/20"}, "status": "KILLED", "alsoRed": "无"},
+      {"tag": "δ", "mutation": "缺 cap > 0 前置守卫（if running >= maxConcurrency）", "designatedKillers": {"C4": "20/20", "C5": "20/20"}, "status": "KILLED", "alsoRed": "C2/C6/C8 同红（不限基线也被扣成空图）", "note": "首轮实跑 C5 为 0/20 → SURVIVED；按 C5 行原文补强后复跑才到 20/20"},
+      {"tag": "ε", "mutation": "cap 实现成恒为 1（maxConcurrency: min(cfg.maxConcurrency, 1)）", "designatedKillers": {"C7": "20/20"}, "status": "KILLED", "alsoRed": "无 —— C1/C2/C3/C6 在恒 1 下全绿，正是 C7 这行存在的理由（契约 C6 行 teeth 的取舍成立）"},
+      {"tag": "ζ", "mutation": "只在首轮排空时判上限（守卫再加 && s.steps == 0）", "designatedKillers": {"C1": "20/20", "C2": "20/20", "C3": "20/20", "C6": "20/20"}, "status": "KILLED", "alsoRed": "无"},
+      {"tag": "η", "mutation": "LIFO 派发（从队尾取激活）", "designatedKillers": {"C2": "20/20"}, "status": "KILLED", "alsoRed": "C3 同红（后放行者顺序反了），C1 与 C6/C7 全绿（峰值与上限仍对）——C2 与 C1 各管一头成立", "note": "契约 C8 行 teeth 未预言 η；实测 η 也让 C8 的 20/20 判红（等待次序反转后 stepLimit=5 的子判据不再等价），属额外杀伤，不据此放宽任何期望"},
+      {"tag": "θ", "mutation": "把等待队列计入步数预算（守卫返回前 s.steps++）", "designatedKillers": {"C8": "20/20"}, "status": "KILLED", "alsoRed": "无 —— C1/C2/C3/C6/C7 对计步无感，正是 C8 那半个判据的独占覆盖"}
+    ],
+    "raceDetections": "8 条变异的每次 20 轮运行中 DATA RACE 计数均为 0",
+    "coverageStatement": "α–θ 八条全部实跑且全部 KILLED，指定杀手行每条都在 20 轮里每轮判红。本片没有「没有可信变异能碰到」的行：C1–C8 每一行都至少在某条变异里是指定杀手或独占覆盖者（C9 是命令背书的结构行，由 sync./recover/LOC 计数而非测试函数守护）。"
+  },
+  "verification": {
+    "refactorReceipt": "receipt:45d6962c-712b-4790-aecb-9bab19c2e136",
+    "refactorReceiptFacts": "绑定命令 `go test ./pkg/hno/graph -run TestP1R16_ -count=1 -race -v` 在重构后字节状态下 exit 0，stdout sha256 前缀 b21b28797ad3db6e，observedAt 2026-09-27T17:33:34.369Z，storedAt .rex-harness/receipts/45d6962c-712b-4790-aecb-9bab19c2e136.json",
+    "perRoundAfterStrengthening": "go test ./pkg/hno/graph -run TestP1R16_ -count=20 -race -v → 8 个 Test 函数各 20/20 PASS，DATA RACE 0，exit 0（/tmp/p1-b8/refactor20.txt）",
+    "package": "go test ./pkg/hno/graph -count=1 -race → ok 1.610s（既有 41 个 Test 函数全部保持通过）",
+    "repository": "go test ./... 零退出（无下游包被本片改坏）",
+    "build": "go build ./... 零退出",
+    "gofmt": "gofmt -l pkg/hno/graph/ 无输出",
+    "vet": "go vet ./pkg/hno/graph/ 零退出",
+    "structure": "sh /tmp/p1-b8/struct.sh：sync_dot_graph=0、sync_dot_scheduler=0、recover_scheduler=1、loc_nonblank_nontest=634（≤ 票面 §9 的 1500）、testfunc_total=49、scheduler_maxConcurrency_reads=5（RED 阶段为 0）",
+    "hashes": {
+      "pkg/hno/graph/scheduler.go": "f2d7fb4b10e9c133f9bbe8b566da40ea8e96d55e",
+      "pkg/hno/graph/graph.go": "dca23943fd9cade4766ceeffe43b47477b815a61",
+      "pkg/hno/graph/p1r16_max_concurrency_test.go": "6934a4f2ae9ed2d80a59a30ead56b3de6bcc4296",
+      "pkg/hno/graph/graph_test.go": "425ea0303e1d5c5c8e95bacf57663ae94a4309ee",
+      "pkg/hno/graph/p1r13_step_limit_test.go": "bc4ab8e71527809e23a12590a078add8f35d68d1",
+      "pkg/hno/graph/p1r14_panic_barrier_test.go": "0ed607dbc01955864276212fa61e0902577ce7b8",
+      "pkg/hno/graph/p1r15_warnings_test.go": "3ea06d27abd3994130e593d297951c895729a4dd",
+      "pkg/hno/graph/p1r15b_warning_text_test.go": "0285ab35729ed3d50359e0fd407edb2d8b1c1a2a"
+    },
+    "existingTestFilesByteIdentical": "五个既有测试文件（graph_test.go、p1r13、p1r14、p1r15、p1r15b）哈希与切片 15b 收尾时记录值一致，本片未触碰。"
+  },
+  "criteriaAccounting": [
+    "契约完成判据 1（每行独立可失败 Test + teethMutant 标注 + red 与 green-at-red 分开陈述）：由 RED ledger 的 rows 与本文件的矩阵覆盖声明共同满足；C1–C8 各对应一个 Test 函数，C9 由命令输出背书。",
+    "完成判据 2（逐轮复现）：改动前四条 red 行 20/20 FAIL（M-6 与 RED 阶段实跑）；改动后同一命令 20/20 PASS（本文件 verification）。",
+    "完成判据 3（变异矩阵 α–θ 全部实跑并指明指定杀手行）：见 mutationMatrix，8/8 KILLED，其中 δ 先 SURVIVED、由 C5 补强后复跑通过，过程如实登记。",
+    "完成判据 4（结构判据命令背书）：见 verification.structure，改动后重跑，sync. 计数仍为 0。",
+    "完成判据 5（无可信变异能碰到的行照实登记）：本片无此类行；δ 暴露的是 C5 的断言缺口而非「测不到的行为」，已按不放宽期望的方式修掉。",
+    "票面 §9 的 LOC 与 Test 函数计数：634 ≤ 1500，Test 函数 41 → 49。"
+  ],
+  "unadjudicatedCarried": [
+    "R16-UNADJ-1：WithMaxConcurrency 收到负数是否该在构建期被拒（本片按母约 :190 的 maxConcurrency > 0 守卫实现「非正数 = 不限」，并由 C5 钉住不停摆；改判需新的 test-design）。",
+    "R16-UNADJ-2：是否提供公共的逐节点在途/NodePending 可观察量。cap > 1 时的 goroutine 实际取得时刻不由调度器决定，本片因此只在 cap=1 上逐字断言放行次序，并用 C7 钉住「cap=2 真放行 2」的下界。",
+    "等待队列在步数判据上的归属已由 C8 钉住，但「打满时是否该有可观察的背压信号」（LangGraph 式的 NodePending 事件）仍未裁决。",
+    "切片 15b 遗留：η-token-only 的「文案不得预测执行」规则需要新的 test-design；判据 7 文案里 so Run cannot terminate 的同类问题；S15-REFACTOR-1/3、S15-STD-1/2/3/6、R15-UNADJ-1/2、B7-AMEND-1。",
+    "票面 B9（取消时正在运行节点的收尾）与 B11（Typed）尚未开始。"
+  ],
+  "independenceDisclosure": "本周期未派发独立审查子代理（用户此前明确拒绝对 P1 派发该角色），矩阵与差异审查均为作者自查，独立性低于双代理审查；矩阵数字来自实跑而非推断，但「变异是否选得全」这一层判断仍属作者本人，须在 review 阶段照此披露。",
+  "writeBackOwed": [
+    "母约 §3.3:190 的并发上限段与票面 :26/:67：把「0 或负数均表示不限（依据 maxConcurrency > 0 前置守卫）」与「等待队列不消耗步数预算」写回，避免下一个读者再靠注释猜。",
+    "票面 :92 行 4：补一句「cap > 1 时放行次序不由 goroutine 起始时刻决定，故次序判据只在 cap=1 上逐字成立」。"
+  ],
+  "nextStageCondition": "进入 review：以切片 15b 收尾字节为 fixed-point（graph.go 9684e49e…、scheduler.go 61c7ba6d…、graph_test.go 425ea030…、p1r15b 测试 0285ab35…），审查本轮有界差异（生产 +3 处、测试 C5 一处、契约与三份 ledger 文档），两轴分别记录 findings 与证据，并披露独立性降级。矩阵中 δ 首轮 SURVIVED 与 η 的额外杀伤必须进入审查视野。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-r16-refactor.json",
+    "receipt:45d6962c-712b-4790-aecb-9bab19c2e136",
+    "receipt:89c6adbc-a734-4a80-af21-eee2af9f16dd",
+    "receipt:727d1c4e-7795-4b93-a61d-9bfea17fc817",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice16.json",
+    "artifact:docs/design/v3-p1-graph-r16-green.json#implementationDiff"
+  ]
+}

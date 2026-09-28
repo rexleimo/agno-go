@@ -1,0 +1,141 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.tdd-red-ledger.v1",
+  "workItemKey": "work-p1-graph-r16-max-concurrency",
+  "activationId": "eac4f8b0-943f-404a-9618-0639aff2920d",
+  "capabilityId": "software.testing.tdd",
+  "stageId": "red",
+  "recordedAt": "2026-09-27T17:21:45Z",
+  "contract": "artifact:docs/design/v3-test-scope-p1-graph-slice16.json",
+  "testabilityDecision": "artifact:docs/design/v3-testability-decision-p1r16.json",
+  "previousStageEvidenceChecked": {
+    "clause": "契约 baselinePlan.redCandidateRow=C1，decision.scenarioCommandBindingNote 承诺「本阶段与其后 RED/GREEN/REFACTOR 的每个 receipt 都用同一条命令」",
+    "verified": "本阶段唯一提交给 failing-test-observed 的回执命令与 decision.redCandidate.command 逐字段一致：executable=go, args=[test, ./pkg/hno/graph, -run, TestP1R16_, -count=1, -race, -v], cwd=/Users/rex/codes/agno-go",
+    "scopeContractUnchanged": "C1–C9 的行、observable、teethMutant 与已提交契约字节一致；RED 阶段没有增删判据、没有放宽期望，也没有触碰生产代码。测试文件自 decision 提交以来字节不变（c4bf463898b197db97fbbed1904ef3f000b8631f），graph.go/scheduler.go 仍是切片 15b 收尾字节。"
+  },
+  "focusedCommand": {
+    "executable": "go",
+    "args": ["test", "./pkg/hno/graph", "-run", "TestP1R16_", "-count=1", "-race", "-v"],
+    "cwd": "/Users/rex/codes/agno-go"
+  },
+  "redReceipt": "receipt:727d1c4e-7795-4b93-a61d-9bfea17fc817",
+  "redReceiptFacts": {
+    "exitCode": 1,
+    "stdoutSha256": "2550f3821ba1e11540e505d05ec044196c5025f06f8afc0940c78d63d217ed5f",
+    "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855（空）",
+    "observedAt": "2026-09-27T17:21:01.047Z",
+    "storedAt": ".rex-harness/receipts/727d1c4e-7795-4b93-a61d-9bfea17fc817.json",
+    "perRowTally": "同一命令的 -v 输出：FAIL=4（PeakInFlightRespectsCap / CapOneSerializesInDeclarationOrder / LaterSiblingObservesEarlierCompletion / CapBoundsPeakAcrossBiggerFanout），PASS=4（ZeroMeansUnlimited / NegativeDoesNotStall / CapTwoActuallyAdmitsTwo / CapDoesNotConsumeStepBudget），race 检测 0 次",
+    "wholePackage": "go test ./pkg/hno/graph -count=1 -race：整包 FAIL 只由本文件这 4 行贡献，既有 41 个 Test 函数无一变红（包内 Test 函数总数 49 = 41 + 本片 8）"
+  },
+  "supersededReceipts": [
+    {
+      "ref": "receipt:cbf5c6c0-c983-47da-b414-4f5d95f0c231",
+      "stage": "decide-testability",
+      "why": "该回执是被绑定场景命令在 decide-testability 阶段的真实非零退出（exit 1，stdoutSha 310d582c15eafe95…），用于支撑已接受的行为差异判定。RED 阶段按 S2 边界要求取得本阶段自己的回执（727d1c4e），二者命令逐字节一致、测试与生产字节一致，唯一差别是 stdout 哈希：兄弟节点的登记交错次序随 goroutine 取得时刻变化，本轮轨迹是 [start s1 start a start s2 …] 而 RED 阶段那一轮是 [start s1 start s2 start a …]。两条都稳定给出「峰值 3 / 6」与「看不到 end a」这两类判红量（契约 M-6 的 -count=20 实测：四条 red 行各 20/20 FAIL）。已接受的 decision 文件不回改。"
+    }
+  ],
+  "rows": [
+    {
+      "row": "C1",
+      "test": "TestP1R16_PeakInFlightRespectsCap",
+      "redStatus": "red",
+      "precondition": "p1r16Fan(ledger, 3, 1, graph.WithMaxConcurrency(1))：入口出三条无条件边指向 a、s1、s2（声明顺序即此），三者各指向输出节点 done；行内先断 Validate() 为 nil。每个兄弟节点体第一句向单一登记器同步登记 start，随后忙等确定工作量，最后登记 end。",
+      "contractExpected": "登记轨迹算出的同时在途峰值恰为 1（母约 :190 的 maxConcurrency > 0 && 在途数 >= 上限 → 激活进 pending），且 Completed() 仍是 7 个（entry + 3 兄弟 + done 被三次激活）。",
+      "observed": "失败：p1r16_max_concurrency_test.go:285 —— 「WithMaxConcurrency(1) 下同时在途节点峰值 = 3, want 1；轨迹 = [start s1 start a start s2 end s1 end a end s2]」。三个 start 全部先于任何 end，即上限 1 一点都没有生效。",
+      "failureClass": "行为缺陷：导出的 WithMaxConcurrency 旋钮对执行没有任何作用（契约 M-1：cfg.maxConcurrency 读取点为零）"
+    },
+    {
+      "row": "C2",
+      "test": "TestP1R16_CapOneSerializesInDeclarationOrder",
+      "redStatus": "red",
+      "precondition": "与 C1 同一张图、同一夹具， cap=1；另跑一次不带选项的基线用于比对结果等价性。",
+      "contractExpected": "登记轨迹逐字等于 [start a, end a, start s1, end s1, start s2, end s2]（cap=1 下「区间不重叠」与「按声明顺序放行」两件事同时成立），且 Completed()/Output() 与不限基线相同。",
+      "observed": "失败：p1r16_max_concurrency_test.go:311 —— 「cap=1 的登记轨迹 = [start s1 start a start s2 end s1 end s2 end a], want [start a end a start s1 end s1 start s2 end s2]（区间不重叠且按声明顺序逐个放行）」。",
+      "failureClass": "行为缺陷（票面 :67 后半句：激活顺序为声明顺序）；与 C1 各管一头——C2 的逐字顺序专门抓 η（LIFO 派发），那种实现下 C1 仍可能绿。"
+    },
+    {
+      "row": "C3",
+      "test": "TestP1R16_LaterSiblingObservesEarlierCompletion",
+      "redStatus": "red",
+      "precondition": "同 cap=1 的三兄弟图；每个兄弟在登记 start 之后立刻向登记器查询「此刻已开始/已完成集合」，并把这份快照作为自己的节点输出交出，测试经 Result.Value 读回。",
+      "contractExpected": "Result.Value(\"s1\") 含 \"end a\" 且不含 \"start s2\"；Result.Value(\"s2\") 含 \"end s1\"。即后来被放行的节点在入口就观测到前序已完成（票面 :92 行 4）。",
+      "observed": "失败：p1r16_max_concurrency_test.go:353 —— 「s1 在入口观测到的已完成集合不含 \"end a\"；实际交出 = \"start a | start s1 | start s2\"」；:356 —— 「s1 在入口就观测到了尚未被放行的 start s2」；:353 —— 「s2 在入口观测到的已完成集合不含 \"end s1\"；实际交出 = \"start a | start s1 | start s2\"」。",
+      "failureClass": "行为缺陷：三个兄弟同时在场，后进入者看不到前序完成，反而看到本该还在排队者的 start。"
+    },
+    {
+      "row": "C4",
+      "test": "TestP1R16_ZeroMeansUnlimited",
+      "redStatus": "green-at-red",
+      "precondition": "同一拓扑、3 个兄弟，WithMaxConcurrency(0)；每个节点登记 start 后等待「已登记 start 数达到 3」的 channel gate（带 2s 有界逃逸阀，母约 §7 的既有惯例，不用 sleep 定序）。",
+      "contractExpected": "三者的 Result.Value 都不是 gate 超时标记，峰值 = 3，即 0 表示不限（票面 :26、母约 :143）。",
+      "observed": "通过。",
+      "honestNote": "今天天然通过——旋钮无任何读取点，因此谁都「不限」。本行不是 RED，它是 GREEN 阶段最容易改坏的一半：δ（把 0 当成 0 个槽、缺 cap>0 前置守卫）必须让它立刻变红并把停摆报成失败。牙齿留到变异矩阵证明，不在 RED 阶段谎称已取得。"
+    },
+    {
+      "row": "C5",
+      "test": "TestP1R16_NegativeDoesNotStall",
+      "redStatus": "green-at-red",
+      "precondition": "WithMaxConcurrency(-1)，其余与 C4 相同（三方 gate 握手 + 逃逸阀）。",
+      "contractExpected": "图照常收敛，Completed()/Output() 与不带选项的基线逐字相同；本切片明确不在 Validate 里新增对负数的拒绝（那是 R16-UNADJ-1，未获授权）。",
+      "observed": "通过。",
+      "honestNote": "护栏行。它钉住的是「实现者不得把钳制写成不带正数守卫的比较」：同一 δ 变异会杀掉 C4 与 C5；若实现擅自把负数在构建期拒掉，C5 红——那是本片未授权的新行为，须回到 test-design。"
+    },
+    {
+      "row": "C6",
+      "test": "TestP1R16_CapBoundsPeakAcrossBiggerFanout",
+      "redStatus": "red",
+      "precondition": "6 个兄弟、WithMaxConcurrency(2)；兄弟数取 6 是契约 M-6 逐轮测量的结果（4 个兄弟时今天的实现有 2/20 轮自然没越过 2，判据不牢），另跑不限基线比对结果等价性。",
+      "contractExpected": "峰值在飞 ≤ 2；六个兄弟的 start/end 全部成对出现在轨迹里；Completed() 与不限基线相同。",
+      "observed": "失败：p1r16_max_concurrency_test.go:432 —— 「WithMaxConcurrency(2) 下峰值在飞 = 6, want <= 2；轨迹 = [start a start s2 start s3 start s5 start s1 start s4 end a end s2 end s5 end s1 end s3 end s4]」。",
+      "failureClass": "行为缺陷；这一行也是把「上限确实按传入值生效」放到比 3 更大的扇出上量一次，而不是只在 cap=1 的最小图上看一眼。"
+    },
+    {
+      "row": "C7",
+      "test": "TestP1R16_CapTwoActuallyAdmitsTwo",
+      "redStatus": "green-at-red",
+      "precondition": "2 个兄弟、WithMaxConcurrency(2)，各自登记 start 后等待「已登记 start 数达到 2」的 gate（带逃逸阀）。",
+      "contractExpected": "两份 Result.Value 都不是超时标记，即上限 2 必须真的同时放行 2 个。",
+      "observed": "通过。",
+      "honestNote": "C6 管上界、这行管下界：ε（把 cap 实现成恒为 1 / 对任何 cap 都串行）会让 C1/C2/C6 全绿而只有这行红。它存在的理由已写在契约 C6 行的 teeth 里，RED 阶段如实标注为 green-at-red。"
+    },
+    {
+      "row": "C8",
+      "test": "TestP1R16_CapDoesNotConsumeStepBudget",
+      "redStatus": "green-at-red",
+      "precondition": "entry→a、entry→b、a→done、b→done 一张图，WithMaxConcurrency(1)，两个子判据：(1) 再叠 WithStepLimit(2)；(2) 叠 WithStepLimit(5) 并与不限基线比对 Completed()。",
+      "contractExpected": "(1) Run 返回 errors.Is(ErrStepLimitExceeded)，且被排队未放行的 b 从未出现在登记尝试账本里（安全阀的含义是「不再往前走」）；(2) 图正常收敛且 Completed() 与不限基线逐字相同——等待队列不消耗步数预算。",
+      "observed": "通过（两个子判据都在）。",
+      "honestNote": "护栏行，钉的是既有计步语义不能被上限实现顺手改坏：θ（把 pending 计入 steps）杀子判据 (2)；把钳制做成「先 spawn 再判」让 goroutine 自己排队，则 b 被启动，杀子判据 (1)。今天两者都无从违反，因为钳制还不存在。"
+    },
+    {
+      "row": "C9",
+      "test": "（命令背书的结构性护栏行，刻意不写成「测试读自身源码」的自指断言）",
+      "redStatus": "green-at-red",
+      "precondition": "sh /tmp/p1-b8/struct.sh（本轮实测）。",
+      "contractExpected": "graph.go 与 scheduler.go 的 sync. 计数仍为 0、scheduler.go 的 recover( 仍为 1；非空非测试行数记录实测值且 ≤ 票面 §9 的 1500；包内 Test 函数总数 41 + 本片 8 = 49。",
+      "observed": "通过：sync_dot_graph=0、sync_dot_scheduler=0、recover_scheduler=1、testfunc_total=49、loc_nonblank_nontest 实测 618（≤ 1500）。结构性证据同时给出「旋钮无读取点」：scheduler_maxConcurrency_reads=0，graph_maxConcurrency_sites 只有声明处（graph.go:68）与赋值处（:76）。",
+      "honestNote": "这一行不由 Test 函数承担，因此本片新增 8 个 Test 函数对应 C1–C8。GREEN 后必须重跑同一脚本确认三个计数不离位：若实现者加 mutex 或 atomic 来守 cap，就是撞上结构性拒绝（票面 :90），而不是口头劝阻。"
+    }
+  ],
+  "failureReasonForStage": "四行红（C1/C2/C3/C6）指向同一个缺失的用户可观察行为：WithMaxConcurrency(n) 从未限制同时在途的节点数，也没有任何 FIFO 等待队列——调度器在 dispatch() 的循环头无条件排空整个 pending，全仓库对 cfg.maxConcurrency 的读取点为零（结构脚本实测 scheduler_maxConcurrency_reads=0，声明与赋值之外无引用）。因此导出旋钮对外承诺的「同时在途 ≤ n、后来者进入时前序已完成」这条行为今天不存在：cap=1 峰值实测 3，cap=2 在 6 兄弟扇出上峰值实测 6，后进入的兄弟在入口看不到前序的 end 反而看到排队者的 start。五行绿（C4/C5/C7/C8/C9）如实标注为 green-at-red：它们钉的是当前碰巧成立、但没有任何断言在管的属性（0/负数不限、上限 2 确实放行 2、排队不虚耗步数、零锁结构不变），牙齿留到变异矩阵 α–θ 证明。没有基础设施失败：同一命令下编译通过、gofmt -l 无输出、go vet ./pkg/hno/graph/ 零退出、既有 41 个 Test 函数全部保持通过、race 检测 0 次。",
+  "notCountedAsRed": [
+    "C4/C5/C7/C8 的四次 PASS 不作为 RED 证据，也不参与 failing-test-observed 回执的归属；C9 是命令背书的结构行，同样不计",
+    "整包 FAIL 只由本文件 4 行贡献，不借此声称任何回归被修好",
+    "轨迹排列的具体次序不作为判据（随调度而变）；判据是峰值、成对性、以及入口快照里的 end/start 在场与否，这些在 -count=20 下每轮都判红"
+  ],
+  "infrastructureChecks": {
+    "gofmt": "gofmt -l pkg/hno/graph/ 无输出",
+    "vet": "go vet ./pkg/hno/graph/ 零退出",
+    "existingFamilyUntouched": "graph.go 9684e49efb85f6870784cc75a469739669e0a05b / scheduler.go 61c7ba6db72b65eda938c099968e7409fc944d73 / graph_test.go 425ea0303e1d5c5c8e95bacf57663ae94a4309ee（三者字节不变，契约 completionCriteria 第 3 条）",
+    "newFileHash": "pkg/hno/graph/p1r16_max_concurrency_test.go = c4bf463898b197db97fbbed1904ef3f000b8631f（自 decide-testability 以来未变）",
+    "testFuncCount": "包内 ^func Test 计数：graph_test.go 11 + p1r13 8 + p1r14 8 + p1r15 7 + p1r15b 7 + p1r16 8 = 49"
+  },
+  "nextStageCondition": "GREEN 只允许动 scheduler.go 的 dispatch()（在循环头按 maxConcurrency > 0 && running >= cap 停止排空，令后续激活留在 pending 等 FIFO 放行）与把该 cap 从 Graph 读进 scheduler 所需的最小连接，禁止新增 mutex/atomic（C9 结构性拒绝）、禁止新增导出标识、禁止把负数在 Validate 里拒掉（R16-UNADJ-1 未授权）。必须让 C1/C2/C3/C6 四行转绿且不把 C4/C5/C7/C8 改红；同一聚焦命令仍须 -count=20 -race 每轮通过；既有 41 个 Test 函数与五个既有测试文件字节不变；GREEN 的回执必须仍是同一条绑定命令且零退出。若为了让 C1 绿而把 cap 实现成恒 1，C7 必须变红——那说明实现错了，不是断言错了。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-r16-red.json",
+    "receipt:727d1c4e-7795-4b93-a61d-9bfea17fc817",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice16.json#acceptanceMapping",
+    "artifact:docs/design/v3-testability-decision-p1r16.json"
+  ]
+}

@@ -1,0 +1,54 @@
+{
+  "schema": "rex.testability-decision.v1",
+  "workItemKey": "work-p1-graph-engine-r9-output-contract",
+  "activationId": "d6376e2e-ff9b-4a9f-b84e-365dcb13d4d6",
+  "stageId": "decide-testability",
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:docs/design/v3-testability-decision-p1-graph-slice9.json#decision",
+  "redCandidate": {
+    "publicEntry": "github.com/rexleimo/agno-go/pkg/hno/graph：Graph.Validate() 与 Graph.Run(ctx, in) 的返回值，外加 Result.Output()/Value(name)（测试文件是外部包 graph_test，只用导出面）",
+    "setup": "skeleton() 构造除输出声明外完全合法的图：注册 a、b 两节点、加无条件边 a→b、SetEntry(\"a\")，然后每行只加一条缺陷——never-declared 行从不调用 SetOutput，not-a-node 行调用 SetOutput(\"ghost\")。同函数内另带两条反向对照：SetOutput(\"b\") 的合法图必须成功，输出节点合法但返回 nil 的图必须成功且 Value(\"n\") 的 ok 为 true。",
+    "command": {
+      "executable": "go",
+      "args": [
+        "test",
+        "./pkg/hno/graph/...",
+        "-run",
+        "TestP1G_ValidateRejectsMissingOrUnknownOutput",
+        "-count=1",
+        "-v"
+      ],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "契约 slice9 的 A1/A2：两张输出声明不合法的图都要被 Validate 拒绝（错误同时含 graph: output node、被指名的节点名、does not exist），Run 同步返回 err!=nil 且 res==nil；A3/A4 两条对照保持成功。",
+    "observed": "两条缺陷行同时判红（graph_test.go:533「输出不是已注册节点，Validate 却判定合法」，两条子测试 FAIL，包级 FAIL），两条对照行 PASS；进程正常退出测试二进制，非 panic、非编译错误。",
+    "failureReason": "Validate 只做「入口存在 + 每条边两端存在 + 条件边有谓词 + 边种类可路由」四项检查，从未检查 output 字段（pkg/hno/graph/graph.go:219-238，函数体里没有任何 output 分支），调度器又只在 item.name == plan.output 时才写 result.output（pkg/hno/graph/scheduler.go:123-125），所以 output 指向不存在的节点或从未声明时，图照样跑完并交出 Output()==nil 的 Result。测试红的正是这条缺失的构建期检查，而不是夹具或环境。",
+    "receiptRef": "receipt:795383c7-f346-4a7a-8739-78d32d706a2f"
+  },
+  "summary": "存在诚实 RED：新行为（不合法输出声明被构建期拒绝）已能通过稳定公共入口真实复现为失败，非零退出回执已取得，因此选 behavior-delta 走 TDD，不走加固。",
+  "redIndependence": "RED 行（两条拒绝子测试）与对照行（A3/A4）在同一测试函数内且各自可独立失败：A3/A4 今天就绿，只提供「实现不得过度收紧」的边界，不参与本次红。",
+  "scopeDiscipline": {
+    "inThisSlice": "Validate 增加输出声明存在性检查（含未声明=空名的可定位形状），Run 随 Validate 一致拒绝。",
+    "explicitlyNot": "不可达但已注册的输出节点（B6 第 4 项，需入口 BFS）、结构化拒绝错误、母约 .md 写回、表驱动折叠。",
+    "contractAmendment": "§3.5 必查 8 项需增列输出声明项；治理门阻断 .md 写入，需求记在 v3-test-scope-p1-graph-slice9.json#contractAmendmentNeeded。"
+  },
+  "notChosen": {
+    "behavior-preserving-hardening": "不选：本轮要改变调用方可观察的拒绝集合（今天放行、之后拒绝），属新用户可观察行为，且已有真实非零退出回执，不需要伪造成「无行为差异」。",
+    "blocked": "不选：验收条件全部可经公共入口观察，两条对照面也已实测成功。"
+  },
+  "greenObligations": [
+    "GREEN 必须让 receipt 同一条命令零退出，且不得改动本 RED 的任何断言。",
+    "至少三个单点变异归因：去掉存在性检查、降级成「output 非空即放过」、过度收紧成「按输出值判 nil」，各自要有被判红的测试与回执；杀伤不唯一时如实标注。",
+    "邻居回归：pkg/hno/graph 全包、pkg/hno/agent、pkg/hno/runner 不得新增失败。",
+    "包外场景模块 /tmp/p1-invariants-r9 需从公共入口证明被拒输出声明零节点执行，并把 slice8 里 output-never-declared/output-not-a-node 两行由 GAP 改判为拒绝。"
+  ],
+  "blockedConditions": [
+    "若发现必须新增导出 API 才能让 A1/A2 通过，即判为缝选错，停下报告而不是新增 test-only 出口。",
+    "若 A3/A4 对照在实现后失败，说明校验越界到输出值语义，回退实现而不是放宽断言。"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-testability-decision-p1-graph-slice9.json#decision",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice9.json#inScopeBehaviors",
+    "receipt:795383c7-f346-4a7a-8739-78d32d706a2f"
+  ]
+}

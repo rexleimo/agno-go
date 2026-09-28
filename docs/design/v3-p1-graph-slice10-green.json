@@ -1,0 +1,166 @@
+{
+  "schema": "rex.tdd-green.v1",
+  "workItemKey": "work-p1-graph-engine-r10-cycle-termination",
+  "activationId": "07778b0b-7ced-4322-b73c-f8fda7e33209",
+  "stageId": "green",
+  "contractRef": "artifact:docs/design/v3-test-scope-p1-graph-slice10.json#acceptanceMapping",
+  "redRef": "artifact:docs/design/v3-p1-graph-slice10-red.json#observed",
+  "implementation": {
+    "file": "pkg/hno/graph/graph.go",
+    "hashBefore": "b4e6051ec2448e3a93f528eae9153731b4406d4a",
+    "hashAfter": "6ab6388ae419fa8f696c8fe015891168035f71a4",
+    "sizeDelta": "260 → 350 行（+90），scheduler.go 逐字节未变（87854ffbb7629f9adeb2d45fbb74d91f2032b99d）",
+    "changed": [
+      "graph.go:14 新增 \"strings\" 依赖（cycleOf 拼可定位文案用）",
+      "graph.go:218-222 Validate 的 GoDoc 从「五项」改为「六项」，新增「由必定被走的边构成的环（第 7 项）」",
+      "graph.go:246 Validate 收尾从裸 return nil 改为 return g.rejectUnconditionalCycles()",
+      "graph.go:249-268 alwaysTaken()：把「起点一被激活就必定被走」的边收成邻接表 —— 无条件边总是，兜底边仅在起点没有任何条件边替代时（AR1 判据）",
+      "graph.go:270-317 rejectUnconditionalCycles()：三色 DFS 找回到路径上的边，起点按 g.edges 声明顺序遍历，因此同一张图恒报同一个环",
+      "graph.go:319-335 cycleOf()：还原 \"a\" -> \"b\" -> \"a\" 形式的路径文案"
+    ],
+    "errorText": "graph: unconditional cycle \"a\" -> \"b\" -> \"a\": every edge on it is always taken, so Run cannot terminate",
+    "minimalAndNothingElse": "没有实现 WithStepLimit 的消费（NG1）、没有实现 §3.5 第 8 项或给 Warnings() 编内容（NG2）、没有动 join 路由（NG3）、没有动节点名校验（NG4）、没有引入结构化错误类型（NG5）。Run 侧零改动即获得「拒绝前零副作用」，因为 scheduler.go:61-62 早已先 Validate 后建队列。"
+  },
+  "passingTest": {
+    "command": {
+      "executable": "go",
+      "args": [
+        "test",
+        "./pkg/hno/graph/...",
+        "-run",
+        "TestP1G_ValidateRejectsUnconditionalCycle",
+        "-count=1",
+        "-timeout",
+        "25s",
+        "-v"
+      ],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "receipt": "receipt:86a040bb-c8dc-4c59-82f4-bb6b636c905d",
+    "exitCode": 0,
+    "observed": "8 条子测试全 PASS：五条非法行（self-loop / two-node / three-node / with-always-true-exit / default-edge-without-alternative）+ 三条对照行（谓词会转假的条件环 / 有条件替代的兜底回环 / 无环图）。与 RED 是同一条命令、同一批断言，未改任何期望值。",
+    "argvBindingNote": "该回执 argv 与 v3-testability-decision-p1-graph-slice10.json#redCandidate.command 逐字相同。"
+  },
+  "affectedBoundary": [
+    {
+      "command": "go test ./pkg/hno/graph/... -count=1 -timeout 60s -race",
+      "receipt": "receipt:e685fbfd-ac20-457d-8487-5d586434b2cf",
+      "exitCode": 0,
+      "note": "全包 -race 绿，含 slice1–9 既有 9 个测试函数，无新增失败、无被削弱断言"
+    },
+    {
+      "command": "go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1 -timeout 300s",
+      "receipt": "receipt:94848663-285a-4dfd-ad66-fc74bdf67b50",
+      "exitCode": 0,
+      "note": "相邻包绿（graph 包无人依赖，作为票面邻居回归要求仍照跑）"
+    },
+    {
+      "command": "go vet ./pkg/hno/graph/...",
+      "receipt": "receipt:1b6ae0cb-a611-4348-acf6-e6aa5c16ebba",
+      "exitCode": 0
+    },
+    {
+      "command": "gofmt -l pkg/hno/graph",
+      "receipt": "receipt:fc96482f-6d0f-46f0-94f3-9ac5a391fd7a",
+      "exitCode": 0,
+      "note": "输出为空"
+    },
+    {
+      "command": "go build ./...",
+      "receipt": "receipt:263fddf4-bbe4-4264-9b9a-1a82ea10f267",
+      "note": "本轮 GREEN 后单独取回执，非借用邻居批次",
+      "exitCode": 0
+    }
+  ],
+  "downstreamScenario": {
+    "module": "/tmp/p1-invariants-r10（仓库外模块，replace 指向本仓库，只用公共入口；每个 Run 走 boundedRun，2s 期限后 cancel，模块自身不可能挂死）",
+    "receipt": "receipt:f0e4f385-a9bc-466a-892e-db27a36e1084",
+    "exitCode": 0,
+    "observed": [
+      "self-loop / two-node-unconditional / three-node-unconditional / cycle-with-always-true-exit / default-loop-no-alternative → OK rejected with zero node executions，且逐行打印出真实错误文案（含 \"a\" -> \"b\" -> \"a\" 这类可定位路径）",
+      "conditional-cycle-breaks → OK ran=5 completed=[a a b b end]",
+      "default-loop-with-alternative → OK ran=5 completed=[a a b b end]",
+      "acyclic-chain → OK ran=2 completed=[a b]",
+      "conditional-cycle-never-turns → GAP still non-terminating after 2s (executed=505595) — owned by G6/P3",
+      "stepLimit-cannot-bound-it-either → GAP still non-terminating after 2s (executed=363009) — owned by G6/P3"
+    ],
+    "whyHonest": "两条 GAP 行是本轮明知不修、也不假装修掉的残留：它们被打印、被计量、被归口到 G6/P3，但没有任何断言把「非终止」锁定为期望行为。"
+  },
+  "mutationMatrix": {
+    "purpose": "证明本轮断言有杀伤力，而不是恰好通过",
+    "hygiene": "GREEN 态备份 /tmp/p1-cycle10/graph.go.green；每个变异先断言目标行文本匹配、写入、跑同一条聚焦命令、再逐字节还原。全部跑完后校验 graph.go 哈希回到 6ab6388ae419fa8f696c8fe015891168035f71a4（脚本内 assert 通过，输出 restored GREEN hash ok）。",
+    "mutants": [
+      {
+        "id": "M1",
+        "change": "Validate 收尾 return g.rejectUnconditionalCycles() → return nil（整体去掉环检查）",
+        "exit": 1,
+        "killedRows": 5,
+        "rows": "全部五条非法行",
+        "site": "graph_test.go:711「不可断开的环被 Validate 判为合法」",
+        "unique": false
+      },
+      {
+        "id": "M2",
+        "change": "alwaysTaken 只保留 e.from == e.to（只认自环）",
+        "exit": 1,
+        "killedRows": 4,
+        "rows": "two-node / three-node / with-always-true-exit / default-edge-without-alternative（self-loop 行存活）",
+        "unique": true,
+        "note": "杀伤集与任何其他变异不同：它专门暴露「只判自环」这一残缺实现"
+      },
+      {
+        "id": "M3",
+        "change": "alwaysTaken 条件改为 if true（把条件边也算必定被走，过度收紧）",
+        "exit": 1,
+        "killedRows": 2,
+        "rows": "两条合法环对照行",
+        "unique": true,
+        "note": "唯一只杀对照行、不杀非法行的变异 —— 反向对照真的在起作用，不是装饰"
+      },
+      {
+        "id": "M4",
+        "change": "alwaysTaken 去掉 default 分支（把兜底边一律当可断开）",
+        "exit": 1,
+        "killedRows": 1,
+        "rows": "default-edge-without-alternative",
+        "unique": true,
+        "note": "AR1 取舍的那一条边单独有位点守着"
+      },
+      {
+        "id": "M5",
+        "change": "错误文案去掉 %s 路径（只说发现了环，不指名节点）",
+        "exit": 1,
+        "killedRows": 5,
+        "rows": "全部五条非法行",
+        "site": "节点名循环里的 t.Errorf，而非 :711 的 Fatal",
+        "unique": false
+      }
+    ],
+    "nonUniquenessDisclosed": "M1 与 M5 的失败「行集」相同（都红在五条非法行），因此单看行集不能区分二者；区别在失败位点与文案：M1 停在 err==nil 的 Fatal，M5 停在同一行稍后的节点名 Errorf 循环。如实标注为不可由行集唯一归因，而不是宣称五条变异各自唯一。",
+    "coverage": "五条非法行各至少被一个变异唯一杀伤集覆盖（M2/M3/M4 三个唯一集 + M1/M5 的位点区分）；三条对照行由 M3 覆盖。"
+  },
+  "invariantsChecked": [
+    "检查前置于副作用：五条非法行的执行计数为 0，且包外模块逐行印证（Validate 自身也不跑节点）。",
+    "两个公共入口一致：Run 传达与 Validate 同一文案，res==nil。",
+    "不过度收紧：合法条件环的 Completed() 精确保持 [a a b b end]，重访节点未被去重、也未因新检查被拒。",
+    "测试面只增不减：graph_test.go 相对固定点 0387000 累计 +866/-0（git numstat，含 slice8–10 三轮；本轮新测试族自身为 17 处断言、0 行删除），t.Skip 计数 0。",
+    "生产哈希唯一变化点在 graph.go；调度器与既有 9 个测试函数逐字节未动。"
+  ],
+  "refusedShortcuts": [
+    "没有为了让 GREEN 更快而把兜底边一律算可断开（那会留下 default-loop-no-alt 这条永不返回的入口，M4 专门守着）。",
+    "没有顺手实现 WithStepLimit 来「一并解决残留」——那会把 P3/G6 吞进 P1，且让本轮的 GAP 测量行失去意义。",
+    "RED 第一次回执里有一条与本轮无关的夹具错误行，已修测试后重取回执，没有拿旧回执推进。"
+  ],
+  "nextStageCondition": "REFACTOR 只允许在不改变 8 条子测试判定与错误文案可定位性的前提下整理重复（例如 alwaysTaken 与既有边遍历的共用），且必须重跑同一条聚焦命令与全包 -race 取零退出回执；任何断言放宽都判为不合法 REFACTOR。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-slice10-green.json#implementation",
+    "receipt:86a040bb-c8dc-4c59-82f4-bb6b636c905d",
+    "receipt:e685fbfd-ac20-457d-8487-5d586434b2cf",
+    "receipt:1b6ae0cb-a611-4348-acf6-e6aa5c16ebba",
+    "receipt:fc96482f-6d0f-46f0-94f3-9ac5a391fd7a",
+    "receipt:94848663-285a-4dfd-ad66-fc74bdf67b50",
+    "receipt:f0e4f385-a9bc-466a-892e-db27a36e1084",
+    "receipt:bf8e84aa-00a0-4da9-884b-cd8c76b2ea89",
+    "receipt:263fddf4-bbe4-4264-9b9a-1a82ea10f267"
+  ]
+}

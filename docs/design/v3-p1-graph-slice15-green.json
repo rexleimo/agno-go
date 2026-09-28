@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.green-implementation.v1",
+  "workItemKey": "work-p1-graph-r15-warnings",
+  "capabilityId": "software.testing.tdd",
+  "activationId": "4cd4b915-f540-4103-b068-a2dc06b3fdef",
+  "stageId": "green",
+  "slice": "P1 切片 15 = 票面 B7 判据 8（stepLimit 缺失告警）",
+  "contract": "artifact:docs/design/v3-test-scope-p1-graph-slice15.json",
+  "redLedger": "artifact:docs/design/v3-p1-graph-slice15-red.json",
+
+  "implementationChange": {
+    "filesChanged": ["pkg/hno/graph/graph.go"],
+    "before": {"pkg/hno/graph/graph.go": "a189a8692c0364266352e83ad3debeed738f6608"},
+    "after": {"pkg/hno/graph/graph.go": "b1b4aa92dfd6bc38ef1984b8d28b2b73e7a6dfbb"},
+    "diff": "artifact:/tmp/p1-cycle15/graph-go-slice15-green.diff（+69/-2，唯二的删除行是 `// Warnings 返回非致命的构建期提示…` 与 `func (g *Graph) Warnings() []error { return nil }` 桩）",
+    "untouched": {
+      "pkg/hno/graph/scheduler.go": "61c7ba6db72b65eda938c099968e7409fc944d73（切片 14 收尾字节，本片零改动）",
+      "pkg/hno/graph/graph_test.go": "425ea0303e1d5c5c8e95bacf57663ae94a4309ee",
+      "pkg/hno/graph/p1r13_step_limit_test.go": "bc4ab8e71527809e23a12590a078add8f35d68d1",
+      "pkg/hno/graph/p1r14_panic_barrier_test.go": "0ed607dbc01955864276212fa61e0902577ce7b8"
+    },
+    "shape": "Warnings() 从 `return nil` 变成「显式设过预算就安静；否则在全部已声明边上找一个环，找到就出一条点名预算的提示」，并新增一个纯函数 firstCycleOf(adj, edges)（不挂图状态、参数化邻接表，好让 REFACTOR 阶段能拿它与 rejectUnconditionalCycles 的同形遍历对齐）。"
+  },
+
+  "publicBoundaryBeforeAfter": {
+    "method": "同一份公共探针（graph.New/Validate/Warnings/Run，无任何私有访问）在实现前后各跑一次，逐形状对照。",
+    "artifact": "artifact:/tmp/p1-cycle15/main.go",
+    "rows": [
+      {"shape": "cond-self-loop（body --cond--> body，未设上限）", "before": "Validate nil / Warnings 0 条 / Run completed=[body entry] output=seed", "after": "Validate nil / Warnings 1 条 `graph: cycle \"body\" -> \"body\" has no explicit budget: WithStepLimit was not set, so Run stops only when the default stepLimit=1000 is reached` / Run 同一结果"},
+      {"shape": "cond-two-cycle（ping ⇄ pong，未设上限）", "before": "Warnings 0 条", "after": "Warnings 1 条，点名 `\"ping\" -> \"pong\" -> \"ping\"`，Run 结果一字未变"},
+      {"shape": "acyclic（entry → last，未设上限）", "before": "Warnings 0 条", "after": "Warnings 0 条（触发条件守住）"},
+      {"shape": "cond-two-cycle + WithStepLimit(50)", "before": "Warnings 0 条", "after": "Warnings 0 条（票面 :66 后半句的关闭条件）"},
+      {"shape": "uncond-cycle（x → x 无条件边）", "before": "Validate 报 unconditional cycle / Warnings 0 条", "after": "Validate 报同一条错 / Warnings 1 条——非法图也收到提示，见 wordingDefect 与 R15-UNADJ-1"}
+    ],
+    "nonRegression": "五行的 Validate() 与 Run 结果前后全等；本片没动 scheduler.go，也没动 Validate 的任何判据。"
+  },
+
+  "wordingDefectFoundDuringGreen": {
+    "id": "S15-GREEN-1",
+    "what": "首版文案写成 `cycle %s is allowed by build-time validation, but no WithStepLimit was set…`。第 5 行探针（非法图）当场显示这句话在事实层面是假的：那张图的环恰恰被 build-time validation 拒了。",
+    "whyTestsDidNotCatchIt": "没有任何测试覆盖「非法图上的 Warnings()」——契约 R15-UNADJ-1 显式把那一面留作未裁决、不为它新增断言。也就是说这不是「测试弱」，而是公共探针比断言集合宽：只看断言会漏，跑一遍真实调用面就抓到。",
+    "cure": "改成只陈述可确证的事实（有环 + 没设预算 + 生效的是默认值），并在注释里写明本方法不查图合法性；不改 Warnings() 在非法图上的返回与否，那属未裁决面，须人工拍。",
+    "lessonRegistered": "GREEN 阶段跑一次公共探针（而不只是跑测试）在本片第二次被证明有实际收益（切片 14 的 before/after 探针是第一次）。"
+  },
+
+  "perRowOutcome": [
+    {"row": "T1", "test": "TestP1R15_ConditionalCycleWithoutStepLimitWarns", "red": "exit 1（0 条告警）", "green": "exit 0", "receiptRef": "receipt:903ab0db-682c-4c99-857a-b1b383d998af"},
+    {"row": "T4", "test": "TestP1R15_WarningDoesNotChangeValidationOrRun", "red": "exit 1（在场前提不成立）", "green": "exit 0，Completed()=[entry ping]、Output()=seed 与实现前实测全等"},
+    {"row": "T5", "test": "TestP1R15_SelfLoopConditionalEdgeAlsoWarns", "red": "exit 1", "green": "exit 0，自环 \"body\" -> \"body\" 被认出"},
+    {"row": "T6", "test": "TestP1R15_WarningsAreDeterministicAcrossRepeatedQueries", "red": "exit 1", "green": "exit 0，两次询问等长且首条文案全等"},
+    {"row": "T7", "test": "TestP1R15_QueryingWarningsDoesNotMutateTheGraph", "red": "exit 1", "green": "exit 0，询问两次仍能拿到同一条提示，且被询问图与未询问同形图的 Completed()/Output() 全等"},
+    {"row": "T2", "test": "TestP1R15_ExplicitStepLimitSilencesTheWarning", "status": "RED 前即绿，GREEN 后仍绿", "nonVacuousNow": "实现真的会告警之后，本行才第一次真正约束「显式设置 → 闭嘴」；探针第 4 行独立佐证"},
+    {"row": "T3", "test": "TestP1R15_AcyclicGraphWithoutStepLimitDoesNotWarn", "status": "RED 前即绿，GREEN 后仍绿", "nonVacuousNow": "探针第 3 行显示无环图确实 0 条，而不是因为什么都不报才 0 条"}
+  ],
+
+  "structuralCriteria": {
+    "method": "兑现 S14-STD-6：数值连命令一起登记，不让人猜度量。",
+    "loc": {
+      "command": "for f in pkg/hno/graph/*.go; do case $f in *_test.go) continue;; esac; awk '!/^[[:space:]]*$/' $f; done | wc -l",
+      "before": 551,
+      "after": 612,
+      "ceiling": 1500,
+      "meaning": "非测试文件的非空行数（含注释行）"
+    },
+    "zeroLock": {
+      "command": "grep -c 'sync\\.' pkg/hno/graph/graph.go pkg/hno/graph/scheduler.go",
+      "after": "两个文件均 0"
+    },
+    "recoverSurface": {
+      "command": "grep -c 'recover(' pkg/hno/graph/scheduler.go",
+      "after": 1,
+      "meaning": "切片 14 的生产者屏障没被本片扩大或移动"
+    },
+    "toolchain": "gofmt -l pkg/hno/graph/ 无输出；go vet ./pkg/hno/graph/ exit 0；go build ./... exit 0。"
+  },
+
+  "scopeDiscipline": {
+    "noNewExportedSurface": "未新增导出类型/哨兵/Option/配置键；票面 §1 的公共面表一字未改（告警识别仍靠文案，B7-AMEND-1 的代价照实留着）。",
+    "notTouched": ["B8 WithMaxConcurrency（仍无读取点）", "B11 Typed", "切片 14 owed 的测试形状项", "Validate() 的八项判据", "scheduler.go 全文件"],
+    "noWeakening": "没有删测试、没有跳过、没有把期望改成当前输出；T4/T6/T7 的在场前提保留（它们宁可红也不空转）。",
+    "deferredToRefactor": "firstCycleOf 与 rejectUnconditionalCycles 的 DFS 形态重复（同一三色标记 + 声明顺序起点 + cycleOf 还原）是 Standards 会点名的 Duplicated Code。GREEN 阶段刻意没顺手合并：那要改一条已被 B5 测试担保的既有路径，属 REFACTOR 的事，且必须在测试全绿的前提下做。"
+  },
+
+  "receipts": {
+    "declaredScenario": {"command": "go test -count=1 -run TestP1R15_ConditionalCycleWithoutStepLimitWarns ./pkg/hno/graph/", "exitCode": 0, "ref": "receipt:903ab0db-682c-4c99-857a-b1b383d998af"},
+    "familyRace": {"command": "go test -race -count=1 -run TestP1R15 ./pkg/hno/graph/", "exitCode": 0, "ref": "receipt:dcc2b38b-a72f-47e6-8061-5fdcd552783d"},
+    "evidenceNote": "按切片 14 学到的同一限制：TDD 阶段 evidence 里每个 receipt 的命令都要与登记的 scenario 命令逐元素全等，因此只有 declaredScenario 进信封；familyRace 与本文件里其余观察都留在账本。"
+  },
+
+  "nextStageCondition": "REFACTOR 只有在下列成立时才算完成：合并两处 DFS 重复后 7 行仍全绿且现有三个测试文件字节不变；变异矩阵 (a)–(g) 逐个实跑并指明击杀行（尤其 T2/T3 这两条否定行要由 (b)/(c) 证明有牙）；矩阵若发现某行无可信变异则照实登记缺口。"
+}

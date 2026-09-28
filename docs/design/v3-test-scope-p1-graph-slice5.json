@@ -1,0 +1,70 @@
+{
+  "kind": "rex.test-scope-contract.v1",
+  "decisionRef": "artifact:test-scope-contract:p1-graph-engine-slice5-r3",
+  "workItemKey": "work-p1-graph-engine-r5-silent-result",
+  "activationId": "a5efd1dd-0b34-4d7d-b4df-8ace5858cdb4",
+  "authority": "本节把 docs/design/v3-p1-graph-review-verdict.json#cycle4 的两条 hard 阻断（C4-SPEC-2 nil Predicate 静默空 Result、C4-STD-2 (1) 悬空端点检查覆盖全部边种类但零测试）落为一个切片契约。它不新增也不删除 v3-test-scope-p1-graph.md §4 的任何行为，不改 §1 的公共面；cycle4 的其余阻断项在本文件的 outOfScope 中显式排序，不视为放弃。",
+  "gateNote": "docs/design/v3-*.md 仍被 PreToolUse 写入闸门锁定（.json 可写），因此本周期契约与后续决定均以类型化 JSON 入册。需要回写 .md 母契约的两条：(1) §3.5 八项校验的「悬空端点检查覆盖全部已声明边种类」口径；(2) 本文件 rule5Disposition 一项。闸门解除前以本 JSON 为切片 5 的判据，母契约其余章节继续生效于其自身切片。",
+  "userGoal": "关闭「Validate 通过、Run 返回 err==nil，却给出一个没有输出的空 Result」这一类静默通道：引擎无法忠实路由的边声明必须在构建期被拒且错误可定位；同时让已经存在的「悬空端点防线覆盖全部边种类」获得真实检测力，而不是靠实现的偶然结构成立。目标不是加新功能，而是把 R2 打开的两个缺口收回到 fail-closed 一侧。",
+  "inScopeBehaviors": [
+    "S1（行为增量）AddConditional(a, b, nil) ⇒ Validate() 返回非 nil，且错误文本同时指名边种类与被声明的两端节点名，能把缺陷定位到具体声明。当前实测（receipt:28e67f55-2577-4678-9239-986acc2a5c6f）Validate() = <nil>。",
+    "S2（行为增量）同一张图经 Run(ctx, in) 观察：返回非 nil 错误且不返回 Result（res == nil）；绝不再产出 Completed()=[a]、Output()=nil 这种「err==nil 的空结果」。当前实测同一条 receipt：Run err=nil、Completed()=[a]、Output()=<nil>、Value(b)=(<nil>,false)。",
+    "S3（行为增量·反向对照）合法的条件边不得被新校验误伤：AddConditional(a,b,p) 配 p=func(any) bool { return false }（永不命中的合法谓词）⇒ Validate() 仍为 nil，Run 仍按切片 4 的规则 4 走 Default。该行今日即通过，其职责是阻止「Validate 见 p==nil 之外的任何东西就拒绝」这种退化实现，因此必须与 S1 同切片入册。",
+    "S4（既有行为的检测力取证）悬空端点检查对 conditional / default / join 三种边种类同样拒绝，且各自给出指名种类与缺失节点名的错误。当前实测（receipt:86b1ad77-85ad-4e16-9956-68048d491f6f）四行分别输出「conditional edge to node \"ghost\" does not exist」「conditional edge from node ...」「default edge to node ...」「join edge to node ...」。该行为已由切片 4 的统一边表实现但没有任何测试，故按恢复式 RED 流程取证。"
+  ],
+  "outOfScope": [
+    "B4 stepLimit 安全阀（§7 默认 1000、ErrStepLimitExceeded 的产生点、消费者按激活步数计数）与 B5 无条件边成环的构建期拒绝：属「图会挂死宿主」类风险，与本轮「静默空结果」类风险的失效模式不同，必须独立取红、独立回执（cycle4 C4-SPEC-3 的 fix 明确要求三者不得合并）。",
+    "C4-STD-1 Result.Completed() 的重名语义（[a a a b] 是完成日志还是完成集合）：属公共 API 语义决定，未定之前不得用测试锁定任一读法。本轮只登记，不动断言。",
+    "B2 并行 + Join 汇聚屏障的路由：AddJoin 的声明继续被 fail-closed 拒绝，R1 的 join-only 拒绝行不得删除。",
+    "B6 余下构建期校验（重复节点名静默覆盖、不可达节点、非输出汇点、Join 前驱数）、B7 Warnings() 缺失告警、B8 maxConcurrency 打满进 FIFO、B9 取消归一化、B10 节点 panic 转错误、B11 Typed 的真实分支测试。",
+    "把 Add* 链式构造改成内建增量校验（C3-SPEC-4）：需先定「校验发生在哪」，不随本轮夹带。",
+    "rule5Disposition：§3.4 规则 5（扇出时给每个分支打 sub-branch 以隔离 LLM 历史）本轮由测试设计侧做显式处置，判为「不属于 P1 图引擎切片」并移交 P5（事件 / HITL）或 P4（StreamMode）。理由：该规则隔离的是节点内部的 LLM 历史，不是图拓扑；P1 的 Result/Completed 面上没有可观察的对应行为可测，若强行测试只能测一个为测试而造的标识符。cycle4 C4-SPEC-4 要求的「不得默认沉默」由本条满足，母契约 .md 待闸门解除后回写同一处置。"
+  ],
+  "allowedTestSeam": "仅 pkg/hno/graph 的导出 API，测试文件保持 package graph_test（外部观察）：New / AddNode / NodeFunc / AddEdge / AddConditional / AddDefault / AddJoin / SetEntry / SetOutput / Validate / Run 与 Result 的 Output / Value / Completed。禁止断言 nodes、edges、declare、successors、scheduler、config 等未导出符号；禁止断言错误的具体类型或 error 包装层级（只要求可定位文本）；禁止断言谓词调用次数、goroutine 数、channel 收发次数。S4 的恢复式 RED 允许临时修改 pkg/hno/graph/graph.go 中被检的实现行，但必须先备份、事后与备份逐字节校验还原，且恢复期间不得触碰任何测试文件与断言。禁止为测试新增导出 API。",
+  "whyThisSeamIsEnough": "本轮风险全部落在调用方最关心的两面：这张图能不能开始跑（Validate 的返回值与可定位性），以及跑完拿到的是什么（Run 的 err 与 Result 是否为空）。「静默空结果」的定义就是公共面 observable 的：err==nil 且 Output()==nil。把它们经 New→AddConditional→Run→Result 这条最短公共链断住，就足以代表本轮目标；Successors 内部是否走了 nil 分支不在担保范围内，也不该被断言。S3 对照行保证同一道缝仍能区分「合法的恒假谓词」与「缺失谓词」，因此该缝既不过窄也不过宽。",
+  "sliceJustification": "最小纵向切片是「一条缺失路由输入的边声明必须在构建期被拒，且已有端点防线必须被证明有牙」，它足以代表本轮目标，原因有三：(a) cycle4 判定 R2 打开了两个同形态的静默通道，其中只有 nil Predicate 属于「声明本身不完整」这一类，能立即闭掉且不需要任何新语义决定；(b) 另一个同形态通道（可用环而无步数阀）必须搭配未定形的 stepLimit 语义与环拒绝策略，纳入本切片会把一次决定变成三次；(c) S4 与 S1 共用 Validate 的同一段边循环，端点防线与谓词防线在同一测试文件里互相提供反向对照：若实现者把新检查写成「一律拒绝」，S3/切片 4 的 S1–S5 立即判红；若写成「静默跳过」，S1/S2 立即判红。",
+  "falsePassProhibitions": [
+    "只断言 err != nil / Validate() != nil：任何其它校验（入口缺失、Join 不可路由）都能满足它，等于没测。必须同时断言错误文本指名该条声明的两端节点名，并且构造的图只含该一种缺陷。",
+    "把拒绝推迟到 Run 而让 Validate() 仍返回 nil（错误晚了一步）⇒ S1 判红：构建期校验必须在构建期成立。",
+    "把 nil 谓词改判为「永不命中」或「恒真」⇒ 只是换一个静默方向，S1/S2 判红；cycle4 fix 已明确禁止对称静默。",
+    "让 Validate 在遇到 nil 谓词时直接 panic 或返回不可定位的通用文案（如「graph: graph rejected」）⇒ S1 的可定位性子断言判红。",
+    "S3 对照行不得被删或降级为「只跑不断言」；它是唯一挡住「Validate 一律返回错误」这种退化实现的反向证据。",
+    "S4 的恢复式 RED 不得伪装成天然 RED，台账必须标注 recovered RED；不得把端点期望改成当前实现的实际错误文本以外的宽松形式（例如只断言包含 \"ghost\"）。",
+    "通过删除或弱化切片 1/2/3/4 的既有用例、把 Completed() 期望改成实现现状、或把全序断言降级为集合包含来取得 GREEN。",
+    "顺带实现 stepLimit / 环拒绝 / Join 路由来「让测试更好过」⇒ 属超范围，即使全绿也算失败。",
+    "构建失败、import 错误、-race 环境错误一律不得记为 RED 或变异击杀（cycle3 曾把 `declared and not used` 的编译失败误记为一次击杀）。"
+  ],
+  "redPlan": "向 pkg/hno/graph/graph_test.go 追加两个测试函数，每个子用例自带断言、可独立失败：(1) TestP1G_ValidateRejectsConditionalWithoutPredicate 承载 S1 + S2，并含 S3 反向对照子用例 —— 今日实现下 S1/S2 因 Validate()=<nil>、Run err=nil 且 Output()=nil 而真实非零退出（天然 RED，实测形态见 receipt:28e67f55 的观察），S3 子用例通过；(2) TestP1G_ValidateRejectsDanglingEndpointForEveryEdgeKind 承载 S4 的四行表驱动子用例 —— 今日即绿，因此其 RED 走恢复式流程：备份 graph.go → 把 Validate 端点检查限制回 e.kind == edgeUnconditional（保持全部标识符被使用，避免落入「declared and not used」编译失败）→ 运行同一聚焦命令取得真实断言失败的非零退出 → 还原并与备份逐字节校验 → 重新取得零退出 GREEN。",
+  "focusedCommands": [
+    "go test ./pkg/hno/graph/... -run P1G -count=1",
+    "go test -race ./pkg/hno/graph/... -count=1",
+    "go vet ./pkg/hno/graph/...",
+    "gofmt -l pkg/hno/graph",
+    "grep -c 'sync\\.' pkg/hno/graph/graph.go pkg/hno/graph/scheduler.go",
+    "find pkg/hno/graph -name '*.go' -not -name '*_test.go' | xargs wc -l"
+  ],
+  "completionCriteria": [
+    "S1 与 S2 各有一条真实非零退出的天然 RED 回执与一条零退出的 GREEN 回执，失败点须指名谓词缺失而非无关校验。",
+    "S3 对照子用例在同一命令下持续 PASS，且其存在被至少一次变异检验：把 Validate 改成「任何 conditional 边一律拒绝」时 S3 判红。",
+    "S4 取得一条恢复式 RED 的真实非零退出回执（实现临时回退，非编译失败），还原后 pkg/hno/graph/graph.go 的 git hash-object 与备份一致，并有一条零退出 GREEN 回执；台账标注 recovered RED。",
+    "至少两条行为变异被杀掉（非编译失败）：(a) 把 nil 检查写成「跳过这条声明」⇒ S1 判红；(b) 把 nil 当恒真放行 ⇒ S1/S2 判红。每次变异后校验还原哈希逐字节一致。",
+    "切片 1/2/3/4 的全部既有用例在同一命令下仍为 PASS（当前基线 14 条 PASS，receipt:e0875681-af05-4c57-a855-0bb90a86fc33）。",
+    "AddConditional 的 GoDoc 写明「谓词为 nil 属非法声明，Validate 会拒绝」；不得留下与实现相反的注释（C3-STD-1 同类缺陷不得复发）。",
+    "非测试 LOC ≤ 1500；grep -c 'sync\\.' 仍为 0/0；-race 绿；gofmt/vet 净。",
+    "本契约 outOfScope 各项在 diff 中零出现：diff 不得触及 stepLimit、Completed 语义、Join 路由或 config 的未读字段。"
+  ],
+  "environmentNotes": [
+    "切片 4 收尾时全量 go test ./... -count=1 只有一个包失败：pkg/hno/tools/pubmed 的 TestPubMedToolkit_SearchArticles 因线上 PubMed API 返回 500 而失败（外部网络依赖，与 pkg/hno/graph 无关，非本轮回归）。后续回执命令一律不加管道，避免把 grep 的退出码误当命令退出码。",
+    "工作树目前仍未提交（切片 1–4 全部在未提交改动之上，fixed-point 0387000）。恢复式 RED 需要临时改实现，因此本轮强制要求先备份再改，并以哈希校验还原；不得用 git stash / checkout -- 等可能吞掉未提交成果的操作作为还原手段。"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-test-scope-p1-graph.md",
+    "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle4.axes.spec",
+    "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle4.axes.standards",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice4.json",
+    "artifact:docs/design/v3-platform.md",
+    "receipt:28e67f55-2577-4678-9239-986acc2a5c6f",
+    "receipt:86b1ad77-85ad-4e16-9956-68048d491f6f",
+    "receipt:e0875681-af05-4c57-a855-0bb90a86fc33"
+  ]
+}

@@ -1,0 +1,118 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.tdd-red-record.v1",
+  "workItemKey": "work-p1-graph-r13-step-limit-enforcement",
+  "activationId": "96d7d121-ae44-4d64-890c-7153f8daaa94",
+  "stageId": "red",
+  "capabilityId": "software.testing.tdd",
+  "recordedAt": "2026-09-27T12:42:30Z",
+  "scopeContract": "artifact:docs/design/v3-test-scope-p1-graph-slice13.json",
+  "testabilityDecision": "artifact:docs/design/v3-testability-decision-p1-graph-slice13.json",
+
+  "command": {
+    "exact": "go test ./pkg/hno/graph/... -run TestP1R13 -count=1 -timeout 25s -v",
+    "executable": "go",
+    "args": ["test", "./pkg/hno/graph/...", "-run", "TestP1R13", "-count=1", "-timeout", "25s", "-v"],
+    "cwd": "/Users/rex/codes/agno-go",
+    "exitCode": 1,
+    "receiptRef": "receipt:02e230a0-e9d2-46c8-8f59-711e6ddca909",
+    "duration": "4.774s",
+    "infrastructurePrecheck": {
+      "command": "go vet ./pkg/hno/graph/...",
+      "exitCode": 0,
+      "note": "先确认新测试文件可编译，因此本次失败是行为断言失败而不是 rex-tdd RED 第 3 条所禁止的基础设施失败。"
+    }
+  },
+
+  "testFile": "artifact:pkg/hno/graph/p1r13_step_limit_test.go",
+  "testFileBlobSha1": "not-applicable-uncommitted",
+  "fixtureNote": "本族使用自己的 runBounded 夹具（cycleLimit 的 deadline ctx + returnGrace 后备），刻意不复用 graph_test.go:604 的 runWithinLimit：那条夹具把「不自退出」当作构建期拒绝信号，而 §3.5 第 7 项刻意放行的恒真环必须由 Run 自己带哨兵回来，复用会把本次缺口说成相反的修法。",
+
+  "rows": [
+    {
+      "id": "T1",
+      "test": "TestP1R13_StepLimitStopsBreakableCycle",
+      "verdict": "red",
+      "precondition": "graph.New(graph.WithStepLimit(3)) + a→b 无条件边 + b→a 恒真条件边；Validate() 已断言放行",
+      "contractExpected": "Run 返回 errors.Is(err, graph.ErrStepLimitExceeded)、Result 为 nil、累计启动次数恰为 3",
+      "observed": "p1r13_step_limit_test.go:95: Run 的错误 = context deadline exceeded, want errors.Is(err, graph.ErrStepLimitExceeded) (1.15s)",
+      "mapping": "契约 T1 / 票面 B4「WithStepLimit 设为小于所需步数 → errors.Is(err, graph.ErrStepLimitExceeded) 且 Output() 不可用」"
+    },
+    {
+      "id": "T1b",
+      "test": "TestP1R13_LimitRefusesActivationsAtDispatch",
+      "verdict": "red",
+      "precondition": "graph.New(graph.WithStepLimit(2)) + 合法扇出 entry→{x,y}；Validate() 放行",
+      "contractExpected": "上限判定发生在派发之前：Run 以哨兵结束、累计启动恰为 2、第二个兄弟节点 y 一次都不被启动",
+      "observed": "p1r13_step_limit_test.go:124: Run 的错误 = <nil>, want errors.Is(err, graph.ErrStepLimitExceeded) (0.00s)",
+      "mapping": "契约 T1 的计步位置半边（派发前 vs 完成后）"
+    },
+    {
+      "id": "T2",
+      "test": "TestP1R13_StepLimitDefaultsWhenUnset",
+      "verdict": "red",
+      "precondition": "同一张恒真环图，不带任何 Option",
+      "contractExpected": "未显式设置时默认 1000 生效：Run 以哨兵结束、累计启动恰为 1000",
+      "observed": "p1r13_step_limit_test.go:150: 未设置选项的图没有落在默认 1000 上: Run 的错误 = context deadline exceeded, want ErrStepLimitExceeded (1.13s)",
+      "mapping": "契约 T2 / 母约 §7:354「StepLimit：默认 1000」+ WithStepLimit 导出文档「未设置时默认 1000」"
+    },
+    {
+      "id": "T4",
+      "test": "TestP1R13_EachRunGetsItsOwnBudget",
+      "verdict": "red",
+      "precondition": "同一张 limit=3 恒真环图连续 Run 两次",
+      "contractExpected": "两次各自跑到 3 步并给出同一哨兵，累计启动 3 然后 6",
+      "observed": "p1r13_step_limit_test.go:175: 第 1 次 Run 的错误 = context deadline exceeded, want ErrStepLimitExceeded (1.01s)",
+      "mapping": "契约 T4「预算属于单次 Run」"
+    },
+    {
+      "id": "T6",
+      "test": "TestP1R13_NonPositiveStepLimitRejectedAtBuildTime",
+      "verdict": "red",
+      "precondition": "graph.New(graph.WithStepLimit(0)) + 单节点直图",
+      "contractExpected": "Validate() 返回点名 WithStepLimit 的声明类拒绝，Run 复用同一条文案且零节点执行",
+      "observed": "p1r13_step_limit_test.go:275: WithStepLimit(0) 被 Validate 放行：0 既不是合法上限也不该被当成不限步数 (0.00s)",
+      "mapping": "契约 T6；作者裁断，规格权威缺口已在 slice13 契约 amendmentRegistration 记为 S13-AMEND-1"
+    },
+    {
+      "id": "T3",
+      "test": "TestP1R13_ConvergingCycleStillSucceeds",
+      "verdict": "green-control",
+      "note": "对照行，今天必须绿：预算充足的收敛环不得被误伤。它证明本族的红不是「有环即错」。"
+    },
+    {
+      "id": "T5",
+      "test": "TestP1R13_CancellationIsNotReportedAsStepLimit",
+      "verdict": "green-control",
+      "note": "对照行，今天必须绿（票面 B9 已有行为）：取消仍归一化为 context.Canceled，GREEN 阶段不得让新哨兵顶替它。"
+    }
+  ],
+
+  "failureReason": {
+    "statement": "WithStepLimit 是一个被导出但完全不生效的旋钮：scheduler 从不调用 graph 的配置，因此恒真条件环在 Run 里永不自行结束，调用方看到的错误是自己 ctx 的 context deadline exceeded（T1/T2/T4）或根本没有错误（T1b 的有限扇出图正常跑完），而非法上限值又被构建期放行（T6）。",
+    "codeEvidence": [
+      "pkg/hno/graph/scheduler.go:60-73 — Run 构造 &scheduler{plan, ctx, queue, done, result, pending}，没有把 g.cfg 传进调度器；scheduler 结构体没有 steps 字段",
+      "pkg/hno/graph/scheduler.go:98-104 — dispatch 一次性排空 pending，既无并发上限也无逐次步数检查",
+      "pkg/hno/graph/graph.go:20 — ErrStepLimitExceeded 在整个包里只出现在它自己的声明处（无引用点）"
+    ],
+    "quantifiedHarm": "仓库外公共 API 场景 /tmp/p1-cycle13-scenario 实测：声明 limit=3 的图在 300ms 期限里产生 75816 次节点激活（决策阶段记录为 receipt:d9657435-…），即调用方写下的安全阀对失控图零保护。",
+    "matchesTargetBehavior": "是的：失败输出正是「该返回哨兵而没有返回哨兵」，不是断言写错、夹具缺失或环境错误。",
+    "notInfrastructureFailure": "go vet ./pkg/hno/graph/... 退出 0；5 条红行全部给出可读断言输出并在 4.774s 内整体结束，无编译错误、无挂死、无跳过。"
+  },
+
+  "redKind": "natural",
+  "redKindNote": "先写测试后写实现，非恢复 RED；决策阶段同一命令的 receipt:5a80e141-… 是本缺口的首次观察，本条 receipt:02e230a0-… 是当前完整行为族的观察。",
+
+  "evidenceRefs": [
+    "receipt:02e230a0-e9d2-46c8-8f59-711e6ddca909",
+    "artifact:docs/design/v3-p1-graph-slice13-red.json",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice13.json",
+    "artifact:docs/design/v3-testability-decision-p1-graph-slice13.json"
+  ],
+
+  "greenStageGuard": [
+    "GREEN 只能实现 T1/T1b/T2/T4/T6 所需的最小步数阀：调度器读取 cfg、在把一次激活交给节点之前计数、未设置时取 1000、n<=0 在 Validate 里按声明类拒绝。",
+    "不得顺手实现 B7 Warnings、B8 WithMaxConcurrency FIFO、B10 panic→recover：它们已在 slice13 契约的 nonGoals 里外置为欠账。",
+    "T3/T5 两条对照行在 GREEN 后必须仍为绿，否则是实现把「有环」或「取消」误判成了超限。"
+  ]
+}

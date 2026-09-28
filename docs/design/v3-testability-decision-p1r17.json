@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:docs/design/v3-testability-decision-p1r17.json",
+  "workItemKey": "work-p1-graph-r17-cancel-normalization",
+  "activationId": "2c2825ee-6713-45ed-8531-81a076871352",
+  "stageId": "decide-testability",
+  "contract": "artifact:docs/design/v3-test-scope-p1-graph-slice17.json",
+  "redCandidateRow": "D1",
+  "redCandidate": {
+    "publicEntry": "graph.New(graph.WithStepLimit(100)) → (*Graph).AddNode / graph.NodeFunc → (*Graph).AddEdge → SetEntry → SetOutput → (*Graph).Validate → (*Graph).Run(ctx, \"seed\")，读的是 Run 交出的 (res, err) 经 errors.Is(err, context.Canceled) / errors.Is(err, graph.ErrStepLimitExceeded) 判定的错误语义，外加节点体内一次自登记（started 计数与 firstStarted 关闭）作为「取消时刻图仍在派发」的公共侧前提自证",
+    "setup": "pkg/hno/graph/p1r17_cancel_normalization_test.go 的 p1r17RaceGraph(t, 2000, p1r17BusinessAfterCancel, graph.WithStepLimit(100))：entry 出两条无条件边指向 failer 与 spawner，spawner 阻塞在测试手里的 start 闸门之后一次性放出 2000 条无条件后继，每条再指向唯一出口 p1r17exit。测试先把 Run 放进一条 goroutine（p1r17RunAsync），再 close(start)，然后在「第一个后继真的开始运行」这一事件上取得取消时刻；取消前必须完成两项前提自证：started 既小于后继总数（图未收敛）也小于步数预算（阀还没撞上），且非阻塞探 Run 的结果通道仍无值（Run 还在飞，也就是消费者仍在那一次 dispatch 里）。三项都成立才 cancel()。全程不用 time.Sleep 定序（票面 :75）。夹具先以 Validate() 为 nil 守住构建前提。",
+    "command": {
+      "executable": "go",
+      "args": [
+        "test",
+        "./pkg/hno/graph",
+        "-run",
+        "TestP1R17_",
+        "-count=1",
+        "-race",
+        "-v"
+      ],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "契约 D1（票面 :68 的「不得伪装」语义落到步数阀这条路径，并承接 :63 的 B4）：调用方在消费者正在一次性派发一大批激活的窗口里 cancel(ctx) 之后，Run 交出的错误必须满足 errors.Is(err, context.Canceled)，不得是 graph.ErrStepLimitExceeded，也不得交出 Result。理由是取消发生在预算耗尽之前——预算只能在这次派发的第 100 步才撞上，而那一步整件发生在调用方已经取消之后。同族 D2 要求同一窗口里失败节点自造的业务错误也不得顶掉取消语义；D3/D4/D5/D6 是已经成立、修复不得改坏的护栏行。",
+    "observed": "go test 退出码 1（receipt:276bffa9-133a-4002-9963-2f2c6e42f669）。D1 判红两行：「取消落在派发窗口内时 Run 的错误 = graph: step limit 100 reached before the graph converged: graph: step limit exceeded, want errors.Is(err, context.Canceled)（取消时刻已启动 7/2000 个后继，安全阀是在那之后才撞上的）」与「取消被报成步数超限：… —— 预算是取消之后才被耗尽的，调用方要的是取消语义」。同一命令下 D2 判红：「第 5 轮：取消被伪装成节点业务错误 p1r17: store connection reset by peer（取消时刻已启动 1/2000 个后继，业务错误只可能在 ctx.Done 之后产生）」。同族 D3（3 个子用例）/D4（3 种节点出口）/D5（2 段）/D6（2 段）全部判绿，与契约 statusAtRed=green-at-red 一致。前提自证无一失败：D1 在 -count=20 -race 下 20/20 交出 ErrStepLimitExceeded，且「取消之前 Run 已经交出」「窗口没建立」这两类前提报错为 0/20。",
+    "receiptRef": "receipt:276bffa9-133a-4002-9963-2f2c6e42f669",
+    "failureReason": "缺失的目标行为是「取消一旦被调用方提出，调度器在任何一条交出路径上都必须优先报告取消语义」：scheduler.go 全程只在消费者 parked 于 consume 的 select 时咨询 ctx（契约 M-2 实测 ctx_checks_in_scheduler=2，且都在 select 里），因此消费者忙在 dispatch 循环里时取消完全不可见，循环随后在第 100 步撞上安全阀并把 ErrStepLimitExceeded 交给调用方（scheduler.go:120-124），于是调用方看到的失败原因不是它自己施加的那次取消。这不是编译、夹具或环境问题——同一条命令下 Validate() 通过、D3/D4/D5/D6 八段护栏全部成立、包内既有 49 个 Test 未受影响，判红只发生在 D1/D2 声明的公共错误语义上，因此是新的用户可观察行为缺失，而不是既有断言被改坏。"
+  },
+  "nonDeterministicOutputDisclosure": "D1 是确定性红：-count=20 -race 下 20/20 交出 ErrStepLimitExceeded，且 0/20 触发前提报错——这是本片选作 redCandidate 的原因（契约 minimalVerticalSlice 明确写 D1 单独一条即足以代表本片目标）。D2 是竞态红，本轮按票面要求逐字复现并计数：20 次执行 × 30 轮 = 600 轮里命中 46 轮（≈7.7%/轮），低于契约 M-4 早先用另一种更宽松的夹具形态量出的 17.5%~22.5%。因此单次执行的 D2 红色不是必然出现（按 7.7% 估约 91% 概率至少命中一轮），而它的绿色判据仍是跨轮 0 容忍：修复后任何一轮交出业务错误都算整行红。本决定不把 D2 的单轮命中率当作推进依据，也不得反过来把 7.7% 写进期望容差（契约 raceAssertionForm.whyNotRejected 的同一理由）。",
+  "whyNotHardening": "hardening 的前提是没有新的用户可观察行为。本片恰好相反：在同一条公共入口（Run）上，调用方取消之后今天得到的是 graph: step limit exceeded，修复后得到的是 context.Canceled —— 交出的错误标识本身变了，是调用方 errors.Is 就能看到的新的外部行为，且已用公共入口复现为真实失败，故为 behavior-delta 而不是 behavior-preserving-hardening。",
+  "whyNotBlocked": "全部验收行都能经导出面观察：graph.New/WithStepLimit/WithMaxConcurrency/AddNode/NodeFunc/AddEdge/SetEntry/SetOutput/Validate/Run 与 Result 的公共读取器，加上测试自己提供的节点体内的自登记（票面 :92 行 4 允许的节点侧观察面）。不需要读 cfg/scheduler/pending/running，不需要观察 queue 长度或 goroutine 数（票面 :40 明令禁止，契约 M-7 据此撤回了「取消后无悬挂生产者」这条判据），也不需要新增旋钮或测试专用出口，因此不构成 blocked。",
+  "observabilityLimitDisclosure": "「取消落在派发窗口内」这一前提只能由公共侧证据界定，不能由读私有状态界定：started 计数是 steps 的下界而非上界，所以真正闭合前提的是「取消之前非阻塞探 Run 的结果通道仍无值」——撞阀必然结束 Run，因此 Run 仍在飞就把阀排除在取消之前。残余不确定只剩消费者已 logically 返回但结果 goroutine 尚未写入带缓冲通道这一有窗口的窄情形；它若发生，本轮会以 ErrStepLimitExceeded 的判红出现而不是静默通过，并且 0/20 次触发前提报错、20/20 次交出同一被掩盖的错误，故不构成观察面缺陷。此项如实登记，不靠断言私有字段来凑证据。",
+  "scenarioCommandBindingNote": "本阶段与其后 RED/GREEN/REFACTOR 的每个 receipt 都用上面这一条命令；-run TestP1R17_ 覆盖 p1r17_cancel_normalization_test.go 的整族 D 行，逐行归属靠 -v 输出，不混用其它命令。包级全量 -race、-count=20 复跑与结构判据（sync. 计数、recover 计数、LOC 上限、导出面计数）作为契约 completionCriteria 的另行测量，不作为阶段 receipt。receipt 记录的是 stdout/stderr 的 sha256，本次抄录文本出自同一条命令的重跑，时间行（0.02s/0.40s）与 D2 命中轮次随调度而变，因此哈希与抄录文本不逐字节相同属预期差异，已在本项如实标注。",
+  "measuredAt": "2026-09-27T18:29:10.000Z",
+  "productionBytesAtDecision": {
+    "pkg/hno/graph/graph.go": "dca23943fd9cade4766ceeffe43b47477b815a61",
+    "pkg/hno/graph/scheduler.go": "f2d7fb4b10e9c133f9bbe8b566da40ea8e96d55e",
+    "pkg/hno/graph/graph_test.go": "425ea0303e1d5c5c8e95bacf57663ae94a4309ee",
+    "pkg/hno/graph/p1r13_step_limit_test.go": "bc4ab8e71527809e23a12590a078add8f35d68d1",
+    "pkg/hno/graph/p1r16_max_concurrency_test.go": "6934a4f2ae9ed2d80a59a30ead56b3de6bcc4296",
+    "pkg/hno/graph/p1r17_cancel_normalization_test.go": "3b49922c5db4413fbdbbef7cfc1a04917eecd8e7"
+  },
+  "contractDeltaFromMeasurement": [
+    "契约 D5 第一段原写作「复用 p1r17RaceGraph(t, 3, p1r17BusinessAfterCancel, cap=1)」：实测该形态在取消之前必然死锁——上限 1 时唯一的槽位被 failer 占住，spawner 永远拿不到槽位，firstStarted 事件不可能发生。已改为 p1r17CappedBacklogGraph（后继阻塞在 release 上、取消时没有任何节点向 queue 投递），并把「width-capacity 条激活留在队列里」写成构建期声明与上限的算术后果，而不是对 queue 长度的观察。改后 D5 两段实测判绿，与契约 statusAtRed=green-at-red 一致。",
+    "契约 D4 原文允许 20ms sleep 定序：按票面 :75 改为「节点确实进入阻塞」的事件握手（close(blocked) 后才 cancel），不改变该行判据。",
+    "契约 D1/D2 原夹具在断言时刻 Run 尚未启动（先 cancel 后 Run），窗口不存在：改为 p1r17RunAsync 先把 Run 放出去，再加 p1r17AwaitDispatchWindow 的三项前提自证。这一改动使 D1 从「可能靠运气成立的前提」变成可判定的公共侧证据，判据本身未变。",
+    "契约 raceAssertionForm.reproducibilityDisclosure 的命中率数字需按本轮实测更新为「D1 20/20 确定性、D2 46/600（≈7.7%/轮）」；已列入 writeBackOwed，随 GREEN 阶段的证据一并回写。"
+  ],
+  "notTouchedByThisSlice": [
+    "R17-UNADJ-1（取消之后是否应当继续派发已在途批次的剩余激活）：契约 M-5 实测今天为 1998.8/2000，本片按 explicitNonGoals 明确不实现「取消后停止派发」，只在交出路径上做归一化。",
+    "R17-UNADJ-2（节点交出的取消哨兵是否必须仍可被 errors.Is 命中）：D6 只要求未取消时业务错误原样交出，不规定归一化后哨兵的保留方式。",
+    "R17-UNADJ-3（真实节点错误与取消同时成立时的优先次序）：D1/D2 只覆盖「取消在先」的两种掩盖路径；两者真正同时成立且取消在后的次序裁决未合同化。",
+    "running == 0 之后交出成功的窗口（契约登记为 0/300 未复现）：不复现即不合同化，不为它写放宽的断言。",
+    "B11（Typed）与 P2 之后的切片：另开工作项。"
+  ]
+}

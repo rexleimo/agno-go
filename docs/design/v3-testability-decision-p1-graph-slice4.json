@@ -1,0 +1,25 @@
+{
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:testability-decision:p1-graph-engine-slice4-r2",
+  "redCandidate": {
+    "publicEntry": "pkg/hno/graph 导出 API（package graph_test 外部观察）：(*Graph).AddConditional / AddDefault 构造的图经 (*Graph).Validate() 与 (*Graph).Run(ctx, in) 后，由 Result.Completed() / Output() / Value(name) 三面观察路由结果，外加用户自带 Predicate 收到的实参值。断言不引用 nodes/edges/unrouted/successors 等未导出字段，不断言错误具体类型，因此不锁死实现。",
+    "setup": "工作树含切片 1–3 的实现（builder + 单消费者调度器 + 构建期拒绝入口缺失/悬空边/未路由声明）。本切片只向 pkg/hno/graph/graph_test.go 追加 TestP1G_ConditionalAndDefaultRouting：五个目标子用例（predicate-hit-suppresses-default / predicate-miss-falls-back-to-default / multiple-predicates-all-fire / unconditional-edge-suppresses-default / predicate-receives-source-output）+ 一个规则 1 的对照子用例（unconditional-fanout）。节点全部为内存函数：入口 a 产出常量 \"a-out\"，其余节点返回「自身名<-收到的值」，因此 Output() 同时证明哪个节点被执行以及它拿到的上游值。每个用例只注册自己需要的节点，避免 B6「不可达节点」校验落地后成为假失败源。无网络、无凭据、无跨用例共享状态；断言前 gofmt -l pkg/hno/graph 无输出、go vet ./pkg/hno/graph/... 净。",
+    "command": {
+      "executable": "go",
+      "args": [
+        "test",
+        "./pkg/hno/graph/...",
+        "-run",
+        "P1G",
+        "-count=1"
+      ],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "退出码非 0 且为行为级断言失败。目标行为：§3.4 规则 1/2/4 被真实路由——无条件边全部激活；条件边只在 Predicate(源节点本次输出)==true 时激活其目标；仅当源节点没有任何具体边命中时 Default 边才激活。于是上述五个图的 Validate() 必须返回 nil、Run 必须成功，且 Completed()/Output() 精确等于契约 slice4 表中的期望（未执行的节点不得留下 Value）。",
+    "observed": "exit 1，失败形态正是缺失的路由行为本身：五个子用例全部 FAIL —— 四个终止于 graph_test.go:225「按 §3.4 合法的路由图被 Validate 拒绝: graph: conditional edge from \\\"a\\\" to \\\"b\\\" is declared but not routable by this engine」（S4 报的是 to \\\"x\\\"），谓词实参子用例终止于 graph_test.go:260「Run: graph: conditional edge ... not routable」。对照子用例 unconditional-fanout 在同一命令下 PASS，切片 1 的 TestP1G_LinearDagRunsChain、切片 3 的 TestP1G_UnsupportedEdgeDeclarationsAreRejected（含 join-only 与其反向对照）、切片 2 的 TestP1G_ValidateRejectsDanglingEdge 及其两个子用例全部继续 PASS，最终 FAIL github.com/rexleimo/agno-go/pkg/hno/graph 1.153s。这是真实缺失行为而非编译或夹具问题：同一命令在本次测试追加前为 exit 0（receipt:c87aa89a-28ea-414c-ad47-549d967d84ce）。",
+    "failureReason": "缺失的是 §3.4 规则 2/4 的路由实现：successors（scheduler.go:107-114）只扫描无条件边表 g.edges，既看不到条件边也看不到 Default 边；而切片 3 为 fail-closed 落地的护栏（graph.go 的 unrouted 声明表 + Validate 的拒绝分支）此刻会把 conditional/default 判为「已声明但不可路由」。二者叠加的结果是：任何写了条件边的图在构建期就被拒，Run 直接返回错误，条件路由与兜底路由都无从观察。本 RED 与 R1 不矛盾——契约 §12.1 明确 R1 的拒绝集合应随路由落地而收缩，本切片正是把 conditional/default 从拒绝集合移出并交给真实路由；join 声明必须继续被拒（R1 的 join-only 行仍是判据）。",
+    "receiptRef": "receipt:fe1b6446-bf78-4af1-8750-249c60d979c4"
+  },
+  "sliceJustification": "条件边与 Default 路由是余下全部图行为的依赖根：§3.3 要求「图有环就必须有」，而 B5 的合法环对照组只能用条件边收敛（没有 R2 就无法构造必须被放行的环）；规则 4 的「没有任何具体边命中」判定又是 B2 Join 与 Default 共用的路由基础。本切片同时闭掉 cycle-3 的两条 hard 发现：conditional/default 的行为变更自此有了测试担保（C3-STD-2），三条 builder 中与真实语义相反的 GoDoc 在此被改写为真实路由承诺（C3-STD-1）。",
+  "nonGoals": "不实现 B2 并行 + Join 汇聚屏障（AddJoin 仍必须在构建期被拒绝，R1 的 join-only 行不得删除）；不实现 B5 无条件环的构建期拒绝；不实现 B6 余下 4 项校验（重复节点名 / 不可达 / 非输出汇点 / Join 前驱数）；不落实 stepLimit 默认 1000 与 ErrStepLimitExceeded（B4）、不加 Warnings（B7）、不加并发上限 FIFO（B8）、不做取消归一化（B9）、不做 panic 转错误（B10）、不为 Typed 补测试（B11）。若为了通过本切片而顺带实现 Join 聚合，判为实现越界。"
+}

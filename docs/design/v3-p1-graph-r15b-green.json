@@ -1,0 +1,84 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.tdd-green-ledger.v1",
+  "workItemKey": "work-p1-graph-r15b-warning-text",
+  "activationId": "a2339064-524f-4d98-b0da-2fdb6283af8a",
+  "capabilityId": "software.testing.tdd",
+  "stageId": "green",
+  "recordedAt": "2026-09-27T16:39:55Z",
+  "contract": "artifact:docs/design/v3-test-scope-p1-graph-slice15b.json",
+  "previousStageEvidenceChecked": {
+    "redLedger": "artifact:docs/design/v3-p1-graph-r15b-red.json",
+    "redReceipt": "d7dbd5e8-da12-47bc-8f4b-7ade388dccbf（exit 1，场景命令与本片绑定命令逐字段一致）",
+    "nextStageConditionQuoted": "GREEN 只允许动 graph.go 的告警文案与环渲染（判据 8 那条 error 的措辞 + cycleOf 的有界渲染，保留前 6 个点名与收尾），必须让 U2/U3/U4 三行转绿且不把 U1/U5/U6/U7 改红；既有 34 个 Test 函数与三个既有测试文件字节不变；GREEN 的回执必须仍是同一条命令，零退出。",
+    "howMet": "改动只落在 graph.go 的两处（cycleOf 渲染 + Warnings 文案）加一个新常量；测试文件与 scheduler.go 字节不变；U2/U3/U4 转绿且其余四行仍绿；回执 d4b5b46b 用同一条命令、exit 0。"
+  },
+  "focusedCommand": {
+    "executable": "go",
+    "args": [
+      "test",
+      "./pkg/hno/graph",
+      "-run",
+      "TestP1R15B_",
+      "-count=1",
+      "-race",
+      "-v"
+    ],
+    "cwd": "/Users/rex/codes/agno-go"
+  },
+  "greenReceipt": "receipt:d4b5b46b-d5b5-4e5f-a07d-70102f728bea",
+  "greenReceiptFacts": {
+    "exitCode": 0,
+    "stdoutSha256": "05dbbcbcbcb136725fdbe213e46f4c843db92910dc43ff41fde4408d2d055961",
+    "observedAt": "2026-09-27T16:39:32.092Z",
+    "storedAt": ".rex-harness/receipts/d4b5b46b-d5b5-4e5f-a07d-70102f728bea.json",
+    "perRowObserved": "7 行全部 PASS：WarningNamesTheKnobAndItsDefaultNumber / WarningMakesNoClaimAboutRun / InvalidGraphWarningAlsoMakesNoRunClaim / LongCycleWarningIsBoundedAndStillLocatable / ShortCycleStaysFullyRendered / NamedNodesComeFromTheGraph / JudgementSevenMessageUnchanged"
+  },
+  "adjacentChecksNotReceipts": {
+    "wholePackage": "go test ./pkg/hno/graph -count=1 -race → ok（41 个 Test 函数全绿：既有 34 + 本片 7；观察记录，未取回执，因为回执必须绑定场景命令）",
+    "build": "go build ./... → 无输出",
+    "blastRadius": "grep 全仓 *.go 里引用 hno/graph 的文件只有 pkg/hno/graph 自己的 5 个测试文件：graph.go 的文案改动没有包外消费者。",
+    "gofmt": "gofmt -l pkg/hno/graph/ 无输出",
+    "vet": "go vet ./pkg/hno/graph/ 无输出"
+  },
+  "newWarningText": {
+    "shortCycleVerbatim": "graph: cycle \"n0000\" -> \"n0001\" -> \"n0000\" has no explicit budget: WithStepLimit was not set, so the default stepLimit=1000 is what bounds this graph",
+    "longCycle400": "graph: cycle \"n0000\" -> \"n0001\" -> \"n0002\" -> \"n0003\" -> … -> \"n0000\" (400 nodes) has no explicit budget: WithStepLimit was not set, so the default stepLimit=1000 is what bounds this graph",
+    "judgementSevenUnchanged": "graph: unconditional cycle \"a\" -> \"b\" -> \"a\": every edge on it is always taken, so Run cannot terminate",
+    "sizeTableAfter": "同一探针（/tmp/p1-cycle15/review2，命令 cd /tmp/p1-cycle15/review2 && go run .）在改动后：环长 2→149 字节/点名 3；3→160/4；6→188/5；7→188/5；8→188/5；50→189/5；400→190/5。另一探针 /tmp/p1-cycle15/greentext 补测 20000→192 字节/点名 5（改动前 260134）。长度不再随环长增长。"
+  },
+  "implementationDiff": {
+    "file": "pkg/hno/graph/graph.go",
+    "beforeHash": "8b8fb95b5bc0a7015abd12384636cf7cf106869b",
+    "afterHash": "fbf0e84c0505c189309a2a9f234f59875fd54744",
+    "stat": "+33 / -5 行，5 个 hunk：@@ -52,6 +52,11 @@（新常量）、@@ -360,6 +365,11 @@ 与 @@ -369,10 +379,21 @@（cycleOf 文档与有界渲染）、@@ -391,7 +412,14 @@（Warnings 文档：两条文案约束）、@@ -401,7 +429,7 @@（文案本身）",
+    "diffReconstructionProof": "改动前没有把 graph.go 快照到仓库外，因此没有现成 blob 可比。RED 字节由当前文件逆向三处编辑重建，重建结果的 git blob 哈希 = 8b8fb95b5bc0a7015abd12384636cf7cf106869b，与 RED 阶段登记的哈希逐字符相同，所以下面这段 diff 是真实的 RED→GREEN 差异，不是事后描述。此段作为流程事实登记（与切片 15 里 b1b4aa92 未快照那一条同类）。",
+    "diffText": "--- /tmp/p1-cycle15/green/graph.go.red\t2026-09-28 00:39:09\n+++ pkg/hno/graph/graph.go\t2026-09-28 00:37:40\n@@ -52,6 +52,11 @@\n // 它必须有值：图允许有环，而没有预算的环就是永不返回的 Run。\n const defaultStepLimit = 1000\n \n+// maxRenderedCycleNames 是环文案一次交出的被点名节点数上限（含收尾重复的那一格）。\n+// 判据 7 的致命文案与判据 8 的提示共用这段渲染，因此界对两者同时生效：短环照旧整条写出，\n+// 长环改为「点名开头 + 省略 + 说出规模」。\n+const maxRenderedCycleNames = 6\n+\n // config 保存调度参数；stepLimitSet 区分「用户显式设置」与「默认值」，\n // 构建期告警（判据 8）只对未显式设置的环图发出。\n type config struct {\n@@ -360,6 +365,11 @@\n }\n \n // cycleOf 把闭合于 closing 的那段路径还原成 `\"a\" -> \"b\" -> \"a\"` 形式的可定位文案。\n+//\n+// 界：节点数在 maxRenderedCycleNames 以内时逐格点名，收尾回到哪一格照样写出；超过时只点\n+// 开头若干格，中间用省略号，并把环的规模作为数字交给读的人。这段文案的两个天然用法是\n+// 「启动时打印一次」和「贴进 issue」，整条列出 400 个节点两者都放不下（实测 4532 字节，\n+// 20000 节点时 260134 字节）。\n func cycleOf(path []string, closing string) string {\n \tstart := 0\n \tfor i, name := range path {\n@@ -369,10 +379,21 @@\n \t\t}\n \t}\n \n-\tvar sb strings.Builder\n-\tfor _, name := range path[start:] {\n+\tnodes := path[start:]\n+\tbounded := len(nodes)+1 > maxRenderedCycleNames\n+\tshown := nodes\n+\tif bounded {\n+\t\tshown = nodes[:maxRenderedCycleNames-2]\n+\t}\n+\n+\tvar sb strings.Builder\n+\tfor _, name := range shown {\n \t\tfmt.Fprintf(&sb, \"%q -> \", name)\n \t}\n+\tif bounded {\n+\t\tfmt.Fprintf(&sb, \"… -> %q (%d nodes)\", closing, len(nodes))\n+\t\treturn sb.String()\n+\t}\n \tfmt.Fprintf(&sb, \"%q\", closing)\n \treturn sb.String()\n }\n@@ -391,7 +412,14 @@\n //\n // 环的判据取「全部已声明边」而不是「必定被走的边」：一张能通过判据 7 的图，剩下的环必然\n // 至少有一条边可以被跳过。本方法不查图是否合法（非法图上该说什么属未裁决面，见切片 15 契约\n-// R15-UNADJ-1），因此文案只陈述「没设预算」这一事实，不声称这张图能跑。\n+// R15-UNADJ-1）。\n+//\n+// 文案受两条约束，都来自「本方法只有构建期可见的事实可说」：\n+//   - 断言的旋钮与默认数值要写出来（WithStepLimit、defaultStepLimit），因为那正是调用方\n+//     还没选过的东西；只说「有环没预算」等于让人自己去翻文档。\n+//   - 不断言某一次执行会怎样停。本方法既没跑过图也不知道谓词，而同一族自己的正例实测是\n+//     「在自己的收敛上停下、没撞到 1000」；非法图上更是一次都不跑。仓库对同一类问题已有判红\n+//     口径（graph_test.go 把「把永远不会跑的东西说成运行时风险」当缺陷），这里沿用同一取向。\n func (g *Graph) Warnings() []error {\n \tif g.cfg.stepLimitSet {\n \t\treturn nil\n@@ -401,7 +429,7 @@\n \t\treturn nil\n \t}\n \treturn []error{fmt.Errorf(\n-\t\t\"graph: cycle %s has no explicit budget: WithStepLimit was not set, so Run stops only when the default stepLimit=%d is reached\",\n+\t\t\"graph: cycle %s has no explicit budget: WithStepLimit was not set, so the default stepLimit=%d is what bounds this graph\",\n \t\tcycle, defaultStepLimit)}\n }\n \n"
+  },
+  "minimalityAudit": {
+    "notDone": [
+      "没有导出新的哨兵错误或配置项（S15-STD-1 仍挂号）",
+      "没有改 firstCycleOf 的签名或遍历顺序（S15-STD-2/3 不在本片）",
+      "没有给 Warnings() 加记忆化或成本优化（S15-STD-6 不在本片）",
+      "没有动 Validate() 的判定集合、scheduler.go、stepLimit 取值校验",
+      "没有为了让 U4 绿而把界实现成「整条省略」——短环仍逐字完整（U5/U7 为证）"
+    ],
+    "sharedRendererDecision": "有界渲染落在共享的 cycleOf 上（判据 7 与判据 8 同时生效），依据是契约 M-4 的实测：既有 B5 族全是 ≤2 节点的环，界取 6 个点名时它们的文案逐字节不变；U7 把这条推理变成落地检查，本轮判据 7 文案确认未变。"
+  },
+  "structuralCriteriaReMeasured": {
+    "command_nonBlankNonTestLOC": "for f in pkg/hno/graph/*.go; do case $f in *_test.go) continue;; esac; grep -v '^[[:space:]]*$' $f; done | wc -l",
+    "value": 614,
+    "previous": "588（切片 15 REFACTOR 收尾）→ 614（本片 GREEN，+26：新常量 3 行文档 + cycleOf 界 + Warnings 文档）",
+    "ticketCeiling": "票面 §9 结构判据上限 1500 行，未触及",
+    "syncCount": "grep -c 'sync\\.' graph.go scheduler.go → 0 / 0",
+    "recoverCount": "grep -c 'recover(' scheduler.go → 1",
+    "firstCycleOfCount": "grep -c '^func firstCycleOf' graph.go → 1",
+    "testFunctions": "grep -c '^func Test' 各文件 → 11 + 8 + 8 + 7 + 7 = 41（本片新增 7）"
+  },
+  "nextStageCondition": "REFACTOR 只能在测试保持通过的前提下整理重复/命名/边界，并按契约 completionCriteria 跑变异矩阵 (α)–(ζ)：α 去掉默认数值、β 把 Run stops only when 写回、γ 去掉渲染界、δ 界取 1、ε 环名换成常量、ζ 界取 500。每条变异必须实跑并指明指定杀手行；指定杀手行未在其每轮判红即判该变异未被可靠杀死。REFACTOR 的回执仍必须是同一条场景命令、零退出。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-r15b-green.json",
+    "artifact:docs/design/v3-p1-graph-r15b-red.json",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice15b.json#acceptanceMapping"
+  ]
+}

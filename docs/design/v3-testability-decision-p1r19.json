@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:docs/design/v3-testability-decision-p1r19.json",
+  "workItemKey": "work-p1-graph-r19-join-barrier",
+  "activationId": "559f65af-faa3-4d4d-a893-97631b23db89",
+  "capabilityId": "software.testing.design",
+  "stageId": "decide-testability",
+  "measuredAt": "2026-09-27T20:06:44Z",
+  "contract": "artifact:docs/design/v3-test-scope-p1-graph-slice19.json",
+  "redCandidateRow": "D1",
+  "redCandidate": {
+    "publicEntry": "外部包 package graph_test：graph.New / AddNode / NodeFunc / AddEdge / AddJoin / SetEntry / SetOutput / Validate / Run，观察 Result.Output() / Result.Completed()。未触碰票面 :40 的任何内部面。",
+    "setup": "pkg/hno/graph/p1r19_join_barrier_test.go:23 构造 entry→{a,b}→join（identity 前驱，join 返回 \"joined\"），join 节点体向自己的测试私有 buffered channel（cap 8）发一个信号，Run 返回后 drain 计数。顺序前提由握手担保，零 sleep。",
+    "command": {
+      "executable": "go",
+      "args": [
+        "test",
+        "./pkg/hno/graph",
+        "-run",
+        "TestP1R19_",
+        "-count=1",
+        "-race",
+        "-v"
+      ],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "Validate() 返回 nil，Run 执行整张图，join 恰好执行一次（channel 计数 == 1），Result.Output() == \"joined\"，Completed() 里 join 出现 1 次（票面 :61 的 B2）。",
+    "observed": "测试在 p1r19_join_barrier_test.go:39 判红：`含 Join 汇聚屏障的合法图被 Validate 拒绝：graph: join edge from \"a\" to \"join\" is declared but not routable by this engine（票面 :61 要求 entry→{a,b}→join 可执行）`，随后 `--- FAIL: TestP1R19_JoinBarrierRunsExactlyOnce (0.00s)`、包级 `FAIL github.com/rexleimo/agno-go/pkg/hno/graph 2.904s`，整命令 exit 1。同一绑定命令 `-count=5 -race` 复跑：`--- FAIL: TestP1R19_JoinBarrierRunsExactlyOnce` 出现 5/5 轮，是确定性红而不是竞争红。stdout sha256 e94ff372fec22a817d0d906c230581a39f40485bcc28513b0923af65f0dd6ea9。",
+    "receiptRef": "receipt:279aa8da-e3b3-4fc3-9c8b-a31059f1461b",
+    "failureReason": "缺失的目标行为就是 B2 本身：edgeKind.routable()（graph.go:137-139）把 edgeJoin 留在拒绝白名单之外，scheduler 全文没有任何汇聚记账（scheduler.go:194-215 的 successors 只有 unconditional/conditional/default 三支），因此 Join 声明在构建期就被 fail-closed 拒掉，图从未进入路由。失败发生在 Run/Validate 的公共面上，不是夹具、语法或环境问题 —— 同一命令里既有 8 份测试文件仍全绿（见 productionBytesAtDecision 的包级复跑）。"
+  },
+  "whyNotHardening": "存在新的用户可观察行为：今天 `entry→{a,b}→join` 在 Validate/Run 上被拒（实测 receipt:279aa8da，5/5 确定性），落地后同一张图必须能跑并交出汇聚结果。behavior-preserving-hardening 的前提是「没有新用户可观察行为」，这里不成立；把 Join 路由说成加固等于否认 B2 是票面 §4 的一行行为。",
+  "whyNotBlocked": "验收条件全部可在真实公共场景观察：绑定命令就是那张图的端到端执行，观察面是导出 API 的返回值与错误，不需要内部读数。契约 §observabilityLimit 已如实登记两条精度上限（「凑齐的那一刻」与「不挂死」只能到握手/有界阀的精度），但精度上限不等于不可观察 —— D1–D7 每行都已有可判红的断言形状。",
+  "scenarioCommandBindingNote": "本片所有回执只用一条命令，逐字为 `go test ./pkg/hno/graph -run TestP1R19_ -count=1 -race -v`，且一律以 `receipt -- go test …` 直接取得（executable 记录为 `go`）。理由与教训登记在票面 §14.5：切片 18 曾因用 `-- sh -c \"go test …\"` 取回执，使声明场景命令与回执记录的 executable 不匹配而被宿主整项拒收（receipt:a7b51ac5-3097-4d98-b162-18e4d9dbf309，已作废、不作为证据）。逐行归属靠 -v 输出里的 `--- FAIL: TestP1R19_*` 名字区分。",
+  "productionBytesAtDecision": {
+    "pkg/hno/graph/graph.go": "a8e46a3a2f0baaa699ae60f26498c6f5c1c851cb",
+    "pkg/hno/graph/scheduler.go": "0ce6c3b332ddc768c1c5a10d6c1591fc88d67a2a",
+    "pkg/hno/graph/p1r19_join_barrier_test.go": "本片新增，D1 候选测试",
+    "既有 8 份测试文件": "逐字节等于契约 baselineBytes（graph_test.go 425ea030…、p1r13 bc4ab8e7…、p1r14 0ed607db…、p1r15 3ea06d27…、p1r15b 0285ab35…、p1r16 6934a4f2…、p1r17 cbc8b692…、p1r18 10bce61b…），决策时零改动"
+  },
+  "contractDeltaFromMeasurement": [
+    "契约 D1 的 expectedAtRed 原写「今天整图被 Validate 拒绝，节点根本没跑」—— 实测确认，且拒绝句是 graph.go:271 的 `not routable` 那句，据此把 D6 的判据形状（不得退化成那句 not routable）写成可断言的差异。",
+    "候选测试用「测试私有 channel 计数」而非 `Completed()` 长度作为 join 执行次数的主判据：`Completed()` 只在成功返回后可读，若实现把 join 激活两次，两次都会写进同一张 values map（scheduler.go:181-182 按名字键控），Completed() 里 join 会重复出现但 Output()/Value() 看不出双跑。契约的牙齿归属据此把 D1 的执行次数判据登记为 channel 计数，Completed() 计数只作第二判据。",
+    "候选测试的 Validate 判据先于 Run 判据失败，说明 RED 落在构建期而不是路由期。这是事实而非偏差：B2 的红必须先由「声明被放行」打开，才能观察到屏障行为，GREEN 阶段的实现顺序也据此排（routable() 收缩 → 屏障记账）。",
+    "确认 `-count=5 -race` 下失败 5/5 稳定，故本片不需要竞争取样轮数（对照切片 17 的 D2 需要 600 轮）。契约 §observabilityLimit 里那条「不挂死」精度上限因此只在 D7 一行生效，不扩散。"
+  ],
+  "notTouchedByThisSlice": [
+    "B6 余下两项：重复节点名（今天静默覆盖，且有 graph_test.go:949 担保该语义）与非输出节点无出边的 sink 拒绝 —— 留切片 20，改判据需新的 rex-test-design 周期。",
+    "R1 fail-closed 不变式整体：契约 allowedTestSeam.retires 只授权收缩 `join-only` 那一格，R1 的反向对照（未路由种类仍被拒、合法图放行）必须保留。",
+    "InputSchema/OutputSchema（票面 §3 划到 v3.1）、Send 动态扇出（P3）、Cache/Timeout/Trace（P2）、Store（差异化能力，P4+）。",
+    "R18-Q1 / R18-Q2 / S18-SPEC-2 / R17-GAP-1..3 / R18-GAP-1 / S17-STD-5+S18-STD-6（脚本未入库）/ golangci-lint 从未运行 —— 全部按未裁决或未闭环原样携带，不在本片顺手处理。"
+  ]
+}

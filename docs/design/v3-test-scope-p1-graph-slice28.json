@@ -1,0 +1,270 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p5-session-sidecar",
+  "activationId": "pending",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-28T09:30:00Z",
+  "contractRef": "docs/design/v3-test-scope-p1-graph-slice28.json",
+  "slice": 28,
+  "series": "P5 第 2 片（G7 会话事件侧车 + 派生视图 + 跨进程恢复；D1=OPT-1 落地，2026-09-28 裁决关闭）",
+  "userGoal": "把 D1 裁决（OPT-1：会话事件为侧车内部存储 + 派生视图，Session 对外 JSON 零改动）变成可运行的存储与接线能力：会话事件与挂起记录按 (session_id, run_key) 住进独立的侧车存储（不碰 Session 结构体、不碰四个 marshal 边界、事件写入绝不路由过 Storage.Update——Update 每次触摸重打 UpdatedAt 会破坏字节恒等）；挂起记录完整携带切片 27 的等待项（节点/输入/Interrupt 全量/Mode）与引擎账目（检查点 Seq 续号 + 步数预算），派生视图（事件流/按 run 切片/跨 run 待答中断聚合）供 UI 与调试只读；跨进程恢复 = 快照字节水合进全新侧车 + 同一声明重建全新图实例 + 经 pending 恢复入口装回挂起 → Resume 照常跑完，重复 Resume → ErrNothingToResume，坏响应 → ErrInvalidResponse 且挂起保留；事件流 fail-open（写失败不阻塞不污染主会话路径）、挂起记录 fail-closed（写失败必须上交，绝不静默丢弃）。",
+  "whyThisSlice": "母约 P5 验收三条在本片的落位：「审批场景跨进程恢复」= D4/D5/D6/D7（切片 27 交付了同图实例的 Resume 三语义与 EntryInterrupt 持久化，但挂起态住在进程内——g.pending 与 Suspension.seq/steps 均未导出，切片 27 契约明言「跨进程重建不属本片（会话侧车片）」）；「重复 Resume 幂等」= D8（幂等语义跨重启保持）；「契约测试绿」= D10（四个 marshal 边界字节零改动 + 允许包基线全绿）。切片拆分登记（切片 27 契约 whyThisSlice）兑现：第 1 片 = 引擎内 HITL 核心（实现中）；第 2 片 = 本片（会话侧车存储 + 派生视图 + 跨进程恢复接线）；第 3 片（可选）= run 事件流生产者桥接与事件/待答中断的对外 HTTP 上浮（D1 §3 登记：那是 v3.1 显式契约变更，本片不做）。",
+  "measuredBeforeDesign": [
+    {
+      "id": "M1-今天的存储形状与缺口（仓库内实测，session 层字节未动）",
+      "scene": "仓库 /Users/rex/codes/agno-go（只读测量；测试仅跑允许包 ./internal/session/... ./pkg/hno/session/... ./pkg/agentos/...，绝不跑 pkg/hno/graph——切片 27 正在实现中，其编译态是兄弟片的在途状态）",
+      "commands": [
+        "go test ./internal/session/... ./pkg/hno/session/... ./pkg/agentos/... -count=1",
+        "go vet ./internal/session/... ./pkg/hno/session/...",
+        "git hash-object --no-filters internal/session/service/service.go internal/session/store/postgres/store.go internal/session/dto/types.go pkg/hno/session/db/surreal/storage.go pkg/agentos/session_handlers.go pkg/hno/session/session.go pkg/hno/session/storage.go pkg/hno/session/memory_storage.go",
+        "grep -rln -iE \"suspension|ErrSuspended|RequestInterrupt|InterruptID|SessionEvent|EventStore|sidecar\" internal/session pkg/hno/session pkg/agentos",
+        "go test ./internal/session/... ./pkg/hno/session/... -count=1 -race"
+      ],
+      "observations": [
+        "四个 marshal 边界在当前字节逐一复核在位（receipt:9e425c0a 哈希、receipt:ee752f64 锚点）：① internal/session HTTP wire = toListItem（service/service.go:390）/buildSessionDetail（:407）/响应结构体（:81-101），手工逐字段投影；② internal/session 持久化 = store/postgres/store.go:104 起的按列 JSONB（encodeJSON :528），runs 列是不透明 []map[string]any（dto/types.go:88）；③ pkg/hno/session 持久化 = surreal sessionToPayload（db/surreal/storage.go:347，:352 整结构体 json.Marshal(copy)——全仓库唯一一处，Session 结构体加字段只有这里的持久化字节自动变）；④ pkg/agentos 投影 = SessionResponse（session_handlers.go:35）/sessionToResponse（:545）/buildSessionRuns（:563）逐字段挑拣。",
+        "基线绿：允许包 -count=1 全 exit 0（receipt:dfbb0ae0）；go vet 干净（receipt:2a5565a9）。-race 读数（receipt:a79fc2f8，exit 1）是环境级链路失败而非测试红：internal/session/store/postgres（pgx/v5 引入 net→cgo libresolv）在本机 clang/MacOSX27.0 SDK 的 .tbd 损坏下无法链接 race 测试二进制；其余全部允许包 -race ok。本片 -race 门禁按可链接包面枚举，该环境事实如实登记。",
+        "缺口为真：suspension/ErrSuspended/RequestInterrupt/InterruptID/SessionEvent/EventStore/sidecar 在 internal/session + pkg/hno/session + pkg/agentos 的全部 .go 文件中命中 0（receipt:64ebad5b，grep exit 1 零命中）——今天没有任何事件/挂起存储面。",
+        "依赖闭包测量：pkg/hno/session（本体仅 import pkg/hno/agent + pkg/hno/types；非测试 LOC 3003）不 import pkg/hno/graph；pkg/hno/agent 的 import 闭包很重（models/runner/memory/…）——这决定 M2 探针走 d1probe 先例（replace 指向仓库只读字节）而不是拷贝闭包。",
+        "切片 27 在途状态（只读查看 pkg/hno/graph 文件名）：hitl.go 尚未落仓库，仓库导出面无任何 restore/pending 符号——pending 恢复入口的依赖登记以切片 27 契约为权威接口（见 carriedItems）。"
+      ]
+    },
+    {
+      "id": "M2-可行性实验（候选缝整体落在 /tmp 副本，仓库字节未动）",
+      "scene": "/tmp/g7s28（module g7s28 + replace github.com/rexleimo/agno-go => 仓库只读字节；graph/ = /tmp/g7exp 预演引擎逐字节副本 + restore_rehearsal.go 43 行恢复入口预演；sidecar/ = 侧车预演 247 行；hitlbridge/ = 接线预演 130 行；cmd/probe = 21 个观察面。登记：切片 27 未落仓库，预演引擎用 /tmp/g7exp 的 rehearsal 形状，以切片 27 契约为权威接口）",
+      "commands": [
+        "go -C /tmp/g7s28 test ./sidecar ./hitlbridge -count=1",
+        "go -C /tmp/g7s28 test ./sidecar ./hitlbridge -count=1 -race",
+        "go -C /tmp/g7s28 test ./sidecar ./hitlbridge ./graph -count=1 -p 1",
+        "go -C /tmp/g7s28 run ./cmd/probe",
+        "go -C /tmp/g7s28 run -race ./cmd/probe"
+      ],
+      "observations": [
+        "侧车/接线两包测试多轮 0 判红（receipt:cac4b557、-race receipt:dc06e4a0，均 exit 0）；三包全量含预演引擎 exit 0（receipt:08d2292c；graph 单包亦 exit 0 receipt:6ccc609f、解耦后首轮 receipt:a01d4533）。",
+        "21 个观察面全绿（receipt:8d1e1983，exit 0；-race receipt:047ae48d，exit 0）：[A0] 中断→挂起形状（Is/As、1 待答 1 已完成）；[A0-account] 挂检查点 sink 后账目可读 seq=2/steps=2 且条目流恰 1 完成条目 + 1 EntryInterrupt 条目（切片 27 D7 语义）；[A] OPT-1 核心命题——事件+挂起记录写进侧车后同一 Session 值 marshal 140 字节逐位不变；[B2] 对照（D1 裁决材料同款）——MemoryStorage.Update 本身就改字节（UpdatedAt 重打），事件写入绝不路由过 Update 的纪律由来；[C] 侧车快照 713 字节 → 全新实例水合无损（记录、序号状态全回）；[D] 派生视图——PendingInterrupts 跨 run 聚合返回持久化形状待答中断、EventsByRun/Events 按 Seq 升序；[E] 跨进程恢复全链——坏响应（approved 给 string）被拒（包 ErrInvalidResponse、点名字段与类型）且挂起记录保留、账目续号逐值回装（record seq/steps = 2/2）、好响应后图跑完（final 输出 done=true）、等待节点恰重跑 1 次、重复 Resume → ErrNothingToResume、挂起记录清除；[F] Handoff 档跨重启——等待节点体内调用数不变、响应直接成为其输出喂后继；[G] 失败语义——挂起记录写失败上交且可 errors.Is 归因（fail-closed）、事件追加失败被接线层吞掉不阻塞（fail-open）、主会话路径（MemoryStorage.Create）全程不受侧车故障影响。",
+        "结构代价（副本实测）：侧车包 247 行（go doc 导出面 18 符号）、接线包 130 行（3 符号）、测试 422 行、恢复入口预演 43 行；pkg/hno/session、internal/session、pkg/agentos 零文件改动。",
+        "过程披露（全部回执如实登记）：解耦前首跑（receipt:786de72c，exit 1）暴露预演副本测试文件残留旧 module 路径，经 replace 解析进兄弟片在途的仓库 pkg/hno/graph——已把副本 import 路径全部改写为本地模块后重跑，教训：/tmp 副本与 replace 同用时必须先 grep import 路径；开发中途三条 exit 1（receipt:87471c67 未用变量 + 夹具节点重入时无条件再中断、receipt:509c4d49 账目检查在无检查点配置下过严、receipt:c59339b2 校验失败后再安装撞上「图上已有挂起」守卫）均为夹具/预演迭代而非命题证伪，最后一条直接催生了恢复入口的 ErrPendingInstalled 语义（安装永不覆盖活挂起，保护重悬链）；预演引擎的 TestP1R17 取消归一化测试在并发负载下偶发判红（多包并行时 receipt:eb2a8bd3 exit 1，单包串行 5/5 ok 且引擎字节与 g7exp 逐字节同）——登记为预演副本的环境负载脆弱性，引擎测试属切片 27 票面，本片绑定命令不含 ./graph。"
+      ]
+    }
+  ],
+  "designConsequence": "五条语义在本片定形（实验已按此实现并实测）：（1）侧车落位是新包 pkg/hno/session/sidecar——不进 Session 结构体（surreal :352 整结构体 marshal 的持久化字节自动保持恒等）、不加会话行新列、不落 internal/session（那是 fixture 钉住的 Go↔Python 对齐层，D1 §1.2 实测 fixture 供给缺席、护栏是 skip 绿，把恢复关键数据放上无护栏的互操作桥违背裁决本意，且会把 pgx 拖进接缝——M1 实测该包恰是唯一 -race 无法链接的允许包）、不落 pkg/agentos（投影层下面放存储是层次倒置）；pkg/hno/session 已有 Storage 接口 + MemoryStorage 旁路容器先例，侧车按 (session_id, run_key) 记键、存通用 JSON 记录，不 import 引擎类型（graph 类型与侧车的换算住在接线层）；存储物理形态走 Checkpointer/CacheStore 先例：Sidecar 接口 + MemorySidecar 实现在本片，真实 DB 列/表适配是下一片薄层，快照字节（Snapshot/RestoreSnapshot）就是持久适配将要持有的字节形态的往返证明；（2）记录形状两类两语义：事件流 Event（Seq/RunKey/Kind/At/Payload）= 观测数据 fail-open，接线层吞写错、绝不阻塞会话/运行路径；挂起记录 SuspendedRun（Waiting[]{Node,In,Interrupt{ID,Message,ResponseSchema,Payload,Mode}} + Values/Completed + 引擎账目 Seq/Steps + CreatedAt）= 恢复关键 fail-closed，写失败必须上交（丢失挂起 = 审批永远悬死）、半截记录拒收（ErrInvalidRecord）、恢复成功即清除（幂等）；Mode 在侧车层是本地整型常量（ModeRerun=0/ModeHandoff=1）镜像切片 27 的 InterruptMode，映射住在接线层；（3）跨进程恢复接线是新包 internal/hitlbridge（仓库惯例：共享服务在 internal/；公共暴露留第 3 片）：Capture（挂起+账目→记录）、Install（记录→*Suspension→装回）、ResumeSaved（读回→安装→Resume→成功后清除+补事件）；图不序列化——新进程用同一 builder 声明重建图实例，恢复的只有挂起态，这是唯一诚实的重建语义；依赖切片 27 的 pending 恢复入口（挂起账目读出口 ResumeAccount + 安装口 RestorePending/SetResumeAccount + ErrPendingInstalled「安装永不覆盖活挂起」守卫，保护重悬链）——该入口不在切片 27 交付面内（其契约明言「本片不暴露内部字段」），也不在今日仓库字节中（M1 实测零符号）；若切片 27 收口字节最终未含该入口，本片实现按 /tmp/g7s28/graph/restore_rehearsal.go 的预演形状把它作为最小公共面补进 pkg/hno/graph，且实现严格串行于切片 27 收口之后并重取其 baselineBytes（切片 26/27 同款串行约束），除该入口外不得为测试导出任何 pending 内部态；账目跨重启逐值回装保证检查点 Seq 不跳号、步数预算跨恢复累计（切片 27 D7/D12 语义跨进程保持）；（4）派生视图是侧车接口上的三个只读访问器（Events 全流 Seq 升序 / EventsByRun / PendingInterrupts 跨 run 聚合待答中断）——只读侧车记录、返回持久化 generic 形状，UI/调试可直接消费；把它们上浮到 AgentOS HTTP 是新对外面积 = v3.1 显式契约变更（D1 §3 的「b 作为独立任务」），本片不做；（5）OPT-1 主命题作为不变量行钉死：侧车写入后同一 Session 值的 marshal 字节逐位不变（M2 [A] 实测 140 字节），对照锚 [B2]（Storage.Update 本身改字节）证明纪律的必要性；四个 marshal 边界的 8 个锚文件在实现后必须逐字节同哈希（D10）。",
+  "redProtocol": "两段制：第一段落 API 面（sidecar 包的类型/接口/MemorySidecar/快照、hitlbridge 的 Capture/Install/ResumeSaved 签名、恢复入口若需补进 pkg/hno/graph 则同段落位），D2–D9 按今天的形状真实判红——今天没有任何事件/挂起存储面（M1 gap grep receipt:64ebad5b 零命中），侧车读写无从发生、派生视图无物可返、重启恢复无链可走，全部是行为红而非编译红（唯一允许的编译红是新包本身落地前的引用错，落地后立即转行为红）；D1 与 D10 是不变量/反向锚行，两段都应绿，其牙齿由变异矩阵提供（事件写入改道 Storage.Update → D1 判红；锚文件哈希变动 → D10 判红）。第二段落消费者接线（Capture/ResumeSaved 的 fail-open/fail-closed 分流、记录生命周期、账目回装）转绿。两段各自留 receipt，两段之间测试文件零改动。M2 副本即两段完整预演。",
+  "acceptanceMapping": [
+    {
+      "row": "D1",
+      "behavior": "OPT-1 不变量：事件与挂起记录写进侧车后，同一 Session 值的对外 JSON marshal 字节逐位不变；对照锚：Storage.Update 本身（与事件无关）就改字节（UpdatedAt 每次触摸重打）——事件写入绝不路由过 Update",
+      "publicEntry": "json.Marshal(sess) 前后夹住 sidecar.AppendEvent/SaveSuspendedRun",
+      "assertion": "bytes.Equal(前,后)==true 且对照锚 !bytes.Equal（今天侧车不存在，两段制第一段落 API 后此行为成立；牙齿由变异提供：事件写入改道 Storage.Update 即红）",
+      "independentlyFailable": "对把事件塞进 Session 结构体/会话行新列、或侧车写走路过 Update 的实现判红（surreal :352 整结构体 marshal 字节必变，九个 fixture 面随碎）"
+    },
+    {
+      "row": "D2",
+      "behavior": "侧车存储语义：事件追加获会话内单调 Seq；挂起记录保存/读取/清除；缺 session/run/等待项的半截记录被点名拒绝（ErrInvalidRecord）；快照字节→全新实例水合后记录与序号状态无损（水合后新事件 Seq 接续旧流）",
+      "publicEntry": "Sidecar 接口全家 + MemorySidecar.Snapshot/RestoreSnapshot",
+      "assertion": "Seq 升序、记录逐字段相等、ErrInvalidRecord 三方向、水合后 Seq 接续（今天无侧车面，实现前必红）",
+      "independentlyFailable": "对丢事件、Seq 跳号、接受半截记录、水合丢账目的实现判红"
+    },
+    {
+      "row": "D3",
+      "behavior": "派生视图：Events（会话全流，Seq 升序）、EventsByRun（run 切片）、PendingInterrupts（跨 run 聚合全部未清除挂起的待答中断，持久化 generic 形状）——「重启」（快照→水合）后照常可读",
+      "publicEntry": "Sidecar 三只读访问器",
+      "assertion": "水合后的新实例上三个视图内容与写入一致（实现前必红）",
+      "independentlyFailable": "对视图漏读、乱序、或把待答中断聚合成引擎私有形状的实现判红"
+    },
+    {
+      "row": "D4",
+      "behavior": "审批场景跨进程恢复（Rerun 档，母约 P5 验收①）：Run 中断 → Capture 入侧车 → 快照字节水合进全新侧车 + 同一声明重建全新图实例 → ResumeSaved 带合法响应 → 图跑完（final 输出到位）、等待节点恰重跑一次且响应经 InterruptResponse 可见",
+      "publicEntry": "hitlbridge.Capture/ResumeSaved × graph.Run/Resume × MemorySidecar 快照往返",
+      "assertion": "res!=nil + final 值断言 + 重跑计数 ==1（今天无任何侧车/接线/恢复入口，实现前必红）",
+      "independentlyFailable": "对重启后丢挂起、重跑时拿不到响应、或图从零重跑（不从中断点续）的实现判红"
+    },
+    {
+      "row": "D5",
+      "behavior": "Handoff 档跨重启：等待节点体内调用数不变（不偷跑），响应直接成为其输出喂给后继",
+      "publicEntry": "Interrupt{Mode:Handoff} 持久化 × ResumeSaved",
+      "assertion": "calls==1 + 后继输出 == 响应（实现前必红）",
+      "independentlyFailable": "对「Handoff 跨重启也重跑节点体」的实现判红"
+    },
+    {
+      "row": "D6",
+      "behavior": "切片 27 校验语义跨重启保持：坏响应（类型错/缺必填）→ 包 ErrInvalidResponse 的错误且挂起记录保留（可修正重试）；修正后同一挂起恢复成功",
+      "publicEntry": "ResumeSaved 坏/好响应序列",
+      "assertion": "第一次 Is(ErrInvalidResponse) 且记录在，第二次成功（实现前必红）",
+      "independentlyFailable": "对「校验失败即销毁持久化挂起」或跨重启不校验的实现判红"
+    },
+    {
+      "row": "D7",
+      "behavior": "引擎账目跨重启逐值回装：记录携带挂起时的 Seq（检查点续号）与 Steps（预算已消费），Install 原值装回——检查点 Seq 不跳号、步数预算跨重启继续累计（切片 27 D7/D12 的跨进程版）",
+      "publicEntry": "ResumeAccount 读出口 × 记录 Seq/Steps 字段 × SetResumeAccount",
+      "assertion": "记录 seq/steps == 挂起产物读出的账目（挂检查点 sink 时 seq==完成条目数+EntryInterrupt 条目数）（实现前必红：挂起账目是未导出字段，无读出口则进程外不可得）",
+      "independentlyFailable": "对账目清零回装（Seq 跳号/预算重置）的实现判红"
+    },
+    {
+      "row": "D8",
+      "behavior": "幂等与生命周期（母约 P5 验收②跨重启版）：恢复成功后重复 Resume → ErrNothingToResume；挂起记录成功后清除（再 PendingInterrupts 为空）；对已有活挂起的图重复安装不覆盖（ErrPendingInstalled 被接线层按良性处理——保护重悬链的新挂起不被旧记录冲掉）",
+      "publicEntry": "Resume ×2 / 记录清除断言 / 二次 Install",
+      "assertion": "Is(ErrNothingToResume) + 记录消失 + 重悬链记录可再 Capture（实现前必红）",
+      "independentlyFailable": "对二次恢复重跑图、清除失败仍报成功、或安装覆盖活挂起的实现判红"
+    },
+    {
+      "row": "D9",
+      "behavior": "失败语义按数据类分流：事件追加失败 fail-open（接线层吞掉，Capture 照常成功、挂起记录照常落）；挂起记录写失败 fail-closed（上交且可 errors.Is 归因到后端错误）；记录缺失时 ResumeSaved 上交点名错误；侧车故障期间主会话路径（Storage.Create/Get）完全不受影响",
+      "publicEntry": "注入失败的 Sidecar 夹具 × Capture/ResumeSaved × MemoryStorage",
+      "assertion": "fail-open 方向 Capture==nil、fail-closed 方向 Capture!=nil 且 Is(后端错误)、主存储照常（实现前必红）",
+      "independentlyFailable": "对事件写失败阻塞主路径、或挂起记录丢失被静默吞掉的实现判红（两方向各自判）"
+    },
+    {
+      "row": "D10",
+      "behavior": "边界零触碰 + 契约测试绿（母约 P5 验收③）：四个 marshal 边界的 8 个锚文件实现后逐字节同哈希；允许包基线（./internal/session/... ./pkg/hno/session/... ./pkg/agentos/...）零改动全绿；契约测试维持 skip 绿原状（fixture 供给不在本仓库，本片不改任何 fixture 面——D1 §1.2 的诚实读数）",
+      "publicEntry": "git hash-object --no-filters <8 锚文件> × go test 允许包",
+      "assertion": "8 哈希与开工快照全同 + 基线 exit 0（实现前后都应绿；哈希变动即本行红）",
+      "independentlyFailable": "对顺手改投影/加结构体字段/动 fixture 锚面的实现判红"
+    }
+  ],
+  "minimalVerticalSlice": "D1 + D2 + D4 + D8 + D9 五行（字节恒等不变量、侧车存储语义、跨进程恢复正例、幂等与生命周期、失败语义分流）。理由：D1 是裁决本体，D2 是存储地基，D4 是母约 P5 验收①的最小完整纵向（中断→持久化→模拟重启→恢复），D8 是验收②，D9 是两类数据不可混淆的安全线。D3/D5/D6/D7/D10 为派生视图/Handoff 档/校验保持/账目连续/边界反向锚补强。",
+  "allowedTestSeam": {
+    "add": [
+      "pkg/hno/session/sidecar/p5g7_sidecar_test.go（package sidecar_test，外部包，只用导出 API；TestP5S28_* 命名；字节恒等行用真实 pkg/hno/session.Session + MemoryStorage 做夹具）",
+      "internal/hitlbridge/p5g7_wiring_test.go（package hitlbridge_test，外部包；TestP5S28_* 命名；失败注入夹具自备——实现 Sidecar 接口的 failing 双层包装，互斥锁属夹具不属产品）"
+    ],
+    "modify": [
+      "无。既有全部测试文件一份都不许动——M2 已证仓库允许包与 /tmp 副本均可在零改动下成立。"
+    ],
+    "retires": [],
+    "sourceSeam": "新包 pkg/hno/session/sidecar/sidecar.go（Sidecar 接口 + MemorySidecar + Event/SuspendedRun/InterruptRecord/WaitingNodeRecord + 三派生视图 + Snapshot/RestoreSnapshot）；新包 internal/hitlbridge/bridge.go（Capture/Install/ResumeSaved + fail-open/fail-closed 分流 + 记录生命周期）；条件性新面 pkg/hno/graph 恢复入口（仅当切片 27 收口字节未含时：ResumeAccount/SetResumeAccount/RestorePending/ErrPendingInstalled，预演形状 /tmp/g7s28/graph/restore_rehearsal.go，串行约束见 designConsequence 第 3 条）。pkg/hno/session、internal/session、pkg/agentos 预期零改动文件；M2 副本实测全部产品代码 377 行、测试 422 行。"
+  },
+  "forbiddenObservations": [
+    "侧车内存实现内部（map 形状、互斥锁、键拼接方式）——唯一观察面是 Sidecar 接口返回值与 Snapshot 字节（票面 :40 同族）",
+    "graph 引擎 pending 内部字段/调度器状态——挂起态只经恢复入口的公共面与 *Suspension 读数观察",
+    "time.Sleep 定序；事件 At 时间戳不断言（墙钟）；PendingInterrupts 的聚合次序只断「稳定可复现」不断言具体排序算法",
+    "断言 AgentOS HTTP 面上出现事件/待答中断（本片无新端点；上浮是 v3.1 显式变更）",
+    "为测试导出侧车内部状态或引擎 pending 态的内部版本"
+  ],
+  "baselineBytes": {
+    "note": "本片不改 pkg/hno/graph（条件性恢复入口除外，届时按切片 27 契约的 rebaselineCommand 重取其字节）。下列 8 锚是四个 marshal 边界的字节快照，实现后必须逐字节全同（D10）。",
+    "anchorsCommand": "git hash-object --no-filters internal/session/service/service.go internal/session/store/postgres/store.go internal/session/dto/types.go pkg/hno/session/db/surreal/storage.go pkg/agentos/session_handlers.go pkg/hno/session/session.go pkg/hno/session/storage.go pkg/hno/session/memory_storage.go",
+    "anchors": {
+      "internal/session/service/service.go": "933a463e470ed21bb69ff9672f9e415b9f6e20bf",
+      "internal/session/store/postgres/store.go": "1f2d1597f027bc7b4d6c2bafc581e7c4f85d7b5c",
+      "internal/session/dto/types.go": "f62ed813f65ee90680f4e8854ed982f4b2ce2108",
+      "pkg/hno/session/db/surreal/storage.go": "9c407d8dc16d64fd2240fda8b14668cf7580522a",
+      "pkg/agentos/session_handlers.go": "676ab7bc895a9556e086a7c4e5b100c0522931cd",
+      "pkg/hno/session/session.go": "e991a2ba10b5022c32c4763b8f38679a01a2bca1",
+      "pkg/hno/session/storage.go": "d32dfe35de5cf3e5c5e980ba368301bf2124d4e7",
+      "pkg/hno/session/memory_storage.go": "deb803d18ae3de68049c278e08064554bcdd181e"
+    },
+    "counters": {
+      "sessionPkgNontestLoc": 3003,
+      "expectedNewNontestLoc": 377,
+      "expectedNewNontestLocBreakdown": "sidecar 247 + hitlbridge 130（M2 副本实测；条件性恢复入口另计 ≤60 行，预演 43 行）",
+      "expectedSidecarExportedSymbols": 18,
+      "expectedBridgeExportedSymbols": 3,
+      "boundaryModifiedFiles": 0
+    }
+  },
+  "carriedItems": [
+    {
+      "id": "切片27依赖",
+      "ref": "docs/design/v3-test-scope-p1-graph-slice27.json（designConsequence 第 7 条 + carriedItems「第2片登记」）",
+      "carriedIntoDesign": "权威接口 = 切片 27 契约：跨进程恢复「经 Graph 重建 + pending 恢复入口」，该入口不在其交付面（「本片不暴露内部字段」）。落地状态（M1 实测）：hitl.go 尚未落仓库、导出面零 restore/pending 符号——本片实现严格串行于切片 27 收口之后；若收口字节未含入口，按预演形状（ResumeAccount/SetResumeAccount/RestorePending/ErrPendingInstalled）最小补进 pkg/hno/graph 并重取其 baselineBytes；若已含，则本片只消费不新增。M2 预演用 /tmp/g7exp rehearsal 形状完成全链验证（此 caveat 如实登记）。"
+    },
+    {
+      "id": "D1-裁决",
+      "ref": "artifact:docs/design/v3-adjudication-d1-session-events.md §5",
+      "carriedIntoDesign": "OPT-1 已裁决关闭（2026-09-28）：本片即其落地——侧车物理形态（独立容器而非 runs 通道，即裁决材料 §3 留给本契约的子选择）落位 pkg/hno/session/sidecar，四边界零触碰由 D1/D10 钉死；「事件上浮为对外契约」留 v3.1 显式变更（第 3 片）。"
+    },
+    {
+      "id": "R19-Q1",
+      "ref": "票面 §15.5",
+      "carriedIntoDesign": "挂起形状本身不受本片影响（零派发/R19-Q1 族是引擎面）。侧车对 Values/Completed 的持久化经 JSON 快照往返天然深拷贝，进程间无别名；同图实例内的别名问题仍是 S19-STD-1 的裁决面，本片不扩大。"
+    },
+    {
+      "id": "S19-STD-1",
+      "ref": "状态文档 §5",
+      "carriedIntoDesign": "切片 27 的防御性拷贝口径（Resume 不改写调用方仍持有的旧 Suspension 视图）在侧车侧由序列化自然满足：跨重启的 Values 是 JSON 反序列化的新对象，别名不经本片传播。"
+    },
+    {
+      "id": "第3片登记",
+      "ref": "切片 27 契约 whyThisSlice",
+      "carriedIntoDesign": "run 事件流生产者桥接（S23-SPEC-1 交点）与事件/待答中断的 AgentOS HTTP 上浮（v3.1 契约变更 + python 侧核对）本片不做；本片交付的派生视图接口是其消费面。"
+    }
+  ],
+  "explicitNonGoals": [
+    "侧车持久化 DB 适配（postgres 新表/surreal 容器等）——Sidecar 接口 + MemorySidecar + 快照字节往返是本片全部；真实适配是下一片薄层（CacheStore 先例：实现属调用方）。",
+    "事件/待答中断的 AgentOS HTTP 端点上浮（v3.1 显式契约变更，需 fixture 再供给与 python 侧核对，D1 §3）。",
+    "run 事件流生产者桥接 / CheckpointEvent（切片 23 协议层交点，第 3 片可选）。",
+    "Session 对外 JSON 的任何改动（D1=OPT-1 明令禁止；D1/D10 双行钉死）。",
+    "引擎 HITL 语义本身（切片 27 票面：schema 子集、Rerun/Handoff、预算、重试交互——本片只跨进程搬运，不新增引擎语义）。",
+    "侧车记录 TTL/GC/多租户配额、事件分页/游标（派生视图最小集之外的面）。",
+    "内部会话对齐层（internal/session）的任何投影或存储改动。"
+  ],
+  "completionCriteria": [
+    "1. redProtocol 两段各自留 receipt（第一段落 API 面后 D2–D9 行为红、D1/D10 绿；第二段落接线后全绿）；两段之间测试文件零改动。",
+    "2. 每行牙齿由变异证明（至少：事件写入改道 Storage.Update（D1 破）、挂起记录写失败静默吞掉（D9 fail-closed 破）、事件写失败升级为阻塞（D9 fail-open 破）、成功后不清除挂起记录（D8 生命周期破）、安装覆盖活挂起（D8 守卫破）、账目清零回装（D7 破）、快照形状丢字段（D2 破）、派生视图改读主会话存储（D3 破））；等价变异如实登记。",
+    "3. 既有全部测试文件零改动；8 个边界锚文件 git hash-object 与开工快照逐字节全同（D10）。",
+    "4. 门禁全 exit 0：绑定命令（-race）；go build ./... 与邻近包面（串行于切片 27 收口后执行）；go test ./pkg/hno/session/... -count=1 与 -race、go test ./internal/session/... -count=1（该树 -race 的链接失败是 M1 登记的环境事实，非测试红，-race 门禁按可链接包面枚举）、go test ./pkg/agentos/... -count=1、go vet 新包、gofmt -l 新包目录。",
+    "5. 结构判据：新包非测试 LOC ≤ 450（M2 实测 377 + 条件性入口余量）、边界改动文件数 == 0、sidecar/bridge 导出符号 18/3（条件性入口另登记）、新包 sync. 计数仅限 MemorySidecar 的 RWMutex（先例 MemoryStorage）。",
+    "6. 绑定命令在最终字节重跑取新回执；-race 无 DATA RACE。",
+    "7. 写回：母约 §9/§10 P5 行标注第 2 片交付（侧车 + 派生视图 + 跨进程恢复）；D1 裁决材料补一行落地指针（不代改裁决本文）；状态文档由编排方收口。",
+    "8. 防碰巧绿：绑定命令 -count=30 -race 一次 exit 0；若条件性恢复入口落进 pkg/hno/graph，其整包 -count=5 -race 按切片 27 契约口径补一次。"
+  ],
+  "forbiddenShortcuts": [
+    "把事件写进 Session 结构体新字段或会话行新列（OPT-2 侧门；D1/D10 双行钉死）。",
+    "侧车写走路过 Storage.Update 的捷径（UpdatedAt 重打破坏字节恒等，[B2] 实测）。",
+    "事件写失败升级为阻塞主路径，或挂起记录写失败静默吞掉（两类数据两种语义，D9 钉死，混淆任一方向即红）。",
+    "恢复成功后保留挂起记录（下次重启会二次恢复已完成的运行），或清除失败仍报成功。",
+    "安装时覆盖图上已有活挂起（冲掉重悬链的新挂起）。",
+    "账目不回装/清零回装（Seq 跳号、预算重置，切片 27 D7/D12 的跨进程版破）。",
+    "用真实 sleeps/墙钟给恢复链定序；为测试导出引擎 pending 或侧车内部态。",
+    "借本片顺手改 internal/session 投影或 fixture 面（护栏缺席，D1 §1.2）。"
+  ],
+  "observabilityLimit": [
+    "Sidecar 接口不承诺持久性——MemorySidecar 进程崩即失（设计如此）；持久性由未来 DB 适配满足同一接口，本片以快照字节往返证明记录形状可持久，不以内存实现冒充持久担保。",
+    "快照字节格式是内存实现的传输面，不是 wire 契约；DB 适配可自选物理形态，只需满足接口语义。",
+    "PendingInterrupts 的聚合次序（按记录创建时间+声明序）不担保跨版本稳定；事件 At 为墙钟值不作断言。",
+    "恢复入口若由本片补进 pkg/hno/graph，其形状以「挂起账目读出口 + 安装口 + 不覆盖守卫」为限，是切片 27 契约预留面的最小实现；更丰富的恢复 API 属后续契约。",
+    "模拟重启 = 快照字节水合 + 同声明重建图实例；真实跨进程部署（网络/DB 中间层）不在单元面内。",
+    "预演副本（/tmp/g7s28）中引擎侧 TestP1R17 在并发负载下偶发判红（引擎字节与 g7exp 逐字节同、单包串行 5/5 ok）——引擎测试脆弱性属切片 27 票面，本片绑定命令不含 ./graph。"
+  ],
+  "verificationCommands": [
+    "go test ./pkg/hno/session/sidecar/... ./internal/hitlbridge/... -run TestP5S28_ -count=1 -race -v   # 本片唯一绑定场景命令（cwd 仓库根；包在实现时落地）",
+    "go build ./... ; go test ./pkg/hno/session/... -count=1 ; go test -race ./pkg/hno/session/... -count=1 ; go test ./internal/session/... -count=1 ; go test ./pkg/agentos/... -count=1 ; go vet ./pkg/hno/session/sidecar/... ./internal/hitlbridge/... ; gofmt -l pkg/hno/session/sidecar internal/hitlbridge",
+    "git hash-object --no-filters internal/session/service/service.go internal/session/store/postgres/store.go internal/session/dto/types.go pkg/hno/session/db/surreal/storage.go pkg/agentos/session_handlers.go pkg/hno/session/session.go pkg/hno/session/storage.go pkg/hno/session/memory_storage.go   # 必须与 baselineBytes.anchors 逐字节全同",
+    "find pkg/hno/session/sidecar internal/hitlbridge -name '*.go' -not -name '*_test.go' | xargs wc -l   # 必须 ≤ 450（M2 副本实测 377）",
+    "grep -rln -iE \"suspension|ErrSuspended|RequestInterrupt|sidecar\" internal/session pkg/agentos | wc -l   # 必须 0（对齐/投影层零渗透；pkg/hno/session 下仅 sidecar 新包命中）"
+  ],
+  "writeBackOwed": [
+    "母约 §9/§10 交付表 P5 行：标注第 2 片交付（会话事件侧车 + 派生视图 + 跨进程恢复接线）与三条 P5 验收的落位（跨进程恢复 = D4–D7、幂等 = D8、契约测试绿 = D10）。",
+    "D1 裁决材料：追加落地指针一行（OPT-1 已由切片 28 落地，侧车落位 pkg/hno/session/sidecar；不代改裁决本文）。",
+    "状态文档 §4/§5：由编排方收口。",
+    "若条件性恢复入口落进 pkg/hno/graph：切片 27 契约的 baselineBytes/counters 按其 rebaselineCommand 重取并登记。"
+  ],
+  "adjudicationOptions": [],
+  "notes": "本契约由测试设计代理写成；M1 全部在仓库只读实测（测试仅跑允许包，绝未对 pkg/hno/graph 执行任何测试/构建），M2 全程在 /tmp/g7s28 副本（d1probe 同款 replace 指向仓库只读字节；切片 27 用 /tmp/g7exp rehearsal 形状预演并登记 caveat）。开发中途全部 exit 1 均如实登记并归类（夹具迭代 / 环境链接失败 / 负载脆弱性 / 解耦教训），无一条被静默丢弃。环境事实两条：本机 clang/MacOSX27.0 SDK .tbd 损坏使 internal/session/store/postgres 无法链接 -race 测试二进制（非测试红）；.rex-harness/（回执目录）在 .gitignore:62。activationId 待派发回填。仓库字节除本契约文件外未动。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-platform.md#9",
+    "artifact:docs/design/v3-platform.md#12",
+    "artifact:docs/design/v3-adjudication-d1-session-events.md",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice27.json",
+    "receipt:dfbb0ae0-0aa7-49e2-a9e1-0895103cedea",
+    "receipt:a79fc2f8-1930-447d-b59e-15449d93ddb0",
+    "receipt:2a5565a9-95c6-41a5-b292-91c683e6922a",
+    "receipt:9e425c0a-3e35-40c1-9b01-1b9f45b7d7fc",
+    "receipt:ee752f64-603b-43bf-b767-9879aeb3c43f",
+    "receipt:64ebad5b-1eb8-4536-8c19-75f2d1ecfa9e",
+    "receipt:786de72c-9f31-4e3c-9124-d1dd8736687e",
+    "receipt:c83edded-abce-4c58-b0ae-f86015866256",
+    "receipt:a01d4533-8dab-462b-811b-e673cd27ad4e",
+    "receipt:6ccc609f-a227-438e-9436-0109f9090bed",
+    "receipt:cac4b557-72b1-4c0d-8016-47d7d050a1e8",
+    "receipt:87471c67-e734-48c6-aada-a61b08d57d5e",
+    "receipt:eb2a8bd3-76b2-485f-bb17-ccca288a421d",
+    "receipt:dc06e4a0-8d7e-4192-957f-d8e8c56d2163",
+    "receipt:08d2292c-e0c8-4990-8fe0-eebdf9b710d1",
+    "receipt:509c4d49-e75e-4f27-828a-b990ba2acce1",
+    "receipt:c59339b2-04e6-442f-bd32-7bb1ff36950c",
+    "receipt:8d1e1983-70d1-4afb-97f1-5ae57c17cab3",
+    "receipt:047ae48d-5d6a-495a-8651-d11234e024b2"
+  ]
+}

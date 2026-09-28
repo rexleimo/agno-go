@@ -1,0 +1,93 @@
+{
+  "schema": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p1-graph-engine-r9-output-contract",
+  "activationId": "d6376e2e-ff9b-4a9f-b84e-365dcb13d4d6",
+  "slice": "P1-graph slice9：输出声明的构建期校验",
+  "userGoal": "让图引擎在「输出声明本身不合法」时于构建期拒绝，而不是跑完一张图后交给调用方一个 Output()==nil 且 err==nil 的结果。slice8 自审 S8-SPEC-1 实测：SetOutput(\"ghost\") 与从不调用 SetOutput 两张图今天都返回 err=<nil> output=<nil> completed=[a b] executed=2。",
+  "acceptanceSource": [
+    "docs/design/v3-platform.md:212-223 §3.5 构建期校验必查 8 项（第 3 项钉住口，输出轴无对应项）",
+    "docs/design/v3-test-scope-p1-graph.md:65 B6 校验清单（同缺输出存在性）",
+    "docs/design/v3-p1-graph-slice8-review-verdict.json#axes.spec.findings[S8-SPEC-1]（本行为的发现回执链）",
+    "docs/design/v3-p1-graph-slice8-invariant-review.json#newFinding（R8-IV-1）"
+  ],
+  "contractAmendmentNeeded": {
+    "detail": "§3.5 的必查清单需新增一项：输出节点未声明或不存在 → Validate 非 nil。母约是 .md，PreToolUse 治理门阻断写入，因此本切片只把修订需求落在本 JSON；写回 §3.5/B6 由解除门控后的治理轮执行。",
+    "blocksImplementation": false,
+    "why": "新校验是 §3.5 精神（非法/不受支持的声明在构建期被拒）的直接推论，契约 v3-test-scope-p1-graph.md:167-168 已把该精神写成不变式，故这不是新增目标，而是补记遗漏。"
+  },
+  "inScopeBehaviors": [
+    {
+      "id": "A1",
+      "behavior": "SetOutput 指向未注册节点：Validate 返回非 nil，错误同时含「graph: output node」、被指名的节点名（带引号）与「does not exist」；同一张图经 Run 传达为 err!=nil 且 res==nil。",
+      "observable": "公共入口 graph.Graph.Validate / graph.Graph.Run 的返回值"
+    },
+    {
+      "id": "A2",
+      "behavior": "从未调用 SetOutput：同 A1 的拒绝形状，节点名渲染为空串引用；Run 同样 err!=nil 且 res==nil。",
+      "observable": "同上"
+    },
+    {
+      "id": "A3",
+      "behavior": "反向对照：输出节点已注册且被本次执行完成时，Validate 为 nil、Run 成功、Output() 等于该节点返回值。此对照必须与 A1/A2 同轮存在，否则「Validate 一律报错」可同时满足 A1/A2。",
+      "observable": "Validate()==nil + Run 的 Result.Output()/Completed()"
+    },
+    {
+      "id": "A4",
+      "behavior": "判别面（本切片的核心区分）：输出节点合法但其返回值就是 nil 时，图必须仍然合法、Run 必须成功，且 Output()==nil 与 Value(输出节点名)==(nil,true) 同时成立。新校验只拒绝「声明不合法」，绝不把「合法节点产出 nil」误判为非法。",
+      "observable": "Validate()==nil、Run 的 err==nil、Result.Output()==nil、Result.Value(name) 的 ok==true"
+    },
+    {
+      "id": "A5",
+      "behavior": "收口 slice8 审查项 S8-STD-5：悬空端点表驱动行的 Run 面除判 err!=nil 外，补判 res==nil，与同文件其它拒绝用例的观察面一致。",
+      "observable": "Result 指针为 nil（纯测试强度，不引入新行为）"
+    }
+  ],
+  "explicitNonGoals": [
+    "不校验「输出节点已注册但本次执行未到达它」——那属 §3.5 第 4 项不可达节点，需要 BFS，单独一轮取 RED。本切片该面行为保持现状（err==nil、Output()==nil），并在 downstreamEvidence 里如实记录为仍开放的同类静默面。",
+    "不引入结构化拒绝错误（kind/side/node 字段），文案仍是 fmt 组装的散文；文案断言的脆弱性（slice8 S8-STD-3）留给结构化错误轮。",
+    "不动 §3.5 其余未落项（重复节点名、不可达、非输出汇点、Join 前驱数、B5 环检测、B4 stepLimit）。",
+    "不修复 scheduler.go:70 与 plan 中 output 的活读问题（与 C6-STD-4 同轮）。",
+    "不做表驱动折叠、不抽 assertRejectNames 辅助函数（slice8 S8-STD-2 的债务仍挂账，避免与本行为轮混做）。",
+    "不写回母约 .md（门控阻断，见 contractAmendmentNeeded）。"
+  ],
+  "outOfScopeObservableChanges": "除 A1/A2 的拒绝外，任何当前能跑出 Result 的图在本轮之后必须仍能跑出同样的 Result；A4 就是这条的守卫。",
+  "allowedTestSeam": [
+    "pkg/hno/graph/graph_test.go（外部测试包 graph_test，只用导出面：New/AddNode/AddEdge/AddConditional/AddDefault/SetEntry/SetOutput/Validate/Run 与 Result.Output/Value/Completed）。",
+    "仓库外独立场景模块 /tmp/p1-invariants-r9：沿用 slice8 已建立的「计数节点」手法，从包外公共入口验证拒绝路径零节点执行，并保留 A4 的绝对期望。"
+  ],
+  "forbiddenTestSeam": [
+    "禁止为测试新增导出 API（例如 SetOutput 的校验开关、WithOutput 变体或导出哨兵错误）。",
+    "禁止改用内部字段（g.output / plan.output / s.result.outputSet）作为唯一证明。",
+    "禁止用 errors.Is/As 去匹配一个本轮并不承诺存在的哨兵错误类型。"
+  ],
+  "falsePassProhibitions": [
+    "不得把 Validate 改成「output 为空就报错、非空就放过」而放过 ghost —— A1 必须真实判红该实现（节点存在性检查，不是字符串非空检查）。",
+    "不得用「删除 A3/A4 对照」的方式让实现更容易通过。",
+    "不得靠把 reference 或实测值改写为当前错误输出来取得 GREEN。",
+    "RED 必须来自产品缺少该校验本身：若测试因语法/夹具/环境失败，属基础设施失败，不得记为合法 RED。",
+    "GREEN 之后必须证明 A4 仍能杀掉「把 output 校验做成 Output()==nil 就拒绝」这类过度收紧的变异体。"
+  ],
+  "completionCriteria": [
+    "行为级 RED：新增输出校验测试在现行实现下真实非零退出，且失败原因正是「非法输出声明被放行」，回执 id 记入 testability 决定与 GREEN 账本。",
+    "GREEN：A1..A4 全绿，零退出回执；-race 与 go build ./... 与 go vet 全绿。",
+    "邻居回归：pkg/hno/graph 全包、pkg/hno/agent 与 pkg/hno/runner 的既有测试零新增失败。",
+    "公共场景：/tmp/p1-invariants-r9 从包外证明「被拒输出声明零节点执行」与「A4 合法 nil 输出仍成功」两面，零退出回执。",
+    "变异归因：至少 3 个单点变异体（去掉存在性检查、把存在性检查降级为非空检查、过度收紧成按值判 nil）各自被具体测试判红，逐一体附回执；杀伤不唯一时必须如实标注。",
+    "台账诚实：A5 的补判要有「不补则杀不掉对应变异体」的证据；slice8 账本中关于「输出轴仍静默」的表述要在本轮账本里就地更新为「声明不合法已拒绝，未到达仍开放」。",
+    "无法达成以上任一条时停在当前阶段报 blocked，不得改用弱证据推进。"
+  ],
+  "environmentNotes": [
+    "回执统一用 rex-harness receipt --root /Users/rex/codes/agno-go；场景模块在 /tmp 下，cwd 记仓库根并用 sh -c 内cd。",
+    "禁止把 go test 结果管道给 tail/head 后再报退出码（slice7 曾因此把红报成绿）。",
+    "变异实验前备份 pkg/hno/graph/*.go，跑完立即恢复并核对哈希，与 slice8 冻结哈希逐字节比对。",
+    "docs/design/v3-*.md 受 PreToolUse 治理门阻断，本轮全部台账用 .json。"
+  ],
+  "downstreamEvidence": {
+    "currentBehaviorMeasured": [
+      "SetOutput(\"ghost\")：err=<nil> output=<nil> completed=[a b] executed=2（receipt:3247c3de-a0f8-4f6c-811b-59876239b1f3）",
+      "从不调用 SetOutput：err=<nil> output=<nil> completed=[a b] executed=2（同上）",
+      "按「必须拒绝」断言时真实非零退出（receipt:ae945dd1-649c-4b93-8e81-7d0535ec75b6）"
+    ],
+    "stillOpenAfterThisSlice": "输出节点已注册却未被执行到 → 依旧 err==nil 且 Output()==nil；归 B6 不可达项，本轮只登记不修。"
+  }
+}

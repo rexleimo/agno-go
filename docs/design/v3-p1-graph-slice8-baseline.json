@@ -1,0 +1,130 @@
+{
+  "schema": "rex.hardening-baseline.v1",
+  "workItemKey": "work-p1-graph-engine-r8-teeth-rework",
+  "workflowActivationId": "aad3cb04-df5d-4059-b429-106ab27c2b31",
+  "activationId": "71c5cfe2-858d-49ad-b844-2275ea4b5aaa",
+  "commandToken": "7a7507df-52ed-478b-989a-dc6a7108cc4a",
+  "stageId": "baseline",
+  "recordedAt": "2026-09-27T08:29:30Z",
+  "frozenState": {
+    "head": "0387000",
+    "graph.go": "3483783f1e787c96ca6c236341664d095acec5c0",
+    "scheduler.go": "87854ffbb7629f9adeb2d45fbb74d91f2032b99d",
+    "graph_test.go": "0ebcadebed389afe7aa842a6958f3116dc7a9af2",
+    "note": "基线在切片 7 冻结态上采集，未做任何本轮改动；三个哈希由 git hash-object --no-filters 复算。"
+  },
+  "environment": {
+    "kind": "独立可清理的下游模块场景",
+    "path": "/tmp/p1-baseline-r8（go.mod 以 replace 指向本仓库，与产品代码分离，不写入仓库根）",
+    "whyReal": "被测对象是库的导出 API，因此真实 I/O 边界就是另一个模块经 go run 消费它：scenario 通过 New/AddNode/AddEdge/AddJoin/SetEntry/SetOutput/Validate/Run/Result 观察，不直接调用任何私有 helper，也不在包内自证。",
+    "addedVsCycle7": "在 cycle7 的 7 条场景之外，新增 4 条拒绝场景（entry-never-declared、entry-not-a-node、join-edge-not-routable、edge-to-missing-node），并把 next-run-visible 的 output 从『只打印』改为『绝对断言 == D-OUT』；rejection 帮助函数带 recover，使 panic 成为一种可上报的观察而不是让场景静默死掉。"
+  },
+  "scenarios": [
+    {
+      "id": "BS-1",
+      "publicEntry": "go run .（模块 /tmp/p1-baseline-r8）",
+      "setup": "合法骨架 a→b，输出 b，入口 a，d 注册未连",
+      "expected": "reference 与 5 条运行中修改场景全部 completed=[a b] output=seed",
+      "observed": "reference / inflight-AddNode / inflight-SetOutput / inflight-nil-predicate / inflight-dangling-edge / inflight-legal-edge 六行均 OK，completed=[a b] output=seed",
+      "receiptRef": "receipt:f940b6f3-dfe4-4cd6-99ee-1e3cb25001a7"
+    },
+    {
+      "id": "BS-2",
+      "publicEntry": "同上，第二次 Run",
+      "setup": "第一次 Run 之后 AddEdge(\"b\",\"d\") 且 SetOutput(\"d\")",
+      "expected": "下一次 Run 可见：completed=[a b d]，且 Output() 等于被指名输出节点自身的值 D-OUT",
+      "observed": "next-run-visible OK completed=[a b d] output=D-OUT（本轮起该值是断言而非打印）",
+      "receiptRef": "receipt:f940b6f3-dfe4-4cd6-99ee-1e3cb25001a7"
+    },
+    {
+      "id": "BS-3",
+      "publicEntry": "Graph.Validate() 与 Graph.Run()",
+      "setup": "只缺入口：注册 a、b，AddEdge(a,b)，SetOutput(b)，从不调用 SetEntry",
+      "expected": "两个入口都拒绝且可定位，进程存活",
+      "observed": "entry-never-declared OK validate=\"graph: entry node \\\"\\\" does not exist\" run 同一错误，missing-phrases=[]，无 panic",
+      "receiptRef": "receipt:f940b6f3-dfe4-4cd6-99ee-1e3cb25001a7"
+    },
+    {
+      "id": "BS-4",
+      "publicEntry": "同上",
+      "setup": "入口指向未注册的名字 ghost",
+      "expected": "拒绝并指名 ghost",
+      "observed": "entry-not-a-node OK validate=\"graph: entry node \\\"ghost\\\" does not exist\" run 同一错误，missing-phrases=[]",
+      "receiptRef": "receipt:f940b6f3-dfe4-4cd6-99ee-1e3cb25001a7"
+    },
+    {
+      "id": "BS-5",
+      "publicEntry": "同上",
+      "setup": "声明引擎不路由的 Join 边",
+      "expected": "错误同时钉住种类与前缀与不可路由原因",
+      "observed": "join-edge-not-routable OK：\"graph: join edge from \\\"a\\\" to \\\"d\\\" is declared but not routable by this engine\"",
+      "receiptRef": "receipt:f940b6f3-dfe4-4cd6-99ee-1e3cb25001a7"
+    },
+    {
+      "id": "BS-6",
+      "publicEntry": "包内测试面（同一冻结态）",
+      "setup": "go test ./pkg/hno/graph/... -count=1 与 -run TestP1G -count=1 -v",
+      "expected": "既有行为不丢：全绿零退出",
+      "observed": "全包 ok（receipt:90f223ce）；-run TestP1G -v 实测 35 PASS / 0 FAIL / 0 SKIP（receipt:de41c46d）",
+      "receiptRef": "receipt:90f223ce-34c9-453c-96bc-8e168995e698"
+    },
+    {
+      "id": "BS-7",
+      "publicEntry": "go test -coverprofile",
+      "setup": "同一冻结态，pkg/hno/graph 覆盖画像",
+      "expected": "记录『必检入口校验是否真的有测试经过』的独立数值",
+      "observed": "块 graph.go:220.36,222.3 计数为 0（紧随其后的 :223 边循环块计数为 1），即入口存在性检查体在当前测试面从不执行；这是 cycle7 C7-SPEC-4 的第三条独立佐证路径。",
+      "receiptRef": "receipt:6a34ef4b-722f-4e70-9c6e-4b6e5f0ce94e"
+    }
+  ],
+  "preHardeningDefectMeasurements": [
+    {
+      "id": "PD-1",
+      "measurement": "删除 graph.go:220-222 后 go test ./pkg/hno/graph/... -count=1 退出 0（35/35 绿），而导出 API 后果是 Validate() 返回 <nil> 且 Run() 以 SIGSEGV 结束（panic 帧 scheduler.go:110，goroutine 起于 :109）。",
+      "receiptRef": "receipt:b16b68fd-220c-4f3e-9679-95f111774bdf",
+      "probeRestored": "receipt:13e5ca5e-0c62-42f0-8e90-11f5aac80610"
+    },
+    {
+      "id": "PD-2",
+      "measurement": "删除 graph_test.go:574-577（上一轮自己新增的断言）后全套件仍退出 0，结合结构证明（reference 是 :494 那次已完成 Run 的不可变 Result，:495 已用 Fatalf 断言同一谓词）判为按构造不可能为假。",
+      "receiptRef": "receipt:37eb1423-1f85-449a-8212-42be72c1e2ec"
+    },
+    {
+      "id": "PD-3",
+      "measurement": "夹具值 \"D-OUT\" 与 \"E-OUT\" 在 graph_test.go 中各只出现 1 次（都在定义处），从未被任何断言读取；唯一执行 d 的包内对照（:550）只读 Completed()。",
+      "receiptRef": "receipt:de41c46d-5832-413e-9f21-81a48c50923f"
+    }
+  ],
+  "noop": "非 noop：cycle7 实测的三处零检测力（PD-1/PD-2/PD-3）本轮要转为有检测力，且契约 (d) 需结案。",
+  "negativeClauses": [
+    "不把『删除生产校验后判红』记作 failing-test-observed：那是变异证明，属加固轮。",
+    "不引入 typed error、不做表驱动化重构、不碰注释类承前端口（B7-6/B7-7）。",
+    "不接受无回执的断言强度声明。"
+  ],
+  "rollbackDigest": "回滚 = 恢复 graph_test.go 到 0ebcadebed389afe7aa842a6958f3116dc7a9af2、graph.go 到 3483783f1e787c96ca6c236341664d095acec5c0、scheduler.go 到 87854ffbb7629f9adeb2d45fbb74d91f2032b99d；备份在 /tmp/p1-cycle6/（graph.go、scheduler.go、graph_test.go、graph_test.go.slice7-hardened 及两个 .pre-* 变异前副本）。场景模块 /tmp/p1-baseline-r8 独立于仓库，删除即清理。",
+  "priorBaselines": [
+    "docs/design/v3-p1-graph-slice7-baseline.json（cycle7 BS-1…BS-5）",
+    "docs/design/v3-p1-graph-review-verdict.json#cycle7.parentVerification（PV-1…PV-6）"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-slice8-baseline.json#scenarios",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice8.json#inScopeBehaviors",
+    "receipt:f940b6f3-dfe4-4cd6-99ee-1e3cb25001a7",
+    "receipt:90f223ce-34c9-453c-96bc-8e168995e698",
+    "receipt:6a34ef4b-722f-4e70-9c6e-4b6e5f0ce94e",
+    "receipt:de41c46d-5832-413e-9f21-81a48c50923f",
+    "receipt:b16b68fd-220c-4f3e-9679-95f111774bdf",
+    "receipt:37eb1423-1f85-449a-8212-42be72c1e2ec",
+    "receipt:13e5ca5e-0c62-42f0-8e90-11f5aac80610"
+  ],
+  "submissionBinding": [
+    "命令绑定说明：rex-harness 对 hardening baseline 阶段的 receipt 校验会把证据项里的每个 receipt: 引用与该工作项 testabilityDecision.baseline.command 逐字比对（software-workflow-runtime.mjs:267-295 + validate-command-evidence.mjs 的 assertExecutionReceiptMatchesCommand）。因此提交的回执必须是声明过的那条命令（receipt:de41c46d，go test ./pkg/hno/graph/... -run TestP1G -count=1 -v，cwd 为仓库根），下游场景模块回执（f940b6f3）、全包回执（90f223ce）与覆盖画像回执（6a34ef4b）在本台账内逐条留痕并作为判据依据，但不混进同一证据项，否则按构造必然被判为场景不匹配。",
+    "这是产品约束而非绕行：真实场景仍按 skill 要求在独立可清理环境执行，只是提交面必须与类型化结论声明的那一条公共入口命令一致。"
+  ],
+  "invariantsToPreserve": [
+    "graph.go / scheduler.go 哈希不变（本轮零生产代码改动）。",
+    "BS-1…BS-5 的公共行为逐条保持：加固只增加测试能否发现其退化的能力。",
+    "graph_test.go 相对 0387000 的删除行仅限 PD-2 那条被证明惰性的断言。",
+    "非测试文件零 sync./atomic./recover(。"
+  ]
+}

@@ -1,0 +1,256 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.tdd-refactor-record.v1",
+  "workItemKey": "work-p1-graph-r15-warnings",
+  "activationId": "4cd4b915-f540-4103-b068-a2dc06b3fdef",
+  "stageId": "refactor",
+  "capabilityId": "software.testing.tdd",
+  "recordedAt": "2026-09-27T16:12:00Z",
+  "scopeContract": {
+    "ref": "artifact:docs/design/v3-test-scope-p1-graph-slice15.json",
+    "rows": "T1-T7 共 7 行，全部落在 pkg/hno/graph/p1r15_warnings_test.go（外部测试包 graph_test）",
+    "discipline": "本阶段未新增/删除/放宽任何行为行：契约的 7 行仍是 7 行，判据文本未改。唯一测试改动是 T6 的夹具形状（见 measuredTestChangeDuringRefactor），它服务的行为（同图重复询问给出确定答案）未变。"
+  },
+  "previousStageEvidenceChecked": {
+    "redLedger": "artifact:docs/design/v3-p1-graph-slice15-red.json（5 行天然红 + T2/T3 实现前即绿的说明）",
+    "greenLedger": "artifact:docs/design/v3-p1-graph-slice15-green.json",
+    "greenNextStageConditionVerbatim": "合并两处 DFS 重复后 7 行仍全绿且现有三个测试文件字节不变；变异矩阵 (a)-(g) 逐个实跑并指明击杀行（尤其 T2/T3 这两条否定行要由 (b)/(c) 证明有牙）；矩阵若发现某行无可信变异则照实登记缺口。",
+    "clauses": [
+      "合并后 7 行全绿：go test -count=5 -race ./pkg/hno/graph/ 零退出，receipt:572be952-745a-4a7c-864c-6dd10d51871d。",
+      "现有三个测试文件字节不变：graph_test.go 425ea0303e1d5c5c8e95bacf57663ae94a4309ee、p1r13_step_limit_test.go bc4ab8e71527809e23a12590a078add8f35d68d1、p1r14_panic_barrier_test.go 0ed607dbc01955864276212fa61e0902577ce7b8，与 GREEN 台账登记值逐字符相同（另含 scheduler.go 61c7ba6db72b65eda938c099968e7409fc944d73）。",
+      "(a)-(g) 逐个实跑：见 mutationMatrix，7 个契约变异全部杀死，T2 由 (c) 杀死、T3 由 (b) 杀死，两条否定行都有牙。",
+      "无可信变异处照实登记：(h)/(i) 两个额外探针存活，登记为 matrixFoundGap，不静默扩面。"
+    ]
+  },
+  "productionChangeDuringRefactor": {
+    "file": "pkg/hno/graph/graph.go",
+    "hashBeforeGreen": "a189a8692c0364266352e83ad3debeed738f6608（切片 13 收尾，本片起点）",
+    "hashAfterGreen": "b1b4aa92dfd6bc38ef1984b8d28b2b73e7a6dfbb（GREEN 未快照字节，故 GREEN→REFACTOR 这一步只有描述、附不了字节级 diff：见 disclosure）",
+    "hashAfterRefactor": "8b8fb95b5bc0a7015abd12384636cf7cf106869b",
+    "whatChanged": "删掉 rejectUnconditionalCycles 里内联的三色 DFS（判据 7），改为委托 new shared helper firstCycleOf(adj, edges)（graph.go:415）；Warnings 复用同一 helper（graph.go:399）。判据 7 与判据 8 现在只差喂进来的邻接表：alwaysTakenAdjacency() 对 adjacency(全部边)。",
+    "why": "GREEN 把这次重复显式挂到 deferredToRefactor（v3-p1-graph-slice15-green.json scopeDiscipline），因为先要证明 7 行行为成立再动两处判据共享的遍历。",
+    "errorTextPreserved": "判据 7 的文案逐字不变（graph: unconditional cycle %s: every edge on it is always taken, so Run cannot terminate），既有 B5 行的锚点断言未受影响。",
+    "diffRef": "artifact:/tmp/p1-cycle15/graph-go-slice15-refactor.diff",
+    "diffStats": "单 hunk @@ -353,66 +353,104 @@，相对切片 13 基线 +72 / -34 行（含注释重写）",
+    "disclosure": "GREEN 阶段的中间字节 b1b4aa92 未做快照，因此 REFACTOR 的 diff 只能相对本片起点 a189a869 给出；GREEN→REFACTOR 净变化按描述为「删 28 行内联 DFS、加 4 行委托与新注释、重写两处注释」。这是流程瑕疵（下次每阶段先 cp 备份），不影响行为结论。"
+  },
+  "structuralCriteriaReMeasured": {
+    "note": "每条都附可逐字复现的命令（S14-STD-6 的教训：只登记数字的台账不可复核）。receipt 只存 stdout 摘要，故数值在此列出并由命令担保。",
+    "metrics": [
+      {
+        "name": "非空非测试行（含注释）",
+        "command": "for f in pkg/hno/graph/*.go; do case $f in *_test.go) continue;; esac; grep -v '^[[:space:]]*$' $f; done | wc -l",
+        "observed": 588,
+        "history": "本片起点 551 → GREEN 612 → REFACTOR 588（净 -24：合并掉的重复大于新增的 helper 注释）",
+        "ticketCeiling": "票面 §5 结构上限 1500，未触及"
+      },
+      {
+        "name": "锁原语计数",
+        "command": "grep -c 'sync[.]' pkg/hno/graph/graph.go pkg/hno/graph/scheduler.go",
+        "observed": "graph.go 0 / scheduler.go 0（§3.3 零锁模型未破）"
+      },
+      {
+        "name": "firstCycleOf 定义处数",
+        "command": "grep -c '^func firstCycleOf' pkg/hno/graph/graph.go",
+        "observed": 1,
+        "why": "REFACTOR 中途曾误留重复定义导致语法错误，这条计数是那次的守门测量"
+      },
+      {
+        "name": "panic 屏障处数",
+        "command": "grep -c 'recover(' pkg/hno/graph/scheduler.go",
+        "observed": "1（切片 14 落点未动）"
+      }
+    ],
+    "receiptRef": "receipt:5b42e64a-2edc-4d0b-8ad2-04315f928bfc",
+    "receiptCommand": "bash -c \"for f in pkg/hno/graph/*.go; do case $f in *_test.go) continue;; esac; grep -v '^[[:space:]]*$' $f; done | wc -l; grep -c 'sync[.]' pkg/hno/graph/graph.go; grep -c '^func firstCycleOf' pkg/hno/graph/graph.go; grep -c '^[A-Za-z]' /dev/null; git hash-object --no-filters -- pkg/hno/graph/{graph,scheduler,graph_test,p1r13_step_limit_test,p1r14_panic_barrier_test,p1r15_warnings_test}.go\"",
+    "noNewExportedSurface": "Warnings 是票面 :22 既有公共出口；helper 为非导出。未新增导出的 test-only 出口。"
+  },
+  "mutationMatrix": {
+    "script": "/tmp/p1-cycle15/matrix.py（仓库外；每次注入后立刻 finally 写回并断言哈希全等，S14-PROC-1）",
+    "criterion": "变异体须在「指定杀手行」的每一次重复里都判红才算杀死。red 集合来自 go test -count=1 -v ./pkg/hno/graph/ 的 --- FAIL: 行，按测试名归属，不用整包退出码代替。",
+    "baseline": "注入前整包 34 个 Test 函数全绿（计数命令 grep -c '^func Test' pkg/hno/graph/*_test.go：graph_test 11 + p1r13 8 + p1r14 8 + p1r15 7；另有 t.Run 子行不在此计数内）。go test -count=1 ./pkg/hno/graph/ ok 0.511s；matrix.py 自身退出码即「全部注入-执行-恢复且哈希一致」的自检。",
+    "reproducibility": "同一脚本共完整执行 4 次（第 1 次因 (a) 锚点缩进写错未跑成，第 2 次 (b)/(i) 草案编译失败弃计，见 supersededReceipts.processIncidents）。从第 3 次起 9 个变异的 red 集合签名逐字相同；最后一次 receipt:a3e86ae3 是在最终测试字节（p1r15_warnings_test.go 3ea06d27）上重取的。",
+    "mutants": [
+      {
+        "id": "a-never-warn",
+        "shape": "Warnings 整个函数体换成 return nil",
+        "contractRow": "(a)",
+        "killedBy": ["T1", "T4", "T5", "T6", "T7"],
+        "trials": "1/1 稳定",
+        "note": "T2/T3 仍绿，正确：它们是「不该提示时闭嘴」的否定行，不因提示缺席而红。"
+      },
+      {
+        "id": "b-warn-without-cycle",
+        "shape": "删掉 if !ok { return nil } 并以 _, _ = cycle, ok 消费两个变量：没设上限就啰嗦",
+        "contractRow": "(b)",
+        "killedBy": ["T3"],
+        "trials": "1/1 稳定",
+        "significance": "契约点名要用 (b) 证明 T3 有牙：成立。无 T3 时「判据 8 只在有环时警告」这一半可以被静默丢掉而不被发现。"
+      },
+      {
+        "id": "c-invert-knob-guard",
+        "shape": "if g.cfg.stepLimitSet 反向为 if !g.cfg.stepLimitSet",
+        "contractRow": "(c)",
+        "killedBy": ["T1", "T2", "T4", "T5", "T6", "T7"],
+        "trials": "1/1 稳定",
+        "significance": "契约点名要用 (c) 证明 T2 有牙：成立。T2 是票面 :66 后半句（显式设置后不含它）唯一的守卫行。"
+      },
+      {
+        "id": "d-blind-to-self-loops",
+        "shape": "Warnings 的邻接表 keep 换成 e.from != e.to，看不见自环",
+        "contractRow": "(d)",
+        "killedBy": ["T5"],
+        "trials": "1/1 稳定",
+        "note": "只有 T5 红：其它行的图里没有自环，这正是 T5 存在的理由（body --cond--> body 是最常见的重试回路写法）。"
+      },
+      {
+        "id": "e-message-drops-knob",
+        "shape": "文案换成不含 step/limit 的同义句（graph: loop %s has no explicit budget: the cap was not chosen...）",
+        "contractRow": "(e)",
+        "killedBy": ["T1", "T4", "T5", "T6", "T7"],
+        "trials": "1/1 稳定",
+        "note": "B7-AMEND-1（提示必须点名可拧的旋钮）由 isStepLimitCycleWarning 承担，这条变异证明该判据不是装饰。"
+      },
+      {
+        "id": "f-seed-from-map",
+        "shape": "firstCycleOf 外层起点 range edges 换成 range adj（map 遍历序）",
+        "contractRow": "(f)",
+        "killedBy": ["T6"],
+        "trials": "6/6 稳定判红",
+        "observed": "第 2-12 次询问即漂：graph: cycle \"pong\" -> \"ping\" -> \"pong\" vs \"ping\" -> \"pong\" -> \"ping\"。",
+        "extra": "该变异同时命中判据 7 的文案，但 B5 族一次都没红（见 matrixFoundGap S15-REFACTOR-3）。"
+      },
+      {
+        "id": "g-memoize-by-writing-cfg",
+        "shape": "返回提示前插入 g.cfg.stepLimitSet = true（以写代读）",
+        "contractRow": "(g)",
+        "killedBy": ["T6", "T7"],
+        "trials": "1/1 稳定",
+        "significance": "T7（只读）的牙齿由 (g) 证明：没有它，「问一次就没」的实现可以全绿通过 T1-T5。"
+      },
+      {
+        "id": "h-duplicate-warning",
+        "shape": "同一次询问交出两条 error（第二条不含关键词）",
+        "contractRow": "契约外补充探针",
+        "killedBy": [],
+        "trials": "1 轮，7 行全绿 → 存活",
+        "observed": "第二条不含 step/limit 关键词，因此 stepLimitWarnings 只挑出第一条；长度断言只有 T6 有，而它比的是「两次询问等长」，重复不破坏等长。"
+      },
+      {
+        "id": "i-fake-cycle-name",
+        "shape": "把 cycle 覆盖成常量 `\"a\" -> \"b\" -> \"a\"`（文案里的环不再来自这张图）",
+        "contractRow": "契约外补充探针",
+        "killedBy": [],
+        "trials": "1 轮，7 行全绿 → 存活",
+        "observed": "对 T5 的自环图它报的是另一个环，仍无人判红。"
+      }
+    ],
+    "contractRowCoverage": "(a)-(g) 七个契约变异全部被指定杀手行在每一轮里判红。反过来按行看谁能让它红：T1 = a,c,e；T2 = c；T3 = b；T4 = a,c,e；T5 = a,d,e；T6 = a,c,e,f,g；T7 = a,c,e,g。7 行里没有一行是「任何可信变异都碰不动」的死行。",
+    "survivors": ["h-duplicate-warning", "i-fake-cycle-name"]
+  },
+  "matrixFoundGap": {
+    "S15-REFACTOR-1": {
+      "claim": "没有任何一行断言「一次询问恰好交出一条步数上限告警」。",
+      "evidence": "变异 (h) 存活（7 行全绿）。",
+      "why-not-fixed-now": "条数不在契约 T1-T7 的判据文本里，票面 :66 只规定「警告」与「显式设置后不含它」；「一次几条」属未裁决面，与既有 R15-UNADJ-1/2 同类。REFACTOR 阶段自扩判据等于用实现反写契约。",
+      "disposition": "挂号：需要一次 test-design 裁决（建议 T1 改成 len(hits) != 1 判红，代价一行）。若维持现状，必须把「可重复交出多条」写进契约当作被接受的语义。"
+    },
+    "S15-REFACTOR-2": {
+      "claim": "没有任何一行核对告警点名的环真来自这张图。",
+      "evidence": "变异 (i) 存活（7 行全绿）。",
+      "why-not-fixed-now": "「文案必须指向真实环」不是票面 B7 的要求，而是我从仓库既有约定（一次只点一个可定位对象）推出的期待。",
+      "disposition": "挂号为待裁决；同时记录事实：判据 7 那一侧同样的期待已被 B5 行部分看住（锚点含 \"a\"/\"b\"），只是不看顺序。"
+    },
+    "S15-REFACTOR-3": {
+      "claim": "合并遍历之后，判据 7「同一张图永远报出同一个环」这条文档承诺只剩 B7 的 T6 在看。",
+      "evidence": "变异 (f) 让 graph.go:399 与 :356 共用的 firstCycleOf 漂动，但 9 轮实跑里 pkg/hno/graph/graph_test.go 的既有行一次都没红（matrix 每轮 otherFailures 均为空）。原因可读：graph_test.go:710 与 :1252 的锚点是 strings.Contains 前缀 + 环上节点名集合，环被旋转报出时两个节点名仍然全在。",
+      "isThisNew": "不是本片引入的缺陷（B5 行的判据本来就没打算管顺序），但 REFACTOR 让共享面变大，因此风险面从「只在判据 8 内」扩到「两处共用」。",
+      "disposition": "挂号为 hardening 候选：给 B5 族的某一行加顺序敏感锚点（例如断言完整环文案），或把文档措辞降为「报出环上的节点」二者之一，需人工裁决。"
+    },
+    "rowsWithoutCredibleMutant": "无。7 行每行都有至少一个可信变异能把它判红（见 contractRowCoverage）；两个存活探针不是「行没牙」，而是「牙口没覆盖到的行为面」。"
+  },
+  "measuredTestChangeDuringRefactor": {
+    "change": "T6 夹具从「单环」改为「两个互不相交的环 + 20 次重复询问」。",
+    "originalJustification": "注释当时写：只有一个环时无论起点取自 nodes 还是 edges 都报同一个环，本行会退化成永真断言。",
+    "measurementThatRefutesIt": "为核这句而做了临时探针（/tmp/p1-cycle15/probe_single_cycle_t6.py + 一次性 p1r15_tmp_probe_test.go，跑完即删并验证 not exists）：把变异 (f) 喂给单环形状，4/4 轮判红，未变异对照 1/1 绿。漂动来自旋转报告同一个环（\"pong\" -> \"ping\" -> \"pong\"），不是换报另一个环。所以原注释那句是错的。",
+    "actionTaken": "改写 T6 注释为实测结论：两个环加强的是「换环」这一形态，单环形状并非永真；改回单环不会让本行变哑，但会丢掉一种形态。保留夹具形状，不再留未经测量的断言性理由。",
+    "receiptRefs": [
+      "receipt:69aa419a-b9ac-492f-8423-4c2d54ae2537（python3 /tmp/p1-cycle15/probe_single_cycle_t6.py，exit 0＝恢复自检通过；其 stdout 内含 control exit0 与 (f) 4 轮 exit1）"
+    ],
+    "finalBytesAfterChange": "pkg/hno/graph/p1r15_warnings_test.go 3ea06d27abd3994130e593d297951c895729a4dd（此前 RED 时 e7bd66ad1f8c6930442a643d8ab5f970b1d45d0c，加固夹具时 4b2d03fd01c1beda416b13547b1986a6117c4038）",
+    "lesson": "测试自己的注释也要被测量：这一条与 S15-GREEN-1（实现文案未经实测）同形，只是发生在测试侧。"
+  },
+  "testDiffReview": {
+    "files": {
+      "pkg/hno/graph/p1r15_warnings_test.go": "本片唯一测试改动文件；7 个 TestP1R15_* 行、2 个夹具、2 个识别 helper，最终 blob 3ea06d27abd3994130e593d297951c895729a4dd。",
+      "pkg/hno/graph/graph_test.go": "0 变更（425ea030 未动）。",
+      "pkg/hno/graph/p1r13_step_limit_test.go": "0 变更（bc4ab8e7 未动）。",
+      "pkg/hno/graph/p1r14_panic_barrier_test.go": "0 变更（0ed607db 未动）。",
+      "pkg/hno/graph/scheduler.go": "0 变更（61c7ba6d 未动）。",
+      "deletions": "对既有测试的删除行数 0；没有 skip、没有放宽期望、没有把断言改成抄当前输出。"
+    },
+    "publicEntryOnly": "package graph_test（外部测试包，结构上就读不到私有面）。全部观察走 graph.New / WithStepLimit / AddNode / NodeFunc / AddEdge / AddConditional / SetEntry / SetOutput / Validate / Warnings / Run / Result.Completed / Result.Output。grep 验证：文件内 time.Sleep 0 次、cfg 0 次、stepLimitSet 0 次、defaultStepLimit 0 次、g.nodes 0 次（receipt:5b42e64a 之外另跑）。",
+    "boundaryJudgement": "T6 断言的是「同一张图两次询问文案一致」，属于调用方可观察的性质；它没有断言「必须报某一个特定的环」，因此不违反契约 forbiddenObservation（不观察内部遍历次序）。变异 (f) 恰好把这条边界量化了：漂动只有 4/4 可测，而期望值本身没被写死。",
+    "stillConstraintsBehaviorNotInternals": "7 行断言的对象全是提示的在场/缺席、可认出性、稳定性，以及图的执行结果未受影响；没有一处以内部调用次数或实现类型作为判据。",
+    "negativeRowsDiscipline": "T2/T3 用与 T1 同一个 isStepLimitCycleWarning 认出对象（helper 共用，见文件 :66 注释），避免「含」与「不含」两组断言各自漂移——变异 (b)/(c) 分别只让其中一组红，说明两组确实各管一头。"
+  },
+  "finalReceipts": [
+    {
+      "command": "go test -count=1 -run TestP1R15_ConditionalCycleWithoutStepLimitWarns ./pkg/hno/graph/",
+      "exitCode": 0,
+      "receiptRef": "receipt:73c868df-c9c3-43a4-9b12-f00370a9d723",
+      "note": "本 Command 声明的场景命令（testabilityDecision.redCandidate.command 逐字相同），在最终字节上取的零退出回执，因此作为 refactor-check-recorded 的唯一 receipt 引用。"
+    },
+    {
+      "command": "go test -count=5 -race ./pkg/hno/graph/",
+      "exitCode": 0,
+      "receiptRef": "receipt:572be952-745a-4a7c-864c-6dd10d51871d",
+      "note": "整包 34 个 Test 函数（含 B7 这 7 行）重复 5 次、竞态检测全绿；-count=5 顺带把 T6 的重复询问在进程内多跑了几轮。"
+    },
+    {
+      "command": "python3 /tmp/p1-cycle15/matrix.py",
+      "exitCode": 0,
+      "receiptRef": "receipt:a3e86ae3-a448-4914-a40c-64a8a129a57c",
+      "note": "退出码即「9 个变异全部注入-执行-恢复且 graph.go 哈希回到 8b8fb95b」的自检结果。"
+    },
+    {
+      "command": "bash -c \"for f in pkg/hno/graph/*.go; do case $f in *_test.go) continue;; esac; grep -v '^[[:space:]]*$' $f; done | wc -l; ...\"",
+      "exitCode": 0,
+      "receiptRef": "receipt:5b42e64a-2edc-4d0b-8ad2-04315f928bfc",
+      "note": "结构度量与 6 个文件哈希。"
+    },
+    {
+      "command": "python3 /tmp/p1-cycle15/probe_single_cycle_t6.py",
+      "exitCode": 0,
+      "receiptRef": "receipt:69aa419a-b9ac-492f-8423-4c2d54ae2537",
+      "note": "T6 形状的可测性探针；探针文件已删除并验证不存在，图字节恢复哈希一致。"
+    }
+  ],
+  "supersededReceipts": {
+    "refs": [
+      "receipt:302b196a-eeb5-410a-a376-f7e1d38719ad",
+      "receipt:05458b93-c8a9-4d22-9a72-4580211fc380",
+      "receipt:f33f7d26-023d-4460-a017-fb6822454e27",
+      "receipt:875d5650-a9cd-423d-a0fd-ae330bb7a868",
+      "receipt:0e50c564-a6f3-41f9-8804-825eb4ca4c62",
+      "receipt:be3f32fa-0d48-4730-86f8-8f5fa2a3cbc0"
+    ],
+    "why": "这些在 T6 注释修正前的字节状态（p1r15_warnings_test.go 4b2d03fd）上取得。为守住「同一批证据属于同一字节状态」这条在本片 RED 阶段学到的纪律，全部在最终字节上重取，旧回执仅留作过程痕迹，不进入提交信封。",
+    "processIncidents": "矩阵首两轮里 (b) 与 (i) 的草案各自编译失败（undefined / declared and not used）。编译失败不记为击杀，也不记为红：改判据为「先保证变异体可编译，再看杀手行」，重设计后 (b) 杀 T3、(i) 作为存活探针成立。"
+  },
+  "environmentFact": {
+    "headMovedMidCycle": "本周期内 HEAD 从 9854ce3 变为 0387000（feat(graph): land zero-lock scheduler with build-time edge validation），不是我所为，我也未提交任何改动。",
+    "staleSnapshotCommitted": "HEAD 里的 pkg/hno/graph 是较早的快照：git show HEAD:pkg/hno/graph/scheduler.go 的 recover( 计数 0、stepLimit 计数 0，而工作树 61c7ba6d 两者都在；p1r13/p1r14/p1r15 三个测试文件在 HEAD 完全不存在（未跟踪）。也就是说切片 13/14/15 的成果目前只活在 working tree。",
+    "consequence": "本阶段与后续 review 的 fixed-point 一律用逐文件 git hash-object，不用 HEAD；已向用户口头报告一次，不擅自提交或改历史。"
+  },
+  "nextStageExpectation": "review 阶段（standards + spec 两轴）须带着本台账的 5 项待裁决挂号：R15-DIVERGE-1、B7-AMEND-1、R15-UNADJ-1/2、S15-REFACTOR-1/2/3，外加 S15-GREEN-1 与 S14 遗留（S14-STD-1/2/5、S14-SPEC-1/2/3/4）。独立性降级须照实披露：用户此前拒绝对 P1 派发独立审查子代理，本轮仍是作者自查。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-test-scope-p1-graph-slice15.json",
+    "artifact:docs/design/v3-testability-decision-p1-graph-slice15.json",
+    "artifact:docs/design/v3-p1-graph-slice15-red.json",
+    "artifact:docs/design/v3-p1-graph-slice15-green.json",
+    "file:pkg/hno/graph/graph.go",
+    "file:pkg/hno/graph/p1r15_warnings_test.go",
+    "receipt:73c868df-c9c3-43a4-9b12-f00370a9d723"
+  ]
+}

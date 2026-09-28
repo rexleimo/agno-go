@@ -1,0 +1,25 @@
+{
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:testability-decision:p1-graph-engine-slice5-r3",
+  "redCandidate": {
+    "publicEntry": "pkg/hno/graph 导出 API（package graph_test 外部观察）：(*Graph).AddConditional 构造的图经 (*Graph).Validate() 与 (*Graph).Run(ctx, in) 后，由 (*Result).Completed() / Output() / Value(name) 与 Run 返回的 error 观察结果。断言只引用「错误文本是否指名该声明的两端节点名」与「res 是否为 nil」，不引用 edges/declare/successors 等未导出符号，不断言错误的具体类型或包装层级，因此不锁死实现。",
+    "setup": "工作树含切片 1–4 的实现（统一边声明表 + 单消费者调度器 + §3.4 规则 1/2/4 的真实路由 + 构建期拒绝入口缺失/悬空端点/未路由种类），全部未提交，fixed-point 0387000。本切片只向 pkg/hno/graph/graph_test.go 追加 TestP1G_ValidateRejectsConditionalWithoutPredicate，三个子用例：S1「缺失谓词的条件边在构建期被拒且可定位」（AddConditional(\"a\",\"b\",nil) → Validate）、S2「同一非法声明经 Run 传达为错误且不返回空结果」（同一图 → Run，断 err 与 res==nil）、S3 反向对照「永不命中的合法谓词不得被误判为非法」（AddConditional(a,b,恒假谓词) + AddDefault(a,c) → 断 Validate 为 nil 且 Completed() 恰为 [a c]）。节点全部为内存 identity 函数，无网络、无凭据、无跨用例共享状态；断言前 gofmt -l pkg/hno/graph 无输出、go vet ./pkg/hno/graph/... 净。",
+    "command": {
+      "executable": "go",
+      "args": [
+        "test",
+        "./pkg/hno/graph/...",
+        "-run",
+        "P1G",
+        "-count=1"
+      ],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "退出码非 0 且为行为级断言失败。目标行为：一条引擎无法忠实路由的声明（条件边缺谓词）必须在构建期被拒，错误可定位到该声明的两端节点名；同一图经 Run 必须返回错误且不返回 Result，绝不再给出「err==nil 但没有输出」的空结果；与此同时合法的恒假谓词必须照常通过并按规则 4 落到兜底边。",
+    "observed": "exit 1。失败形态正是缺失行为本身：S1 终止于 graph_test.go:343「Validate() = <nil>，缺失谓词的条件边被放行」，S2 终止于 graph_test.go:355「Run() 的 err = <nil>，Completed() = [a]、Output() = <nil>：调用方拿到一个没有输出的空结果」；S3 反向对照在同一命令下 PASS，切片 1 的 TestP1G_LinearDagRunsChain、切片 3 的 TestP1G_UnsupportedEdgeDeclarationsAreRejected（含 join-only 与反向对照两个子用例）、切片 4 的 TestP1G_ConditionalAndDefaultRouting（六个子用例）、切片 2 的 TestP1G_ValidateRejectsDanglingEdge（两个子用例）全部继续 PASS，最终 FAIL github.com/rexleimo/agno-go/pkg/hno/graph 0.044s。同一命令在本次测试追加前为 exit 0 且 14 条 PASS（receipt:e0875681-af05-4c57-a855-0bb90a86fc33），故这不是编译或夹具问题。缺陷前提另经独立探针实测入册：receipt:28e67f55-2577-4678-9239-986acc2a5c6f 记录该图 Validate() = <nil> 且 Completed() = [a]、Output() = <nil>、Value(b) = (<nil>, false)。",
+    "failureReason": "缺失的是构建期对「无路由输入的条件边」的拒绝。Validate（graph.go:211-227）的边循环只查 from/to 节点存在性与边种类可路由性，从不查看 e.p；successors（scheduler.go 的 switch）在 edgeConditional 分支写的是 if e.p != nil && e.p(out)，于是 p==nil 的条件边被当作「永不命中」，一条本该激活 b 的边静默消失。由于 AddConditional(a,b,nil) 的两端都存在、种类又可路由，Validate 放行、Run 正常收敛，调用方拿到 err==nil 且 Output()==nil 的 Result。这与 cycle-2 的 C2-SPEC-1 是同一缺陷类（声明被静默丢弃后跑出空结果），区别只在被丢弃的输入是谓词而非边种类。",
+    "receiptRef": "receipt:bb70c8b2-c65e-4a01-ad7d-4e7c89316ddf"
+  },
+  "sliceJustification": "本切片只收「声明本身不完整」这一类静默通道，它是 cycle4 两条 hard 阻断中唯一不需要新语义决定的一个：nil 谓词的处置（拒绝）沿用引擎已有的 fail-closed 立场，不引入新的公共面。与之同形的另一个通道（环路径可用而步数阀不存在）必须搭配未定形的 stepLimit 默认值与无条件环拒绝策略，纳入本切片会把一次决定变成三次。S4（悬空端点检查覆盖全部边种类）与本 RED 共用 Validate 的同一段边循环，因此作为同一切片的恢复式 RED 取证入册：端点防线与谓词防线在同一测试文件里互供反向对照——实现若写成「一律拒绝」，S3 与切片 4 的六个子用例立即判红；若写成「静默跳过」，S1/S2 立即判红。",
+  "nonGoals": "不实现 B4 stepLimit 安全阀与 ErrStepLimitExceeded 的产生点（cycle4 C4-SPEC-3 明确要求其与环拒绝、默认值三者各取独立 RED，不得合并）；不实现 B5 无条件边成环的构建期拒绝；不决定 C4-STD-1 的 Result.Completed() 重名语义（未定之前不用测试锁定任一读法）；不实现 B2 Join 路由（AddJoin 的声明继续被拒绝，R1 的 join-only 行不得删除）；不实现 B6 余下校验（重复节点名 / 不可达 / 非输出汇点 / Join 前驱数）、B7 Warnings、B8 并发上限 FIFO、B9 取消归一化、B10 panic 转错误、B11 Typed 分支测试；不做 Add* 链式构造的内建增量校验。§3.4 规则 5（扇出 sub-branch 隔离 LLM 历史）由契约 slice5 的 outOfScope 显式处置为「移交 P5/P4，不属 P1 拓扑切片」，本切片既不实现也不假装覆盖。若为通过本切片而顺带实现上述任一项，判为实现越界。"
+}

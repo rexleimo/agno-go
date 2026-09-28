@@ -1,0 +1,240 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p1-graph-r18-typed",
+  "activationId": "c2bb91c2-f18b-4058-86a7-558972700eda",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-27T19:25:00Z",
+  "contractRef": {
+    "ticket": "docs/design/v3-test-scope-p1-graph.md",
+    "behaviorRow": "§4:70 B11「泛型包装：graph.Typed 包装的节点接到 TIn、返回 TOut；对错误类型输入返回可判定错误而非 panic」",
+    "publicFace": "§1:28 graph.Typed[TIn, TOut](...) —— 已由 §1 列出，本片不改公共面",
+    "precedentForLocatability": "§11.1「错误文本包含 offending 节点名（可定位，不要求新导出哨兵）」",
+    "cancelBoundaryCarried": "§13.1 三咨询点与「未取消不得归一化成取消」",
+    "motherSpec": "docs/design/v3-platform.md §3.2（Typed 签名）与 §3.4（路由核心，跨节点传的是 any）",
+    "observationRecord": "docs/design/v3-red-observation-p1r18.md"
+  },
+  "userGoal": "让 graph.Typed 成为可信的类型出口：接到 TIn、返回 TOut 这条已经成立的行为要被断言钉住，而未成立的那一半——「对错误类型输入返回可判定错误」——必须补齐到调用方能从公共面判断『哪个节点、期望什么类型、实际收到什么类型』，同时不得引入新的导出面、不得破坏既有的三条正确行为（fn 错误逐字交出、不 panic、不与步数超限/取消两个哨兵混淆）。",
+  "whyThisSlice": "B11 是票面 §4 唯一还没有任何一行断言在管的行为行：Typed 的语句覆盖率实测 0.0%（receipt:27e54800-6ea7-4636-b9f3-4d0271f772c3），同包总覆盖 96.6%，全仓 *_test.go 里 'Typed' 零命中。它是 P1 收尾前最后一处『API 已导出、行为无担保』的面，也是吸收 adk 构建期校验时 Go 泛型唯一给不到的地方：跨节点连线走 any，类型对错只在运行期见分晓。这一行足以代表本片目标，因为其余 P1 行为（B1–B10）都已有变异测试过的断言行。",
+  "measuredBeforeDesign": [
+    {
+      "id": "T-1",
+      "what": "Typed 的成功形状已经成立",
+      "command": "cd /tmp/p1-r18/probe && go run .（场景 1）",
+      "receiptRef": "receipt:c7b7fa29-164e-46c2-ab1d-1246b304304d",
+      "observed": "Typed[string,int]('len') → show：err=<nil>，Output='n=4 typed=int'，Completed=[len show]。下游节点收到的是 int（reflect 打印 kind=int），说明 TOut 以具体类型流出。",
+      "conclusion": "D1 登记为 green-at-red 护栏行：今天对，但没有任何断言在管。"
+    },
+    {
+      "id": "T-2",
+      "what": "四种不同成因交出逐字相同、不带身份的错误串",
+      "command": "cd /tmp/p1-r18/probe && go run .（场景 2/3/5/9b）",
+      "receiptRef": "receipt:c7b7fa29-164e-46c2-ab1d-1246b304304d",
+      "observed": "入口即不匹配（needstring 收 42）、下游不匹配（seed→a→b，b 收 string）、nil 输入（Run(ctx,nil) 进 TIn=string）、[3]string 进 []string —— 四次全部是 err=\"graph: input type mismatch\"，Result 均为 nil，均未 panic。",
+      "conclusion": "这是本片唯一的诚实 RED 面：错误不可归因。票面 B11 的『而非 panic』那一半已由切片 14 的 panic 屏障成立，不得伪造在这一层。"
+    },
+    {
+      "id": "T-3",
+      "what": "接口 TIn 收到 nil 也判类型不符（Go 断言语义）",
+      "command": "cd /tmp/p1-r18/probe && go run .（场景 6）",
+      "receiptRef": "receipt:c7b7fa29-164e-46c2-ab1d-1246b304304d",
+      "observed": "Typed[io.Reader,string] 收 Run(ctx,nil) ⇒ err=\"graph: input type mismatch\"。nil 接口值对任何断言都失败，『接口形状下 nil 合法』的直觉不成立。",
+      "conclusion": "D5 钉当前形状（nil → 可归因的类型不符），不钉直觉；将来若要放开 nil，属行为变更，另立切片。"
+    },
+    {
+      "id": "T-4",
+      "what": "fn 自己的哨兵错误逐字交出，且零值输出不被当成缺失",
+      "command": "cd /tmp/p1-r18/probe && go run .（场景 4/7）",
+      "receiptRef": "receipt:c7b7fa29-164e-46c2-ab1d-1246b304304d",
+      "observed": "场景 4：errors.Is(err, sentinel)=true 且 Result==nil；场景 7：TOut=int(0) 流到下游 got=0 kind=int，Value('zero') 命中。",
+      "conclusion": "D6 与 D1 的后半为护栏行；GREEN 不得把类型不符的语义渗进这两条路径。"
+    },
+    {
+      "id": "T-5",
+      "what": "结构基线",
+      "command": "sh /tmp/p1-b9/struct.sh ; go doc -all ./pkg/hno/graph | grep -cE '^(func|type|var|const) '",
+      "receiptRef": "contract-local:沿用切片 17 登记的同一脚本与同一命令（本片基线复测值见 observed）",
+      "observed": "sync_dot_graph=0、sync_dot_scheduler=0、recover_scheduler=1、ctx_checks_in_scheduler=4、loc_nonblank_nontest=649、testfunc_total=55、exportedSymbols=24（含 Typed 自身）。",
+      "conclusion": "D8 的三条结构判据以此为基线：本片不得引入锁、不得新增导出面、非测试 LOC 仍 ≤1500（票面 §9）。"
+    },
+    {
+      "id": "T-6",
+      "what": "nil fn 由 panic 屏障兜住，但结论形状是『另一条 goroutine 崩了』",
+      "command": "cd /tmp/p1-r18/probe && go run .（场景 8）",
+      "receiptRef": "receipt:c7b7fa29-164e-46c2-ab1d-1246b304304d",
+      "observed": "Typed[int,int]('nilfn', nil) ⇒ err='graph: node \"nilfn\" panicked while running: runtime error: invalid memory address or nil pointer dereference'，进程不崩。",
+      "conclusion": "登记为 R18-Q2（是否升级为构建期拒绝），本片不为此改 Validate()，也不把它写成本片的完成判据。"
+    }
+  ],
+  "acceptanceMapping": [
+    {
+      "id": "D1",
+      "behavior": "Typed 包装的节点接到 TIn、返回 TOut（票面 B11 前半句）",
+      "publicEntry": "graph.New/AddNode(Typed)/AddEdge/SetEntry/SetOutput/Run + Result.Output/Value/Completed",
+      "fixture": "Typed[string,int]('len') → NodeFunc('show')，Run(ctx,\"abcd\")",
+      "assertion": "err==nil；Value('len')==int(4)；Output() 由下游按 int 拼出；Completed()==[len show]（字典序）",
+      "teethMutant": "把 TOut 丢弃、交出 nil（或把 in 原样透传不做断言）→ D1 的 Value/Output 类型判红",
+      "statusAtDesign": "green-at-red（T-1 实测已成立，无断言在管）"
+    },
+    {
+      "id": "D2",
+      "behavior": "错误类型输入交出的错误必须点名 offending 节点",
+      "publicEntry": "(*Graph).Run 的 error 文本（导出 API 唯一可归因面；Result 此路为 nil）",
+      "fixture": "单节点图：Typed[string,int]('needstring')，Run(ctx, 42)",
+      "assertion": "err!=nil 且 Result==nil 且不 panic；err.Error() 含以引号包裹的节点名 \"needstring\"（正则形式允许任意标点，例如 graph: node \"needstring\": ...）",
+      "teethMutant": "错误文本不带节点名（= 基线现状 T-2）→ D2 红；节点名不带引号包裹而写成前缀粘连 → 由正则的引号要求挡住",
+      "statusAtDesign": "RED 候选（基线逐字为 'graph: input type mismatch'，T-2）"
+    },
+    {
+      "id": "D3",
+      "behavior": "同一错误必须同时可判定『期望什么类型』与『实际收到什么类型』",
+      "publicEntry": "(*Graph).Run 的 error 文本",
+      "fixture": "两形状：(i) TIn=string 收到 int；(ii) TIn=int 收到 string（镜像夹具，防止实现把两个槽位写成同一个词或次序颠倒）",
+      "assertion": "两形状下 err.Error() 都要出现 expected 与 got 两个标签，且 (i) 命中 (?i)expected[^,]*string.*got[^,]*int、(ii) 命中 (?i)expected[^,]*int.*got[^,]*string；不得出现 `expected string, got string` 这类同词充数",
+      "teethMutant": "只带类型不带标签（两者同词即判红）→ D3 红；只报期望类型不报实际类型 → D3 红",
+      "statusAtDesign": "RED 候选（与 D2 同一基线缺口）"
+    },
+    {
+      "id": "D4",
+      "behavior": "点名的是真正失败的那一个节点，不是图上任意一个节点",
+      "publicEntry": "(*Graph).Run 的 error 文本",
+      "fixture": "三节点链：seed(any→string) → a=Typed[string,string] → b=Typed[int,int]；不匹配发生在 b",
+      "assertion": "err.Error() 含 \"b\" 且不含 \"a\"、不含 \"seed\"（引号包裹的完整名字边界，防止 'a' 作为子串蒙混）",
+      "teethMutant": "实现把节点名写死为入口节点或第一个 Typed 节点的名字 → D4 红而 D2 仍绿，这正是本片不许糊弄的那一颗牙",
+      "statusAtDesign": "RED 候选（T-2 场景 3 实测与场景 2 逐字相同）"
+    },
+    {
+      "id": "D5",
+      "behavior": "nil 输入（具体 TIn 与接口 TIn 两种形状）同样是可归因的类型不符，且进程不崩",
+      "publicEntry": "(*Graph).Run(ctx, nil)",
+      "fixture": "(i) Typed[string,int]('needstring') 收 nil；(ii) Typed[io.Reader,string]('needreader') 收 nil（T-3 实测两者今天都走类型不符分支）",
+      "assertion": "两形状下 err!=nil、Result==nil、不 panic、含 \"needstring\"/\"needreader\" 点名；got 槽位必须是表示『无值』的字样（接受 no value | <nil> | nil 三种渲染之一），不得渲染成某个具体类型名",
+      "teethMutant": "把 nil 的形状并进『正常断言成功』（例如 in == nil 时直接喂零值给 fn）→ D5 红；got 槽位打印成 reflect.TypeOf(nil) 的 panic 或空串 → D5 红",
+      "statusAtDesign": "部分红（不 panic / Result==nil 已成立，点名与 got 形状未成立）"
+    },
+    {
+      "id": "D6",
+      "behavior": "fn 自己返回的错误逐字交出，不被类型语义污染",
+      "publicEntry": "errors.Is + (*Graph).Run",
+      "fixture": "Typed[string,int]('fail') 内返回调用方自定义哨兵",
+      "assertion": "errors.Is(err, sentinel)==true；Result==nil；err.Error() 不含 expected/got 标签（不得把业务错误改写成类型不符）",
+      "teethMutant": "把 fn 的错误包成类型不符（或与类型分支共用一条错误构造）→ D6 红",
+      "statusAtDesign": "green-at-red（T-4 实测已成立）"
+    },
+    {
+      "id": "D7",
+      "behavior": "类型不符不得与图自身的两个哨兵混淆，也不得被归一化成取消",
+      "publicEntry": "errors.Is(err, graph.ErrStepLimitExceeded) / errors.Is(err, context.Canceled)",
+      "fixture": "D2 的夹具 + 一个刻意把 stepLimit 压到 1 的同型夹具（证明不是预算结论）+ 一个未取消的正常收敛夹具",
+      "assertion": "三条路径下 errors.Is(err, ErrStepLimitExceeded)==false 且 errors.Is(err, context.Canceled)==false；未取消的图仍正常收敛（err==nil）",
+      "teethMutant": "把类型不符包上 %w context.Canceled（承接票面 §13.1 反向牙齿的同族写坏法）→ D7 红",
+      "statusAtDesign": "green-at-red（T-2 场景 10 实测双 false）"
+    },
+    {
+      "id": "D8",
+      "behavior": "结构判据：本片不越出票面 §1 与 §9 的边界",
+      "publicEntry": "命令背书（不新增 Test 行，也不为测试新增出口）",
+      "fixture": "同一条覆盖剖析 + 结构计数 + go doc 导出面计数",
+      "assertion": "sync_dot_graph==0 且 sync_dot_scheduler==0（票面 :71 B12）；exportedSymbols 仍为 24（本片不得新增导出面，含哨兵）；loc_nonblank_nontest ≤ 1500（票面 §9）；go tool cover -func 里 Typed 由 0.0% 变为 >0%；gofmt -l 无输出、go vet 通过",
+      "teethMutant": "为『可判定』新增导出哨兵（exportedSymbols 24→25）→ D8 判红，这正是 R18-Q1 未裁决前不许动手的原因",
+      "statusAtDesign": "命令背书行（基线见 T-5）"
+    }
+  ],
+  "observabilityLimit": [
+    "「编译期类型安全」本身不可观察：它由 Typed[TIn,TOut] 的泛型签名直接给出，能编译即成立，运行期测试无法证明它，本片也不假装能测。可观察的只有运行期把不匹配归因出来的能力。",
+    "跨节点连线的静态类型校验不可观察，也不在本片：票面 §3 已把 InputSchema/OutputSchema 校验划到 v3.1。",
+    "票面 :40 的禁止观察面（scheduler 内部字段、queue 长度、goroutine 数、私有类型断言、内部计时）本片一行不碰；类型不符时 Result 为 nil，因此连 Completed() 都不可用作旁证。",
+    "错误文本是本片唯一的归因面（这是票面 §11.1 已经接受的形式）。它的上限是：机器判定只能靠字符串匹配。是否给机器一个 errors.As 目标属 §1 公共面变更，登记为 R18-Q1 由人类裁决，本片不自行决定。"
+  ],
+  "minimalVerticalSlice": "D2 单独即可代表本片目标：它把『可判定』落到『错误点名 offending 节点』这一条可观察事实上，且在基线上真实判红（T-2）。D3 保证点名之外还能判断类型期望与实际，D4 保证点名不是随便点名（它是 D2/D3 不能被糊弄的那颗牙），D1/D6/D7 是三条已成立、必须继续成立的护栏。这一组足以代表 B11，因为 B11 的两个半句一一对应：前半句＝D1，后半句＝D2/D3/D4/D5。",
+  "allowedTestSeam": {
+    "newTestFile": "pkg/hno/graph/p1r18_typed_test.go（package graph_test，外部测试包，票面 §1）",
+    "productionFilesAllowedToChange": [
+      "pkg/hno/graph/graph.go —— 仅 Typed 及其错误构造，预计 ≤ 60 行"
+    ],
+    "forbiddenToChange": [
+      "pkg/hno/graph/scheduler.go（本片零改动）",
+      "既有 7 份测试文件的任何断言",
+      "pkg/hno/agent 与 pkg/hno/runner（票面 §3 非目标）"
+    ],
+    "boundScenarioCommand": "go test ./pkg/hno/graph -run TestP1R18_ -count=1 -race -v",
+    "receiptRule": "本片每个 receipt 逐字节只用这条命令（cwd /Users/rex/codes/agno-go）；D1–D7 的逐行归属靠 -v 输出，不允许混入其它命令的回执",
+    "whyNotNarrower": "Typed 没有比 Graph.Run 更窄的公共入口：它的输出类型只有流到下游、再经 Result 读出才可见。私有接缝（直接调 NodeFunc 的闭包）会绕过调度器，测不到『哪个节点失败』这一归因面。"
+  },
+  "baselineBytes": {
+    "pkg/hno/graph/graph.go": "dca23943fd9cade4766ceeffe43b47477b815a61",
+    "pkg/hno/graph/scheduler.go": "0ce6c3b332ddc768c1c5a10d6c1591fc88d67a2a",
+    "pkg/hno/graph/graph_test.go": "425ea0303e1d5c5c8e95bacf57663ae94a4309ee",
+    "pkg/hno/graph/p1r13_step_limit_test.go": "bc4ab8e71527809e23a12590a078add8f35d68d1",
+    "pkg/hno/graph/p1r14_panic_barrier_test.go": "0ed607dbc01955864276212fa61e0902577ce7b8",
+    "pkg/hno/graph/p1r15_warnings_test.go": "3ea06d27abd3994130e593d297951c895729a4dd",
+    "pkg/hno/graph/p1r15b_warning_text_test.go": "0285ab35729ed3d50359e0fd407edb2d8b1c1a2a",
+    "pkg/hno/graph/p1r16_max_concurrency_test.go": "6934a4f2ae9ed2d80a59a30ead56b3de6bcc4296",
+    "pkg/hno/graph/p1r17_cancel_normalization_test.go": "cbc8b692a84ed5ce23b461a8ed40b9ba3870d386",
+    "pkg/hno/graph/p1r18_typed_test.go": "（基线不存在，本片新增）"
+  },
+  "explicitNonGoals": [
+    "不新增导出面（哨兵错误、As 目标、类型描述器都不行）：那会改动票面 §1 的公共面，属测试范围变更，须由 rex-harness 另发 Command。本片把这一选择登记为 R18-Q1。",
+    "不做构建期的跨节点类型连线校验（InputSchema/OutputSchema，票面 §3 已划到 v3.1）。",
+    "不为 nil fn 改 Validate()（登记为 R18-Q2；今天由切片 14 的 panic 屏障兜住，不崩进程）。",
+    "不改 pkg/hno/graph/scheduler.go：取消语义与并发上限由票面 §13 已收口，本片只在 D7 复用它给出的反向边界。",
+    "不触碰 pkg/hno/agent / pkg/hno/runner 的行为与测试，不夹带 P0 遗留 judgement 项（StopMaxTurnsReached / StopToolCallLimit 枚举拆分、StopReason 类型化）。",
+    "不引入 G3 节点策略（Retry/Cache/Timeout/Trace）、G5 Send 动态扇出、G4 StreamMode、G7 事件化、G8 Store —— 全部按票面 §3 留在 P2+。"
+  ],
+  "outOfScopeBehaviors": [
+    "泛型节点注册表 / codegen / 反射式 schema 推导。",
+    "把 Result.Value 改造成带类型的取值器（会改 §1 的 Result 可观察面）。",
+    "放开 nil 进接口 TIn 的合法性（T-3 已说明这是 Go 断言语义，改它属行为变更）。"
+  ],
+  "completionCriteria": [
+    "1. D2、D3、D4 必须在 baselineBytes 上真实判红（同一条绑定命令、非零退出、失败原因与『错误不可归因』一致）；D5 至少其点名部分判红。把断言改成匹配现有文案 'graph: input type mismatch' 不算 RED，也不算 GREEN。",
+    "2. D1、D6、D7 允许 green-at-red，但必须在契约里如实登记其 teethMutant（本轮已登记），并在 REFACTOR 的变异矩阵里给每条至少一次被证伪的机会；不得把 green-at-red 写成『这行不用测』。",
+    "3. 变异矩阵至少四条，且逐条指名杀手行：(a) 节点名写死为入口节点 → D4 红、D2 绿；(b) 只报期望类型不报实际类型 → D3 红；(c) got 槽位打印 reflect.TypeOf(in)（nil 时崩或空）→ D5 红；(d) 把类型不符包成 context.Canceled → D7 红。矩阵必须记录 exit、判红 Test 名、fired 的断言行、恢复后 blob hash 未变（restoredIdentical）。",
+    "4. 产品改动只在 pkg/hno/graph/graph.go 的 Typed 及其错误构造内，非测试 LOC 仍 ≤ 1500（票面 §9，基线 649），且本片增量为 ≤ 60 行。",
+    "5. 结构判据全保持：sync_dot_graph=0、sync_dot_scheduler=0、exportedSymbols=24（D8 的哨兵条款）、Typed 覆盖率 > 0%。",
+    "6. go test ./pkg/hno/graph -race -count=1 全绿（切片 1–17 的 55 个 Test 函数一个不许少、一个断言不许放宽）；gofmt -l 无输出；go vet 通过。golangci-lint 仍未运行 → 如实登记，不写成已过。",
+    "7. 若实现选择与本片任一判据冲突，停在当前阶段上报测试范围变更需求；不得反向改写 D1–D8。",
+    "8. 新增/更名的术语若写进 docs，须与票面 §13 的 B9 措辞一致（不得把类型不符重新表述成取消或超限的变体）。"
+  ],
+  "forbiddenShortcuts": [
+    "不得用 strings.Contains(err, \"input type mismatch\") 作为唯一判据（那是把期望值改成当前错误输出）。",
+    "不得为了让 D4 绿而放宽成『文本里出现字母 a』——D4 要求引号包裹的完整名字边界，且反向断言不含 \"a\"/\"seed\"。",
+    "不得为可判定性新增导出哨兵（§1 变更，R18-Q1 未裁决）。",
+    "不得删除或弱化 D1/D6/D7 中任何一条已有护栏；不得跳过任何 Test 行。",
+    "不得读 scheduler 内部字段、queue 长度、goroutine 数来旁证归因（票面 :40）。",
+    "不得用 sleep 定序（票面 :75）；本片所有夹具都必须是同步无关的（类型不符是确定性的，不需要时序）。"
+  ],
+  "unadjudicatedCarried": [
+    "R17-GAP-1（D2 队列项侧守卫『整条删除』形态需 parked-window 夹具）、R17-GAP-2（D5:419 无任何变异可达，σ 实测存活）、R17-GAP-3（超时形状无行）",
+    "R17-UNADJ-1/2/3、R16-UNADJ-1/2、S16-STD-1…4、S15-STD-*、R15-UNADJ-*、B7-AMEND-1、15b token-only 措辞债",
+    "S17-STD-1…5（含 struct.sh 仍在 /tmp 未入库：本契约 D8 复用它，属已知债务）",
+    "本片新增：R18-Q1（是否给『类型不符』一个导出哨兵 / errors.As 目标 —— 要改票面 §1 公共面）、R18-Q2（nil fn 是否升级为 Validate 拒绝）"
+  ],
+  "retires": "本片收口后：票面 §4:70 的 B11 行由『无断言在管』变为 8 行断言 + 至少 4 条变异背书；§12.2 里『B11 Typed 未做』那条不再成立；票面 §4 的 B1–B11 自此全部有牙齿担保，P1 行为面无剩余行 —— 是否宣布 P1 收尾由 rex-harness 判，本契约不自行收口整个工作票。",
+  "sedimentCarried": [
+    "票面 §13.1 的取消三咨询点与「未取消不得归一化成取消」→ 本片 D7 直接把它当反向边界使用；D7 的 (d) 写坏法与 §13.1 的 ν 同族。",
+    "切片 14 的 panic 屏障（scheduler.go:170-177 的 runNode recover 形状）→ 本片『而非 panic』那一半的既有担保，D5 的不 panic 断言与它同源。",
+    "切片 11.1 的可定位先例 → 本片归因判据的形式依据（文本点名，不新增导出）。"
+  ],
+  "verificationCommands": [
+    "go test ./pkg/hno/graph -run TestP1R18_ -count=1 -race -v        # 绑定场景命令（RED/GREEN 共用）",
+    "go test ./pkg/hno/graph -race -count=1                            # 包级回归（切片 1–17 全绿）",
+    "go test ./pkg/hno/graph -count=1 -coverprofile=/tmp/p1-r18/cover.out && go tool cover -func=/tmp/p1-r18/cover.out | grep -E 'Typed|total'",
+    "sh /tmp/p1-b9/struct.sh ; go doc -all ./pkg/hno/graph | grep -cE '^(func|type|var|const) '",
+    "gofmt -l pkg/hno/graph ; go vet ./pkg/hno/graph/"
+  ],
+  "writeBackOwed": [
+    "票面 §4:70 的 B11 措辞精确化：「可判定」= 错误点名 offending 节点 + 期望类型 + 实际类型（依 §11.1 可定位先例，明确不要求新导出哨兵），并记入 T-2 的四形同串这一实测理由。",
+    "母约 v3-platform.md §3.2/§3.4 的 Typed 描述补一句运行期归因（泛型只保证单节点签名，跨节点走 any，故运行期必须可归因）。",
+    "R18-Q1/R18-Q2 两项登记给用户裁决；若 R18-Q1 裁决为『要哨兵』，则 §1 公共面需一次新的测试设计 Command。"
+  ],
+  "evidenceRefs": [
+    "receipt:c7b7fa29-164e-46c2-ab1d-1246b304304d（探针 10 场景，exit 0；输出正文另存 /tmp/p1-r18/probe.out.txt）",
+    "receipt:27e54800-6ea7-4636-b9f3-4d0271f772c3（Typed 覆盖率 0.0% / total 96.6%，/tmp/p1-r18/cover.txt）",
+    "docs/design/v3-red-observation-p1r18.md（本阶段观察记录：逐场景观察 + 设计判断）",
+    "docs/design/v3-test-scope-p1-graph.md §1、§4:70、§11.1、§12.2、§13（B9 已收口的取消边界）",
+    "docs/design/v3-p1-graph-r17-review-verdict.json（carried adjudications 清单来源）",
+    "git hash-object --no-filters 的基线值（baselineBytes，10 条）"
+  ]
+}

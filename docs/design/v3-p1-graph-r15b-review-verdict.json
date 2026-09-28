@@ -1,0 +1,192 @@
+{
+ "schemaVersion": 1,
+ "kind": "rex.standards-spec-review.v1",
+ "workItemKey": "work-p1-graph-r15b-warning-text",
+ "activationId": "51b44ec4-0f2f-4611-a386-18d5c527e95a",
+ "capabilityId": "software.review.standards-spec",
+ "stageId": "review",
+ "recordedAt": "2026-09-27T16:47:40Z",
+ "independenceDisclosure": "作者自查，非独立审查：用户此前已拒绝对 P1 派发独立审查子代理（Tool 调用被拒），本轮仍是同一作者读自己的 diff。两轴分开记录、不互相掩盖，但独立性降级必须由读者一并计入。",
+ "fixedPoint": {
+  "definition": "切片 15b 的有边界差异 = 生产字节 RED→REFACTOR + 本片新增的测试文件，不以 git HEAD 为基准（HEAD 里的 pkg/hno/graph 是切片 14 之前的陈旧快照，p1r13/14/15/15b 测试文件均未跟踪，见切片 15 登记的环境事实）",
+  "graphGoBefore": "8b8fb95b5bc0a7015abd12384636cf7cf106869b",
+  "graphGoAfter": "9684e49efb85f6870784cc75a469739669e0a05b",
+  "testFileAdded": "pkg/hno/graph/p1r15b_warning_text_test.go 0285ab35729ed3d50359e0fd407edb2d8b1c1a2a（262 行 / 7 个 Test 函数）",
+  "unchangedAndHashVerified": {
+   "pkg/hno/graph/scheduler.go": "61c7ba6db72b65eda938c099968e7409fc944d73",
+   "pkg/hno/graph/graph_test.go": "425ea0303e1d5c5c8e95bacf57663ae94a4309ee",
+   "pkg/hno/graph/p1r13_step_limit_test.go": "bc4ab8e71527809e23a12590a078add8f35d68d1",
+   "pkg/hno/graph/p1r14_panic_barrier_test.go": "0ed607dbc01955864276212fa61e0902577ce7b8",
+   "pkg/hno/graph/p1r15_warnings_test.go": "3ea06d27abd3994130e593d297951c895729a4dd"
+  },
+  "diffNonEmpty": "是：生产侧 +38/-6 行、5 个 RED→GREEN hunk 加 2 个 GREEN→REFACTOR hunk；测试侧整文件新增。diff 文本见两份 ledger 的 diffText 字段（重建字节经 git blob 哈希逐字符核验）。"
+ },
+ "specSources": [
+  "artifact:docs/design/v3-test-scope-p1-graph-slice15b.json（本片契约 U1–U7、非目标、完成判据）",
+  "artifact:docs/design/v3-p1-graph-slice15-review-verdict.json（两条 blocking 的原文：S15-SPEC-1、S15-STD-5）",
+  "docs/design/v3-platform.md §3.5 判据 7/8（母约）",
+  "docs/design/v3-test-scope-p1-graph.md :22 :27 :66 :113-119（票面）"
+ ],
+ "standards": {
+  "standardSources": [
+   "AGENTS.md「Coding Style & Naming Conventions」：导出符号要有 GoDoc、错误文案小写、无 inline comment 除非澄清非显然逻辑、fmt.Errorf 包装",
+   "AGENTS.md「Testing Guidelines」：测试就近放置、用稳定替身",
+   "仓库既有取向：graph_test.go:1222-1240（诊断不得把不会发生的事说成运行时风险）、一次只点一个可定位对象的稳定文案约定"
+  ],
+  "findings": [
+   {
+    "id": "S15B-STD-4",
+    "severity": "hard",
+    "axis": "standards(test-strength)",
+    "location": "pkg/hno/graph/p1r15b_warning_text_test.go:134 与 :157（runMethodName 的两处使用）",
+    "evidence": "实跑：把文案改成 \"so the default stepLimit=%d is what will stop it\"（一句纯粹的执行预测，但不含 Run 这个词）后，绑定场景命令 `go test ./pkg/hno/graph -run TestP1R15B_ -count=1 -race -v` 退出码 0、7 行全绿（变异后已恢复，恢复哈希 9684e49e… 核验 MATCH）。也就是说 U2/U3 的 observable 是「不含整词 Run」，而它们的 behavior 写的是「不断言某次 Run 会怎样停」——规则的前半比后半弱。同一缺陷形态在切片 15 已经出现过一次：存活变异 (i) 用常量环名骗过了当时全部 7 行（S15-REFACTOR-2）。",
+    "impactOnShippedCode": "本片交付的措辞 \"is what bounds this graph\" 自身也落在断言照不到的边界上：它说的是配置生效值，不是某次执行的结果，但这句话没法被现有任何一行证伪。诚实的说法是本片把「不许点名 Run」做到了，「不许预测执行」只做到了 token 级。",
+    "fix": "开一次新的 test-design 激活，把「只说构建期事实」写成可证伪的语法级判据（例如禁止 will/stops/cannot/never 这类预测用词，或要求文案的每个动词都指向构建期可见对象），再回到 TDD。不在 review 阶段就地加断言——那是越界改测试范围。"
+   },
+   {
+    "id": "S15B-STD-1",
+    "severity": "judgement",
+    "location": "pkg/hno/graph/graph.go:399（cycleOf 有界分支）",
+    "evidence": "fmt.Fprintf(&sb, \"… -> %q (%d nodes)\", closing, len(nodes)) 在错误文案里引入了非 ASCII 省略号；本包其余错误文案全为 ASCII（grep 'graph: ' 的既有文案无多字节字符）。",
+    "fix": "要么换成 \"...\"，要么在契约/母约写回里明确「环引用用省略号连接」是刻意的展示选择。非阻塞。",
+    "scanCommand": "python3 扫描：对 graph.go/scheduler.go 逐行匹配 (errors\\.New|fmt\\.Errorf)\\(\"([^\"]*)\" 并检查非 ASCII → 仅 graph.go:399 一处"
+   },
+   {
+    "id": "S15B-STD-2",
+    "severity": "judgement",
+    "location": "pkg/hno/graph/p1r15b_warning_text_test.go:231（TestP1R15B_JudgementSevenMessageUnchanged）与 graph_test.go:700/:1228/:1245",
+    "evidence": "同一组锚点（graph: unconditional cycle + \"a\" + \"b\"）在两个文件里各写一遍。",
+    "fix": "接受为本片的护栏重复（契约 M-4 把「敢改共享渲染器」的依据落在实测锚点上，U7 就是那条依据的落地检查）；若切片 16 再动渲染，应把锚点集收成一张共享表，第三次重复就是该提取的信号。"
+   },
+   {
+    "id": "S15B-STD-3",
+    "severity": "judgement",
+    "location": "pkg/hno/graph/p1r15b_warning_text_test.go:90（onlyWarningOfThisFamily 取 hits[0]）",
+    "evidence": "取第一条、按「至少一条」观察，条数与排序不进断言。",
+    "fix": "沿用切片 15 的挂号 S15-REFACTOR-1（告警条数是否钉成恰好一条），仍待裁决；本轮如实保留该取舍，不静默收紧。"
+   }
+  ],
+  "smellBaseline": [
+   "Mysterious Name：未见（cycleHeadWhenBounded/maxRenderedCycleNames 说出各自持有的东西；仅 S15B-STD-4 涉及「措辞说了断言管不到的话」这一类命名诚实问题）",
+   "Duplicated Code：见 S15B-STD-2（跨测试文件的锚点重复，判定为可接受护栏）",
+   "Feature Envy：未见（测试只读公共出口返回的文本，不伸手进 cfg）",
+   "Data Clumps：未见（新参数只有一个常量，没有成组字段）",
+   "Primitive Obsession：judgement——环引用仍是拼好的 string 而非结构化值；本片契约明确把「新增公共面」列为非目标，故不在本片动",
+   "Repeated Switches：未见",
+   "Shotgun Surgery：未见（有界渲染落在唯一的 cycleOf，判据 7/8 同时受益，这正是收拢的方向）",
+   "Divergent Change：未见（graph.go 本轮只因「文案与渲染」一个原因变化）",
+   "Speculative Generality：未见（没有为假想的第三种告警预留钩子）",
+   "Message Chains：未见",
+   "Middle Man：未见",
+   "Refused Bequest：未见"
+  ],
+  "toolingFact": "golangci-lint 未安装（command -v golangci-lint 失败），make lint 本轮未运行；go vet ./pkg/hno/graph/ 与 gofmt -l 均无输出（`go test` 默认跑的 vet 子集也通过）。"
+ },
+ "spec": {
+  "findings": [
+   {
+    "id": "S15B-SPEC-1",
+    "severity": "hard",
+    "location": "artifact:docs/design/v3-test-scope-p1-graph-slice15b.json retires[0]",
+    "evidence": "契约写的是「S15-SPEC-1 → 由 U2/U3 立断言后闭环」；实跑证据见 S15B-STD-4（不含 Run 一词的预测句 7 行全绿）。因此 S15-SPEC-1 只能算部分闭环：token 级达成，语义级未达成。",
+    "fix": "把 retires 条目改成「token 级闭环 + 语法级判据待新契约」，并在母约写回里带上这条区别。不改已提交文件的哈希，改的是下一次设计周期的口径。"
+   },
+   {
+    "id": "S15B-SPEC-2",
+    "severity": "judgement",
+    "location": "pkg/hno/graph/graph.go:367（判据 7 致命文案）",
+    "evidence": "提示侧被要求不点名执行，而致命侧仍写 \"every edge on it is always taken, so Run cannot terminate\"。两条文案现在对同一件事用两套规则。契约 U7 明确要求判据 7 文案一字不动，故本片不动它是对的；但规则的归属地（M-5 那条仓库取向）同时覆盖两者。",
+    "fix": "挂号 R16：由 test-design 判断判据 7 是否也要受「只说构建期事实」约束。反证留给裁决：无条件可达环上「Run 永不终止」在构建期是可判的（每条边都必被走 + 可达性检查先行），因此它未必是同一类越界——需要人裁决，不由本片顺手改。"
+   },
+   {
+    "id": "S15B-SPEC-3",
+    "severity": "judgement",
+    "location": "artifact:docs/design/v3-test-scope-p1-graph-slice15b.json writeBackOwed",
+    "evidence": "两条母约/票面写回（判据 8 加「只描述构建期可见事实」与「环渲染有界」；票面 :66 补「必须给出默认预算数值与有界但可定位的环引用」）尚未落地到文档。",
+    "fix": "随下一次文档提交执行写回，并把 S15B-SPEC-1 的区别一并写入，避免母约留下一句实现兑现不了的规则。"
+   }
+  ],
+  "rowClosure": [
+   {
+    "row": "U1",
+    "status": "closed",
+    "proof": "TestP1R15B_WarningNamesTheKnobAndItsDefaultNumber 绿，且变异 α（去掉默认数值）3/3 轮判红"
+   },
+   {
+    "row": "U2",
+    "status": "closed-at-token-level",
+    "proof": "文案不含 Run（实测 149–192 字节的新文案），β 3/3 轮判红；语义级见 S15B-SPEC-1"
+   },
+   {
+    "row": "U3",
+    "status": "closed-at-token-level",
+    "proof": "非法图侧实测只出一条且不含 Run，β 同时判红该行；对提示在场与否保持中立（未越界裁决 R15-UNADJ-1）"
+   },
+   {
+    "row": "U4",
+    "status": "closed",
+    "proof": "400 节点 → 5 点名 / 190 字节 / 报出 (400 nodes)；20000 节点 → 192 字节；γ 与 ζ 各自 3/3 轮判红"
+   },
+   {
+    "row": "U5",
+    "status": "closed",
+    "proof": "短环逐字 \"ping\" -> \"pong\" -> \"ping\"；δ 3/3 轮判红"
+   },
+   {
+    "row": "U6",
+    "status": "closed",
+    "proof": "ε（常量环名）3/3 轮判红，切片 15 的存活变异 (i) 形态在有界路径上被关闭；短环与长环两侧都查"
+   },
+   {
+    "row": "U7",
+    "status": "held",
+    "proof": "判据 7 文案逐字未变（实测输出），既有 34 个 Test 函数在 -count=5 -race 下全绿，三个既有测试文件与 scheduler.go 字节不变"
+   }
+  ],
+  "nonGoalsRespected": [
+   "R15-UNADJ-1 未被裁决：U3 对提示在场与否中立，实现也没有加「非法图就不提示」的分支",
+   "S15-STD-1 未动：没有新导出符号（maxRenderedCycleNames / cycleHeadWhenBounded 均为包内常量）",
+   "S15-STD-2/3 未动：firstCycleOf 签名与邻接闭包保持原样",
+   "S15-STD-6 未动：Warnings() 仍每次全量走图，未加记忆化",
+   "Run/调度器/Result 语义零改动（scheduler.go 哈希不变）"
+  ],
+  "scopeCreep": "未见。生产 diff 只落在常量块、cycleOf、Warnings 三处；没有顺手做记忆化、没有加新旋钮、没有改判据 7 的判定集合。"
+ },
+ "measuredDuringReview": {
+  "survivingProbe": "η 变异（预测句去掉 Run 一词）→ 场景命令 exit 0，7 行全绿。这是本轴最重的发现，S15B-STD-4/S15B-SPEC-1 由此而来。",
+  "sizeTable": "外部探针 /tmp/p1-cycle15/greentext：2→149B/3 点名；4→171/5；5→182/6；6→188/5；400→190/5；20000→192/5（改动前 400→4532/401、20000→260134）",
+  "suite": "go test ./pkg/hno/graph -count=5 -race → ok（41 个 Test 函数）",
+  "structural": "非空非测试行数 618（链：588→614→618），票面上限 1500；sync. 计数 0/0；recover( 计数 1；Test 函数 41",
+  "receipt": "review 阶段的测量未取回执（回执只用于阶段推进的通过/失败判定）；η 变异实跑与恢复在同一脚本内完成并核验哈希"
+ },
+ "verdict": {
+  "result": "approve-with-followups",
+  "blocking": [],
+  "followUps": [
+   "S15B-STD-4 / S15B-SPEC-1（语法级「不预测执行」判据需要新的 test-design 激活）",
+   "S15B-SPEC-2（R16：判据 7 文案是否受同一规则约束）",
+   "S15B-SPEC-3（母约 §3.5 判据 8 与票面 :66 的写回）",
+   "S15B-STD-1（省略号的 ASCII 取舍）",
+   "S15B-STD-3（告警条数与排序仍未裁决）"
+  ],
+  "carriedFromPreviousSlices": [
+   "R15-DIVERGE-1",
+   "B7-AMEND-1",
+   "R15-UNADJ-1/2",
+   "S15-REFACTOR-1",
+   "S15-REFACTOR-3",
+   "S14-SPEC-1/2/3/4",
+   "S15-STD-1",
+   "S15-STD-2/3/4/6",
+   "S14-STD-1/5",
+   "P1 后续：B8 WithMaxConcurrency 落地或显式降级、B11 Typed 覆盖"
+  ]
+ },
+ "summary": "Standards 轴 4 条（1 hard：token 级断言骗不过语法级预测，实测 η 变异 7 行全绿；3 judgement），Spec 轴 3 条（1 hard：S15-SPEC-1 只能算部分闭环；2 judgement：判据 7 的双规则、写回未落地）。U1–U7 逐条有据，非目标未越界，无 scope creep。合并本身不阻塞，但「S15-SPEC-1 已闭环」这句话要按 S15B-SPEC-1 降级后再写进母约。",
+ "evidenceRefs": [
+  "artifact:docs/design/v3-p1-graph-r15b-review-verdict.json",
+  "artifact:docs/design/v3-p1-graph-r15b-refactor.json",
+  "artifact:docs/design/v3-p1-graph-r15b-green.json",
+  "artifact:docs/design/v3-p1-graph-r15b-red.json"
+ ]
+}

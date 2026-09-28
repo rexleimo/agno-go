@@ -1,0 +1,54 @@
+{
+  "schema": "rex.testability-decision.v1",
+  "workItemKey": "work-p1-graph-r13-step-limit-enforcement",
+  "workflowActivationId": "e567a816-8a15-4fbe-852d-22166e612679",
+  "activationId": "4c532b87-08a3-4e6c-a359-6cd204f47304",
+  "stageId": "decide-testability",
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:docs/design/v3-testability-decision-p1-graph-slice13.json#decision",
+  "contractRef": "artifact:docs/design/v3-test-scope-p1-graph-slice13.json#inScopeBehaviors",
+  "redCandidate": {
+    "publicEntry": "github.com/rexleimo/agno-go/pkg/hno/graph：graph.New(graph.WithStepLimit(3)) 构建器链 → Graph.Validate() → Graph.Run(ctx, \"seed\") 的 (*Result, error)，判据只用 errors.Is(err, graph.ErrStepLimitExceeded) 与 res==nil（测试文件 pkg/hno/graph/p1r13_step_limit_test.go 是外部包 graph_test，只用导出面 + 票面 §1 允许的观察面）",
+    "setup": "一张 §3.5 第 7 项刻意放行的图：节点 pass 与 sink，AddEdge(pass→sink) 无条件、AddConditional(sink→pass, 谓词恒真)、SetEntry(pass)/SetOutput(sink)。它不是不可终止的无条件环（那种图构建期就被拒），而是母约 §3.3:192 明确交给步数上限兜住的那一类。夹具复用 graph_test.go 已有的 looping(count) 计数节点体，无新导出面、无 sleep。",
+    "command": {
+      "executable": "go",
+      "args": [
+        "test",
+        "./pkg/hno/graph/...",
+        "-run",
+        "TestP1R13",
+        "-count=1",
+        "-timeout",
+        "25s",
+        "-v"
+      ],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "契约 T1：Validate 放行该图后，Run 以 errors.Is(err, graph.ErrStepLimitExceeded) 结束且不返回 Result（票面 B4 后半句「Output() 不可用」）；上限为 3 时节点激活被钉在 3 次。",
+    "observed": "判红一条（-run TestP1R13 命中本族唯一一条测试）：p1r13_step_limit_test.go:40「Run 的错误 = context deadline exceeded, want errors.Is(err, graph.ErrStepLimitExceeded)」，--- FAIL，包级 FAIL，exit 1，耗时 1.10s（不是挂死、不是编译失败、不是夹具错误：同一命令里 Validate 那一条前置断言通过，说明红点确实落在执行面）。仓库外独立场景 /tmp/p1-cycle13-scenario 把量级测了出来：显式 WithStepLimit(3) 的图在 300ms 内启动了 75816 次节点激活（约等于申报预算的 25000 倍），err 仍是 context deadline exceeded、isStepLimit=false；不带选项的同一张图是 42838 次。两行都 SCENARIO-FAIL、exit 1。",
+    "failureReason": "WithStepLimit 是死旋钮：graph.go:65-71 把 n 写进 config.stepLimit，graph.go:154-158 的 New 把 opts 应用进 g.cfg，但 scheduler.go 全文没有一处读 g.cfg——Run 在 scheduler.go:60-73 构造 scheduler 时只带 plan/ctx/queue/done/result/pending，母约 §3.3:177 要求的 steps 计数字段不存在，§3.3:192 的「steps >= stepLimit → 返回 ErrStepLimitExceeded」无处执行；graph.go:20 导出的哨兵 ErrStepLimitExceeded 在整个非测试代码里只有它自己的声明与注释这两个出现点。于是 consume 循环（scheduler.go:76-95）在 dispatch→等待→complete→再 dispatch 之间对恒真条件边永远重激活，唯一的出口是调用方的 ctx。测试红的是这条完全不存在的公共行为，不是实现细节写错了。",
+    "receiptRef": "receipt:5a80e141-f237-4d87-a520-8a655cca2d44",
+    "independentScenarioRef": "receipt:d9657435-58d4-47f7-9b76-a39d11745916（/tmp/p1-cycle13-scenario，仓库外 go run . 真实调用面，exit 1）",
+    "commandNote": "聚焦命令刻意用 -run TestP1R13 前缀而不是单个函数名：本片的 T1–T6 全部落在 TestP1R13_ 家族里，同一条命令在 RED/GREEN/REFACTOR 三个阶段都能覆盖整族，阶段之间不需要换命令（换命令会让前一阶段的回执与新命令不匹配）。"
+  },
+  "decision": {
+    "summary": "走 behavior-delta，不走 hardening：目标行为今天完全不存在（无计数、无哨兵错误、无默认值生效），且已用稳定公共入口真实复现为非零退出 + 可定位失败输出，同时给出量级证据（300ms 内 75816 次激活 vs 申报的 3）。没有新行为的加固路径在这里是不诚实的——它会用「测试字节变了」冒充「公共行为变了」。",
+    "redIndependence": "本轮只前置 T1 一条红（最小可独立失败的纵向切片）。T2 与 T1 在同一次实现里天然同时成立，但各自有一行独立断言：把默认值写坏（0 当不限）只会让 T2 红，把显式值忽略只会让 T1 红。T4（per-Run 预算）在 T1/T2 全绿时仍可单独红（Graph 级累计计数）。T5/T6 分别钉取消与非法旋钮，都不依赖前面几条先绿。既有对照（graph_test.go:743/:772 收敛环）今天全绿，只承担「安全阀不得误伤有限步数」的边界，不参与本次红。",
+    "whyThisSliceRepresentsTheGoal": "票面 §2 把 P1 的价值判据写成三件事，第一件就是「有环图不会锁死」；B4 是这条判据唯一的行为落点，而 §3.5 第 7 项的环检测文档明确把恒真谓词的环交接给步数上限。因此「Run 以 ErrStepLimitExceeded 结束且 Output() 不可用」这一条一旦成立并有牙齿，就足以代表本次目标：它同时验证了计步发生在消费者独占路径上（否则在途激活会翻倍）、验证了默认值与显式值两条入口、也验证了取消语义没有被顶替。",
+    "scopeDiscipline": {
+      "inThisSlice": "给 scheduler 加消费者独占的步数计数（母约 §3.3:177 的 steps 语义，实现位置在消费者侧，不引入 sync.，B12 零锁不破）；Run 把 g.cfg 带进 scheduler；默认 1000 生效；超限返回包装了 ErrStepLimitExceeded 的错误且不返回 Result；WithStepLimit(n<=0) 归入既有 Validate 声明类拒绝；WithStepLimit/config 的导出注释改为与实际一致。",
+      "explicitlyNot": "B7 Warnings() 本体（今天恒 nil）、B8 WithMaxConcurrency 的 FIFO 等待队列（同为死旋钮，另片）、B10 节点 panic 转错误（今天 scheduler.spawn 无 recover，风险更高但属独立行为，另片）、Durability 三档、G5 Send、G3 Retry/Cache/Timeout/Trace、§3.5 剩余校验项、聚合诊断。",
+      "amendmentFlag": "T6（n<=0 构建期拒绝）超出票面 B4 与母约 §3.3/§7 的文字，属作者裁断，已在契约 amendmentRegistration（S13-AMEND-1）挂号并登记母约写回义务；T1–T5/T7 全部有规格原文。"
+    },
+    "evidenceContractForNextStages": "RED 阶段沿用同一条聚焦命令并扩出 T2–T6 的行；GREEN 只补 scheduler/Run/Validate 的实现字节；REFACTOR 后必须重跑牙齿矩阵（含 >= vs >、计步位置、per-Run 重置、默认值、吞 ctx 错误、n<=0 放行 六个方向）并复核 B12 sync. 计数仍为 0 与 B13 非测试 LOC ≤1500。基线场景命令与本轮 RED 命令不同属正常（这是 behavior-delta 不是 hardening），但 TDD 各阶段的命令型证据必须各自引用本阶段真实执行的 receipt。"
+  },
+  "submittedEvidence": {
+    "stage": "design-tests",
+    "expected": [
+      "test-scope-contract-recorded",
+      "acceptance-test-mapping-recorded",
+      "test-seam-recorded"
+    ]
+  },
+  "createdAt": "2026-09-27T12:27:30Z"
+}

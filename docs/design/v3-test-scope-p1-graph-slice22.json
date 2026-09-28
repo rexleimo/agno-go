@@ -1,0 +1,169 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p2-graph-g3-node-policies",
+  "activationId": "pending",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-28T00:00:00Z",
+  "contractRef": "docs/design/v3-test-scope-p1-graph-slice22.json",
+  "slice": 22,
+  "series": "P2 第 1 片（G3 节点策略四合一），P1 已于切片 21 收口（票面 §17）",
+  "userGoal": "母约 §4（G3）：节点级四类策略——Retry（借鉴 adk retry.go）、Cache（借鉴 LangGraph CachePolicy）、Timeout（借鉴 LangGraph TimeoutPolicy）、Trace（节点级事件记录）——经 `AddNode` 的变参 NodeOption 挂到图节点上，让「节点失败了自动重试、跑太久有期限、同输入不重复算、每步可观察」成为图引擎的公共面能力，而不再由每个调用方自己在节点体内手写。",
+  "whyThisSlice": "状态文档 §4 写明 P1 闭合后才进 P2；切片 21 已闭合 P1（B1–B13 逐行背书）。G3 是母约交付表（:505）里 P2 的第一行，且它不依赖 R19-Q2 的裁决（那是 `Send`/G5 那片的门槛）。本片把 P2 的测试缝一次立起来：四个策略共用同一条挂载缝（NodeOption）与同一条执行缝（runNode 包络），先立缝再逐片加深，比四片各立各的缝便宜且不与已交付字节冲突。",
+  "measuredBeforeDesign": [
+    {
+      "id": "M1-今天的公共面形状（仓库外探针，引擎字节未动）",
+      "scene": "/tmp/g3m1（go.mod 模块 github.com/rexleimo/agno-go，pkg/hno/graph 为切片 21 收口字节 4cb363b7→b7790b9f 的逐字节副本，cmd/probe 只调导出 API）",
+      "commands": [
+        "go -C /tmp/g3m1 run ./cmd/probe",
+        "go doc -all ./pkg/hno/graph | grep -icE 'trace|hook|span|retry|cache|timeout'"
+      ],
+      "observations": [
+        "SHAPE-1（重试缺位）：节点第一次失败后 Run 立即交出该错误，calls=1 —— 今天没有任何重试（receipt:d1d6b822-a23a-45cd-bdfe-732c17689984，exit 0）。",
+        "SHAPE-2（超时缺位）：节点看到的 ctx.Deadline() ok=false，睡 30ms 后照常成功 —— 今天没有按节点的期限基础设施，ctx 就是调用方那一份。",
+        "SHAPE-3（缓存缺位）：同一输入两次 Run，节点真跑两次（calls=2，输出随次数变化）—— 今天没有记忆化。",
+        "SHAPE-4（追踪缺位）：结构事实 —— `go doc -all` 对 trace/hook/span/retry/cache/timeout 的命中数为 0，导出面上不存在任何策略挂载点或事件 sink。"
+      ]
+    },
+    {
+      "id": "M2-可行性实验（候选缝整体落在仓库副本上，仓库字节未动）",
+      "scene": "/tmp/g3exp（同一副本 + 新文件 policy.go + graph.go 变参 AddNode/policies 表 + scheduler.go 的 runNode 包络与消费者侧 trace 发射；探针 cmd/probe 量 11 个观察面）",
+      "commands": [
+        "go -C /tmp/g3exp test ./pkg/hno/graph -count=1",
+        "go -C /tmp/g3exp test ./pkg/hno/graph -count=1 -race",
+        "go -C /tmp/g3exp run ./cmd/probe",
+        "go -C /tmp/g3exp doc -all ./pkg/hno/graph | grep -cE '^(func|type|var|const) '"
+      ],
+      "observations": [
+        "既有全部测试（含切片 13–21 的 10 份测试文件）在带缝副本上 **0 个判红**：-count=1 exit 0（receipt:af1fff5a-7245-4bd9-983c-b3b70dac411a）、-race exit 0（receipt:b210906d-5cde-4f82-ad4b-5fc5ff46204d）。变参 `AddNode(n Node, opts ...NodeOption)` 对既有单参调用源兼容 —— 这是本片最大的 API 风险，已被实测排除。",
+        "11 个观察面全部成立（receipt:b17d891f-7d8b-4366-adec-6e35ad10e48e，exit 0）：OBS-1 重试恢复（calls=3、err=nil）；OBS-2 零值不重试（calls=1）；OBS-3 耗尽交最后错误（calls=2）；OBS-4 重试不消耗步数预算（stepLimit=1 下 3 次尝试成功）；OBS-5 超时交 DeadlineExceeded；OBS-6 PerAttempt+ShouldRetry 组合 calls=2；OBS-7 缓存命中跨 Run（calls=1、同值）；OBS-8 不同键再跑；OBS-9 trace 事件含 Node/In/Out；OBS-10 脱敏后 In/Out 不可见；OBS-11 Enabled=false 零事件。",
+        "结构代价（副本实测）：导出面 24 → 35（新增 RetryConfig/CacheConfig/CacheStore/TimeoutConfig/TraceConfig/NodeEvent/NodeOption 与 WithRetry/WithTimeout/WithCache/WithTrace）；非测试 LOC 872 → 1055（仍 ≤1500）；`sync.` 计数仍 0 —— 重试/超时在生产者 goroutine 内包络、缓存查询在生产者侧、trace 事件由消费者串行发出，零锁模型未破。",
+        "实验结束时仓库逐字节复核：graph.go=b7790b9f…、scheduler.go=c878a6c7…，与切片 21 收口态全同；两个副本目录均不入库。"
+      ]
+    }
+  ],
+  "designConsequence": "四条取值与挂载语义在本片按先例定形，实现前写明：（1）挂载走变参 `AddNode(n, opts ...NodeOption)`，M2 已证源兼容；（2）策略配置取值遵循 WithMaxConcurrency 先例「guard 钳制、不进 Validate」——MaxAttempts<1 即 1 次（不重试是零值直接给出的语义）、Timeout<=0 即不限时、缓存未声明即不缓存，本片不新增任何 Validate 行；（3）ShouldRetry 为 nil 一律不重试（fail-closed：引擎不替调用方分类哪些错误可重试）；（4）缓存只存成功结果（失败结果入库会让下一次 Run 把失败当结论交出，违反 fail-closed 精神）；（5）母约 §4 的 TraceConfig 草图没有 sink 字段——没有 Hook 的 trace 任何调用方都观察不到，本片补 `Hook func(NodeEvent)` 并由消费者 goroutine 串行发射（零锁不破），这是对母约草图的一处显式增量（writeBackOwed 第 1 项）；（6）CacheStore 接口声明在 pkg/hno/graph 内、不依赖 internal/cache（母约 §4「泛化到 any」的方向，依赖方向单向不破）；（7）Jitter 字段按母约草图保留进 API，但本片不为它的随机分布设任何行为行（见 observabilityLimit）。",
+  "redProtocol": "本片新增的是公共面符号（不是既有符号上的新行为），所以 RED 取两段：第一段先把 API 面落进仓库（四个 Config/Option 类型 + 挂载表，语义不接线），此时绑定命令可编译、D1–D14 每行按 M1 形状真实判红（编译失败不是本片的 RED 形状）；第二段接线语义转绿。两段都各自留 receipt。M2 副本就是第一段+第二段的完整预演。",
+  "acceptanceMapping": [
+    { "row": "D1", "behavior": "重试正例：节点前两次失败第三次成功，MaxAttempts=3 且 ShouldRetry 恒真 → 节点恰好执行 3 次，Run 成功、输出为最后一次的返回值、下游照常流动", "publicEntry": "AddNode(n, WithRetry(...)) → Run → Result.Output/Completed", "assertion": "夹具自身计数 == 3 且 err == nil 且 Output() 为成功值（今天 calls=1 且 err 非 nil，M1 SHAPE-1，故实现前必红）", "independentlyFailable": "对「今天失败即停」的形状必红；对多试/少试的实现也红" },
+    { "row": "D2", "behavior": "零值语义（反向对照）：不声明 WithRetry 的失败节点 → 恰执行 1 次、错误原样交出", "publicEntry": "AddNode(n) → Run", "assertion": "calls == 1 且 runErr == 节点错误", "independentlyFailable": "把「默认重试一次」这类实现判红（零值即不重试是契约语义）" },
+    { "row": "D3", "behavior": "重试耗尽：恒失败、MaxAttempts=2 → 恰执行 2 次，Run 交出最后一次的错误", "publicEntry": "AddNode(n, WithRetry(...)) → Run", "assertion": "calls == 2 且 runErr.Error() 含第 2 次的标记（不是第 1 次的）", "independentlyFailable": "对 off-by-one（少试一次）与「交第一个错误」的实现判红" },
+    { "row": "D4", "behavior": "ShouldRetry 门槛：MaxAttempts=3 但 ShouldRetry 对首错返回 false → 只执行 1 次；ShouldRetry 为 nil 时即便 MaxAttempts=3 也只执行 1 次", "publicEntry": "WithRetry 的 ShouldRetry/nil 语义", "assertion": "两个子用例 calls 都 == 1 且错误原样交出", "independentlyFailable": "把 nil 当「全部重试」的实现判红（fail-closed 语义）" },
+    { "row": "D5", "behavior": "重试不消耗步数预算：单节点图 WithStepLimit(1)、MaxAttempts=3、第三次成功 → Run 成功", "publicEntry": "WithStepLimit × WithRetry 组合", "assertion": "calls == 3 且 err == nil（若每次尝试计一步，第 2 步就会撞 ErrStepLimitExceeded）", "independentlyFailable": "把重试计成激活的实现判红" },
+    { "row": "D6", "behavior": "超时正例：节点监听 ctx、Timeout=20ms → 节点收到 DeadlineExceeded，Run 交出可 errors.Is 到 context.DeadlineExceeded 的错误，无重试时恰执行 1 次", "publicEntry": "AddNode(n, WithTimeout(...)) → Run", "assertion": "errors.Is(runErr, context.DeadlineExceeded) 且 calls == 1（今天 ctx 无 deadline、跑满即成功，M1 SHAPE-2，故实现前必红）", "independentlyFailable": "对「期限没接到节点 ctx」的实现判红；不断言精确耗时（见 observabilityLimit）" },
+    { "row": "D7", "behavior": "零值语义（反向对照）：不声明 WithTimeout → 节点拿到的 ctx 与调用方同形（无新增 deadline）", "publicEntry": "AddNode(n) → 节点内 ctx.Deadline()", "assertion": "夹具记录 ok == false（与调用方 ctx 一致），Run 照常", "independentlyFailable": "给所有节点默认加期限的实现判红" },
+    { "row": "D8", "behavior": "组合：PerAttempt=true、Timeout=15ms、Retry MaxAttempts=2 且 ShouldRetry 接受 DeadlineExceeded → 两次尝试各自拿到新期限（夹具记录每次的 ctx.Deadline()，严格递增），恰执行 2 次", "publicEntry": "WithTimeout(PerAttempt) × WithRetry 组合", "assertion": "calls == 2、两次 DeadlineExceeded、两次 deadline 值递增", "independentlyFailable": "把期限只挂一次（复用同一 deadline）的实现判红" },
+    { "row": "D9", "behavior": "缓存命中：同输入两次 Run（Store 为夹具内存表）→ 节点只真执行 1 次，两次 Output 同值", "publicEntry": "AddNode(n, WithCache(...)) → 两次 Run", "assertion": "calls == 1 且两次输出相等（今天每次都真跑，M1 SHAPE-3，故实现前必红）", "independentlyFailable": "对「每 Run 各自为政不查 Store」的实现判红" },
+    { "row": "D10", "behavior": "按键分流：不同输入（不同键）→ 再真执行一次；KeyFunc 为 nil 时默认键从输入值派生（同值同键）", "publicEntry": "WithCache 的 KeyFunc/默认键", "assertion": "不同输入 calls 递增；同输入不同 Run 命中", "independentlyFailable": "默认键实现成常量/指针地址的实现判红" },
+    { "row": "D11", "behavior": "失败不入缓存（fail-closed）：节点失败后再次 Run → 仍真执行（错误绝不被当成缓存结论交出），成功一次之后的同键 Run 才命中", "publicEntry": "WithCache × 失败节点", "assertion": "失败后 calls 继续递增；成功后同键 calls 不再递增", "independentlyFailable": "把错误也写进 Store 的实现判红" },
+    { "row": "D12", "behavior": "追踪正例：Enabled=true 时 Hook 对每个节点的完成收到恰一条事件，含节点名、Attempt、In/Out（未脱敏时可见）", "publicEntry": "AddNode(n, WithTrace(...)) → Run → 夹具收集 NodeEvent", "assertion": "事件数 == 节点数、Node/Out/In 字段与夹具写下的值一致（今天导出面上无任何 sink，M1 SHAPE-4，故实现前必红）", "independentlyFailable": "对 sink 缺失或字段缺失的实现判红" },
+    { "row": "D13", "behavior": "脱敏：RedactIn/RedactOut=true → 事件里 In/Out 均为 nil（脱敏在发射侧完成，不要求 Hook 自己剥）", "publicEntry": "TraceConfig.RedactIn/RedactOut", "assertion": "两字段 == nil，事件本身仍送达", "independentlyFailable": "只改字段名不清洗载荷的实现判红" },
+    { "row": "D14", "behavior": "零值语义（反向对照）：不声明 WithTrace 或 Enabled=false → Hook 零调用；引擎不存在全局默认 hook", "publicEntry": "未挂 trace 的图", "assertion": "事件数 == 0", "independentlyFailable": "引入全局/默认发射的实现判红" }
+  ],
+  "minimalVerticalSlice": "D1 + D2 + D6 + D9 + D12 五行（每个策略一条正例 + 零值反向对照），D3–D5、D7–D8、D10–D11、D13–D14 是各自策略族内的语义补强与组合。理由：四策略共享同一条缝，纵切先证明「挂上就生效、不挂零改变」这对性质，其余行都是同一条缝上的变体；M2 已把 11 个对应观察面在副本上预演过一遍。",
+  "allowedTestSeam": {
+    "add": [
+      "pkg/hno/graph/p2g3_policies_test.go（package graph_test，外部包，只用导出 API；夹具自备内存 CacheStore 与事件收集器，计数器是夹具自己的状态，不是引擎内部读数）"
+    ],
+    "modify": [
+      "无。既有 10 份测试文件一份都不许动 —— M2 已证变参 AddNode 源兼容、全部既有测试在带缝副本上 0 判红；若实现迫使任何既有断言改写，那说明缝的形状错了，应回到本契约而不是改测试。"
+    ],
+    "retires": [],
+    "sourceSeam": "pkg/hno/graph/graph.go（AddNode 变参、policies 表、capturePlan 复制）、pkg/hno/graph/scheduler.go（runNode 包络、queueItem 携带 attempt/in、消费者侧发射）、新文件 pkg/hno/graph/policy.go"
+  },
+  "forbiddenObservations": [
+    "scheduler 内部字段、queue 长度、goroutine 数、私有类型断言、内部计时（票面 :40）——重试次数的观察面是夹具自己的调用计数，不是引擎读数",
+    "`time.Sleep` 定序；期限/退避行为不断言精确耗时（下界松断言或错误类型断言，杜绝时钟抖动判红）",
+    "为测试导出内部可变状态、新增只服务测试的产品出口；把 policies 表或发射路径变成公共读数",
+    "trace 事件不断言跨并行分支的全局次序（无全局时序可断，沿用 Completed 字典序的同一取舍）"
+  ],
+  "baselineBytes": {
+    "pkg/hno/graph/graph.go": "b7790b9f0eab673d6b89ad8fdf1008652ea6b468",
+    "pkg/hno/graph/scheduler.go": "c878a6c74cad89bbdfc773c21c58952d3944630d",
+    "pkg/hno/graph/graph_test.go": "624f19624c6f4fa3c04ee6619e722b03de83336c",
+    "pkg/hno/graph/p1r21_duplicate_node_test.go": "a8a936ed101cbf3c2883205fc9ecd280826e7255",
+    "unchangedOtherTestFiles": [
+      "p1r13 bc4ab8e7", "p1r14 0ed607db", "p1r15 3ea06d27", "p1r15b 0285ab35",
+      "p1r16 6934a4f2", "p1r17 cbc8b692", "p1r18 10bce61b", "p1r19 8b4b7234"
+    ],
+    "counters": {
+      "loc_nonblank_nontest_wc_l": 872,
+      "sync_count": 0,
+      "exportedSymbols": 24,
+      "expectedFinalExportedSymbols": 35,
+      "expectedFinalLocCeiling": 1500
+    }
+  },
+  "carriedItems": [
+    {
+      "id": "R19-Q1",
+      "ref": "票面 §15.5 / 状态文档 §5",
+      "carriedIntoDesign": "汇聚前驱没跑且再无待派激活时 Run 交出 err==nil 而 Output()==nil 的形状仍未裁决。本片的 D 行没有一个依赖它的解：重试/超时/缓存/追踪都不改变「屏障凑不齐」这条路径的输入输出形状。若日后裁决为 fail-closed 拒绝，策略层无需改动；若裁决为交出部分结论，缓存层需补一条「不缓存未收敛的 Run」的行 —— 在裁决文档里补，不在本片顺手做。"
+    },
+    {
+      "id": "S19-STD-1",
+      "ref": "状态文档 §5 / 票面 §15",
+      "carriedIntoDesign": "激活时交出的聚合 map 与调度器累加器是同一对象（别名）仍未裁决。本片不触碰 join 聚合路径；唯一交点在「重试的 join 前驱重跑时屏障会再 fire」——该形状沿切片 19 的既有语义原样保留，本片不为它设行、也不修它。缓存键按激活输入（act.in）派生，不聚合 map 的别名问题引入新的公共面。"
+    }
+  ],
+  "explicitNonGoals": [
+    "`Send` 动态扇出与 R19-Q2 裁决（G5/P3 那片）。",
+    "Durability 三档（G6）、StreamMode 七模式（G4）、Store 长期记忆（G8）。",
+    "InputSchema/OutputSchema（v3.1）。",
+    "替换或修改 `internal/cache`（cache.Provider 原样保留，共存方式见母约 §4；CacheStore 适配属调用方）。",
+    "为策略配置新增 Validate 拒绝行（guard 钳制语义见 designConsequence；把 MaxAttempts<1 之类当成构建期错误是另一片行为增量）。",
+    "Jitter 的随机分布行为行（字段保留进 API，语义未钉，见 observabilityLimit）。",
+    "跨图共享缓存的一致性/失效语义（TTL 语义由 Store 契约承载，本片只钉「成功才写入、同键命中」）。"
+  ],
+  "completionCriteria": [
+    "1. redProtocol 两段各自留 receipt：第一段（API 面落地、语义未接线）绑定命令可编译且 D1–D14 按今天的形状判红；第二段（接线）全绿。两段之间除实现字节外无测试改动。",
+    "2. 每行牙齿由变异证明，至少覆盖：重试循环整段摘掉、ShouldRetry 判据取反、期限包装摘掉、PerAttempt 退化为单次期限、缓存查询摘掉、失败也写缓存、发射点摘掉、脱敏分支摘掉。等价变异如实登记为观察上限。",
+    "3. 既有 10 份测试文件零改动，逐文件 git hash-object --no-filters 复核并登记（M2 已证可行）。",
+    "4. 票面 §7 门禁在最终字节上全 exit 0：go build ./...、go test ./pkg/hno/graph/... -count=1、-race、go vet、gofmt -l；邻近回归（agent/runner/session-contract）exit 0。",
+    "5. 结构判据：sync. 计数仍 0；非测试 LOC ≤ 1500；导出符号恰好 35（+11 清单见 baselineBytes.counters，多一个或少一个都要在审查里解释）。",
+    "6. 绑定命令在最终字节上重跑并取新回执；-race 下无 DATA RACE（M2 只在副本量过一次）。",
+    "7. 完成后回写：母约 §4 的 TraceConfig 草图补 Hook 字段并把四策略标注已交付（含挂载缝与 guard 钳制语义）；母约交付表 :505 的 P2 行记切片 22 交付；状态文档 §4 加 P2 小节（携带 R19-Q1/S19-STD-1 的交点说明）；票面若扩 P2 节则引用本契约。",
+    "8. 防碰巧绿：绑定命令 -count=30 -race 与整包 -count=5 -race 各一次 exit 0。"
+  ],
+  "forbiddenShortcuts": [
+    "把策略实现成调用方节点体内的文档建议（必须经由公共面缝：NodeOption 声明、引擎执行）。",
+    "用 time.Sleep 充当重试退避的定序断言，或断言精确耗时。",
+    "为绕开编译期缺失把测试写成 reflect/接口空转（红必须来自公共面形状，不是来自断言被架空）。",
+    "把重试计进步数预算或把 trace 事件计成激活（D5 钉死前者；后者由 D12 的事件数 == 节点数钉住）。",
+    "缓存失败结果、或缓存键混入指针身份（D10/D11 钉死）。",
+    "放宽或改写任何既有断言来给新缝让路（M2 证明不需要）。"
+  ],
+  "observabilityLimit": [
+    "退避与期限只断言错误类型与次数，不断言真实时钟耗时：抖动环境下精确时序判红不可恢复。",
+    "Jitter>0 时的延迟分布不在公共面（随机量），本片只有「字段存在、API 收下它」这一事实可断。",
+    "trace 事件的跨节点全局次序不断言（并行分支无全局时序）；单节点内的 Attempt 单调递增可断。",
+    "缓存命中与真实执行在「输出值」上不可区分（这正是缓存的目的），可观察的只有执行次数与边界行为。",
+    "重试间隔内的取消语义（ctx.Done 抢先于 time.After）不在本片 D 行内单独可观察 —— 它叠加在 D2/D4 的既有取消担保上，变异矩阵里登记为等价面。"
+  ],
+  "verificationCommands": [
+    "go test ./pkg/hno/graph -run TestP2G3_ -count=1 -race -v   # 本片唯一绑定场景命令，所有 receipt 逐字用这条（cwd 仓库根，直接取，不得 sh -c 包装）",
+    "go build ./... ; go test ./pkg/hno/graph/... -count=1 ; go test -race ./pkg/hno/graph/... -count=1 ; go vet ./pkg/hno/graph/... ; gofmt -l pkg/hno/graph",
+    "go test ./pkg/hno/agent/... ./pkg/hno/runner/... ./internal/session/contract/... -count=1",
+    "grep -o 'sync\\.' pkg/hno/graph/graph.go pkg/hno/graph/scheduler.go pkg/hno/graph/policy.go | wc -l   # 必须 0",
+    "find pkg/hno/graph -name '*.go' -not -name '*_test.go' | xargs wc -l   # 必须 ≤ 1500（M2 副本实测 1055）",
+    "go doc -all ./pkg/hno/graph | grep -cE '^(func|type|var|const) '   # 必须恰为 35"
+  ],
+  "writeBackOwed": [
+    "母约 §4：TraceConfig 草图补 Hook func(NodeEvent) 字段；四策略标注已交付（切片 22）并记录挂载缝（变参 AddNode）与 guard 钳制语义；交付表 P2 行记本片。",
+    "状态文档 §4：新增 P2 小节，记录本片交付与 R19-Q1/S19-STD-1 的携带交点（见 carriedItems）。",
+    "如票面（v3-test-scope-p1-graph.md）为 P2 扩节，则 §18 引用本契约；不扩则本契约自足。"
+  ],
+  "adjudicationOptions": [],
+  "notes": "本契约为 design-tests 阶段产物（activationId 待工作项派发后回填）。M1/M2 的全部实验在 /tmp 副本上进行，仓库字节逐字节未动（复核记录见 M2 末条）；遵守票面 §17.4 的事故教训：实验全程未对本仓工作树执行任何 git 写操作。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-platform.md#4",
+    "artifact:docs/design/v3-platform.md#505",
+    "artifact:docs/design/v3-test-scope-p1-graph.md#17",
+    "artifact:docs/design/v3-p1-graph-status.md#4",
+    "receipt:d1d6b822-a23a-45cd-bdfe-732c17689984",
+    "receipt:af1fff5a-7245-4bd9-983c-b3b70dac411a",
+    "receipt:b210906d-5cde-4f82-ad4b-5fc5ff46204d",
+    "receipt:b17d891f-7d8b-4366-adec-6e35ad10e48e"
+  ]
+}

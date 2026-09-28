@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:docs/design/v3-testability-decision-p1r18.json",
+  "workItemKey": "work-p1-graph-r18-typed",
+  "activationId": "c2bb91c2-f18b-4058-86a7-558972700eda",
+  "stageId": "decide-testability",
+  "contract": "artifact:docs/design/v3-test-scope-p1-graph-slice18.json",
+  "redCandidateRow": "D2",
+  "redCandidate": {
+    "publicEntry": "graph.New() → (*Graph).AddNode(graph.Typed[string,int](\"needstring\", …)) → (*Graph).SetEntry(\"needstring\") → (*Graph).SetOutput(\"needstring\") → (*Graph).Run(ctx, 42)；断言只读 Run 交出的 (res, err) 二元组本身——err != nil、res == nil、以及 err.Error() 这一段调用方唯一能拿到「哪一个节点坏了」的导出面文本。不读 cfg/plan/scheduler 任何私有字段，不调用 Typed 内部闭包（那会绕过调度器，丢掉归因面）",
+    "setup": "pkg/hno/graph/p1r18_typed_test.go 的 TestP1R18_TypeMismatchNamesTheOffendingNode（package graph_test，外部测试包，票面 §1）：单节点图，唯一节点是 graph.Typed(\"needstring\", func(ctx, s string) (int, error) { return len(s), nil })，同时登记为 entry 与 output，因此类型不符必然发生在被点名这一次激活上，没有第二个候选节点可混淆。Run 传入 int(42)（与 TIn=string 不符）。整张图构建期合法，夹具不含 time.Sleep、channel 握手或任何时序前提——类型不符是确定性事件，观察面与调度时序无关（票面 :75）。",
+    "command": {
+      "executable": "go",
+      "args": [
+        "test",
+        "./pkg/hno/graph",
+        "-run",
+        "TestP1R18_",
+        "-count=1",
+        "-race",
+        "-v"
+      ],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "契约 D2（票面 :70 后半句「对错误类型输入返回可判定错误而非 panic」按 §11.1 先例精确化为可归因）：Run 交出的错误文本必须包含以引号包裹的 offending 节点名 \"needstring\"，同时 Result 仍为 nil、进程不 panic。允许任意标点与措辞（例如 graph: node \"needstring\": input type mismatch），被钉住的是「完整节点名以引号边界出现」这一可定位性质，不是某一条具体文案。",
+    "observed": "go test 退出码 1（receipt:b1222ea4-9a77-42fa-9c5c-9ed5c19df628；回执内 command 与上面逐字节一致——executable go、args [test, ./pkg/hno/graph, -run, TestP1R18_, -count=1, -race, -v]、cwd /Users/rex/codes/agno-go，stdoutSha256=6f8491447f871e12031353d52684927f7376e33422d76f328ccdce3d3589a4ad，stderr 为空哈希）。判红行逐字：「p1r18_typed_test.go:47: Run 的错误文本 \"graph: input type mismatch\" 未包含以引号包裹的 offending 节点名 \"needstring\"；调用方在多节点图上无法定位失败节点（契约 D2 可归因判据）」，其后是 --- FAIL: TestP1R18_TypeMismatchNamesTheOffendingNode (0.00s) / FAIL github.com/rexleimo/agno-go/pkg/hno/graph 0.630s。前两段反向边界（err != nil、res == nil、不 panic）在基线上已成立——判红整件落在第三段的可归因要求上。确定性：同一条命令以 -count=20 -race 复跑，20 次里 20 次交出同一条判红文本（非竞态红，无需按命中率折算轮数）。",
+    "receiptRef": "receipt:b1222ea4-9a77-42fa-9c5c-9ed5c19df628",
+    "failureReason": "缺失的目标行为是「类型不符的错误必须点名 offending 节点」。pkg/hno/graph/graph.go:491 的 Typed 在 in.(TIn) 断言失败时于 :495 执行 return nil, errors.New(\"graph: input type mismatch\")：这是一条无上下文、无包装、无节点名、无类型名、也不是导出哨兵的常量文案，图上任何一个 Typed 节点坏掉都交出逐字相同的错误，调用方除自己重跑一遍拓扑之外无法判定失败点。这不是编译失败、夹具错误或无关依赖问题——同一条命令下测试程序正常编译并进入断言（判红行号 p1r18_typed_test.go:47 就是断言本身），同包既有 55 个 Test 函数不受影响，产品字节仍是契约 baselineBytes（graph.go dca23943fd9cade4766ceeffe43b47477b815a61、scheduler.go 0ce6c3b332ddc768c1c5a10d6c1591fc88d67a2a，本阶段实测一致），且这一行错误分支此前从未被任何测试执行过（基线字节上 p1r18_typed_test.go 尚不存在，go tool cover -func 给出 Typed 0.0% / 包级 96.6%，见契约 measuredBeforeDesign T-6；本行取红后同一测量给出 Typed 80.0% / 包级 98.6%，仍未覆盖的那条语句是 TIn 匹配成功时才执行的 fn 调用，属 D1 的正向形状而非本行归属）。因此这是新的、调用方可观察的行为缺失，而不是既有断言被改坏，也不是实现细节变动。"
+  },
+  "whyNotHardening": "behavior-preserving-hardening 要求「没有新的用户可观察行为」，本片恰好相反：在同一条公共入口（(*Graph).Run 的 error）上，调用方今天在多节点图上拿到的是无法定位的 `graph: input type mismatch`，修复后拿到的是点名 offending 节点并区分 expected/got 类型的错误（D2/D3/D4）。错误文本是 Run 唯一交出的归因面（该路径 Result 为 nil，且 R18-Q1 已禁止新增导出哨兵），它变了就是外部行为变了。并且这一缺失已在 baselineBytes 上用公共入口复现为真实非零退出，故为 behavior-delta。",
+  "whyNotBlocked": "D1–D7 全部可经导出面观察：graph.New/WithStepLimit/WithMaxConcurrency/AddNode/NodeFunc/Typed/AddEdge/AddConditional/SetEntry/SetOutput/Validate/Run 与 Result 的 Output/Value/Completed，加上 errors.Is/errors.As 对错误语义的判定。无需读 scheduler 私有字段、queue 长度或 goroutine 数（票面 :40 禁止，本契约 forbiddenShortcuts 第 5 条已把它写死为禁区），无需新增旋钮或 test-only 出口。诚实的观察上限只在两处，已如实登记而不假造替代证据：(a) B11 前半句「编译期类型安全」属调用方编译期事实，无法从本包测试用例内部复现为运行时可观察行为，D1 只能钉住 TIn/TOut 在运行后确实按具体类型流动；(b) 归因只能靠错误文本，因此判据形式取 §11.1 的先例（引号包裹的完整节点名），而不是新的导出面。",
+  "observabilityLimitDisclosure": "本行的红色不依赖任何私有状态推断，也因此不主张证明了「Typed 内部如何构造错误」：它只证明调用方拿到的文本无法点名节点。残余上限有四项，逐项登记：(1) 断言的是「文本包含引号包裹的完整节点名」，不是「文本格式为 graph: node %q: …」，实现可自由选择措辞，这是刻意的最小约束；(2) D2 的单节点夹具无法区分「点名了失败节点」与「点名了唯一一个节点」，这一混淆由 D4（三节点链，不匹配发生在下游 b，且反向断言不含 \"a\"/\"seed\"）在同一条命令下专门堵住，D4 也在 baselineBytes 上真实判红（契约 completionCriteria 第 1 条）；(3) nil 输入的两形状（D5）在基线上已成立「不 panic、Result 为 nil」，本片红色只主张点名与 got 渲染部分；(4) 覆盖率数字（Typed 0.0%）是设计前的取红依据，不是判据本身——判据是错误文本的可定位性。",
+  "scenarioCommandBindingNote": "本阶段与其后 RED/GREEN/REFACTOR 的每个 receipt 都只用上面这一条命令（go test ./pkg/hno/graph -run TestP1R18_ -count=1 -race -v，cwd /Users/rex/codes/agno-go）；D1–D7 的逐行归属靠 -v 输出，不混入其它命令的回执（契约 allowedTestSeam.receiptRule）。-count=20 的确定性复跑、包级全量 -race、go tool cover 的 Typed 0.0%/96.6%、结构判据（sync. 计数、导出面计数、LOC 上限）以及 /tmp/p1-r18/probe 的十场景观察，均为契约 verificationCommands/measuredBeforeDesign 另行声明场景的测量，只作为数字与文本的抄录来源，不作为本阶段 receipt，避免把场景不匹配的回执混进同一证据项。receipt 记录的是 stdout/stderr 的 sha256；本次抄录文本出自同一条命令的重跑，时间行（0.00s/0.630s）属预期差异。",
+  "measuredAt": "2026-09-27T19:30:26.000Z",
+  "productionBytesAtDecision": {
+    "pkg/hno/graph/graph.go": "dca23943fd9cade4766ceeffe43b47477b815a61",
+    "pkg/hno/graph/scheduler.go": "0ce6c3b332ddc768c1c5a10d6c1591fc88d67a2a",
+    "pkg/hno/graph/graph_test.go": "425ea0303e1d5c5c8e95bacf57663ae94a4309ee",
+    "pkg/hno/graph/p1r13_step_limit_test.go": "bc4ab8e71527809e23a12590a078add8f35d68d1",
+    "pkg/hno/graph/p1r14_panic_barrier_test.go": "0ed607dbc01955864276212fa61e0902577ce7b8",
+    "pkg/hno/graph/p1r15_warnings_test.go": "3ea06d27abd3994130e593d297951c895729a4dd",
+    "pkg/hno/graph/p1r15b_warning_text_test.go": "0285ab35729ed3d50359e0fd407edb2d8b1c1a2a",
+    "pkg/hno/graph/p1r16_max_concurrency_test.go": "6934a4f2ae9ed2d80a59a30ead56b3de6bcc4296",
+    "pkg/hno/graph/p1r17_cancel_normalization_test.go": "cbc8b692a84ed5ce23b461a8ed40b9ba3870d386",
+    "pkg/hno/graph/p1r18_typed_test.go": "8e8bf1ed0d59584bb387bd0affea5c618f736947"
+  },
+  "contractDeltaFromMeasurement": [
+    "契约 D2 的 assertion 原文只写「err.Error() 含以引号包裹的节点名」；实测把「Result 此路为 nil」与「不 panic」也写成了同一行的前置（基线已成立，修复不得改坏），已在 observed 里按两段独立成句记录，判据本身未变。",
+    "契约 D5 的 got 槽位渲染要求（no value | <nil> | nil 三选一）来自本轮探针的场景 5/6 实测：具体 TIn 与接口 TIn 两种形状今天在基线上都走类型不符分支，故 D5 的红色只主张点名与 got 渲染，不主张「不 panic」——这一点在 RED 阶段仍以独立场景自证，不并入 D2 的归属。",
+    "契约 minimalVerticalSlice 原写 D2 单行即足以代表本片；本轮 -count=20 复跑确认 D2 为确定性红（20/20），因此不需要像切片 17 的竞态行 D2 那样按命中率折算取样轮数，RED 阶段仍须在同一条命令内一并取 D3/D4 的红（契约 completionCriteria 第 1 条），否则「点名了唯一一个节点」这一混淆未被排除。",
+    "无判据被删除、放宽或跳过；契约 forbiddenShortcuts 第 1 条（不得用 strings.Contains(err, \"input type mismatch\") 作为唯一判据）正是本行红色形状的反面，本轮实测到的基线文案就是它禁止的期望值来源。"
+  ],
+  "notTouchedByThisSlice": [
+    "R18-Q1（是否新增导出哨兵 / As 目标以使归因不依赖错误文本）：本片按票面 §1 只钉文本，导出面计数须保持 24（契约 D8），是否扩容属未裁决项，留给负责人裁决。",
+    "R18-Q2（fn 为 nil 的 Typed 节点）：今天由切片 14 的 panic 屏障兜住并交出可判定错误，本片不改 Validate()。",
+    "B11 前半句的编译期保证：无法在本包测试里复现为运行时行为差异，D1 只钉运行后 TOut 的实际流动（green-at-red，teethMutant 已登记）。",
+    "构建期跨节点类型连线校验（InputSchema/OutputSchema）：票面 §3 已划到 v3.1，本片不作为目标。",
+    "R17-GAP-1/2/3、S17-SPEC-3（running == 0 成功路径是否必须咨询取消）与其余 r17 遗留裁决：留在 B9 那条线上，不因本片顺手收口。",
+    "G3 节点策略（Retry/Cache/Timeout/Trace）、G4 StreamMode、G5 Send 动态扇出、G7 事件化、G8 Store：按票面 §3 留在 P2+。"
+  ],
+  "receiptShapeDisclosure": "本阶段先以 `-- sh -c \"go test …\"` 取过一次非零回执（receipt:a7b51ac5-3097-4d98-b162-18e4d9dbf309，exitCode 1，输出与下面逐字相同）；rex-harness 以「execution receipt does not match the declared scenario command」拒绝该形态（回执里的 executable 是 sh 而不是 go），故本决定只引用改用直接命令形态重取的 receipt:b1222ea4，旧回执不作为证据。两次执行都是同一条绑定命令、同为非零退出、判红文本逐字相同。"
+}

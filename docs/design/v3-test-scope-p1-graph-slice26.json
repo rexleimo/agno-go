@@ -1,0 +1,211 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p3-graph-g5-send",
+  "activationId": "pending",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-28T06:30:00Z",
+  "contractRef": "docs/design/v3-test-scope-p1-graph-slice26.json",
+  "slice": 26,
+  "series": "P3 第 2 片（母约 §6 G5：动态扇出 Send + AddJoinSend；R19-Q2 已裁决 OPT-C，2026-09-28）",
+  "userGoal": "让节点在运行时决定扇出的数量与参数：Send 派发（数量/参数运行时定，静态边做不到）+ 显式 AddJoinSend(source, target) 汇聚声明（「等 source 本轮派发的全部 Send 激活完成后以聚合输入激活 target 一次」，构建期不数前驱名数、不经 §3.5 第 6 项，运行期屏障按 source 的 pending Send 归零判凑齐）。母约 §6 的 map-reduce 示例随本片改写为可跑通的新声明形态。",
+  "whyThisSlice": "R19-Q2 已裁决（OPT-C），G5 是 P3 剩下的半边；母约交付表 P3 验收「map-reduce 端到端」落在本片。切片 24 已交付 G6，本片落地后 P3 全清、P6（G10 workflow 迁移）的前置 P1–P4 全部满足。",
+  "measuredBeforeDesign": [
+    {
+      "id": "M1-今天的公共面形状（仓库外探针）",
+      "scene": "/tmp/g5m1（module github.com/rexleimo/agno-go，pkg/hno/graph 为切片 24 收口字节逐字节副本，cmd/probe 只调导出 API）",
+      "commands": [
+        "go -C /tmp/g5m1 run ./cmd/probe",
+        "go -C /tmp/g5m1 test ./pkg/hno/graph -count=1"
+      ],
+      "observations": [
+        "结构：Send/Sender/AddJoinSend 符号在导出面为零；节点只有 2 值 Run 签名，运行时扇出无表达（receipt:2f2af892-…，exit 0 的探针面 + receipt:ae57f19c-… 基线测试 exit 0）。",
+        "R19-Q2 [A] 形状在切片 24 字节上复确认：AddJoin 单前驱声明仍被 §3.5 第 6 项拒绝（裁决材料 /tmp/r19q2 亦实测，receipt:5421d654-…）。"
+      ]
+    },
+    {
+      "id": "M2-可行性实验（候选缝整体落在仓库副本上，仓库字节未动）",
+      "scene": "/tmp/g5exp（副本 + 新文件 send.go + graph.go 的 edgeJoinSend 种类/AddJoinSend + scheduler.go 的 pending-Send 屏障；cmd/probe 十个观察面）",
+      "commands": [
+        "go -C /tmp/g5exp test ./pkg/hno/graph -count=1",
+        "go -C /tmp/g5exp test ./pkg/hno/graph -count=1 -race",
+        "go -C /tmp/g5exp run ./cmd/probe",
+        "go -C /tmp/g5exp doc -all ./pkg/hno/graph | grep -cE '^(func|type|var|const) '"
+      ],
+      "observations": [
+        "既有全部测试在带缝副本上 0 判红：-count=1（receipt:9723b80f-…）、-race（receipt:0a144625-…）均 exit 0。",
+        "十个观察面全绿（receipt:cc15e097-…，exit 0）：OBS-1 扇出 3 → summarize 各收独立输入、reduce 恰跑 1 次收到全 3 份；OBS-2 零派发 → reduce 不激活、Run 交 err==nil 而 Output()==nil（该形状与 R19-Q1 同族，本片按「不激活」钉死并登记）；OBS-3 普通边与 join-send 出边共存不互相干扰；OBS-4 无界扇出被步数安全阀拦住（isValve=true、res=nil）；OBS-5 AddJoinSend 贡献 source→target 可达性（withoutJoin 时 reduce 不可达被拒，withJoin 放行）；OBS-6 AddJoin 的 §3.5 第 6 项语义原样保留（单前驱仍拒）；OBS-7 Send 指向未注册节点 → 运行期点名拒绝（fail-closed，不静默丢）；OBS-8 非 Sender 节点零影响；OBS-9 多波扇出（第二波 2 份）逐波凑齐逐波激活；OBS-10 17 节点循环扇出被安全阀收口。",
+        "结构代价（副本实测）：导出符号 41 → 45（+Send、+Sender、+SenderFunc、+AddJoinSend、+EdgeJoinSend 相关 1 项）；非测试 LOC 1219 → 1435（≤1500 仍成立）；`sync.` 计数仍 0 —— pending-Send 记账与屏障都在唯一消费者手里。"
+      ]
+    }
+  ],
+  "designConsequence": "五条语义在本片定形（实验已按此实现并实测）：（1）Sender 是可选扩展面 `SendRun(ctx,in)(any,[]Send,error)`，调度器在生产者路径对每次激活做类型断言 —— 不采用母约 §6 草图的 3 值 Run（一个类型无法同时实现 2 值与 3 值 Run，草图按字面落地会让 Sender 无法经 AddNode 进节点表；SenderFunc 适配器同时提供两个视角，Run 是丢弃 sends 的常规视图、引擎对 Sender 节点从不走它）；（2）AddJoinSend(source,target) 声明：构建期只查端点存在 + 贡献 source→target 一条可达性边（不数前驱名数、不经 §3.5 第 6 项、不与 AddJoin 的判据互通）；routable 白名单加入 edgeJoinSend（fail-closed 默认拒绝一侧保留）；（3）运行期屏障按「source 名下 pending Send 计数归零」判凑齐：source 每次激活派发 N 个 Send 记 N，每个 Send 完成减 1，归零时以聚合输入（目标视角收到的 []any，按派发序）激活 target 一次；多波扇出（source 因环重跑再派发）逐波独立凑齐；（4）零派发（source 激活但 sends 为空/nil）→ 计数即零 → target 不激活，Run 若无其他待派激活交出 err==nil 而 Output()==nil —— 与 R19-Q1 同族的已知形状，本片不裁决只登记；（5）Send 指向未注册节点 → 运行期点名错误（构建期判不了：Send 的目标在运行时才出现），fail-closed 不静默丢。母约 §6 示例改写为 SenderFunc + AddJoinSend 形态（writeBackOwed）。",
+  "redProtocol": "与切片 22/23/24 同构两段制：第一段落 API 面（send.go 的类型/常量/适配器/声明方法 + edgeJoinSend 枚举与白名单 + 图字段），此时 D 行按今天的形状真实判红（扇出不发生、屏障不存在、可达性不放行）；第二段落调度器屏障与生产者断言转绿。两段各自留 receipt。",
+  "acceptanceMapping": [
+    {
+      "row": "D1",
+      "behavior": "扇出正例：source 对 3 项各派发一个 Send 到 summarize → summarize 恰执行 3 次、每次收到该项独有输入；reduce 恰执行 1 次且输入含全部 3 份输出（按派发序）",
+      "publicEntry": "SenderFunc + AddNode + AddJoinSend + AddEdge → Run",
+      "assertion": "sumRuns==3、reduceRuns==1、reduce 输入长度 3 且元素逐一对应（今天无 Send 面，M1 实测，实现前必红）",
+      "independentlyFailable": "对少派/漏收/多次激活 reduce 的实现判红"
+    },
+    {
+      "row": "D2",
+      "behavior": "零派发语义：source 激活但派发 0 个 Send → target 不激活；图上再无待派激活时 Run 交 err==nil 而 Output()==nil（R19-Q1 同族形状按「不激活」钉死）",
+      "publicEntry": "SenderFunc 派发空 → Run",
+      "assertion": "targetRuns==0、err==nil、res!=nil 而 Output()==nil",
+      "independentlyFailable": "对「零派发也激活一次 target」或「报错」的实现判红"
+    },
+    {
+      "row": "D3",
+      "behavior": "普通出边共存：source 同时有无条件出边与 AddJoinSend 声明 → 普通后继照常激活，join-send target 仍等全部 Send",
+      "publicEntry": "AddEdge + AddJoinSend 组合",
+      "assertion": "两路各自语义成立（OBS-3 形状）",
+      "independentlyFailable": "对两路互相吞并的实现判红"
+    },
+    {
+      "row": "D4",
+      "behavior": "安全阀：source 每轮派发的 Send 引入新激活 → 图不收敛时被 WithStepLimit 拦住，返回包 ErrStepLimitExceeded 的错误、res=nil",
+      "publicEntry": "无界扇出 + WithStepLimit",
+      "assertion": "errors.Is(err, ErrStepLimitExceeded)（OBS-4/10 形状）",
+      "independentlyFailable": "对扇出绕过步数计账的实现判红"
+    },
+    {
+      "row": "D5",
+      "behavior": "可达性：AddJoinSend 贡献 source→target 的声明边 —— 只靠 join-send 入边的 target 不再被判不可达；不声明时仍被拒（反向钉）",
+      "publicEntry": "Validate",
+      "assertion": "withJoin Validate()==nil；withoutJoin 报 unreachable 点名 target（OBS-5）",
+      "independentlyFailable": "对不贡献邻接（target 误判不可达）或过度贡献（掩盖真不可达）的实现判红"
+    },
+    {
+      "row": "D6",
+      "behavior": "AddJoin 判据原样保留（反向对照）：单前驱 AddJoin 仍被 §3.5 第 6 项点名拒绝 —— 新声明不得顺手改变旧声明语义",
+      "publicEntry": "AddJoin 单前驱 → Validate",
+      "assertion": "错误文案仍是 join target … at least 2（OBS-6，既有测试 TestP1R19 亦钉）",
+      "independentlyFailable": "对把两类声明混为一套判据的实现判红"
+    },
+    {
+      "row": "D7",
+      "behavior": "Send 指向未注册节点 → 运行期点名错误（节点名 + 归因），Run 拒绝、res=nil，不静默丢该派发",
+      "publicEntry": "SenderFunc 派发到 ghost → Run",
+      "assertion": "err 含 \"ghost\" 与 graph: 前缀、res==nil（OBS-7）",
+      "independentlyFailable": "对静默丢弃或 panic 的实现判红"
+    },
+    {
+      "row": "D8",
+      "behavior": "非 Sender 节点零影响（反向对照）：不实现 SendRun 的节点在带缝引擎上行为逐字节同今天",
+      "publicEntry": "普通 NodeFunc 图 → Run",
+      "assertion": "OBS-8 形状：执行次数/输出/Completed 不变；既有全部测试零改动全过",
+      "independentlyFailable": "对生产者路径断言引入额外开销/语义的实现判红"
+    },
+    {
+      "row": "D9",
+      "behavior": "多波扇出：source 因条件环重跑再派发第二波 → 每波各自凑齐、target 逐波激活（输入只含当波）",
+      "publicEntry": "条件环 + SenderFunc",
+      "assertion": "waves==[1,2]、两次 target 激活的输入长度分别 1/2（OBS-9）",
+      "independentlyFailable": "对跨波累计（第二波收到 3 份）或跨波丢弃的实现判红"
+    }
+  ],
+  "minimalVerticalSlice": "D1 + D2 + D5 + D7 四行（扇出汇聚正例、零派发钉死、可达性双向、未注册目标 fail-closed），D3/D4/D6/D8/D9 为共存/安全阀/反向对照/多波补强。理由：风险集中在「运行时才知道形状的图如何在构建期与运行期各归其责」，四行各钉一头。",
+  "allowedTestSeam": {
+    "add": [
+      "pkg/hno/graph/p3g5_send_test.go（package graph_test，外部包，只用导出 API；计数与输入记录均为夹具自有状态）"
+    ],
+    "modify": [
+      "无。既有 13 份测试文件一份都不许动 —— M2 已证 0 判红；若被迫改写任何既有断言，回到本契约。"
+    ],
+    "retires": [],
+    "sourceSeam": "pkg/hno/graph/send.go（新文件：Send/Sender/SenderFunc/AddJoinSend 声明侧）、pkg/hno/graph/graph.go（edgeJoinSend 枚举 + routable 白名单 + 可达性贡献）、pkg/hno/graph/scheduler.go（生产者类型断言 + pending-Send 记账与屏障）。durability/policy 预期零改动。"
+  },
+  "forbiddenObservations": [
+    "scheduler 内部字段、pending 队列形状、goroutine 数（票面 :40 同族）——扇出计数由夹具自己的调用记录观察",
+    "time.Sleep 定序；多波次序断言用确定性的条件环（谓词计数），不依赖真实时序",
+    "为测试导出 pending-Send 记账或屏障内部状态",
+    "断言聚合输入的 map 键序（若实现为 slice 按派发序则断序合法；不得断任何内部 map 迭代序）"
+  ],
+  "baselineBytes": {
+    "note": "切片 26/27 都改 pkg/hno/graph，实现必须串行：本片先落地，切片 27 契约的 baselineBytes 在本片收口后重取。",
+    "pkg/hno/graph/graph.go": "98b8bdaddb5b5d9259705aa3a54c5d485e78f83c",
+    "pkg/hno/graph/scheduler.go": "4641de5251af296a3f2092a023fe9446e16f62f0",
+    "pkg/hno/graph/policy.go": "6d71fa47ba73c769c8e1bc7d697d39d355e5210f",
+    "pkg/hno/graph/durability.go": "da57a17ed818c9d22db56ad59b23e4a54cf84acc",
+    "counters": {
+      "exportedSymbols": 41,
+      "expectedFinalExportedSymbols": 45,
+      "loc_nonblank_nontest": 1219,
+      "expectedFinalLoc": 1435,
+      "locCeiling": 1500,
+      "syncCount": 0
+    }
+  },
+  "carriedItems": [
+    {
+      "id": "R19-Q1",
+      "ref": "票面 §15.5",
+      "carriedIntoDesign": "D2 把零派发形状按「不激活 + err==nil + Output()==nil」钉死（与 AddJoin 凑不齐同族）。若日后 R19-Q1 裁决为 fail-closed 拒绝，本片 D2 需同改 —— 两处登记联动。"
+    },
+    {
+      "id": "S19-STD-1",
+      "ref": "状态文档 §5",
+      "carriedIntoDesign": "join-send 的聚合输入按派发序 slice 交付，不经 AddJoin 的 map 键控路径 —— 别名问题不经本片扩大。"
+    },
+    {
+      "id": "R19-Q2",
+      "ref": "artifact:docs/design/v3-adjudication-r19-q2-send-join.md §5",
+      "carriedIntoDesign": "已裁决 OPT-C（2026-09-28），本契约即其落地形态。"
+    }
+  ],
+  "explicitNonGoals": [
+    "G7/HITL（切片 27 契约另立）、durability resume（挂 G7）。",
+    "Send 的条件派发 DSL / 派发上限旋钮（无界扇出的安全阀就是步数预算）。",
+    "改 AddJoin 语义或把两类汇聚声明合一（D6 反向钉死）。",
+    "G10 workflow 迁移对 Send 的消费（P6，本片后前置全清）。"
+  ],
+  "completionCriteria": [
+    "1. redProtocol 两段各自留 receipt；两段之间测试文件零改动。",
+    "2. 每行牙齿由变异证明（至少：生产者断言摘掉、屏障凑齐判据摘掉、可达性贡献摘掉、Send 未注册检查摘掉、零派发改判激活）；等价变异登记。",
+    "3. 既有 13 份测试文件零改动，逐文件 git hash-object 复核登记。",
+    "4. 门禁全 exit 0（build/test/-race/vet/gofmt + 邻近 agent/runner/session-contract）。",
+    "5. 结构判据：导出符号恰 45、非测试 LOC ≤1500、sync.=0。",
+    "6. 绑定命令在最终字节重跑取新回执；-race 无 DATA RACE。",
+    "7. 写回：母约 §6 示例改写为 SenderFunc+AddJoinSend 可跑通形态并标注已交付；交付表 P3 行 G5 半边标记交付（P3 全清）；状态文档 §4 由编排方收口。",
+    "8. 防碰巧绿：绑定 -count=30 -race 与整包 -count=5 -race 各一次 exit 0。"
+  ],
+  "forbiddenShortcuts": [
+    "把 Sender 实现成改 Node.Run 签名（草图字面形状已被 designConsequence 第 1 条否证）。",
+    "AddJoinSend 走 §3.5 第 6 项的前驱数判据（裁决就是不让走）。",
+    "零派发时激活 target 一次（空聚合）来「统一形状」—— 那是语义撒谎。",
+    "Send 未注册目标静默丢弃或记警告继续跑。",
+    "改写既有断言（M2 已证不需要）。"
+  ],
+  "observabilityLimit": [
+    "Send 目标注册性只能运行期判（构建期看不见运行时派发），D7 是运行期判据。",
+    "多波之间 target 激活的相对次序由确定性的波完成次序决定；并行波（两波同时在途）的全局次序不断言。",
+    "聚合输入按派发序（slice）是本片钉的形状；若实现改为按完成序，须回契约改 D1 而非静默。",
+    "与 durability 的交点：join-send 激活计一步、其完成照常产检查点条目 —— 本片不加专属条目种类。"
+  ],
+  "verificationCommands": [
+    "go test ./pkg/hno/graph -run TestP3G5_ -count=1 -race -v   # 本片唯一绑定场景命令（cwd 仓库根，直接取）",
+    "go build ./... ; go test ./pkg/hno/graph/... -count=1 ; go test -race ./pkg/hno/graph/... -count=1 ; go vet ./pkg/hno/graph/... ; gofmt -l pkg/hno/graph",
+    "go test ./pkg/hno/agent/... ./pkg/hno/runner/... ./internal/session/contract/... -count=1",
+    "go doc -all ./pkg/hno/graph | grep -cE '^(func|type|var|const) '   # 必须恰为 45",
+    "grep -o 'sync\\.' pkg/hno/graph/graph.go pkg/hno/graph/scheduler.go pkg/hno/graph/send.go | wc -l   # 0"
+  ],
+  "writeBackOwed": [
+    "母约 §6：示例改写（SenderFunc + AddJoinSend）+ 标注已交付（切片 26）；交付表 P3 行标记全清。",
+    "状态文档 §4：由编排方收口（本契约 notes 提示）。",
+    "切片 27 契约 baselineBytes 在本片收口后重取（串行约束）。"
+  ],
+  "adjudicationOptions": [],
+  "notes": "本契约由主代理基于被取消子代理的完整 /tmp 实验测量写成（M1/M2 全部回执真实落盘；实验副本 /tmp/g5m1、/tmp/g5exp）。activationId 待派发回填。仓库字节未动。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-platform.md#6",
+    "artifact:docs/design/v3-adjudication-r19-q2-send-join.md",
+    "receipt:2f2af892-2832-4b81-86ee-750280e63ba1",
+    "receipt:ae57f19c-ce9b-4f23-9f51-6becf29e418d",
+    "receipt:9723b80f-bf2d-42a1-a2d0-96aa25751cdd",
+    "receipt:0a144625-1535-4f8e-81e4-ef1fa4c3cfa0",
+    "receipt:cc15e097-db0d-4d6a-863c-5d55d07ba1dc"
+  ]
+}

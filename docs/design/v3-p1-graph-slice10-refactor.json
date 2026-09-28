@@ -1,0 +1,168 @@
+{
+  "schema": "rex.p1-graph-slice-refactor.v1",
+  "workItemKey": "work-p1-graph-engine-r10-cycle-termination",
+  "activationId": "07778b0b-7ced-4322-b73c-f8fda7e33209",
+  "stageId": "refactor",
+  "objective": "保持测试通过，整理实现并审查测试差异没有弱化用户行为约束。",
+  "contractRef": "artifact:docs/design/v3-test-scope-p1-graph-slice10.json#inScopeBehaviors",
+  "greenRef": "artifact:docs/design/v3-p1-graph-slice10-green.json#decision",
+
+  "changes": [
+    {
+      "id": "RF1",
+      "kind": "implementation-rename",
+      "location": "pkg/hno/graph/graph.go: alwaysTakenAdjacency 声明与其唯一调用点",
+      "what": "把 alwaysTaken 改名为 alwaysTakenAdjacency，并把方法注释从「返回必定被走的边」收紧为「返回按声明顺序保留目标的邻接表」。",
+      "why": "旧名只说「必定被走」，读调用点时看不出返回的是 map[string][]string 且顺序会影响环路径的措辞；名字必须说出它持有的结构，否则调用方会误以为可以当作集合使用。",
+      "behaviorImpact": "无。函数签名、可见性（私有）、返回内容与遍历顺序全部不变，错误文案与子测试判定全部不变。"
+    },
+    {
+      "id": "RF2",
+      "kind": "test-dedupe",
+      "location": "pkg/hno/graph/graph_test.go:710-736（TestP1G_ValidateRejectsUnconditionalCycle 的不合法行循环体）",
+      "what": "同一条子测试里 Validate 面与 Run 面各自手写了一遍 [\"graph: unconditional cycle\" + tc.wantNodes]，现在提到循环体开头构造一次：anchors := append([]string{\"graph: unconditional cycle\"}, tc.wantNodes...)，两处 for _, want := range anchors 复用。",
+      "why": "契约 A5 要求的是「同一个拒绝在两个公共入口给出同一份可定位清单」。两处各自拼串时，日后只改一处就会把这条契约断言静默改成两个不同标准，重复本身即是风险而不是风格问题。",
+      "behaviorImpact": "断言条数不变、期望文本不变、判红条件不变；anchors 每次迭代重新 append，不共享底层数组别名。"
+    }
+  ],
+
+  "hashDelta": {
+    "pkg/hno/graph/graph.go": {
+      "before": "6ab6388a (GREEN)",
+      "after": "e790d40c5e7a05b76c0f39134b91678a593c2220",
+      "changed": true
+    },
+    "pkg/hno/graph/graph_test.go": {
+      "before": "2d0625d5 (RED)",
+      "after": "a14299e6af6d98b93094bffbbf21696acda0c1f1",
+      "changed": true,
+      "note": "RED→GREEN 期间测试文件未改动，GREEN→REFACTOR 只发生 RF2 一处，因此这条 delta 就是本次 REFACTOR 的全部测试差异。"
+    },
+    "pkg/hno/graph/scheduler.go": {
+      "before": "87854ffbb7629f9adeb2d45fbb74d91f2032b99d",
+      "after": "87854ffbb7629f9adeb2d45fbb74d91f2032b99d",
+      "changed": false,
+      "note": "调度器一个字节都没动。拒绝完全发生在 Validate，「零节点执行」因此是既有 Run→Validate 顺序的既成事实，不是本轮新造的执行路径。"
+    }
+  },
+
+  "verification": {
+    "fmt": "gofmt -l pkg/hno/graph 输出为空。",
+    "focusedCommand": "go test ./pkg/hno/graph/... -run TestP1G_ValidateRejectsUnconditionalCycle -count=1 -timeout 25s -v",
+    "focusedResult": "PASS，ok 0.299s，8 条子测试（5 不合法 + 3 对照）全绿，无子测试被判跳过。",
+    "focusedReceipt": "receipt:1c2ce19f-1d31-4d10-9acd-04994f6ccff6",
+    "packageRaceCommand": "go test ./pkg/hno/graph/... -count=1 -timeout 60s -race",
+    "packageRaceResult": "ok 1.337s，无 race 报告。",
+    "packageRaceReceipt": "receipt:e6a10676-1780-4171-99fa-e97ecaa96cf7",
+    "neighborCommand": "go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1",
+    "neighborResult": "exit 0，两包均 ok，未新增失败。",
+    "neighborReceipt": "receipt:2a4e5486-fec9-4a75-a921-b983cd79c9b2"
+  },
+
+  "mutationRecheckAfterRefactor": {
+    "why": "GREEN 账本的牙齿矩阵属于改名前的 graph.go；REFACTOR 若削弱了检测力，只有对当前字节重跑同一组变异才能发现。",
+    "method": "对 post-refactor 的 graph.go（e790d40c）逐个注入单点缺陷：先 assert 目标片段在文件中恰好出现 1 次，写入，跑同一条聚焦命令，从 -v 输出解析被判红的子测试行名与 graph_test.go 失败站点行号，随后立即写回原文并断言原始字节哈希复原。5 个变异全部跑完后 git hash-object 仍为 e790d40c5e7a05b76c0f39134b91678a593c2220。",
+    "mutants": [
+      {
+        "id": "M1",
+        "change": "graph.go:246 Validate 收尾 return g.rejectUnconditionalCycles() → return nil（整体去掉环检查）",
+        "exit": 1,
+        "killedRows": 5,
+        "rows": "self-loop / two-node / three-node / with-always-true-exit / default-edge-without-alternative",
+        "site": "graph_test.go:714「不可断开的环被 Validate 判为合法」",
+        "uniqueByRowSet": false,
+        "receipt": "receipt:ee558379-44c4-4f16-a501-6f6d4a4ff4fa"
+      },
+      {
+        "id": "M2",
+        "change": "alwaysTakenAdjacency 收录条件改为只保留 e.from == e.to（只认自环）",
+        "exit": 1,
+        "killedRows": 4,
+        "rows": "two-node / three-node / with-always-true-exit / default-edge-without-alternative（self-loop 行存活）",
+        "site": "graph_test.go:714",
+        "uniqueByRowSet": true,
+        "note": "行集与 M1/M5 不同：它专门暴露「只判自环」这一残缺实现。"
+      },
+      {
+        "id": "M3",
+        "change": "alwaysTakenAdjacency 收录条件改为 if true（把条件边也算必定被走，过度收紧）",
+        "exit": 1,
+        "killedRows": 2,
+        "rows": "对照：谓词会转假的条件环合法且能结束 / 对照：有条件替代的兜底回环合法且能结束",
+        "sites": "graph_test.go:755、784",
+        "uniqueByRowSet": true,
+        "receipt": "receipt:951c13e2-55ea-4697-acc2-f0ad06b62449",
+        "note": "唯一只杀对照行、不杀非法行的变异——反向对照真的在起作用，不是装饰。"
+      },
+      {
+        "id": "M4",
+        "change": "alwaysTakenAdjacency 去掉 default 分支（兜底边一律算可断开）",
+        "exit": 1,
+        "killedRows": 1,
+        "rows": "default-edge-without-alternative",
+        "site": "graph_test.go:714",
+        "uniqueByRowSet": true,
+        "note": "AR1 取舍的那一条边单独有位点守着。"
+      },
+      {
+        "id": "M5",
+        "change": "错误文案去掉 %s 环路径，只说 \"graph: cycle detected\"",
+        "exit": 1,
+        "killedRows": 5,
+        "rows": "全部五条非法行",
+        "sites": "graph_test.go:718、735（节点名/前缀比较的 t.Errorf，两个公共入口各一处）",
+        "uniqueByRowSet": false
+      }
+    ],
+    "nonUniquenessDisclosed": "M1 与 M5 的失败行集相同（都红在五条非法行），只看行集不能归因；区别在站点——M1 停在 err==nil 的 Fatal（:714），M5 停在同一子测试稍后的锚点比较（:718/:735）。M4 的行集是 M2 的行集子集，靠行数区分。如实标注为「行集不唯一、(行集, 站点) 可区分」，不宣称五条变异各自行集唯一。",
+    "receiptCoverage": "M1 与 M3 另各自重跑了一次并用 rex-harness receipt 归档（两条 exit=1 回执，证明「去掉检查会判红」与「过度收紧会判红」这两个最关键杀伤可被第三方复核）；M2/M4/M5 只留同一次脚本运行的实时解析输出，未单独取回执，标注为 partial。",
+    "conclusion": "改名与去重后，5 个变异的行集（5/4/2/1/5）、站点与 GREEN 账本记录的矩阵逐项一致，且站点行号整体 +3（711→714、752→755、781→784）恰好等于 RF2 插入 anchors 一行的位移。REFACTOR 没有削弱任何一条断言的检测力。"
+  },
+
+  "correction": {
+    "what": "本节初稿把 M1/M2/M3/M4/M5 的注入点写成了凭记忆的另一套描述（例如把 M2 写成「default 边一律视作不可打破」、把 M3 写成「breakable 判定反转」、把 M4 写成「DFS 漏掉 settled」），与 GREEN 账本的真实变异不符，站点行号也是推断的。",
+    "howFixed": "对当前 graph.go 重新真实注入并运行了上述 5 个变异，本节的 change/exit/rows/site 全部取自那一次运行的解析输出；graph.go 在重跑后逐字节复原并二次核验哈希。",
+    "whyItMatters": "变异矩阵是本轮唯一的牙齿证据，抄错的注入等于伪造证据；此项更正随账本一起留档而不是静默覆盖。"
+  },
+
+  "testDiffReview": {
+    "recordedAs": "test-diff-review-recorded",
+    "assertionCount": "整个 graph_test.go 的 t.Error/t.Fatal 计数：REFACTOR 前 82（GREEN 账本记录值），REFACTOR 后实测 82；cycle 测试段（597 行之后）实测 28。",
+    "skips": "t.Skip 出现 0 次。",
+    "weakened": "无。没有删除子测试、没有放宽期望文本、没有把精确匹配改成 Contains 之外的更弱形式、没有新增容差；唯一删除的是同一份锚点清单的第二份手写副本。",
+    "stillConstraintNotImplementationDetail": "断言观察面仍是 Validate 返回值、Run 返回值、Result.Output()/Completed() 与节点执行计数这四个公共面，未引入任何私有 helper 调用次数或内部类型断言。",
+    "matrixShape": "8 条子测试保持各自独立失败：不合法行仍按行名（self-loop / two-node / three-node / with-always-true-exit / default-edge-without-alternative）单独判红，对照行仍单独守卫过度收紧。"
+  },
+
+  "measuredAndNotAbsorbed": [
+    {
+      "finding": "不可达但成环的节点没有可达性豁免：一张 a→b 为入口链、c→d→c 完全不可达的图，post-GREEN 实测 Validate 报 graph: unconditional cycle \"c\" -> \"d\" -> \"c\"，nodesExecuted=0。",
+      "whyNotAbsorbedNow": "契约 slice10 的 A1–A6 与 §3.5 第 7 项都没有规定「只检查可达部分」。把这条在 REFACTOR 里顺手钉成断言，等于用测试私自裁定一个契约未覆盖的语义，属于本阶段禁止的范围扩大。",
+      "recordedAs": "owed：需在下一个测试设计切片里显式决定「不可达环是否合法」，并与 §3.5 第 4 项（不可达节点）一起写回母约。见 artifact:docs/design/v3-test-scope-p1-graph-slice10.json#nextOwed",
+      "evidence": "artifact:docs/design/v3-p1-graph-slice10-green.json#downstreamScenario"
+    },
+    {
+      "finding": "条件环仍可不终止：post-GREEN 实测 2 秒内 567,297 次节点执行。",
+      "whyNotAbsorbedNow": "归属 G6/P3 的 StepLimit 强制执行（v3-platform.md 第 467 行的验收面），slice10 明确 NG 覆盖。",
+      "recordedAs": "owed：G6/P3，不并入本家族闭结判据。"
+    }
+  ],
+
+  "refusedShortcuts": [
+    "没有为了让 REFACTOR 更省事而把 5 条不合法行折叠成更少行——折叠会破坏「每行只有一条缺陷」的判红归因前提。",
+    "没有把 anchors 提到函数级共享变量来少写一次 append：那会引入跨子测试的别名风险，收益只有 2 行。",
+    "没有在 REFACTOR 里顺手实现不可达环豁免或 StepLimit，两者都需要新的契约与 RED。"
+  ],
+
+  "nextStageCondition": "review 阶段必须独立于本次作者自审的结论：逐项核对 §3.5 第 7 项是否真的被这条检查覆盖、default 边的「可打破」判定是否越界解释了契约、以及 M1/M5 行集重叠是否被如实标注而非掩盖。发现的 blocking 项进 cycle10，不得在本工作项内静默修。",
+
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-slice10-refactor.json#changes",
+    "artifact:docs/design/v3-p1-graph-slice10-refactor.json#testDiffReview",
+    "receipt:1c2ce19f-1d31-4d10-9acd-04994f6ccff6",
+    "receipt:e6a10676-1780-4171-99fa-e97ecaa96cf7",
+    "receipt:2a4e5486-fec9-4a75-a921-b983cd79c9b2",
+    "receipt:ee558379-44c4-4f16-a501-6f6d4a4ff4fa",
+    "receipt:951c13e2-55ea-4697-acc2-f0ad06b62449"
+  ]
+}

@@ -1,0 +1,227 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p1-graph-r13-step-limit-enforcement",
+  "activationId": "debc959d-09db-4011-acd9-fe80039896b1",
+  "commandTokenAtReview": "9800a950-8578-466e-b42b-d3575da889b4",
+  "reviewedSlice": "13 / 票面 B4：WithStepLimit 安全阀真正落地",
+  "reviewedAt": "2026-09-27T13:08:30Z",
+  "independence": {
+    "mode": "author-self-review",
+    "disclosure": "与切片 10–12 同一处置：用户此前拒绝对 P1 派发独立审查子代理，因此本轮不是第三方审查。缓解手段是把每条 finding 都锚到可复测的命令或字节上（哈希、numstat、变异矩阵、仓库外场景程序），让下一位读者能推翻我而不是采信我。",
+    "subagentDispatch": "rejected-by-user-earlier-in-P1"
+  },
+  "fixedPoint": {
+    "given": "pkg/hno/graph/graph.go=e75d58d529af2dad7e7f3cbc25ffdff8129f802b，scheduler.go=87854ffbb7629f9adeb2d45fbb74d91f2032b99d，graph_test.go=425ea0303e1d5c5c8e95bacf57663ae94a4309ee",
+    "resolvableAsGitObject": false,
+    "measured": "git cat-file -t 三个值全部 fatal: could not get object info；git rev-parse HEAD = 0387000（P1 切片 1–2 的快照，graph.go 178 行 / scheduler.go 115 行 / graph_test.go 98 行）",
+    "consequence": "三点差分不可用，且 git diff HEAD 给出的是切片 3–13 的累计量（graph.go +264/−16、graph_test.go +1250、scheduler.go +81/−26），不是本片差异。",
+    "usedBoundary": "工作树字节链 + 仓库外逐字节对照：before 三份字节均可复得（graph.go 用 /tmp/p1-cycle12/graph.go.baseline，实测 hash-object 全等 e75d58d5…；scheduler.go 由本片 5 处反向编辑重建，重建结果 hash-object 全等登记值 87854ffb…，这是边界成立而不是我说了算的地方；graph_test.go 工作树字节实测仍等于 425ea030…，即既有测试零变更）",
+    "nonEmptyDiffRef": [
+      "/tmp/p1-cycle13/graph-go-slice13-green.diff（+31/−4）",
+      "/tmp/p1-cycle13/scheduler-go-slice13-green.diff（+32/−17）",
+      "pkg/hno/graph/p1r13_step_limit_test.go 0 → 342 行（git diff --no-index /dev/null 实测 342/0，blob bc4ab8e7…）"
+    ]
+  },
+  "specSources": [
+    "docs/design/v3-test-scope-p1-graph.md 票面 B4/B7/B8/B10/B12/B13、§1 API 清单、§3 非目标、§4.1 反例条款",
+    "docs/design/v3-test-scope-p1-graph-slice13.json 本片契约（T1–T7 + amendmentRegistration）",
+    "docs/design/v3-platform.md 母约 §3.3:177 steps 字段、§3.3:192「steps >= stepLimit → 返回 ErrStepLimitExceeded。图有环就必须有」、§7:354「StepLimit：默认 1000」、§2 价值判据「有环图不会锁死」",
+    "docs/design/v3-p1-graph-slice13-{red,green,refactor}.json 三份阶段账本（含 12 个执行回执）"
+  ],
+  "standardsSource": [
+    "AGENTS.md:23-25（导出符号须有 GoDoc；错误用 fmt.Errorf(\"context: %w\", err) 包装且小写；测试须 table-driven 且与代码同目录）",
+    "AGENTS.md:26-27（无 inline 注释除非说明新逻辑）",
+    "Fowler Refactoring ch.3 12 条 smell 基线"
+  ],
+  "axes": {
+    "standards": {
+      "checkedSmells": 12,
+      "findings": [
+        {
+          "id": "S13-STD-1",
+          "smell": "repo-documented-standard",
+          "severity": "hard",
+          "location": "pkg/hno/graph/p1r13_step_limit_test.go:82-341（8 个 TestP1R13_* 函数）",
+          "evidence": "AGENTS.md:25 原文「Keep tests table-driven and colocated (`*_test.go`)」。本族是 8 个平铺函数；其中 T1/T2/T4/T1c 的形状完全同构（构造图 + 期望错误身份 + 期望启动总数），只有参数不同。",
+          "cure": "把这四行折成一张表（opts、图构造、期望 err 身份、期望启动数），用 t.Run 子测试保留 T1/T1b/T2/T4/T1c 这些行名，使既有变异矩阵的逐行击杀归属不变；或在 P1 契约里显式登记「行为族按行分函数」的例外并说明理由。不在 review 阶段动测试。"
+        },
+        {
+          "id": "S13-STD-2",
+          "smell": "Mysterious Name",
+          "severity": "judgement",
+          "location": "pkg/hno/graph/p1r13_step_limit_test.go:78",
+          "evidence": "func startCounters() map[string]*atomic.Int64 —— 名字读起来像动作（把计数器开起来），实际是「按节点名发一份启动计数器」。",
+          "cure": "改名 activationCounters()（或 countersFor(a, b)）。一行改动，随下一次触碰该文件的批次带走。"
+        },
+        {
+          "id": "S13-STD-3",
+          "smell": "Duplicated Code",
+          "severity": "judgement",
+          "location": "pkg/hno/graph/p1r13_step_limit_test.go（grep 实测同一 if err := g.Validate(); err != nil { 前导 6 处）",
+          "evidence": "六条行各自重复「先 Validate 必须放行」的前导，只有文案不同。",
+          "cure": "不合并。每条文案说的是不同的误拒后果（T1 是「上限这条路根本没机会跑到」，T6 是「非法上限被放行」），折成 helper 会把六种诊断压成一句，正是 S13-STD-1 相反的取舍。记录为「有意保留的重复」。"
+        },
+        {
+          "id": "S13-STD-4",
+          "smell": "Duplicated Code（跨文件）",
+          "severity": "judgement",
+          "location": "p1r13_step_limit_test.go:53 runBounded vs graph_test.go:604 runWithinLimit",
+          "evidence": "两个夹具主体同形（goroutine + select + 期限判红），只差 deadline 语义与失败文案。",
+          "cure": "暂不合并：两者判据相反（一个把「不自退出」当构建期拒绝的证据，另一个要求 Run 自己带哨兵回来），合并参数会把判据藏进布尔开关。规则：出现第三个同形 runner 时抽一个带「谁拥有不自退出」策略的夹具。"
+        },
+        {
+          "id": "S13-STD-5",
+          "smell": "Mysterious Name / 文档与行为不符",
+          "severity": "judgement",
+          "location": "pkg/hno/graph/graph.go:55-56",
+          "evidence": "注释原文「stepLimitSet 区分『用户显式设置』与『默认值』，构建期告警（判据 8）只对未显式设置的环图发出」，而 graph.go:414 的 Warnings() 仍是 return nil 桩。本轮 New 已经真实消费 stepLimitSet（:166-168），于是这句话从「预告」变成了「描述一个只做了一半的机制」。",
+          "cure": "把该注释改成显式的未实现声明并指向 B7 欠账（或直接实现 B7）。属于用户明确反感的「注释承诺行为」类，改起来只有两行。"
+        },
+        {
+          "id": "S13-STD-6",
+          "smell": "Speculative Generality（自报）",
+          "severity": "judgement",
+          "location": "pkg/hno/graph/graph.go:275",
+          "evidence": "if !g.cfg.stepLimitSet || g.cfg.stepLimit > 0 —— 前半个条件只为一条调用方走不到的路径服务（New 之后 stepLimitSet 与 stepLimit 总是同时定形），唯一能命中它的是零值 &graph.Graph{}。",
+          "cure": "刻意保留并说明：去掉它，没写过 WithStepLimit 的调用方会收到一句关于自己没写过的旋钮的拒绝文案，那比多一个条件更坏。若下一位 reviewer 判定 B4 的文案归属更重要，删条件即可，T6 仍然绿。"
+        },
+        {
+          "id": "S13-STD-7",
+          "smell": "Shotgun Surgery / Data Clumps（观察）",
+          "severity": "judgement",
+          "location": "graph.go:53 + 166-168 + 274-279 与 scheduler.go:55-56 + 74 + 110-115",
+          "evidence": "「步数预算」这一个概念落在 6 个点：默认值常量、New 的落点、Validate 的声明校验、scheduler 的两个字段、Run 的取值、dispatch 的判定。",
+          "cure": "不抽。前三个是构建期职责、后三个是执行期职责，跨两侧正是要建的边界；把判定塞进 config 会让零锁论证（steps 只由消费者写）失去落点。记录以便 B8 并发上限加入时按同一形状复核。"
+        },
+        {
+          "id": "S13-STD-8",
+          "smell": "Divergent Change（既有债务，本轮只加深 27 行）",
+          "severity": "judgement",
+          "location": "pkg/hno/graph/graph.go 全文 426 行",
+          "evidence": "同一文件同时因导出 API 面、builder 链式方法、九类构建期校验、告警桩、泛型适配而被改。",
+          "cure": "归属既有欠账（S10-STD-4 / R9-STD-2 一族），不在本片动。触发条件：Validate 的拒绝类别再增加第三条同族时拆 validation.go。"
+        }
+      ],
+      "smellsCheckedAndAbsent": {
+        "Feature Envy": "未见（rejectInvalidStepLimit 只读自己的 g.cfg；dispatch 只读 scheduler 自己的字段）",
+        "Primitive Obsession": "未见为可修项：stepLimit 是 int，票面 §1 就把公共签名钉为 WithStepLimit(n int)，换成自定义类型会违反已冻结的 API",
+        "Repeated Switches": "未见（新增判定是一处 if；successors 的 switch 是既有的且只有一处）",
+        "Message Chains": "未见（最深 g.cfg.stepLimit 两跳，且发生在包内）",
+        "Middle Man": "未见（defaultStepLimit 常量与 helper 都有真实职责）",
+        "Refused Bequest": "不适用（包内无继承/内嵌扩展）"
+      },
+      "repoStandardCompliance": [
+        "GoDoc：WithStepLimit 补齐了「n 必须为正」的承诺；defaultStepLimit 为私有常量，无需导出文档 ✓",
+        "错误包装：dispatch 用 fmt.Errorf(\"graph: step limit %d reached …: %w\", …, ErrStepLimitExceeded)，小写、带 %w、errors.Is 仍成立 ✓（T1 实测）",
+        "inline 注释：新增 8 处注释全部说明「为什么计步在派发前」「为什么预算按 Run 计」「为什么默认值在 New 落」，无一句复述代码在做什么 ✓",
+        "make fmt / vet：gofmt -l 无输出，go vet 退出 0 ✓",
+        "commitAndPrRules（AGENTS.md:30-33）：不适用 —— 本片产物全在工作树，未提交、未开 PR。这是连续第 13 片如此，已在 owed 清单里挂『交付边界』一条。"
+      ],
+      "axisResult": "8 条 findings（1 条文档标准硬偏 S13-STD-1 + 7 条 judgement），其中 3 条刻意保留并给出推翻条件"
+    },
+    "spec": {
+      "conformance": [
+        {
+          "claim": "票面 B4「把 WithStepLimit 设为小于所需步数 → errors.Is(err, graph.ErrStepLimitExceeded) 且 Output() 不可用」",
+          "measured": "T1/T2/T4/T1c 全绿 + receipt:fc469f1d（exit 0）；仓库外公共场景程序实测 limit=3 的恒真环从 75816 次激活降到 starts=3、res==nil=true（GREEN 记录 publicScenarioBeforeAfter）"
+        },
+        {
+          "claim": "母约 §3.3:192 逐字形状「steps >= stepLimit → 返回 ErrStepLimitExceeded」+ §3.3:177 字段名 steps",
+          "measured": "scheduler.go:110 就是 if s.steps >= s.stepLimit，字段名与母约一致（:55）；判据 8 的告警一侧仍未实现"
+        },
+        {
+          "claim": "母约 §7:354「默认 1000」",
+          "measured": "T2 精确断言 1000 次启动，graph.go:53 常量落点；M4（删默认落点）稳定被 T2 杀死"
+        },
+        {
+          "claim": "票面 §3 非目标不得被顺带实现",
+          "measured": "Warnings() 仍 return nil（graph.go:414）、WithMaxConcurrency 仍不被调度器读取（:65）、包内 recover( 出现 0 次 → B7/B8/B10 一条都没借道 ✓ 无 scope creep"
+        },
+        {
+          "claim": "票面 §5 禁止改动既有测试",
+          "measured": "graph_test.go 字节仍为 425ea030…，本片删除行数 0"
+        }
+      ],
+      "findings": [
+        {
+          "id": "S13-SPEC-1",
+          "type": "规格授权缺口已进入公共面",
+          "severity": "judgement",
+          "location": "pkg/hno/graph/graph.go:68-71（WithStepLimit 的导出文档）",
+          "evidence": "文档现在写道「n 必须是正数…Validate 会把它连同那条声明一起拒掉」，而票面 B4 与母约 §3.3/§7 都没规定 n<=0 的行为（契约 amendmentRegistration 已把这条记为 S13-AMEND-1）。作者裁断现在挂在导出注释上，等于对外承诺了一个无规格背书的行为。",
+          "cure": "母约 §3.3 补一句「WithStepLimit 只接受正整数，非正在构建期按声明类拒绝」；该写回被 rex-self-sediment-gate 阻挡（docs/design/*.md 禁写），需显式授权。发布说明在写回之前不要引用这条行为。"
+        },
+        {
+          "id": "S13-SPEC-2",
+          "type": "规格措辞与实测行为不一致（既有约定被本片首次暴露）",
+          "severity": "judgement",
+          "location": "票面 B4 的「Output() 不可用」↔ pkg/hno/graph/graph.go:76-84（Result 的访问器）",
+          "evidence": "实测：超限后 res==nil，而 res.Output() 会对 nil 接收器解引用 panic（/tmp/p1-cycle13-nil 实测输出 PANIC-ON-NIL-RESULT: runtime error: invalid memory address or nil pointer dereference）。这不是本片引入的（scheduler.go:65/84/92/96 四条错误路径历来返回 nil *Result），但本片让「Output() 不可用」第一次成为一条被测试的判据，措辞到底是「拿不到值」还是「不许读」需要裁定。",
+          "cure": "两个方向二选一，都不许静默改：(a) 在 Result 的 GoDoc 与票面里写清「err != nil 时 Result 为 nil，不得读取」；(b) 给三个访问器加 nil 接收器保护并配一条行为测试。方向 (b) 是公共 API 语义变更，另立工作项。"
+        },
+        {
+          "id": "S13-SPEC-3",
+          "type": "范围纪律（流程性）",
+          "severity": "judgement",
+          "location": "p1r13_step_limit_test.go:105-135（T1c）↔ 契约 inScopeBehaviors T1",
+          "evidence": "T1c 在 REFACTOR 期间加入（第一轮变异矩阵里 M3「先派发再判超限」在 T1b 上存活）。它的断言「正好用满预算就收敛的图必须成功」落在契约 T1 原文「上限既不提前也不放宽」的「不提前」半边内，因此行为范围没动，但契约的行清单（T1–T7）里没有这一行。",
+          "cure": "把 T1c 以「REFACTOR 期间由变异矩阵补出、依据 T1 既有承诺」的出处登记进 slice13 契约的行清单；同类缺口若再出现，应回报 rex-harness 走一次 design-tests，而不是继续在 TDD 阶段就地补行（本票是第一次，也是唯一被允许的一次）。"
+        },
+        {
+          "id": "S13-SPEC-4",
+          "type": "母约要求但本片外的事实缺口",
+          "severity": "hard",
+          "location": "母约 §3.3:190（并发上限）+ pkg/hno/graph/graph.go:59-61 与 :65",
+          "evidence": "母约把「并发上限 + FIFO」与「步数上限」并列为调度器的两条钳制；步数这条本轮有了，并发这条仍是导出即空转（WithMaxConcurrency 的文档还写着「打满时新激活进入 FIFO 等待队列，完成一个自动派发一个」）。至此本包只剩这一个「导出了但完全没行为」的旋钮。",
+          "cure": "列为 P1 收尾的发布阻塞项：要么实现 B8，要么在文档里把它标为未生效。禁止再出现第三个空转旋钮。B10（panic 击穿宿主进程）风险更高，仍排在它前面。"
+        },
+        {
+          "id": "S13-SPEC-5",
+          "type": "证据边界",
+          "severity": "judgement",
+          "location": "本轮 fixed-point",
+          "evidence": "三个 fixed-point 值都是 blob 而不是可寻址对象，三点差分不可用；HEAD 停在切片 1–2 的快照，git diff HEAD 覆盖 3–13 片累计。scheduler.go 的基线字节此前从未落盘，本轮靠反向编辑重建并 hash 复核（87854ffb 全等）才立住边界。",
+          "cure": "已在 owed 清单加入流程项：每片进入 GREEN 前先把生产字节复制到 /tmp，让边界不依赖事后的重建能力。"
+        }
+      ],
+      "axisResult": "5 条 findings（1 条 hard：§3.3 并发上限空转的发布阻塞；4 条 judgement），B4/默认 1000/§3.3:192 逐字形状三条规格判据实测达成，非目标零越界"
+    }
+  },
+  "resolvedFromCycle12": [
+    "G6/P3：WithStepLimit 执行兜底 —— 谓词恒真的环现在由步数上限拦住（B4 达成，7 个变异全灭，仓库外场景实测 starts 恰为声明的预算）"
+  ],
+  "owed": {
+    "count": 19,
+    "carriedFromCycle12": 11,
+    "newThisCycle": [
+      "S13-STD-1 预算形状四行折成 table-driven（AGENTS.md:25 硬偏）",
+      "S13-STD-2 startCounters 改名 activationCounters",
+      "S13-STD-5 graph.go:55-56 注释不得把未实现的判据 8 告警说成已存在",
+      "S13-SPEC-1 WithStepLimit(n<=0) 行为的母约写回（gate 阻挡，需授权）",
+      "S13-SPEC-2 「Output() 不可用」的措辞裁定或 nil 安全访问器（公共 API 决策）",
+      "S13-SPEC-3 T1c 回登记进 slice13 契约行清单",
+      "S13-SPEC-4 B8 WithMaxConcurrency 空转旋钮的处置（发布阻塞级）",
+      "票面 B10 节点 panic 仍击穿宿主进程（P1 残留风险最高）",
+      "票面 B7 Warnings 判据 8 告警（stepLimitSet 已被真实消费，剩下只差发出）",
+      "流程：进入 GREEN 前落盘生产基线字节"
+    ]
+  },
+  "verdict": {
+    "result": "pass",
+    "blocking": [],
+    "statement": "切片 13 达成票面 B4 与母约 §3.3/§7 对步数上限的全部字面要求，安全阀从「导出的空承诺」变成实测的收口点（同一张图从 300ms 内 75816 次激活变成恰好等于声明预算的启动数），既有测试零改动、非目标零越界、7 个变异含两条最刁的放置错位全部被逐行击杀。放行进入下一片的前置条件不是本片的修复，而是排序判断：B10（panic 击穿宿主）比 B7/B8 更接近「不能发布」，建议下一片就是它。",
+    "nextSliceOrder": ["B10 panic→error（宿主保护，判据缺口里唯一进程级后果）", "B7 Warnings 判据 8（机制已备好）", "S13-STD-1 + S13-STD-2 + S13-STD-5 一并做（测试形状与注释，无行为风险）", "B8 WithMaxConcurrency FIFO 或显式降级其文档"]
+  },
+  "evidenceRefs": [
+    "receipt:fc469f1d-5212-45c0-99f9-b9a58cfd289e",
+    "receipt:1a970e0a-3a90-4c38-988a-137b22ddc6c3",
+    "artifact:docs/design/v3-p1-graph-slice13-red.json",
+    "artifact:docs/design/v3-p1-graph-slice13-green.json",
+    "artifact:docs/design/v3-p1-graph-slice13-refactor.json",
+    "artifact:/tmp/p1-cycle13/graph-go-slice13-green.diff",
+    "artifact:/tmp/p1-cycle13/scheduler-go-slice13-green.diff",
+    "artifact:/tmp/p1-cycle13/matrix.py",
+    "artifact:/tmp/p1-cycle13-nil/main.go"
+  ]
+}

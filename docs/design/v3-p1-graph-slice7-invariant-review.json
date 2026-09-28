@@ -1,0 +1,73 @@
+{
+  "kind": "rex.hardening-invariant-review.v1",
+  "workItemKey": "work-p1-graph-engine-r7-assertion-teeth",
+  "activationId": "31e8d02e-6473-4327-be45-ddf04e9f57c7",
+  "commandToken": "c2daa0f9-0130-4be3-8ecb-70cc5c60a369",
+  "stage": "verify-invariants",
+  "reviewedAt": "2026-09-27T07:18:00Z",
+  "diffUnderReview": "artifact:/tmp/p1-cycle6/slice7-test-diff.txt（11 删 59 增，逐行核对见下）",
+  "sideEffectPath": {
+    "claim": "会产生副作用的操作（执行节点）只能在所需校验完成之后发生。",
+    "verified": "调度器仍只在 consume→dispatch→spawn 里执行节点，而 spawn 只能在 Run 内构造完 scheduler 之后被调到；Run 的顺序是 Validate()（scheduler.go:61）→ capturePlan()（:65）→ consume()。因此任何未通过构建期校验的拓扑都到不了执行面，且执行读的是校验之后捕获的那份 plan。本轮未改任何非测试代码（graph.go 3483783f / scheduler.go 87854ffb 复算一致），该性质与基线同源。",
+    "newBypassChecked": "新增的 T3/T4 子用例恰好从反面试图绕过它：在节点函数体内改 builder（覆盖节点、改输出名）。MUT-2 与 MUT-3b 判红说明这两条路径确被捕获语义挡住；未产生任何测试专用的产品出口。"
+  },
+  "noTestOnlyEscape": "非测试文件哈希未变 ⇒ 本轮不可能新增导出符号、参数或钩子。grep 核验：graph.go/scheduler.go 无 export 增项、无 sync./atomic./recover( 命中（0/0/0），Warnings() 仍返回 nil，AddJoin 仍只在构建期被拒。",
+  "assertionDelta": [
+    {
+      "removed": "for _, want := range []string{\"conditional\", \"predicate\", `\"a\"`, `\"b\"`}（两处，slice5 用例）",
+      "added": "同列表首项改为 \"graph: conditional edge\"",
+      "verdict": "收紧。必查集合是原来的严格超集，且消除了 \"unconditional edge\" 含子串 \"conditional\" 造成的空断言。"
+    },
+    {
+      "removed": "for _, want := range []string{tc.kind, tc.side, \"does not exist\"}（8 行端点表）",
+      "added": "\"graph: \"+tc.kind+\" edge\" 取代裸 tc.kind",
+      "verdict": "收紧，同理。side 与 does not exist 两项一字未动。"
+    },
+    {
+      "removed": "AddNode(graph.NodeFunc(\"d\", identity))（夹具）",
+      "added": "d 改为返回可区分常量 D-OUT",
+      "verdict": "收紧，但确实改变了一个夹具节点的输出值。核对受影响面：S3 行与 S4 对照只断言 Completed()/三面相等，d 在该两处不参与本次执行；参照图不含 d。故无任何既有断言因 d 换值而改变通过性。"
+    },
+    {
+      "removed": "g.AddConditional(\"a\", \"b\", nil)（S2 刺激）",
+      "added": "g.AddConditional(\"a\", \"d\", nil)",
+      "verdict": "刺激换靶，断言面不变（仍要求三面与参照一致）。旧行只崩溃面敏感，新行额外对『把 nil 谓词当恒真』与『declare 期降级为无条件边』敏感。"
+    },
+    {
+      "removed": "6 行函数头注释",
+      "verdict": "非断言行。改写原因是要把锚定理由写进测试自身，避免后人把它『整理』回裸子串。"
+    }
+  ],
+  "weakenedConstraints": "无。相对 fixed point 0387000 的删除行数为 0（+481/-0），切片 1–4 的任何断言都未触碰；无 t.Skip、无容差放宽、无期望改成当前错误输出（相反：MUT-3 下期望仍是 seed，判红的是实现侧退化）。",
+  "internalDetailAsSoleProof": "无。全部新断言只经导出 API 观察 err/Completed()/Output() 与 Validate/Run 的 error 文案；不读私有字段、不数内部调用次数、不起 goroutine 或用 channel 观测时序，因此也不依赖调度时机（刺激在入口节点函数体内同步发生）。",
+  "determinismCheck": "新增子用例不引入并发或 sleep：改图动作在节点 a 自己的 Run 调用内完成，捕获动作在 Run 入口完成，二者由同一次测试运行的进程顺序确定。-race 全包 exit 0（receipt:ccac1e0e）。",
+  "decisions": [
+    "节点腿的正向对照另起一个子用例（T6），而不是改写 cycle6 已取证的那个对照块：改写在语义上更强，但会让 cycle6 的 MUTANT-2 击杀证据（引用 graph_test.go:528 的失败输出）指向一行不再存在的代码。证据可追溯性优先于行数收益。",
+    "不给 edges 深拷贝编造测试：本周期从源码确认 declare 只 append、导面无就地改写路径，因此该拷贝不可能被任何结果断言区分。为它写测试只会得到一个永远绿、也永远不杀任何东西的断言，属契约禁止的『只测模拟对象』。正确处置是改注释，已排在下一条切片。"
+  ],
+  "openInvariantsDeclaredFalse": [
+    "『构建期校验即终局』仍须带并发前提：与 Run 入口无 happens-before 的改图（另一 goroutine 不加同步）依然与 Run 自身的活读构成数据竞争，实测可路由未经验证的边。本轮只买到『按顺序发生的改图（含节点内部）不影响本次 Run』这一条，且现在有击杀证据。",
+    "entry 未进 plan（Run 在 :70 活读 g.entry），其安全性靠『捕获与首次读取早于任何生产者 goroutine』这条未编码的次序。留在 C6-STD-4 在册。"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-slice7-hardening.json",
+    "artifact:docs/design/v3-p1-graph-slice7-baseline.json",
+    "artifact:/tmp/p1-cycle6/slice7-test-diff.txt",
+    "receipt:f7297939-dc18-4028-8f26-9ecf5e02201c",
+    "receipt:ccac1e0e-a5b5-4799-a05d-8984c5508db2",
+    "receipt:9f72cb33-2f49-4ffc-ab3b-5bfb4a744890",
+    "receipt:7d5f7a2e-0b0e-4a5f-8afa-7b81acd89ce1",
+    "receipt:7ed5a0bc-ad65-40eb-b27f-b99c4103c34d",
+    "receipt:45284724-4af0-432f-b9f5-acdd02589795",
+    "file:pkg/hno/graph/scheduler.go#L56-L72",
+    "file:pkg/hno/graph/graph_test.go#L498-L579"
+  ],
+  "cycle7Corrections": [
+    {
+      "id": "C7-CORR-5",
+      "superseded": "assertionDelta 把夹具换值计入『收紧』，deletedLinesAccounting 总括『每一处都是收紧』。",
+      "corrected": "夹具换值在切片 7 内无任何断言读取（PV-5），该总括对这一行过头；其余删除行（两处词表 → 锚定超集、刺激改新靶、参照绝对期望）仍成立。",
+      "status": "over-claimed"
+    }
+  ]
+}

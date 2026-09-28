@@ -1,0 +1,114 @@
+{
+  "schema": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p1-graph-r13-step-limit-enforcement",
+  "workflowActivationId": "e567a816-8a15-4fbe-852d-22166e612679",
+  "activationId": "4c532b87-08a3-4e6c-a359-6cd204f47304",
+  "stage": "design-tests",
+  "recordedAt": "2026-09-27T12:23:00Z",
+
+  "origin": "P1 票面契约 docs/design/v3-test-scope-p1-graph.md#4 的 B4 行（未被任何切片交付）＋ 母约 docs/design/v3-platform.md §3.3:192 与 §7:354 ＋ graph.go:262-266 自己写下的交接：「谓词恒真的条件边在这里算可断开…那类环由步数上限兜住，归 §7/G6」。切片 12 欠单里的 G6/P3 WithStepLimit 兜底即此条。",
+
+  "specAuthorityNote": "与切片 12 不同，本轮目标行为是票面与母约双重明文要求的，不是作者单方 amendment：票面 B4「把 WithStepLimit 设为小于所需步数 → errors.Is(err, graph.ErrStepLimitExceeded) 且 Output() 不可用」；母约 §3.3:192「steps >= stepLimit → 返回 ErrStepLimitExceeded（对应 LangGraph GraphRecursionError）。图有环就必须有。」；母约 §7:354「StepLimit：默认 1000，超限返回 ErrStepLimitExceeded」。§2 的价值判据第一项「有环图不会锁死」正压在这条上。唯一超出规格文字的地方是 T6（n<=0 的语义），已在 explicitNonGoals 之外单列为 S13-AMEND-1 并登记母约写回义务（吸取切片 12 审查 S12-SPEC-2 的教训：裁断要显式挂号，不静默冻结）。",
+
+  "userGoal": "让 pkg/hno/graph 的步数安全阀成为真实的公共行为：一张含合法可断开环的图，超过步数上限时必须以 errors.Is(err, graph.ErrStepLimitExceeded) 可判别的错误结束，而不是像今天这样只能被调用方的 ctx 超时救走。",
+
+  "currentFactMeasured": "graph.go:20 导出 ErrStepLimitExceeded；graph.go:53-57 的 config 持 stepLimit/stepLimitSet；graph.go:154-158 的 New 已把 opts 应用进 g.cfg。但 scheduler.go 全文（155 行）没有任何 g.cfg 的读者，Run 在 :60-73 构造 scheduler 时不带 cfg；graph_test.go 对 WithStepLimit/ErrStepLimitExceeded 零引用（grep 0 命中）。因此 §3.5 第 7 项刻意放行的那类图（谓词恒真的条件环、有兜底替代的兜底回环）今天进入不自退出的执行——测试族只能靠 graph_test.go:599 的 cycleLimit=1s 加 cancel 才不挂死。",
+
+  "explicitNonGoals": [
+    "不实现 B7：Warnings() 今天恒返回 nil（graph.go:387 是骨架桩），判据 8 的「含合法条件环且未显式设置上限时告警」不在本轮——它需要的是提示面而非执行面，另立切片。",
+    "不实现 B8：WithMaxConcurrency 同样是死旋钮（其导出文档承诺「打满时新激活进入 FIFO 等待队列」，scheduler.dispatch 实际把 pending 一次全派发）。本轮不碰它，也不替它补断言。",
+    "不实现 B10：scheduler.spawn 没有任何 recover（grep recover( 在 pkg/hno/graph 非测试文件 0 命中），节点内 panic 今天会击穿进程。这条风险高于本轮目标，但它是独立行为，另立切片，不借本轮顺带改。",
+    "不做 Durability 三档（§7 的另一半）、G5 Send 动态扇出、G3 节点策略四合一（Retry/Cache/Timeout/Trace）。",
+    "不改 §3.5 已有校验的次序与文案，不改路由核心 §3.4，不改 Result 的可观察形状（Output/Value/Completed）。",
+    "不引入新导出符号：本轮只让已有的 WithStepLimit/ErrStepLimitExceeded 长出行为。"
+  ],
+
+  "inScopeBehaviors": [
+    {
+      "id": "T1",
+      "behavior": "显式 WithStepLimit(n) 且图需要超过 n 步才能收敛时，Run 返回的 error 满足 errors.Is(err, graph.ErrStepLimitExceeded)，且返回的 *Result 为 nil（Output()/Value() 不可用）；调用方自己带的计数节点体观测到「被启动的激活数恰好是 n」——上限既不提前也不放宽。",
+      "observableVia": "graph.New(graph.WithStepLimit(n)).Run(ctx, in) 的 (res, err) ＋ 节点体内自增的计数器",
+      "mapsTo": "票面 B4 后半句；母约 §3.3:192"
+    },
+    {
+      "id": "T2",
+      "behavior": "未显式设置 WithStepLimit 时默认 1000 生效：同一张永不收敛的合法环图，仅靠 New()（不带选项）也会在 1000 次激活处以 ErrStepLimitExceeded 结束，而不是无限跑下去。",
+      "observableVia": "graph.New().Run(ctx, in)（无选项）＋ 计数器",
+      "mapsTo": "母约 §7:354「默认 1000」；WithStepLimit 导出文档「未设置时默认 1000」今天是不实承诺"
+    },
+    {
+      "id": "T3",
+      "behavior": "有限步数的合法图不被误伤：票面 B4 前半句（条件边计数环在 N 次后走 false 分支收敛、Run 返回 nil error）照旧成立，切片 9–12 已交付的全部行结果不变。",
+      "observableVia": "既有对照行（graph_test.go:743 谓词会转假的条件环、:772 有条件替代的兜底回环）与全仓矩阵",
+      "mapsTo": "票面 B4 前半句；安全阀只在超限介入"
+    },
+    {
+      "id": "T4",
+      "behavior": "预算属于单次 Run：同一个 *Graph 连续执行两次，每次都有自己的步数预算；第一次成功不得让第二次以超限失败，反之亦然。",
+      "observableVia": "同一 g 两次 g.Run(ctx, in) 的返回值与节点体计数",
+      "mapsTo": "WithStepLimit 导出文档「单次 Run」；与 P0 收口时 rex 裁定的 per-run 语义一致（用户在循环收口票上明确要求 per-run）"
+    },
+    {
+      "id": "T5",
+      "behavior": "取消语义不被顶替：ctx 先到期/取消时 Run 仍返回 ctx 的错误（errors.Is(err, context.Canceled) 或 DeadlineExceeded），步数哨兵只在步数真的触发时出现；两者互斥可判别。",
+      "observableVia": "取消的 ctx ＋ errors.Is 两个方向",
+      "mapsTo": "票面 B9（取消归一化）不被本轮破坏；母约 §3.3:188"
+    },
+    {
+      "id": "T6",
+      "behavior": "WithStepLimit(n<=0) 不得成为「不限步数」的开关：这类图必须在构建期被拒（Validate 与 Run 同一条可定位文案），而不是静默拒绝一切激活或静默变成无上限。",
+      "observableVia": "graph.New(graph.WithStepLimit(0)).Validate() 的 error 整串与 Run 的复用",
+      "mapsTo": "S13-AMEND-1（规格未覆盖的裁断，见 amendmentRegistration）"
+    },
+    {
+      "id": "T7",
+      "behavior": "导出文档与实际一致：WithStepLimit/ErrStepLimitExceeded/config 的注释只承诺本轮真实成立的行为；config 里「构建期告警（判据 8）只对未显式设置的环图发出」这句在 B7 落地前不得暗示已存在。",
+      "observableVia": "注释文本本身（零用户可观察变更）",
+      "mapsTo": "AGENTS.md「Document exported symbols with GoDoc comments」＋ 注释不能误导（同 S10-STD-1 的判据）"
+    }
+  ],
+
+  "amendmentRegistration": {
+    "id": "S13-AMEND-1",
+    "scope": "仅 T6（n<=0 的语义）。T1–T5、T7 全部有票面或母约原文支撑，不需要 amendment。",
+    "rule": "WithStepLimit(n<=0) 视为非法声明，构建期拒绝。",
+    "why": "母约 §3.3:192 写着「图有环就必须有」安全阀，因此 0 不能被解释成「不限」（那正是母约禁止的状态）；而让它表示「一步都不许跑」会把调用方的笔误变成运行期谜团。既有 Validate 家族已经在拒绝其它声明层不成立（入口/输出不存在、悬空边、条件边缺谓词），归入同族是最小一致性选择。",
+    "authorityGap": "票面 B4 与母约 §3.3/§7 都没有规定 n<=0 的行为。这是作者裁断，不是规格。",
+    "writeBackDuty": "必须把这条裁断写进 docs/design/v3-platform.md（或 P1 票面 B4 的期望列）之后，它才算有规格背书；写回被 rex-self-sediment-gate 阻挡，需显式授权。与切片 12 的 S12-SPEC-2 同一条欠账，本轮一并挂号，不重复犯「静默冻结」的错。"
+  },
+
+  "outOfScopeBehaviors": [
+    "Warnings() 何时非空（B7）。",
+    "并发上限与 FIFO 派发顺序（B8）。",
+    "节点 panic 转错误（B10）。",
+    "AddJoin / 无出口汇点 / 重复节点名 / 空节点名等 §3.5 剩余校验项（切片 12 欠单在前）。",
+    "每步落盘、Durability 档位、Send 动态扇出。"
+  ],
+
+  "allowedTestSeam": "外部包 package graph_test，只用导出面：graph.New(opts...) / WithStepLimit / AddNode / NodeFunc / AddEdge / AddConditional / AddDefault / SetEntry / SetOutput / Validate / Run / Result.Output / Result.Value / Result.Completed 与 graph.ErrStepLimitExceeded（配合 errors.Is）。步数只能由调用方自己提供的节点体计数、或 Run 的返回值来观察。票面 §1 明令禁止的观察面一律禁止：scheduler 内部字段（含将要新增的步数计数）、queue 长度、goroutine 数、私有类型断言、内部计时。不得为测试新增导出符号，不得直接调用私有 dispatch/spawn/complete。",
+
+  "completionCriteria": [
+    "真实 RED 先行：T1 的行为在实现前能经公共入口复现为失败（实测拿不到哨兵错误，而是 ctx 期限到/取消错误），并留下非零退出的执行回执；不得把编译失败或夹具错误记为 RED。",
+    "GREEN 最小：T1–T6 全部判绿，且票面 B4 的两半句（收敛环 nil error 与超限哨兵）同时成立；不新增导出符号。",
+    "牙齿有担保：实现完成后跑单点变异矩阵，至少钉死这些错位——把 steps >= stepLimit 写成 > 、把计步挪到节点完成处（在途激活翻倍）、每 Graph 计数而非每 Run 计数、默认值不生效（0 当作不限）、吞掉 ctx 错误改用哨兵错误、以及删除 T1 的「恰好 n」边界。每个变异给出被判红的行名与站点；编译失败的伪变异如实剔除，不算变异。",
+    "结构判据不破：B12 零锁（pkg/hno/graph 非测试文件里 sync. 出现次数仍为 0，步数计数必须是消费者独占字段）、B13 规模（非测试 LOC ≤ 1500，当前 554）。",
+    "回归不变：切片 9–12 的既有行零修改零跳过（t.Skip 计数 0、既有断言站点不减），聚焦命令与 pkg/hno/graph 全包 -race 零退出、pkg/hno/agent + pkg/hno/runner 零退出、go build ./... 零退出、gofmt/vet 干净、覆盖率不低于 91.1%。",
+    "文档诚实：T7 核过，WithStepLimit/config 注释不再承诺不存在的告警；B8/B10 的缺口以欠单形式记录而不是本轮顺手改。"
+  ],
+
+  "forbiddenShortcuts": [
+    "不得用 time.Sleep 或固定等待来判定「超了多少步」——票面 §4.1 反例条款禁止用 sleep 定序，步数必须由公共面上可观察的激活计数与 Run 返回值判定。",
+    "不得为了断言步数而导出 scheduler 的计数字段、或读取 queue 长度/goroutine 数（票面 §1 禁止的观察面）。",
+    "不得把「超限」实现成返回一个部分完成的 Result 再附错误，从而让 Output() 仍可用——票面 B4 明写 Output() 不可用。",
+    "不得删除、跳过或放宽切片 9–12 的任何既有行/断言来换取新行为通过。",
+    "不得把默认 1000 写进测试常量来替代真实的公共默认值。",
+    "不得用「只验证 mock/helper 被调用」代替 Run 面上的行为断言。"
+  ],
+
+  "baselinePlan": "本切片有新的用户可观察行为（今天完全不存在这条错误路径），因此走 behavior-delta：先在公共入口 graph_test 里落一条最小失败测试（T1 的显式上限场景），用 rex-harness receipt 记录其非零退出与真实失败输出，作为 decide-testability 的 redCandidate；随后才进入 TDD 的 GREEN。若实现过程中发现任何必须新增导出面或改变票面禁止观察面才能成立，停止并回报测试范围变更需求，不自行扩大范围。",
+
+  "sedimentCarried": [
+    "切片 11 的 cycleLimit=1s 夹具（graph_test.go:597-604）在新行为落地后仍是必要的防御，不得删除——它防的是「不自退出的图把测试变挂死」，而 B4 落地后它额外成为「哨兵错误必须在 1s 内出现」的隐式期限。",
+    "切片 12 审查确认的欠单顺序不变：本轮排在 G6/P3 WithStepLimit 那一条上；B7/B8/B10 新登记为 P1 票面未交付行，排序见 review 账本。"
+  ]
+}

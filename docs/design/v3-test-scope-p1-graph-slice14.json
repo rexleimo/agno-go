@@ -1,0 +1,125 @@
+{
+  "schema": "rex.test-scope.contract.v1",
+  "workItemKey": "work-p1-graph-r14-panic-to-error",
+  "workflowActivationId": "2accb916-dddf-4677-989a-9287610c6514",
+  "activationId": "7c5a65a6-f0ed-4036-9e37-e8354337f264",
+  "stage": "design-tests",
+  "recordedAt": "2026-09-27T13:17:00Z",
+  "origin": {
+    "ticket": "docs/design/v3-test-scope-p1-graph.md §4 B10",
+    "ticketWording": "panic 转错误 | 节点内 panic(\"boom\")：Run 返回非 nil error，进程不崩，测试不中断",
+    "mother": "docs/design/v3-platform.md §3.3:182",
+    "motherWording": "生产者（每节点 goroutine）只做三件事：跑节点、recover panic 成 error、往 queue 发送。从不读 queue，从不碰任何 scheduler 字段。",
+    "precedent": "切片 13 的审查裁决把 B10 排在下一片第一位，理由是它是 P1 判据缺口里唯一带进程级后果的一项（docs/design/v3-p1-graph-slice13-review-verdict.json verdict.nextSliceOrder[0]）"
+  },
+  "specAuthorityNote": "关于 panic，母约全文只有一句（§3.3:182），且它把 recover 明确指派给「生产者（每节点 goroutine）」——也就是引擎自己创建的那条 goroutine。这句话同时划出了边界与理由：recover 之所以必须在生产者可观察，是因为 goroutine 里的 panic 无法被父 goroutine 捕获，除此之外没有第二个位置能兜住它。谓词 panic 落在指派之外，本片按测量结果显式拒绝而不是静默扩大（见 outOfScopeBehaviors.rejectedAfterMeasuring）。",
+  "userGoal": "让 pkg/hno/graph 的调用方获得一条可依赖的宿主保护承诺：节点作者写出的 panic（显式 panic(...) 或 provider 里一次 nil 解引用）不会把承载它的那个进程带下去，而是变成 Run 的一条非 nil error。",
+  "currentFactMeasured": {
+    "how": "仓库外公共 API 探针 /tmp/p1-cycle14/{go.mod,main.go}（replace 指向本仓库），三种场景各起一个进程，因为 panic 会终止进程",
+    "nodePanic": "exit=1，输出 `panic: boom` + `goroutine 18 [running]`，栈尾 `created by github.com/rexleimo/agno-go/pkg/hno/graph.(*scheduler).spawn in goroutine 1 / scheduler.go:124`。Run 从未返回值（打印 err 的那行不存在）。",
+    "predicatePanic": "exit=1，但顺序相反：先打印 `MODE pred-panic: 走到这里说明进程活着，Run 以错误返回`（即 main 的 defer 已执行、Run 已展开），随后 `panic: pred-boom` 出现在 `goroutine 1 [running]` 并一路打到 main.main。也就是谓词 panic 是同步逃回调用方的。",
+    "siblingPanic": "exit=1，`panic: sibling-boom` 在 spawn 出来的 goroutine 上，另一个兄弟节点当时仍在 200ms 执行中——一条分支炸就带走整个进程。",
+    "packageRecoverCount": "pkg/hno/graph 非测试文件里 `recover(` 出现次数实测 0：这个包目前没有任何一层 panic 屏障。",
+    "conclusion": "B10 不是「部分实现」，是完全没有：两个用户代码入口里，节点体那条一旦被引擎放到新 goroutine 上，调用方就再无任何手段自救。"
+  },
+  "inScopeBehaviors": [
+    {
+      "id": "T1",
+      "behavior": "节点体内 panic(\"boom\") 时，Run 返回非 nil error 且 Result 为 nil；调用它的测试二进制不中止，同一次运行里排在它后面的测试照常跑完。",
+      "observable": "errors 判非 nil + res == nil + 聚焦命令退出码与「后续测试仍执行」的清单",
+      "authority": "票面 B10 三个子句逐字对应"
+    },
+    {
+      "id": "T2",
+      "behavior": "转换不区分 panic 的值形态：显式 panic(string)、panic(error 值)、以及节点体内一次真实 runtime error（被零除）都必须变成非 nil error。",
+      "observable": "同一公共缝跑三种 panic 形态，各自断言 err != nil",
+      "authority": "母约 §3.3:182 说的是「recover panic 成 error」，没限定值形态；而真实宿主里最常见的恰恰是 provider 内一次 nil 解引用，不是手写 panic()。只测 string 形态等于把承诺写成只覆盖最少见的那种。"
+    },
+    {
+      "id": "T3",
+      "behavior": "返回的错误点名发生 panic 的那个节点：扇出图里 entry→{ok,bad} 只让 bad 崩溃时，错误文案里出现的节点名是 bad。",
+      "observable": "沿用切片 12 的 quotedNames 牙齿法，断言被成对双引号包住的名字集合，而不是 strings.Contains",
+      "authority": "S14-AMEND-1（作者裁断）：票面 B10 只要求「非 nil error」，没要求可定位。先例是切片 12 已确立并被接受的「名字牙齿」判据（拒绝发生在哪个名字上是调用方可观察面）。母约写回之前不算有规格背书。"
+    },
+    {
+      "id": "T4",
+      "behavior": "崩溃不得把 Run 变成不返回：兄弟节点仍在执行时发生 panic，Run 必须自己回来并交出 error。",
+      "observable": "带 deadline 的等待（与切片 13 runBounded 同一形状：context 超时 + 兜底 select），超时即判红",
+      "authority": "票面 B10「进程不崩」的必要性条件——recover 之后不把结果交给唯一消费者，running 就永不归零，consume 会永久阻塞。这条断言存在的目的就是击杀「recover 但漏投递」这一最可能的错实现。"
+    },
+    {
+      "id": "T5",
+      "behavior": "屏障不是一次性的，也不脏化本次状态：同一张图第一次 Run 因 panic 失败、第二次 Run（节点这次不崩）必须正常收敛并交出正确 Output()。",
+      "observable": "第二次 Run 的 err == nil、Output() 与 Completed() 断言",
+      "authority": "票面 B10 + 与切片 13 T4「预算属于单次 Run」同构的可复用性要求"
+    },
+    {
+      "id": "T6",
+      "behavior": "对照行：节点自己 return err 的既有语义不被恢复逻辑改写——Run 交出的仍是那个 error 本身（errors.Is 身份成立），不是被包进 panic 文案的新错误。",
+      "observable": "errors.Is(err, sentinelUsedByNode) 断言",
+      "authority": "票面 §4.1 反例条款精神：新行为不得吃掉旧行为。没有这条对照，「在返回路径上无条件重新包装」的实现对全部断言都是绿的。"
+    },
+    {
+      "id": "T7",
+      "behavior": "对照行：happy path 完全不受影响——同一张无 panic 图的 Completed()/Output() 与今天一致。",
+      "observable": "Output() 值相等 + Completed() 序列相等",
+      "authority": "既有基线（切片 1–13 的包级全绿）"
+    },
+    {
+      "id": "T8",
+      "behavior": "panic 展开时节点自己的 defer 已经执行完毕：引擎的 recover 不得取代节点作者的资源清理。",
+      "observable": "节点体内 defer 里递增的计数器，在 Run 返回后读为 1",
+      "authority": "母约 §3.3:182 把屏障放在「生产者 goroutine」这一层，正是为了让被 panic 帧内的 defer 先跑完；放在别处这条就不成立。"
+    }
+  ],
+  "rejectedAfterMeasuring": {
+    "id": "R14-REJECT-1",
+    "candidate": "顺手把谓词（AddConditional 的 Predicate）panic 也 recover 掉",
+    "measured": "谓词跑在消费者 goroutine 上，而消费者就是调用 Run 的那条 goroutine：探针里 panic 先让 Run 展开（main 的 defer 已打印），再以 goroutine 1 上的活 panic 打到 main。",
+    "decision": "本片不实现。",
+    "reason": "调用方在这条路径上仍有处置权（自己的 recover 有效），引擎代它吞掉反而是把选择权拿走；更关键的是消费者 goroutine 同时跑调度器内部逻辑，宽到这一层的 recover 会把引擎自己的 bug 一并变成 error——那正是票面 §4.1 要判红的「用返回错误掩盖一切」。母约 §3.3:182 的指派范围也只有生产者。",
+    "residual": "记录为规格缺口而不是已满足：谓词 panic 目前同步逃给调用方，公共文档没有说明这一点。是否要在文档面写清，属实现阶段的独立裁决，不在本片断言里。"
+  },
+  "outOfScopeBehaviors": [
+    "在 Run 或 consume 外层整体 recover（把调度器内部 bug 一起转成 error）。",
+    "新增导出哨兵如 ErrNodePanicked：票面只要求「非 nil error」，本片不为此扩公共面，断言也不得依赖一个规格里没有的 error identity。",
+    "B7 Warnings()、B8 WithMaxConcurrency FIFO、B11 Typed 的测试覆盖——实测本包对 graph.Typed 与 Warnings() 的断言数均为 0，但它们各自是独立判据，另片处理。",
+    "改动 pkg/hno/agent、pkg/hno/runner、pkg/hno/workflow 的任何行为或既有测试。",
+    "恢复语义之外的错误文案美化、堆栈转储、结构化日志。"
+  ],
+  "allowedTestSeam": {
+    "entry": "外部测试包 graph_test 里的公共入口链：graph.New() → AddNode(graph.NodeFunc(...)) → AddEdge/AddConditional → SetEntry/SetOutput → Run(ctx, in)。没有任何私有符号参与搭建或断言。",
+    "file": "新增 pkg/hno/graph/p1r14_panic_barrier_test.go（票面 §5 允许「新增 pkg/hno/graph 下的同包测试文件」）。",
+    "focusedCommand": "go test ./pkg/hno/graph/... -run TestP1R14 -count=1 -timeout 25s -v",
+    "suiteCommand": "go test ./pkg/hno/graph/... -count=1 -race —— T1 的「测试不中断」只有包级运行能观察：RED 时该命令会因 panic 中止而跑不完剩余测试。",
+    "forbiddenObservation": "scheduler 字段、queue 长度、running 计数、goroutine 数量、内部计时（票面明列为禁观察面）。T8 的计数器与 T2/T5 的输入输出全部由调用方自己提供。"
+  },
+  "completionCriteria": [
+    "T1–T8 在聚焦命令下全绿，且每条 RED 都在改实现之前真实观察到非零退出。",
+    "包级 go test ./pkg/hno/graph/... -count=1 -race 全绿，go vet 干净。",
+    "结构判据不退让：非测试文件 sync. 出现次数仍为 0（B12）、引擎核心非测试 LOC ≤ 1500（B13）。",
+    "既有测试字节不变：graph_test.go=425ea0303e1d5c5c8e95bacf57663ae94a4309ee、p1r13_step_limit_test.go=bc4ab8e71527809e23a12590a078add8f35d68d1。",
+    "每条断言的牙齿由变异测试证明（本项目既有基线）：至少包含「recover 后不投递 queueItem」「只覆盖 panic(string) 形态」「错误不点名节点」「恢复路径重新包装节点自身 error」四个变异，逐一给出击杀行。",
+    "R14-REJECT-1 的裁决与测量随本契约留档，避免下一位读者以为谓词面已被遗忘。"
+  ],
+  "forbiddenShortcuts": [
+    "把 panic 场景写成 t.Skip 或子测试里吞掉，让「进程不崩」看起来成立。",
+    "只断言 err != nil 而不看是谁的 panic（T3）——那会让「所有 panic 报同一句话」的实现白过。",
+    "用 time.Sleep 给兄弟节点定序（票面 §4.1）；T4 用 deadline 兜底悬挂，不用 sleep 制造时序。",
+    "为了让 T2 变绿而在节点包装层做一次类型断言式特判，只处理 error 值的 panic。",
+    "反向放宽 T6：把节点自身 error 也纳入 panic 文案格式，然后改断言去迎合。",
+    "借本片顺带实现 B7/B8/B11 或新增导出面。"
+  ],
+  "baselinePlan": {
+    "kind": "behavior-delta",
+    "why": "存在今天无法观察、修好后可观察的用户侧事实：同一公共入口下，调用方目前只能得到一次进程终止，之后才可能得到一个 error。",
+    "redCandidate": "聚焦命令下最小的 T1：节点 panic(\"boom\") → 断言 Run 返回非 nil error。当前字节下的真实失败是二进制以 `panic: boom` 中止、Run 的返回值那行永不打印、非零退出，与缺失行为逐字一致。"
+  },
+  "sedimentCarried": [
+    "切片 13 审查裁决 verdict.nextSliceOrder：B10 → B7 → S13-STD-1/2/5 → B8。本片取第一项。",
+    "S13-SPEC-4（hard）：WithMaxConcurrency 仍是本包唯一「导出即空转」的旋钮，列为发布阻塞，仍欠。",
+    "S13-STD-1/2/5（测试形状 table-driven 偏离、startCounters 命名、config 注释误导）：仍欠，与本片无冲突，不借道处理。",
+    "实测新增事实：graph.Typed 与 Warnings() 在本包测试里断言数均为 0，B11/B7 是「无覆盖」而不只是「未实现」。",
+    "流程债（切片 13 登记）：进场时把被改生产文件基线字节复制到 /tmp 再动手，别靠事后反向重建。本片执行：进场即快照 scheduler.go/graph.go 到 /tmp/p1-cycle14/。"
+  ]
+}

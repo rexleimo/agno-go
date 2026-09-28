@@ -1,0 +1,100 @@
+{
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p1-graph-engine-r7-assertion-teeth",
+  "activationId": "29e3dd6f-a14a-4ae5-ad37-70c7b26a28a3",
+  "slice": "P1 切片 7（断言检测力清偿）",
+  "governingReview": "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle6",
+  "userGoal": "让切片 6 声称已具备的检测力变成真的：现有断言中被证明为空断言或零增量检测力的部分，必须改到能被对应变异判红，并且真正承载『一次 Run 只执行进入时拓扑』这条承诺的两处捕获（nodes map、output 值）必须有测试观察。目的是不以绿测数量冒充检错力。",
+  "explicitNonGoals": [
+    "不改生产代码：pkg/hno/graph/graph.go 与 scheduler.go 的哈希在本轮前后必须都是 3483783f1e787c96ca6c236341664d095acec5c0 / 87854ffbb7629f9adeb2d45fbb74d91f2032b99d。",
+    "不引入结构化拒绝错误（typed error 携带 Kind/Endpoint 字段）：那是 cycle6 排序 (1) 的 behavior-delta，需要自己的 RED 与公共 API 决策；本轮若顺手引入就是偷渡导出面变更。",
+    "不加锁、不做 recover、不承诺并发无同步改图的安全性（B10 仍是显式非目标）。",
+    "不实现 stepLimit（B4）、无条件环拒绝（B5）、Join 路由（B2）、空 AddJoin（C5-SPEC-1）、输出可达性（C5-SPEC-2）、多 Default 扇出（C4-STD-2 (2)）。",
+    "不改写 cycle6 之外任何切片的既有断言；相对 fixed point 的删除行数必须仍为 0。"
+  ],
+  "behaviorsInScope": [
+    {
+      "id": "T1",
+      "behavior": "四种边种类各自的构建期拒绝文案可两两分辨：把任一种类的 label 换成另一种类的 label 必然判红。",
+      "observable": "公开入口 graph.Validate() / graph.Run() 返回的 error 文案；断言形式从「含子串 <kind>」改为「含 graph: <该种类的完整 label> 前缀」（即 \"unconditional edge\" / \"conditional edge\" / \"default edge\" / \"join edge\"）。",
+      "closes": "C6-SPEC-1（\"unconditional edge\" 含子串 conditional 导致的空断言）"
+    },
+    {
+      "id": "T2",
+      "behavior": "运行中追加一条指向未路由新靶、且缺谓词的条件边，既不能崩溃也不能改变本次路由。",
+      "observable": "graph.Run() 的 err / Result.Completed() / Result.Output() 三面与同轮实跑参照一致；刺激改为 g.AddConditional(\"a\", \"d\", nil)（d 已注册、是新靶），使『活读并静默跳过缺谓词边』这一退化的 C4-SPEC-2 原始缺陷复现时 Completed() 会多出 d 而判红，不再只依赖 nil 解引用崩溃作为唯一区分信号。",
+      "closes": "C6-SPEC-2"
+    },
+    {
+      "id": "T3",
+      "behavior": "运行中用 AddNode 覆盖同名节点不得改变本次 Run 的输出来源。",
+      "observable": "入口节点函数体内执行 g.AddNode(graph.NodeFunc(\"b\", 替身节点)) 后，本次 Run 的 Completed()/Output() 与参照一致；替身节点返回可区分的值，故一旦被读到 Output 立刻不同。",
+      "closes": "C6-STD-2 / C6-SPEC-3（nodes map 复制零测试，receipt:ce012bd9 实证）"
+    },
+    {
+      "id": "T4",
+      "behavior": "运行中用 SetOutput 改写输出节点名不得改变本次 Run 的 Output。",
+      "observable": "入口节点函数体内执行 g.SetOutput(\"d\") 后，本次 Run 的 Output() 仍等于参照；d 已注册且可返回与 b 不同的值，故 output 捕获若丢失或被活读都能区分。",
+      "closes": "C6-STD-2 的 output 面（receipt:cf8c0d58 实证该捕获当前零测试）"
+    },
+    {
+      "id": "T5",
+      "behavior": "参照 Run 自身必须带绝对期望，使「让参照与受试同向退化的缺陷」可见。",
+      "observable": "reference.Output() 断言为绝对值（恒等节点链 a→b 对输入 \"seed\" 的 Output 为 \"seed\"），与既有的 Completed()==[a b] 绝对断言配对。",
+      "closes": "C6-STD-2 的根因之一：只与实跑参照相等 ⇒ 同向退化永不可见"
+    }
+  ],
+  "behaviorsOutOfScope": [
+    "另一 goroutine 与 Run 入口无 happens-before 的并发改图（数据竞争，未定义行为；本轮不给保证、也不假装给）。",
+    "任何新的用户可观察产品行为：本轮不新增能力，只让既有能力的担保变实。"
+  ],
+  "allowedTestSeam": [
+    "只经导出 API：graph.New / AddNode / AddEdge / AddConditional / AddDefault / AddJoin / SetEntry / SetOutput / Validate / Run，以及 Result.Completed / Result.Output。",
+    "测试位于外部包 graph_test，不用内部符号、不调度 goroutine、不用 channel 观测、不断言私有字段或内部调用次数。",
+    "错误面允许断言：graph: 前缀 + 该边种类的完整 label + 原因词 + 端点名。相对切片 6 契约（只允许种类标签与原因词）这是收紧而非放宽，理由：cycle6 证明宽松的包含判断可以整条为空断言。"
+  ],
+  "falsePassProhibitions": [
+    "不得删除、跳过或弱化任何既有断言来换取通过。",
+    "不得把期望改成当前实现的实际输出。",
+    "不得只测模拟对象或只证明 helper 被调用。",
+    "不得用『与实跑参照相等』这一种形式承担全部断言：每条新观察面必须至少有一个绝对期望。",
+    "不得以『测试变多了』作为完成证据；完成判据是被变异判红。",
+    "不得改动 pkg/hno/graph 的非测试文件（哈希核验）。",
+    "不得为了杀掉『只贴错 conditional label』而写死四种 label 的枚举式快照测试 —— 必须锚定「graph: + 种类」这一结构，避免把文案变成不可演进的常量表。",
+    "不得声称 T3/T4 已闭而对应的『去 map 复制』『抹 output 捕获』变异仍全绿。",
+    "不得把并发无同步改图的崩溃当作本轮可修复项来提交（B10 非目标）。"
+  ],
+  "completionCriteria": [
+    "三个变异各自真实判红并有非零退出回执：(a) capturePlan 改回 nodes := g.nodes（共享活表）；(b) plan 的 output 捕获抹为 \"\"；(c) label(edgeConditional) 返回 \"unconditional edge\"。(d) 已按 cycle7 审查 C7-SPEC-1 结案为 unachievable-by-construction，不再是欠账：graph.go 拒绝任何 nil 谓词的条件边声明，Run 先 Validate 再 capturePlan，复制后的 plan 里不可能出现 nil 谓词，因此『重新加回 e.p != nil 静默跳过守卫』这个变异在 err/Completed/Output/Value 四个观察面上与被变异前的实现按构造相同（等价变异），实测插入该守卫后 -count=1 与 -run TestP1G -v 均退出 0、35/35 全绿。S2 改新靶的真实收益只是『Completed 去重实现』的稳健性，判据按该窄形式重述于切片 8 契约。",
+    "go test ./pkg/hno/graph/... -run TestP1G -count=1 -v 全绿；go test -race ./pkg/hno/graph/... -count=1 全绿；邻近包 ./pkg/hno/agent/... ./pkg/hno/runner/... 全绿。",
+    "纯测试改动：graph.go / scheduler.go 的 git hash-object --no-filters 在本轮结束时仍为 3483783f… / 87854ffb…（变异期间的临时改动必须 cp 回写并复算核验）。",
+    "pkg/hno/graph/graph_test.go 相对 fixed point 0387000 仍是纯增（删除行 0）。",
+    "非测试文件零 sync./atomic./recover( 命中保持 0。",
+    "每条新增断言都在台账里写明它杀哪个变异；每个变异写明它杀在哪一条断言（行号）。",
+    "台账登记与 cycle6 四条 superseded 声明的对应关系：本轮把哪几条从『不实/过度声明』变为『有证据』，未在范围内的（C6-STD-3 文案、C6-STD-4 entry 次序、C6-SPEC-7 母约回写）明确留在册上不伪装闭结。"
+  ],
+  "focusedCommands": [
+    "go test ./pkg/hno/graph/... -run TestP1G -count=1 -v",
+    "go test ./pkg/hno/graph/... -count=1",
+    "go test -race ./pkg/hno/graph/... -count=1",
+    "go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1"
+  ],
+  "baselineEvidenceRequired": "本轮属 behavior-preserving-hardening：先在与变异隔离的真实场景取得零退出的通过基线回执，之后才允许选择 hardening 结论。",
+  "environmentNotes": [
+    "macOS：无 timeout 命令。",
+    "回执一律用 rex-harness receipt 且把 node 路径逐字写全，不要塞进 shell 变量（zsh 会把整串当成一个文件名）；判定退出码时不要给 go test 接管道。",
+    "git hash-object 一律带 --no-filters，与冻结记录逐字节可比。",
+    "变异一律先 cp 备份到 /tmp，恢复后复算哈希；工作树保持未提交，不 commit 除非用户明确要求。"
+  ],
+  "cycle7Amendments": [
+    {
+      "id": "A-slice7-(d)",
+      "change": "完成判据 (d) 由欠账改为 unachievable-by-construction，并给出等价性证明与实测退出码。",
+      "evidence": [
+        "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle7.axes.spec.findings[C7-SPEC-1]",
+        "artifact:docs/design/v3-p1-graph-slice7-hardening.json#limitations[0]"
+      ],
+      "evidenceNote": "等价变形的实测由 cycle7 独立审查完成（插入守卫后退出 0、35/35 全绿），父侧在 cycle7.parentVerification 中复核其论证；本轮不另附回执，因为没有一条本轮命令复现该守卫形态。"
+    }
+  ]
+}

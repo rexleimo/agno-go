@@ -1,0 +1,69 @@
+{
+  "schema": "rex.tdd.stage-ledger.v1",
+  "workItemKey": "work-p1-graph-r14-panic-to-error",
+  "workflowActivationId": "2accb916-dddf-4677-989a-9287610c6514",
+  "activationId": "d227e859-09db-4d51-abb1-547eecc8f82c",
+  "capabilityId": "software.testing.tdd",
+  "stage": "green",
+  "recordedAt": "2026-09-27T13:29:30Z",
+  "previousStageCarried": "RED 已接受：8 条行为行各自取得非零回执（docs/design/v3-p1-graph-slice14-red.json#redObservations），族级失败回执 receipt:e8978e57-4568-49a9-8669-c5344d628b1b。本阶段只改实现字节，测试字节保持 RED 阶段的 86f4425bc5a20f98eb9a98a0f355dee56fc298d6 不变。",
+  "declaredScenarioCommand": "go test ./pkg/hno/graph/... -run TestP1R14 -count=1 -timeout 25s -v",
+  "implementationChange": {
+    "files": [
+      {
+        "path": "pkg/hno/graph/scheduler.go",
+        "beforeHash": "18a98a6069e0477953369ef81ad0071a012b9779",
+        "afterHash": "61c7ba6db72b65eda938c099968e7409fc944d73",
+        "diffRef": "/tmp/p1-cycle14/scheduler-go-slice14-green.diff（+18/−2 行，其中净增 15 个非空非测试 LOC）",
+        "what": "spawn 里对节点的直接调用改为 s.runNode(act)；新增 runNode：具名返回值 + 帧内 recover，把任意 panic 值转成 fmt.Errorf(\"graph: node %q panicked while running: %v\", act.name, v)，结果仍只经 queueItem 交给唯一消费者。"
+      },
+      {
+        "path": "pkg/hno/graph/graph.go",
+        "beforeHash": "a189a8692c0364266352e83ad3debeed738f6608",
+        "afterHash": "a189a8692c0364266352e83ad3debeed738f6608",
+        "what": "零改动（实测 hash-object 与切片 13 收尾字节全等）。"
+      }
+    ],
+    "minimality": "一处调用改写 + 一个新函数。没有新增导出面、没有新哨兵错误、没有新增投递通道、没有引入 sync.，也没有为测试留任何产品出口。恢复点选在生产者 goroutine 的帧上，是母约 §3.3:182 指定的那一层，不是随手加在最外层。"
+  },
+  "greenObservations": [
+    {
+      "scope": "契约全量（T1、T2 三行、T3、T4、T5、T8）+ 对照行（T6、T7）",
+      "command": "go test ./pkg/hno/graph/... -run TestP1R14 -count=1 -timeout 25s -v",
+      "exitCode": 0,
+      "observed": "8 个顶层测试 + 3 个 T2 子测试全部 --- PASS，末尾 PASS/ok。关键可观察事实不只是「每条绿」，而是整个族第一次在同一个进程里跑到底：RED 阶段族级命令在第一条就以 panic 终止，其余 7 条从未开始。",
+      "receiptRef": "receipt:3200a119-0b65-4bf3-a8d7-15d09811d1bf"
+    },
+    {
+      "scope": "既有测试族未退化（票面 §1「测试不中断」只能在整包跑完时观察）",
+      "command": "go test ./pkg/hno/graph/... -count=1 -race",
+      "exitCode": 0,
+      "observed": "ok github.com/rexleimo/agno-go/pkg/hno/graph 1.351s。含切片 1–13 的全部既有行为族，-race 无报告。",
+      "receiptRef": "receipt:5affbe76-bc9f-4b1a-9752-04c77c4d2de6",
+      "note": "该回执的场景命令与 declaredScenarioCommand 不同，因此只登记在账本里，不并入任何 rex 证据项（同项内回执必须逐字匹配声明场景）。"
+    }
+  ],
+  "publicBoundaryBeforeAfter": {
+    "how": "仓库外壳 /tmp/p1-cycle14/main.go 三模式，同夹具同命令，只换实现字节",
+    "nodePanic": "before: exit=1，`panic: boom` 带走进程，Run 无返回 → after: exit=0，`Run 返回 err=graph: node \"a\" panicked while running: boom res=<nil>`，进程活着打完 MODE 行。",
+    "siblingPanic": "before: exit=1 整进程终止（兄弟仍在途）→ after: exit=0，`err=graph: node \"bad\" panicked while running: sibling-boom`，点名的是崩溃节点而非无辜兄弟。",
+    "predPanic": "before: exit=1，panic 逃回调用方 goroutine → after: 仍 exit=1 且形态一字未变。这正是契约 R14-REJECT-1 预言并拒绝扩权的那一面：本片没有顺手把谓词也 recover 掉，行为未变这件事本身是被测量出来的，不是推断出来的。",
+    "value": "测试缝内的绿只证明断言成立；这组证明的是票面 B10 的真实后果面——宿主进程不再被一条图里的节点崩溃带走。"
+  },
+  "structuralCriteria": {
+    "B12_zeroLock": "非测试文件 sync. 出现次数实测 0（graph.go + scheduler.go 全量 grep）。崩溃 goroutine 不写 scheduler 字段：恢复值经 runNode 的具名返回值 → queueItem → 唯一消费者。",
+    "B13_size": "非空非测试 LOC 551（前值 536，本片 +15），票面判据上限 1500。",
+    "recoverSurface": "全包 recover( 出现次数从 0 变为 1，且只落在生产者帧——没有第二处屏障，符合「宽到把调度器内部 bug 一起吞掉」的红线。",
+    "existingTestBytesUnchanged": "graph_test.go=425ea0303e1d5c5c8e95bacf57663ae94a4309ee、p1r13_step_limit_test.go=bc4ab8e71527809e23a12590a078add8f35d68d1，均与切片 13 收尾登记值全等。"
+  },
+  "scopeDiscipline": {
+    "notDoneOnPurpose": [
+      "谓词 panic 不 recover（R14-REJECT-1，测量见上）。",
+      "没有新增 ErrNodePanicked 之类导出哨兵：票面只要求非 nil error，规格未要求 error identity。",
+      "没有在 Run/consume 外层加第二层 recover。",
+      "B7 Warnings()、B8 WithMaxConcurrency、B11 Typed 覆盖均未触碰。"
+    ],
+    "panicValueIdentity": "panic(err) 形态下本片不保证 Run 返回的就是那个 err 本身（当前实现统一包装成一条命名节点的新错误）。契约 T2 的断言面刻意只钉「非 nil error」，避免把母约未规定的形态写进测试基线；如果日后要承诺身份保持，需要新的设计裁决而不是顺手改。"
+  },
+  "nextStageConditions": "REFACTOR 阶段必须：(1) 用变异测试证明每条断言的牙齿——至少覆盖「recover 后不投递 queueItem」「只对 panic(string) 生效」「错误不点名节点」「把节点自身 error 也重新包装」四个方向；(2) 复核测试 diff 仍约束公共可观察行为而不是实现细节；(3) 复查 B12/B13 与既有测试字节。"
+}

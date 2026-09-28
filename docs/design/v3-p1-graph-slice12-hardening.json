@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 1,
+  "kind": "p1-graph-slice12-hardening",
+  "workItem": "work-p1-graph-r12-unreachable-name-teeth",
+  "capability": "software.testing.hardening",
+  "activationId": "f167eaa3-9636-476e-9935-eb508a1f15f8",
+  "testabilityDecision": "behavior-preserving-hardening",
+  "decisionRef": "docs/design/v3-testability-decision-p1-graph-slice12.json#decision",
+  "contractRef": "docs/design/v3-test-scope-p1-graph-slice12.json",
+
+  "baseline": {
+    "stage": "baseline",
+    "frozenBytes": {
+      "pkg/hno/graph/graph.go": "e75d58d529af2dad7e7f3cbc25ffdff8129f802b",
+      "pkg/hno/graph/graph_test.go": "d60690eb8d606b116ba4f6898b06555f9edd0289",
+      "pkg/hno/graph/scheduler.go": "87854ffbb7629f9adeb2d45fbb74d91f2032b99d",
+      "branch": "main",
+      "head": "0387000"
+    },
+    "publicScenarioCommand": {
+      "executable": "go",
+      "args": ["test", "./pkg/hno/graph/...", "-run", "TestP1G_ValidateRejectsUnreachableNodes", "-count=1", "-timeout", "25s", "-v"],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "publicScenarioExpected": "既有公共行为成立：4 条非法行 + 4 组对照（含 4 条既有次序行）全部通过，零退出，无 SKIP。",
+    "publicScenarioObserved": "exit 0；-v 计到 13 条 --- PASS（父测试 1 + 非法行 4 + 对照组 4 + 既有次序行 4），0 FAIL，0 SKIP，末行 ok github.com/rexleimo/agno-go/pkg/hno/graph 0.172s。",
+    "receiptRef": "receipt:75f1f991-e014-4716-bf00-2cab53386562",
+    "independentCleanableScenario": {
+      "why": "加固对象是拒绝文案的名字选取规则，需要仓库外、可整体删除的真实调用面来证明公共行为没被后续改动带动。",
+      "path": "/tmp/p1-cycle12-scenario/",
+      "driver": "go run . 通过 graph.New/AddNode/AddEdge/AddConditional/SetEntry/SetOutput/Validate/Run 这些导出面构造 6 个形状：orphan-registered、unreachable-chain、unreachable-many、unreachable-output、unreachable-cycle、conditional-cycle-legal。断言：文案前缀 graph: unreachable node 、中段 : not reachable from entry 、后缀 through any declared edge 齐全；被点名名字恰好出现 1 次；同图其余不可达名字（beta/gamma/delta/d）一个都不出现；Run 复用同一条拒绝且无输出。",
+      "wrapper": "/tmp/p1-cycle12-scenario/baseline.sh（场景 + 聚焦测试 + 包级 -race 三段，任一非零即失败）",
+      "observed": "SCENARIO-OK；reject names 逐行为 [orphan entry] / [c a] / [alpha a] / [out entry] / [c a]；conditional-cycle-legal 放行且 output=SEED；包级 -race ok 1.418s。",
+      "receiptRef": "receipt:f513dce5-889a-48a6-8f83-a53735020c1c"
+    },
+    "baselineObservationCorrection": "测试范围/可测性决策文件 docs/design/v3-testability-decision-p1-graph-slice12.json 的 baseline.observed 写成「实测 12 行 PASS」，其自身括号内的分解（父 1 + 非法 4 + 对照 4 + 嵌套 4）相加为 13。本轮以 -v 重新计数确认为 13 条 --- PASS（父测试行在列 0，其余 12 条缩进），旧数字是记账笔误，不是行为差异；已接受决策文件保持原样不回填，此处为更正记录。",
+    "stoppingRule": "基线任一环节非零退出即停在 baseline，不进入修改。本轮三段全部零退出，方可进入 harden。"
+  },
+
+  "harden": {
+    "stage": "harden",
+    "productionBytesChanged": false,
+    "productionHashBefore": "e75d58d529af2dad7e7f3cbc25ffdff8129f802b",
+    "productionHashAfter": "e75d58d529af2dad7e7f3cbc25ffdff8129f802b",
+    "schedulerHashUnchanged": "87854ffbb7629f9adeb2d45fbb74d91f2032b99d",
+    "testBytes": {
+      "before": "d60690eb8d606b116ba4f6898b06555f9edd0289",
+      "after": "425ea0303e1d5c5c8e95bacf57663ae94a4309ee",
+      "diff": "/tmp/p1-cycle12/graph-test-slice12.diff",
+      "diffHow": "加固前的 d60690eb 字节没有留副本。本轮把加固后文件按 10 处反向还原（/tmp/p1-cycle12/revert.py），再用 git hash-object --no-filters 比对得到 match: True，所以这份 diff 是逐字节精确差异，不是近似。",
+      "added": 110,
+      "removed": 5,
+      "removedLinesAre": [
+        "looping 文档注释的第二行（H1 把它改写并归位）",
+        "func noCount() {}（连同新注释一起重新出现在加固侧）",
+        "一个空行",
+        "wantNodes: []string{`\"c\"`} 与 wantNodes: []string{`\"alpha\"`}（H3 把它们重排成对齐的字段块，期望值本身没动）"
+      ],
+      "assertionSitesRemoved": 0,
+      "fileLines": "1243 → 1348",
+      "assertionSitesInTargetTest": "22 → 29（+7）",
+      "assertionSitesInFile": "104 → 111",
+      "skips": "0 → 0",
+      "tableRowsInTargetTest": "4 → 5"
+    },
+    "edits": [
+      {"id": "H1", "what": "S10-STD-1：把 looping 的文档注释从 noCount 上移回 looping，noCount 得到自己的说明（上一轮遗留的注释错位）。", "contract": "T5"},
+      {"id": "H2", "what": "新增 quotedNames/occurrences 两个测试内 helper：从公共 error.Error() 里按成对双引号抽出被点名的节点名并计数，只读公共字符串，不碰私有状态。", "contract": "T1 的观察手段"},
+      {"id": "H3", "what": "表结构增加 entry / wantName / alsoUnreachable 三个字段并逐行填值，把「该图还有哪些不可达节点」写成行数据而不是靠文案子串猜。", "contract": "T1"},
+      {"id": "H4", "what": "新增引号段牙齿：len(names) 必须为 2（恰好一个不可达节点 + 入口）；wantName 恰好出现 1 次；entry 恰好出现 1 次；alsoUnreachable 里每个名字出现 0 次。", "contract": "T1"},
+      {"id": "H5", "what": "同一实例 g.Validate() 重复 3 次必须给出与首次逐字节相同的文案（原先只对新建实例重复 16 次）。", "contract": "T3 / S11-STD-6"},
+      {"id": "H6", "what": "Run 的拒绝与 Validate 的拒绝整串相等（原先两个入口各自只查 anchors 子串）。", "contract": "T2"},
+      {"id": "H7", "what": "新增非法行 reverse-edge-connected（entry 与 sink 之间有边，但方向是 sink→entry）：sink 不可达必须被点名。", "contract": "T4，见 contractPremiseMismatch"}
+    ],
+    "contractPremiseMismatch": {
+      "what": "契约 T4 把「可达只按正向声明边算」映射到 unreachable-chain 行，并记录「审查实测 MU10（相连即算可达）已被 4 行判红」。本轮第一次矩阵在加固前的测试字节上实测：MU10（把反向边也并进后继表）三次运行全部 exit=0、零 FAIL 行 —— 它是存活的。",
+      "why": "unreachable-chain 的 c→d 两个节点无论按正向还是无向 BFS 都到不了，方向差异在这个形状上不可观察；要观察它必须有一个「与入口有边相连、但边指向入口」的节点，此前所有行都没有这种形状。",
+      "disposition": "T4 声明的行为本身在契约范围内（inScopeBehaviors），错的是它映射到的那一行。本轮按 H7 补一行，把这条已声明行为变成可判红的事实：没有新增契约外的行为，没有改公共面，没有动生产字节。上一轮的「已被 4 行判红」是错误记录，保留为 review 的 finding。",
+      "measured": "加固后 MU10 三次运行都被 reverse-edge-connected 行的 :1121 判红；另加测 MU10b（把后继表整体换成前驱表，即「能走到入口才算可达」），也被 :1121 连同其它行判红（18 行）。"
+    },
+    "mutationMatrix": {
+      "command": "python3 /tmp/p1-cycle12/matrix.py（每个变异注入后跑整包 go test ./pkg/hno/graph/... -count=1 -timeout 90s -v 三次，随后逐字节还原 graph.go 并校验哈希，收尾再复测整包）",
+      "receiptRef": "receipt:d94c1a9c-5434-4697-b9f8-11a7f3e0cbf6",
+      "exitSemantics": "脚本只在「没有任何变异存活 且 每次还原后 graph.go 哈希等于 e75d58d5 且 收尾整包零退出」时以 0 退出；有变异存活 exit 5，还原失败 exit 3，收尾不干净 exit 6。所以这份零退出回执本身就是牙齿声明，不只是运行记录。",
+      "baseline": "注入前整包 exit 0 / 0 FAIL（脚本自己打印 matrix baseline: exit 0, 0 FAIL rows）。",
+      "rows": [
+        {"id": "MU1", "injection": "删掉 Validate 里的可达性检查调用", "verdict": "KILLED", "failRowsPerRun": [6, 6, 6], "targetRows": 6, "sites": [1121, 1236, 1239]},
+        {"id": "MU2", "injection": "可达只沿无条件边", "verdict": "KILLED", "failRowsPerRun": [11, 11, 11], "targetRows": 2, "sites": [232, 267, 388, 718, 735, 755, 784, 913, 1207, 1290]},
+        {"id": "MU3", "injection": "次序反转：先环后可达", "verdict": "KILLED", "failRowsPerRun": [1, 1, 1], "targetRows": 1, "sites": [1236, 1239]},
+        {"id": "MU4b", "injection": "sort 不再决定被点名的节点（取 map 遍历到的第一个）", "verdict": "KILLED", "failRowsPerRun": [2, 2, 2], "targetRows": 2, "sites": [1133], "note": "上一片测量时行集在 2–3 之间抖动（map 顺序随机），本轮三次都是 2 行。"},
+        {"id": "MU5", "injection": "取字典序最后一个", "verdict": "KILLED", "failRowsPerRun": [2, 2, 2], "targetRows": 2, "sites": [1149, 1161, 1168, 1184]},
+        {"id": "MU6", "injection": "把输出节点当作第二个根", "verdict": "KILLED", "failRowsPerRun": [1, 1, 1], "targetRows": 1, "sites": [1121]},
+        {"id": "MU7", "injection": "共用骨架的 keep 判定取反", "verdict": "KILLED", "failRowsPerRun": [22, 22, 22], "targetRows": 3, "sites": [38, 116, 232, 267, 320, 388, 560, 580, 714, 718, 735, 755, 784, 803, 913, 1207, 1254, 1290]},
+        {"id": "MU8", "injection": "breakable 永远不置位（兜底边一律算必走）", "verdict": "KILLED", "failRowsPerRun": [1, 1, 1], "targetRows": 0, "sites": [784], "note": "切片 10 的 AR1 判据仍由 :784 钉住，本轮加固没有挤松上一片的担保。"},
+        {"id": "MU9", "injection": "聚合诊断：把全部不可达名字拼进同一条消息（每个名字都带引号）", "verdict": "KILLED", "failRowsPerRun": [2, 2, 2], "targetRows": 2, "targetRowNames": ["unreachable-chain", "unreachable-many"], "sites": [1158, 1168], "note": "本轮目标：加固前它三次运行全部 exit=0 存活（F11-SPEC-1），现在由 H4 的引号段计数判红。"},
+        {"id": "MU9b", "injection": "只聚合前两个不可达名字", "verdict": "KILLED", "failRowsPerRun": [2, 2, 2], "targetRows": 2, "sites": [1158, 1168], "note": "部分聚合也过不去，牙齿不只在「全量拼」这一种写法上生效。"},
+        {"id": "MU10", "injection": "相连即算可达（反向边也并进后继表）", "verdict": "KILLED", "failRowsPerRun": [1, 1, 1], "targetRows": 1, "targetRowNames": ["reverse-edge-connected"], "sites": [1121], "note": "加固前存活，见 contractPremiseMismatch。"},
+        {"id": "MU10b", "injection": "把可达算成「能走到入口」（后继表整体换成前驱表）", "verdict": "KILLED", "failRowsPerRun": [18, 18, 18], "targetRows": 3, "sites": [38, 116, 232, 267, 320, 388, 560, 580, 718, 735, 755, 784, 803, 913, 1121, 1207, 1290]}
+      ],
+      "summary": "12 个变异全部判红，且每个变异三次运行的失败行集大小一致；没有出现编译失败的伪变异（上一片 MU4 那种非变异本轮没有）。",
+      "nonUniquenessDisclosed": "MU1/MU6/MU10 共享站点 :1121（都是该行 Validate 的 t.Fatal），MU1/MU3 共享 :1236/:1239。单看站点无法区分，区分靠行集：MU1 6 行、MU3 1 行（只有 A6 对照）、MU6 1 行（unreachable-output）、MU10 1 行（reverse-edge-connected）。MU9 与 MU9b 行集相同（unreachable-chain/unreachable-many），但注入写法不同，两条都保留。",
+      "siteNumbersArePostHardening": "所有站点行号都测于加固后的字节（graph_test.go 425ea030），与上一片的行号不可直接对照。"
+    },
+    "behaviorPreserved": {
+      "publicScenarioReRun": "/tmp/p1-cycle12-scenario/baseline.sh 加固后复跑：SCENARIO-OK，六个形状的 reject names 与基线逐行相同（[orphan entry] / [c a] / [alpha a] / [out entry] / [c a] / conditional accept output=SEED），产物存 /tmp/p1-cycle12/scenario-after.txt。",
+      "receiptRef": "receipt:9b87291f-7151-490a-8d24-f738ec95d12a",
+      "focusedNow": "同一条聚焦命令加固后是 14 条 --- PASS（父测试 1 + 非法行 5 + 对照组 4 + 既有次序行 4），0 FAIL / 0 SKIP。",
+      "note": "该回执含三段：仓库外公共 API 场景、聚焦测试、包级 -race。生产字节未动，公共面没有任何可观察变更。"
+    },
+    "affectedBoundary": {
+      "command": "/tmp/p1-cycle12-scenario/boundary.sh",
+      "includes": "pkg/hno/agent + pkg/hno/runner 回归、go build ./...、go vet ./pkg/hno/graph/...、覆盖率对照切片 11 的 91.1%",
+      "observed": "agent ok 0.311s、runner ok 0.531s、build 零退出、vet 静默、coverage: 91.1% of statements（与切片 11 基线相同，未下降）。BOUNDARY-OK。",
+      "receiptRef": "receipt:da4710fb-c620-4089-b870-2aaa16d9a37c"
+    },
+    "forbiddenShortcutsCheck": "没有删行、没有 SKIP、没有放宽既有期望：anchors 子串循环、16 次新建实例重复校验、执行计数为 0、Run 返回 nil Result 都原样保留；removed 的 5 行全部是注释归位与表字段重排，不含断言（逐行清单见 testBytes.removedLinesAre）。"
+  },
+
+  "verify": {
+    "stage": "verify-invariants",
+    "sideEffectPath": {
+      "productionUnchanged": true,
+      "proof": "graph.go 加固前后都是 e75d58d529af2dad7e7f3cbc25ffdff8129f802b，scheduler.go 仍是 87854ffbb7629f9adeb2d45fbb74d91f2032b99d（矩阵脚本每次注入后都按哈希还原，收尾再整包复测零退出）。",
+      "checkBeforeEffect": "Graph.Run 在 scheduler.go:61 先调用 Validate 并在出错时返回 nil Result，节点调度从 scheduler.go:64 之后才开始；本轮没有触碰这条路径，因此「副作用只发生在校验之后」的原状保持。",
+      "stillPinnedBy": "graph_test.go:730（切片 10 的无条件环行）与 :1179（本轮不可达行）都断言 executions.Load()==0；:1177 断言拒绝时 res==nil。"
+    },
+    "invariantsConfirmed": [
+      "构建期拒绝先于任何节点执行（执行计数为 0）。",
+      "不可达节点的拒绝一次只点一个名字，且是字典序最小者；同图其它不可达名字不得出现在文案里。",
+      "同一图对象与新建对象重复校验给出逐字节相同的文案（16 次新建 + 3 次同实例）。",
+      "Validate 与 Run 对同一缺陷给出同一条整串消息，且 Run 不返回 Result。",
+      "可达只按正向声明边算：与入口有边相连但方向不可达的节点仍被点名（reverse-edge-connected 行）。"
+    ],
+    "testDiffReview": {
+      "diffRef": "/tmp/p1-cycle12/graph-test-slice12.diff",
+      "onlyAdditiveEvidence": "removed 的 5 行逐行核过：两条注释行（H1 归位）、func noCount() {}（加固侧带新注释重新出现）、一个空行、两条 wantNodes 字段重排（期望值文本未变）。断言站点 104 → 111，t.Skip 保持 0，既有期望文案（graph: unreachable node / 各引号名）一条未减。",
+      "publicSeamOnly": "测试仍是 package graph_test；只调用 graph.New/AddNode/AddEdge/AddConditional/SetEntry/SetOutput/Validate/Run 与 Result.Output/Completed/Value。grep 私有符号（adjacency/rejectUnreachableNodes/alwaysTakenAdjacency/edgeDecl/edgeUnconditional/edgeDefault/edgeConditional）在测试文件里 0 命中；quotedNames/occurrences 只解析公共 error.Error() 返回的字符串。",
+      "noMockOnlyProof": "没有新增任何「验证 helper 被调用」式的断言；执行计数只用于拒绝先于副作用这一条用户可观察事实。",
+      "findings": [
+        {
+          "id": "S12-STD-1",
+          "severity": "judgement",
+          "where": "graph_test.go:1157（len(names) != 2 的判定，失败输出在 :1158）",
+          "what": "len(names)!=2 把「这条消息里恰好有两个带引号的名字」当成约束，比契约文字（只点一个不可达名字）略紧：将来若给拒绝文案加第三条带引号提示，这一条会先红。",
+          "disposition": "保留。这正是本轮要的牙齿——聚合式实现唯一可观察的形状就是引号段变多；把它写松会让 MU9 类变异重新存活。已在契约 nonGoals 里声明文案措辞不在本轮范围，所以这条约束的可修订点是文案契约本身，不是断言。"
+        },
+        {
+          "id": "S12-STD-2",
+          "severity": "judgement",
+          "where": "occurrences(names, tc.entry) 与 occurrences(names, tc.wantName) 一对断言",
+          "what": "依赖「入口名与被点名不可达名不同」这一夹具事实。当前 5 行都成立；若将来加入同名行，两条断言会同时给出误导性的计数失败。",
+          "disposition": "保留但记录：入口不可达按构造不可能发生（入口是 BFS 的根），所以同名行无法成立，不需要额外守卫。上一版曾写过 t.Fatalf 夹具自校验，因它永远不会为真已删除。"
+        }
+      ]
+    },
+    "noTestOnlyExport": "生产字节未变，导出面零变更；go build ./... 与被依赖包回归见 receipt:da4710fb-c620-4089-b870-2aaa16d9a37c。",
+    "scopeDiscipline": "没有新增契约外的用户可观察行为：H1–H6 只加担保；H7 补的行观察的是契约 T4 已声明的行为（其原映射行观察不到，见 harden.contractPremiseMismatch）。公共面没有任何需要新契约的变化，因此不必回 rex-test-design 重开范围。",
+    "closedThisSlice": [
+      "F11-SPEC-1（阻断项：MU9 聚合式实现在全部断言下存活）—— 现在 MU9/MU9b 都在 :1158 与 :1168 被判红。",
+      "S10-STD-1（looping 文档注释挂在 noCount 上）—— H1 归位，noCount 有自己的说明。",
+      "S11-STD-6（重复校验只取样新建实例）—— H5 补同实例 3 次。"
+    ],
+    "correctionsToPriorRecords": [
+      "切片 11 审查记录里「MU10（相连即算可达）已被 4 行判红」是错误结论：本轮第一次矩阵在加固前字节上实测它三次运行 exit=0 存活。更正见 harden.contractPremiseMismatch。",
+      "切片 12 可测性决策文件 baseline.observed 的「12 行 PASS」应为 13 行，见 baseline.baselineObservationCorrection。"
+    ],
+    "owedAfterThisSlice": "§3.5 第 2/5/6/8 项、Add* 增量语义（F11-SPEC-2/S10-SPEC-1）、R9-STD-2 存在性检查合并、R9-SPEC-1 空节点名、F11-SPEC-3 join 可达语义、S10-STD-3 结构化拒绝错误、S10-STD-4 死旋钮处置、G6/P3 WithStepLimit 执行、母约回写（被治理门挡住）。本轮没有新增欠单。",
+    "rollbackDigest": "回退本轮只需把 pkg/hno/graph/graph_test.go 还原成 /tmp/p1-cycle12/graph_test.go.slicel11（git hash-object --no-filters 值 d60690eb8d606b116ba4f6898b06555f9edd0289）；生产字节本来就没动，无需回退。"
+  }
+}

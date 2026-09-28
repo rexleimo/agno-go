@@ -1,0 +1,142 @@
+{
+  "schema": "rex.tdd.stage-ledger.v1",
+  "workItemKey": "work-p1-graph-r14-panic-to-error",
+  "workflowActivationId": "2accb916-dddf-4677-989a-9287610c6514",
+  "activationId": "d227e859-09db-4d51-abb1-547eecc8f82c",
+  "designStageActivationId": "7c5a65a6-f0ed-4036-9e37-e8354337f264",
+  "capabilityId": "software.testing.tdd",
+  "stage": "red",
+  "recordedAt": "2026-09-27T13:27:00Z",
+  "contractRef": "artifact:docs/design/v3-test-scope-p1-graph-slice14.json#inScopeBehaviors",
+  "decisionRef": "artifact:docs/design/v3-testability-decision-p1-graph-slice14.json#decision",
+  "declaredScenarioCommand": "go test ./pkg/hno/graph/... -run TestP1R14 -count=1 -timeout 25s -v",
+  "previousStageCarried": "design-tests 的 behavior-delta 已接受，其 redCandidate 回执 receipt:dab5ee76-a4a4-4b4e-a25f-9c042b32a880 是对 T1-only 字节取的。本文件把行为族扩到契约全量，因此每条 RED 都在当前测试字节上重取，不沿用旧回执。",
+  "implementationBytesUntouched": {
+    "graph.go": "a189a8692c0364266352e83ad3debeed738f6608（= 切片 13 收尾字节，实测 hash-object 与 /tmp/p1-cycle14/graph.go.baseline 全等）",
+    "scheduler.go": "18a98a6069e0477953369ef81ad0071a012b9779（= 切片 13 收尾字节，同样与 /tmp/p1-cycle14/scheduler.go.baseline 全等）",
+    "meaning": "本阶段只新增测试文件，实现零改动 —— 所有红的来源是产品缺行为，不是我改了实现又反推断言。"
+  },
+  "testFileBytes": {
+    "path": "pkg/hno/graph/p1r14_panic_barrier_test.go",
+    "hashObject": "86f4425bc5a20f98eb9a98a0f355dee56fc298d6",
+    "lines": 280,
+    "newFile": true,
+    "existingTestsTouched": "无：graph_test.go 实测仍为 425ea0303e1d5c5c8e95bacf57663ae94a4309ee，p1r13_step_limit_test.go 仍为 bc4ab8e71527809e23a12590a078add8f35d68d1"
+  },
+  "redObservations": [
+    {
+      "contract": "T1（票面 B10 全句）",
+      "test": "TestP1R14_NodePanicBecomesRunError",
+      "command": "go test ./pkg/hno/graph/ -run TestP1R14_NodePanicBecomesRunError -count=1 -timeout 25s -v",
+      "exitCode": 1,
+      "observed": "panic: boom，栈尾 created by (*scheduler).spawn in goroutine（scheduler.go:124）→ spawn.func1（scheduler.go:125）；断言行未执行，Run 的两个返回值从未被读取。",
+      "whyThisIsTheMissingBehavior": "票面 B10 要求「Run 返回非 nil error、进程不崩、测试不中断」。当前非测试文件里 recover( 出现次数为 0，节点体跑在引擎自己创建的 goroutine 上，Go 对未捕获的 goroutine panic 的处置是终止进程，因此不是返回值取错而是根本没有返回。",
+      "receiptRef": "receipt:bb8b1a68-0f9d-46f5-b5db-dc26865aab18",
+      "kind": "natural-red"
+    },
+    {
+      "contract": "T2 行 1/3",
+      "test": "TestP1R14_NonStringPanicValuesAlsoBecomeErrors/string",
+      "command": "go test ./pkg/hno/graph/ -run TestP1R14_NonStringPanicValuesAlsoBecomeErrors/string -count=1 -timeout 25s -v",
+      "exitCode": 1,
+      "observed": "panic: boom-string 逃逸，二进制中止。",
+      "whyThisIsTheMissingBehavior": "同 T1 的机制，只是 panic 值为 string。此行是表里唯一在当前实现下能与其他两行区分开的部分——表结构让每行可单独 -run 到。",
+      "receiptRef": "receipt:84da34a7-e093-4bc3-b78c-52b090dd7a90",
+      "kind": "natural-red"
+    },
+    {
+      "contract": "T2 行 2/3",
+      "test": "TestP1R14_NonStringPanicValuesAlsoBecomeErrors/error-value",
+      "command": "go test ./pkg/hno/graph/ -run TestP1R14_NonStringPanicValuesAlsoBecomeErrors/error-value -count=1 -timeout 25s -v",
+      "exitCode": 1,
+      "observed": "panic: boom-error（打印的是 error 值的 message），栈里 panicking.2 ← scheduler.go:125 ← scheduler.go:124。",
+      "whyThisIsTheMissingBehavior": "业务代码 panic 一个 error 是最常见写法，当前同样带走进程。断言只钉「非 nil error」，不钉恢复后的身份保持——母约未规定，本片不为此扩公共面。",
+      "receiptRef": "receipt:c8d0215a-f96f-44f7-b5ac-51736f21d270",
+      "kind": "natural-red"
+    },
+    {
+      "contract": "T2 行 3/3",
+      "test": "TestP1R14_NonStringPanicValuesAlsoBecomeErrors/runtime-error-divide-by-zero",
+      "command": "go test ./pkg/hno/graph/ -run TestP1R14_NonStringPanicValuesAlsoBecomeErrors/runtime-error-divide-by-zero -count=1 -timeout 25s -v",
+      "exitCode": 1,
+      "observed": "panic: runtime error: integer divide by zero（真实 runtime.Error，在节点体内现场发生，非表预置），栈尾仍是 spawn 创建的 goroutine。",
+      "whyThisIsTheMissingBehavior": "这一行代表宿主里最高频的崩溃源：provider 里一次 nil 解引用或被零除。若屏障只对显式 panic(string) 生效，这条仍然带走进程。",
+      "receiptRef": "receipt:207af898-45c2-40be-abb2-34d04ec2c260",
+      "kind": "natural-red"
+    },
+    {
+      "contract": "T3（S14-AMEND-1）",
+      "test": "TestP1R14_PanicErrorNamesThePanickingNode",
+      "command": "go test ./pkg/hno/graph/ -run TestP1R14_PanicErrorNamesThePanickingNode -count=1 -timeout 25s -v",
+      "exitCode": 1,
+      "observed": "panic: named-boom 逃逸；entry 已正常完成、ok 与 bad 同时在途，崩溃发生在 bad，而调用方拿不到任何归属信息（进程直接被带走）。",
+      "whyThisIsTheMissingBehavior": "契约 T3 的可观察面是 quotedNames(err.Error()) 恰好含一次 \"bad\" 且不含 \"ok\"/\"entry\"。没有 error 就没有名字，本行的红与 T1 同源但断言面不同：一个「返回错误却不点名」的实现会让本行单独红而 T1 绿。",
+      "receiptRef": "receipt:97e6450a-4913-45c4-adff-f0b1b52cce54",
+      "kind": "natural-red"
+    },
+    {
+      "contract": "T4",
+      "test": "TestP1R14_PanicWhileSiblingInFlightStillReturns",
+      "command": "go test ./pkg/hno/graph/ -run TestP1R14_PanicWhileSiblingInFlightStillReturns -count=1 -timeout 25s -v",
+      "exitCode": 1,
+      "observed": "panic: in-flight-boom；slow 仍在 channel gate 上占住在途位置（未 sleep 定序，票面 §4.1）。",
+      "whyThisIsTheMissingBehavior": "本行专门盯「recover 了但忘了向唯一消费者投递」这一最可能的错实现：那种写法下 running 永不归零，Run 悬挂到 panicReturnGrace 兜底时限。当前字节的红是进程死亡，与悬挂是两种可区分形态，本行的价值在 GREEN 之后仍可单独击杀该变异。",
+      "receiptRef": "receipt:915e2aca-e385-4794-90f3-4e6e52d83d84",
+      "kind": "natural-red"
+    },
+    {
+      "contract": "T5",
+      "test": "TestP1R14_SecondRunStillWorksAfterAPanic",
+      "command": "go test ./pkg/hno/graph/ -run TestP1R14_SecondRunStillWorksAfterAPanic -count=1 -timeout 25s -v",
+      "exitCode": 1,
+      "observed": "第一次 Run 即 panic: first-run-boom 中止进程，第二次 Run 从未执行。",
+      "whyThisIsTheMissingBehavior": "契约 T5 的形状是「崩溃属于本次 Run，不污染下一次」。挂在 *Graph 上的一次性屏障或把 done 复用的实现，会让第二次 Run 立即失败或悬挂，而 T1–T4 全绿。",
+      "receiptRef": "receipt:c8619b9e-d165-4c7a-9e55-06114f1c021c",
+      "kind": "natural-red"
+    },
+    {
+      "contract": "T8",
+      "test": "TestP1R14_NodeDefersStillRunWhenItPanics",
+      "command": "go test ./pkg/hno/graph/ -run TestP1R14_NodeDefersStillRunWhenItPanics -count=1 -timeout 25s -v",
+      "exitCode": 1,
+      "observed": "panic: defer-boom 逃逸，defer cleaned.Add(1) 的读数从未被断言。",
+      "whyThisIsTheMissingBehavior": "本行钉屏障的层级：恢复点必须在节点帧之外，节点自己的清理才会先跑完。计数器由测试自己提供，属调用方可观察面。",
+      "receiptRef": "receipt:3efd03b7-0756-4544-98ff-34ae1942ffb4",
+      "kind": "natural-red"
+    }
+  ],
+  "familyReceipt": {
+    "contract": "declaredScenarioCommand 下的族级 RED（本阶段 failing-test-observed 的引用对象）",
+    "command": "go test ./pkg/hno/graph/... -run TestP1R14 -count=1 -timeout 25s -v",
+    "exitCode": 1,
+    "observed": "源码序第一条（T1）即以 panic: boom 终止二进制，其余 7 条从未开始 —— 这本身就是票面 B10「测试不中断」子句的失败形态。",
+    "receiptRef": "receipt:e8978e57-4568-49a9-8669-c5344d628b1b"
+  },
+  "controlRowsGreenBeforeImplementation": {
+    "rows": [
+      "TestP1R14_NodeReturnedErrorKeepsItsIdentity（T6）",
+      "TestP1R14_HappyPathUnaffected（T7）"
+    ],
+    "observed": "两条在当前未修字节下即通过（-v 输出 --- PASS ×2，ok ... 0.339s）。",
+    "whyThisIsNotAnIllegalRed": "rex-tdd 规定「产品变更前已通过」不构成合法 RED——所以这两条不声称新行为，它们是契约里显式登记的对照行：约束实现阶段不许把节点自身 error 重新包装、不许误伤正常路径。它们现在绿正是前提；若 GREEN 之后变红，那是越界实现被抓住。",
+    "receiptRef": "对照行不作为 failing-test-observed 引用；其通过形态在 GREEN 阶段的包级命令里继续被覆盖。"
+  },
+  "legitimacyCheck": {
+    "notInfraFailure": "八条红的输出都是 panic 值本身 + 引擎 goroutine 栈（scheduler.go:124/125），不是编译、环境或夹具错误。同一测试文件在同一字节下 go vet 干净、gofmt 无 diff、两条对照行通过，说明基础设施成立。",
+    "notPreExistingPass": "八条均在产品变更前失败，且失败点在被测公共入口 Run 上。",
+    "notMockOnly": "断言只用 Run 的返回值与测试自己提供的节点体计数器，无 mock、无私有符号。",
+    "perRowIndependence": "每行单独 -run 到并各自取得非零回执；族级命令只能观察到第一条死亡，因此族级回执用于证据项，逐行回执用于证明行的独立性与 GREEN 后的击杀能力。"
+  },
+  "disclosedBeyondContract": {
+    "id": "S14-RED-D1",
+    "what": "T3 里除「点名 bad」之外，还断言错误文案含 \"panic\" 一词。",
+    "why": "契约 T3 的observable 是「被引号包住的名字集合」。仅凭名字，一条写 \"graph: node \\\"bad\\\" failed\" 的文案也绿，而调用方会把它当成可重试的业务错误——这与 T6（节点自身 error 身份保持）配合才构成完整可判定面。",
+    "status": "属 T3「可定位」语义的边界内收，不新增导出面、不动公共 API；母约写回义务与 S14-AMEND-1 同批登记。"
+  },
+  "greenStageConditions": [
+    "只允许改 scheduler.go（必要时 graph.go 的导出注释），实现字节必须最小：在 spawn 创建的那条 goroutine 上 recover，把任意 panic 值转成命名该节点的 error，并沿用既有 queueItem.err 投递通道，使 running 正常递减。",
+    "非测试文件 sync. 出现次数实测仍为 0（B12）；引擎核心非测试 LOC ≤ 1500（B13）。",
+    "既有测试字节不变（graph_test.go=425ea030…、p1r13_step_limit_test.go=bc4ab8e7…），且包级 go test ./pkg/hno/graph/... -count=1 -race 全绿——「测试不中断」只能在整包跑完时观察。",
+    "对照行 T6/T7 在 GREEN 之后仍绿；若变红说明恢复逻辑越界。"
+  ]
+}

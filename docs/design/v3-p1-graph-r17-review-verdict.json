@@ -1,0 +1,217 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p1-graph-r17-cancel-normalization",
+  "activationId": "2037f006-7d6b-409e-99b6-eb5b1d7c4abd",
+  "capabilityId": "software.review.standards-spec",
+  "stageId": "review",
+  "recordedAt": "2026-09-27T19:02:30.000Z",
+  "independenceDisclosure": "本轮仍是作者自查：用户此前明确拒绝对 P1 派发独立审查子代理（该次工具调用被拒），因此 Standards 与 Spec 两轴由同一作者分别独立走查、各自记录、不互相背书。披露的具体后果：(a) 11 条变异（κ–υ、ρ、χ、ο、π）由作者本人选取，「变异集是否穷尽」这一层没有第二双眼睛；(b) 三条存活变异（ρ/χ/ο）的「等价 vs 漏检」判定是作者自己的归因，第 3 节给了可反驳的实测数字而不是结论；(c) 两轴发现数不等不构成任何一轴通过的理由。若要以本片作为发布前担保，需要一次带第二双眼睛的复评。",
+  "fixedPoint": {
+    "whyNotHead": "HEAD 在本周期内前移过（0387000 feat(graph): land zero-lock scheduler with build-time edge validation 提交的是 pkg/hno/graph 的较早快照），以 HEAD 为 fixed-point 会把切片 1–16 的成果算进本片差异。因此沿用前例：取切片 17 契约的 baselineBytes（= 切片 16 收尾字节）逐文件比对。",
+    "perFile": {
+      "pkg/hno/graph/scheduler.go": "f2d7fb4b10e9c133f9bbe8b566da40ea8e96d55e",
+      "pkg/hno/graph/graph.go": "dca23943fd9cade4766ceeffe43b47477b815a61",
+      "pkg/hno/graph/graph_test.go": "425ea0303e1d5c5c8e95bacf57663ae94a4309ee",
+      "pkg/hno/graph/p1r13_step_limit_test.go": "bc4ab8e71527809e23a12590a078add8f35d68d1",
+      "pkg/hno/graph/p1r14_panic_barrier_test.go": "0ed607dbc01955864276212fa61e0902577ce7b8",
+      "pkg/hno/graph/p1r15_warnings_test.go": "3ea06d27abd3994130e593d297951c895729a4dd",
+      "pkg/hno/graph/p1r15b_warning_text_test.go": "0285ab35729ed3d50359e0fd407edb2d8b1c1a2a",
+      "pkg/hno/graph/p1r16_max_concurrency_test.go": "6934a4f2ae9ed2d80a59a30ead56b3de6bcc4296"
+    },
+    "finalBytes": {
+      "pkg/hno/graph/scheduler.go": "0ce6c3b332ddc768c1c5a10d6c1591fc88d67a2a",
+      "pkg/hno/graph/p1r17_cancel_normalization_test.go": "cbc8b692a84ed5ce23b461a8ed40b9ba3870d386"
+    },
+    "diffNonEmpty": "是：生产侧 `git diff f2d7fb4b… -- pkg/hno/graph/scheduler.go` = 6 个 hunk、+20/−5；测试侧新增 1 个文件 596 行（549 行非空，6 个 TestP1R17_ 函数 + 11 个 helper）。graph.go 与全部既有测试文件本片零改动（hash 逐一相等）。"
+  },
+  "specSources": [
+    "docs/design/v3-test-scope-p1-graph.md :68（B9 验收行原文：节点阻塞期间 cancel ctx → Run 返回错误且取消语义为 context.Canceled（errors.Is），不得伪装成节点业务错误）、:40（禁止观察面）、:75（不得用 sleep 定序）、:147（后续 RED 次序里 B9 的位置）、:188（票面剩余行为行清单）、§4.1 反例条款、§9（结构判据）",
+    "docs/design/v3-platform.md :188（母约取消条款原文：「在途节点返回 context.Canceled，consumer 统一归一化为取消而非错误」）、:190（B8 并发上限判据，本片引用其 >0 守卫语义）",
+    "docs/design/v3-test-scope-p1-graph-slice17.json（本周期测试范围契约：M-1…M-7、raceAssertionForm、D1–D7、非目标、完成判据、forbiddenShortcuts、writeBackOwed）",
+    "docs/design/v3-testability-decision-p1r17.json（behavior-delta 决定 + notTouchedByThisSlice 5 项）",
+    "docs/design/v3-red-observation-p1r17.md / v3-p1-graph-r17-green.md / v3-p1-graph-r17-refactor.md（三阶段实跑账本）"
+  ],
+  "standardsSources": [
+    "AGENTS.md（Coding Style：tab 缩进、导出符号 GoDoc、%w 包装、错误文案小写、No inline comments unless clarifying novel logic；Testing Guidelines：table-driven + 同址、行为变化必须加回归测试；Build/Test：make fmt / make vet / make lint）",
+    "仓库内既有同形实践：pkg/hno/graph 每片一个 p1rNN_*_test.go + p1rNN 前缀 helper、p*Grace 有界逃逸阀（graph_test.go:623、p1r13:72、p1r14:46、p1r16:35 同形）、公共 GoDoc 里引用内部契约标识（graph.go:211、graph.go:422）",
+    "Fowler smell 基线 12 条（逐条走查，见 standards.smellBaselineSweep）"
+  ],
+  "standards": {
+    "summary": "生产侧差异只有 6 个 hunk，全部落在同一文件、同一变化原因（取消咨询点），未新增导出面、未新增文件、未引入锁；硬违规未见（gofmt / go vet / go build ./... 全绿）。发现 5 条，前四条落在测试文件与注释表意上，第五条是判据可复现性，判断性级别，都不改变对外行为。",
+    "findings": [
+      {
+        "id": "S17-STD-1",
+        "title": "D2 的步数预算写成两处字面量，且其中一处正是前提自证的参数",
+        "location": "pkg/hno/graph/p1r17_cancel_normalization_test.go:247 与 :253（另见 :233 注释）",
+        "evidence": "夹具 `graph.WithStepLimit(1000000)` 与前提自证 `p1r17AwaitDispatchWindow(..., p1r17Succ, 1000000)` 各写一次同一个字面量。helper 里那条判据是 `if ran >= int64(budget) { t.Fatalf(\"…安全阀可能已经在取消之前撞上…\") }` —— 两个 1000000 一旦只改一处，前提自证就会检查一个夹具并没有用的预算，D2 的「安全阀够不着」变成空判据。同文件已有 `p1r17StepBudget = 100` 的先例（:55），本片只是没给第二个预算起名。",
+        "severity": "judgement",
+        "fix": "加 `p1r17BigBudget = 1000000` 常量，两处都引用它；这样夹具与前提自证在类型层面共用同一个值。"
+      },
+      {
+        "id": "S17-STD-2",
+        "title": "errProbeEOF 的名字与它在本文件里承载的东西无关",
+        "location": "pkg/hno/graph/p1r17_cancel_normalization_test.go:68-69（用于 :340）",
+        "evidence": "该哨兵只为 D4 的第三种出口形状「节点包装了别的哨兵的错误」服务，名字却讲「probe stream 的 EOF」，且与本文件另一个哨兵 `errP1R17Business`（:66）的命名习惯不一致（少切片前缀、多一个与图无关的名词）。读者需要读到 :340 才知道它的全部作用是「一个不是取消、不是业务哨兵的第三方错误」。",
+        "severity": "judgement",
+        "fix": "重命名为 `errP1R17Unrelated`（或 `errP1R17ThirdSentinel`），文案同步为 `p1r17: unrelated third-party failure`。"
+      },
+      {
+        "id": "S17-STD-3",
+        "title": "前提自证 helper 收 6 个位置参数，其中两个 int 语义不同却相邻",
+        "location": "pkg/hno/graph/p1r17_cancel_normalization_test.go:164（调用点 :211、:253、:431）",
+        "evidence": "`func p1r17AwaitDispatchWindow(t, out, firstStarted, started *atomic.Int64, total, budget int)`：`total` 用于「取消时图尚未收敛」，`budget` 用于「安全阀尚未撞上」，两者都是裸 int 且相邻，互换后仍然编译。本轮逐个核对三处调用点，实参次序全部正确（`:211`/`:431` 传 (p1r17Succ, p1r17StepBudget)，`:253` 传 (p1r17Succ, 1000000)），所以今天没有活缺陷；风险在于它和 S17-STD-1 是同一处耦合的两个面。",
+        "severity": "judgement",
+        "fix": "把「夹具声明的后继总数 + 该次 Run 的步数预算」并进一个 fixture 结构（由 p1r17RaceGraph 一并返回），helper 改为 `p1r17AwaitDispatchWindow(t, out, w)`。与 S17-STD-1 同一个改动可一并解决。"
+      },
+      {
+        "id": "S17-STD-4",
+        "title": "生产注释引用外部行号与只在临时产物里的变异字母，属会腐烂的引用",
+        "location": "pkg/hno/graph/scheduler.go:103（「票面 :68」）、:127-130（「变异 τ」「变异 ο」）；同形问题在测试文件头 :8、:26、:233",
+        "evidence": "AGENTS.md 允许「clarifying novel logic」的注释，这两条的内容本身成立（都有实测背书），但引用方式是行号与字母：`v3-test-scope-p1-graph.md` 的 B9 行号在 writeBackOwed 落地后会移动；τ/ο 的完整定义目前只在 `docs/design/v3-p1-graph-r17-refactor.md` 第 2 节与 `/tmp/p1-b9/mutants*.mjs`（后者不入库）。一年后读到「变异 ο」的维护者无处可查。",
+        "severity": "judgement",
+        "fix": "生产注释改引「票面 B9」+ 台账路径（`docs/design/v3-p1-graph-r17-refactor.md` 的变异表），不引行号与单字母；随 B9 写回一并做。"
+      },
+      {
+        "id": "S17-STD-5",
+        "title": "结构判据的唯一执行体在 /tmp，票面与契约都直接引它 —— 不可复现",
+        "location": "/tmp/p1-b9/struct.sh ↔ docs/design/v3-test-scope-p1-graph-slice17.json verificationCommands 第 5 项",
+        "evidence": "契约 verificationCommands 写「sh /tmp/p1-b9/struct.sh（sync. 计数、recover 计数、ctx 咨询点、LOC、Test 函数数）」，票面 §9 与 B12 的判据也是这三行 grep。本片的 D7 与补跑的 T_lock / U_export 结论全部依赖它，而 /tmp 会被清；切片 13–16 的账本同样引用各自的 /tmp 脚本，即这条债不是本片新造的，是一直没还的。",
+        "severity": "judgement（可复现性债，非行为债）",
+        "fix": "落到 `scripts/graph-structure-check.sh`（含导出面计数），由票面 §9 引用；不要写成读自身源码的 Go 测试（契约刻意把 D7 留成命令背书行，自指断言是它禁止的形态）。"
+      }
+    ],
+    "positiveNotes": [
+      "本片顺带清掉了一处真实的重复：`consume` 原先同时通过结构体字段 `s.ctx` 和参数 `ctx` 持有同一份上下文（`return s.consume(ctx)` + `case <-ctx.Done()`），本轮统一为字段单源（`consume()`），三条咨询点全部读 `s.ctx` —— 这是 Data Clumps 的正向消除，不是新增抽象。",
+      "REFACTOR 阶段主动收回了两处过度声明的注释（原写「取消判据写在预算判据之前……放在预算之后会交出一个调用方没做过的事」），依据是 ο 实测等价；并且没有为了掩饰而删除该变异记录，第 3 节留了完整归属表。",
+      "零锁判据（票面 B12）与规模判据（§9）在最终字节上仍成立：`sync_dot_graph=0 sync_dot_scheduler=0 recover_scheduler=1 loc_nonblank_nontest=649`（上限 1500），取消咨询点从 2 增至 4。",
+      "blast radius 实测为零：`grep agno-go/pkg/hno/graph` 的命中只有 pkg/hno/graph 内部的外部测试包 `graph_test`，仓库里没有任何生产代码 import 这个包（`go build ./...` 亦通过）。"
+    ],
+    "smellBaselineSweep": {
+      "Mysterious Name": "S17-STD-2（errProbeEOF）。生产侧新增只有两条守卫，命名 `s.ctx.Err()` 直述其事，未见。",
+      "Duplicated Code": "S17-STD-1（同一个 1000000 写两处）。另：测试里 5 个夹具共享「New → AddNode → AddEdge → SetEntry/SetOutput → Validate(t.Fatalf)」的形状，本轮已把三处派发窗口前提自证抽到 p1r17AwaitDispatchWindow（:164）；剩下的形状重复属测试可读性优先，见 fix 判断不改。",
+      "Feature Envy": "未见。新增判据全部读 scheduler 自己的字段（s.ctx / s.pending / s.steps / s.running）。",
+      "Data Clumps": "S17-STD-3（(total, budget) 与 (graph, start, started, firstStarted) 四元组返回值是想要诞生的小类型）。正向：本片把重复的 ctx 传参收进结构体字段。",
+      "Primitive Obsession": "S17-STD-3 的同一处：两个语义不同的裸 int 相邻。",
+      "Repeated Switches": "未见。diff 里没有新增 switch/if 级联。",
+      "Shotgun Surgery": "未见，且方向相反：如果取消归一化再增加一个咨询点，当前形状仍只需改 scheduler.go 一个文件。真正散射的是注释里的引用方式（S17-STD-4）。",
+      "Divergent Change": "未见。scheduler.go 在本 diff 里只因一个原因变化（取消）。",
+      "Speculative Generality": "两条守卫中，队列项侧那条在今天所有夹具下都不可被单独证伪（ρ/χ 各 500 轮 0 命中）。它不是投机抽象（只有 3 行、无新概念、契约 raceAssertionForm.greenMustBeDeterministic 明确指名该时刻），但牙齿待建 → 记为 Spec 轴 S17-SPEC-1，Standards 轴不重复计。",
+      "Message Chains": "未见。最长链是 `s.ctx.Err()`。",
+      "Middle Man": "测试侧 `p1r17Run(t, g, ctx)` 是 `p1r17Await(t, p1r17RunAsync(g, ctx))` 的薄封装；它有两个调用族（D3/D4/D6）并省掉每个用例手写 goroutine + 阀，判断为收益大于成本，不改。",
+      "Refused Bequest": "未见。无继承/接口实现变化。"
+    }
+  },
+  "spec": {
+    "summary": "规格来源已确认（票面 :68 + 母约 :188 + 切片契约 D1–D7）。B9 的字面场景与它真正失败的两个窗口都实现并有逐轮实跑背书，errors.Is 语义、无 Result 交出、有界返回三项在 6 行上全绿，且 D6 反向钉住了「没取消时不得被归一化」。发现 6 条：一条是契约牙齿形态选错（经补跑已收窄为账本更正）、一条牙齿归属写错行、一条观察面上限须登记、两条规格文本要求不到而实现/刻意不实现的面（须裁决）、一条超时形状覆盖缺口。无「实现与规格相反」级缺陷。",
+    "findings": [
+      {
+        "id": "S17-SPEC-1",
+        "title": "契约 D2 的 teethMutant 形态选错：整条删除守卫不可达，但「读快照 ctx」可达且已判红",
+        "location": "docs/design/v3-test-scope-p1-graph-slice17.json acceptanceMapping[D2].teethMutant ↔ pkg/hno/graph/scheduler.go:104-106",
+        "evidence": "契约写「ν 取到 item.err 后原样 return（不看 ctx）→ D2 红」。实跑：χ=只拿掉该守卫 → exit 0；ρ=与之互换次序 → exit 0；各以 -count=5 复测 = 500 轮，disguisedHits=0。机制：派发侧守卫还在时消费者先在 dispatch 循环头交出取消，走不到队列项分支。但按契约 λ 形态补跑的 L_snap（取消只在 consume 入口读一次快照）单独就把 D2 判红（绑定命令一次实跑：D2 的第 17/31/32/37… 轮交出业务哨兵，exit 1）。⇒ D2 有独立杀手，契约的牙齿登记方式要改：把 ν/χ 换成 λ（快照 ctx）。",
+        "severity": "judgement（文本/账本债，非行为债；原判「无独立杀手」经补跑撤回）",
+        "fix": "更正契约 D2.teethMutant：指定杀手写 λ（读一次快照 ctx）与 κ（两条都不咨询），删掉 ν 这条不可达形态。若仍想覆盖「整条守卫被删」，需要一个消费者 parked 在 select 且队列里已有业务错误的夹具（entry → {gate 放行的失败节点, 永不返回的阻塞节点}，close(gate) 与 cancel() 并发发出），另开 RED 轮，不在本片顺带。"
+      },
+      {
+        "id": "S17-SPEC-2",
+        "title": "D5 新增的「取消之后不得再放积压」断言没有任何变异可达",
+        "location": "pkg/hno/graph/p1r17_cancel_normalization_test.go:419 ↔ docs/design/v3-test-scope-p1-graph-slice17.json acceptanceMapping[D5].teethMutant（σ）",
+        "evidence": "契约 D5.teethMutant 指名 σ（取消时把等待队列继续放出直到撞 limit）。实跑：σ 单独 → exit 0；π（σ + 拿掉派发守卫）→ 判红的是 D1，:419 未 fire。机制：D5 第一段取消时没有任何节点向 queue 投递，消费者从 select 的 ctx.Done 分支直接返回，不再进 dispatch；而能进入派发窗口的第二段形状里，`started` 在节点体内登记，spawn 到登记之间有 goroutine 启动偏差，正确实现也会偶然多算，把它当判据等于写一条竞态容差（契约 forbiddenShortcuts）。 【留档复跑 2026-09-27】σ 在最终字节上单跑 exit 0、6 行全绿、无 DATA RACE、无前提失败（/tmp/p1-b9/mutants7.out.txt）；该行此前只在 S17-SPEC-2 的证据里出现，未进 refactor §2 的表，现已补入。",
+        "severity": "judgement（须裁决，不阻塞）",
+        "fix": "该行保留（删行＝放宽，契约禁止；且 D5 整体已由 λ / υ 证明不是空行）。裁决点是 R17-UNADJ-1「取消之后是否应当停止派发在途批次的剩余激活」：若答「应当」，需要一个能把积压真的留在队列里且消费者回到 dispatch 的公共夹具，另开切片；若答「不要求」，则应从契约 D5.teethMutant 里撤掉 σ 并删掉 :419。已登记为 R17-GAP-2。"
+      },
+      {
+        "id": "S17-SPEC-3",
+        "title": "母约 :188 的「统一归一化为取消而非错误」比实现更宽，与刻意不咨询的 running==0 路径冲突",
+        "location": "docs/design/v3-platform.md:188 ↔ pkg/hno/graph/scheduler.go:94-96",
+        "evidence": "母约原文：「在途节点返回 `context.Canceled`，consumer 统一归一化为取消而非错误」。逐字读，「统一」覆盖成功交出这一支；实现里 `if s.running == 0 { return s.result, nil }`（:94-96）明确不咨询 ctx（:87 注释已写为刻意取舍，契约 notTouchedByThisSlice 第 4 项登记为 0/300 未复现）。票面 :68 只讲「节点阻塞期间 cancel」，管不到这一支，所以实现与票面不冲突，但与母约的字面冲突。",
+        "severity": "judgement（文本债，非行为债）",
+        "fix": "走已在 writeBackOwed 里的母约 §3.3 回写：把「统一归一化」改写为「三条交出结论的路径（取消分支、队列项、派发失败）各自在交出之前咨询 ctx；已合法收敛的成功路径不回滚」。若人类裁决要求成功路径也归一化（即取消之后不得交出 Result），那是新的用户可观察行为 → 新切片取红，不在本片顺带实现（票面 :147 明令）。 【状态 2026-09-27】母约 §3.3 的措辞冲突已按「按路径陈述 + 显式登记未裁决」回写完毕（见票面 §13.4），本条剩余部分是实质裁决：成功路径是否也必须报取消。"
+      },
+      {
+        "id": "S17-SPEC-4",
+        "title": "超时（DeadlineExceeded）形状既不在票面 B9 文本里，也没有任何一行断言在管",
+        "location": "docs/design/v3-test-scope-p1-graph.md:68 ↔ D3/D4/D5 全部用 context.WithCancel",
+        "evidence": "票面 :68 的取消语义只写 `context.Canceled`。实现交回的是 `s.ctx.Err()` 原值，因此 WithDeadline/WithTimeout 到点时同样归一化，只是错误变成 `context.DeadlineExceeded` —— 这个泛化行为今天没有任何断言钉，也没有任何非目标条款声明它。删掉两条守卫里的任意一条，超时形状的表现与取消形状同源，因此它是真实的用户可观察面而不是空话。",
+        "severity": "judgement（覆盖缺口，非缺陷）",
+        "fix": "两种收口都要人类点头：(a) 认为超时归 B9 之外 → 在票面 §4.1 或契约 explicitNonGoals 里显式写明「取消 = WithCancel，超时另议」，避免下一个读者把它当遗漏；(b) 认为属于 B9 → 补一行 D 形状（同一夹具，ctx 换成 WithTimeout）另开 RED。已登记为 R17-GAP-3。"
+      },
+      {
+        "id": "S17-SPEC-5",
+        "title": "契约 D5.teethMutant 的 ρ 形态实测判红的是 D1，杀手归属写错了行",
+        "location": "docs/design/v3-test-scope-p1-graph-slice17.json acceptanceMapping[D5].teethMutant ↔ pkg/hno/graph/p1r17_cancel_normalization_test.go:219（D1 断言）",
+        "evidence": "契约原文：「ρ 把 ctx 咨询放在『pending 为空』分支之后（有积压时不咨询）→ D5 红」。按该形态逐字补跑 R_empty（拿掉派发循环头守卫 + 在 for 之后问一次 ctx）：exit 1，判红的是 TestP1R17_CancellationWinsOverStepLimitDuringDispatch（:219/:223，交出 ErrStepLimitExceeded），D5 判绿。机制与结论一致：有积压而不咨询时，消费者一路排空到撞预算判据才交出错误，那正是 D1 钉的形状。",
+        "severity": "judgement（账本债；该行仍被杀死，不是漏检）",
+        "fix": "更正契约：ρ 的指定杀手改为 D1；D5 的牙齿改绑 λ（select 取消分支，实测 :410 判红）与 υ（取消交出 Result，实测 :413/:416 判红），σ 那条与 R17-GAP-2 一并裁决。"
+      },
+      {
+        "id": "S17-SPEC-6",
+        "title": "「用错 ctx 实例」在父子链上不可检测，应登记为观察面上限而不是留在牙齿表里",
+        "location": "docs/design/v3-test-scope-p1-graph-slice17.json acceptanceMapping[D2/D5].teethMutant（ξ「用错 ctx 实例」）↔ /tmp/p1-b9/mutants6.out.txt X_child",
+        "evidence": "X_child：Run 里 `childCtx, _ := context.WithCancel(ctx)`，调度器改读 childCtx。绑定命令 exit 0，6 行全绿，build-ok。原因是取消沿父子链传播，子实例的 Err() 在守卫读到之前就已非 nil，因此该形态与正确实现在公共面上不可区分；真正断链的写法（读 context.Background()）行为上等价于 κ，已被 D1/D2 覆盖。",
+        "severity": "judgement（覆盖面披露）",
+        "fix": "在契约 observabilityLimit 里加一句：ξ 形态限父子链传播，能区分的是「读的是不是同一个实例的同一时刻」，不得把 ξ 当作一条独立牙齿承诺；同时在票面写回里避免把「实例正确」当成验收条件。"
+      }
+    ],
+    "unmetSpecSilence": "无静默未达：票面 :68 的三个可观察量（Run 返回错误、errors.Is 命中 context.Canceled、不得伪装成节点业务错误）都有 6 行实跑背书；反向的 B4 安全阀（票面 :63）与 B1/B4（未取消时业务错误原样交出）由 D6 的三个子用例钉住，且 ξ 变异证明「把预算耗尽改成报取消」会被判红。"
+  },
+  "measuredDuringReview": [
+    "git diff f2d7fb4b10e9c133f9bbe8b566da40ea8e96d55e -- pkg/hno/graph/scheduler.go → 6 hunk，+20/−5（git diff --stat）",
+    "git hash-object --no-filters → scheduler.go 0ce6c3b332ddc768c1c5a10d6c1591fc88d67a2a、p1r17_cancel_normalization_test.go cbc8b692a84ed5ce23b461a8ed40b9ba3870d386、graph.go dca23943…（与 baseline 相等）、graph_test.go 425ea030…（相等）",
+    "绑定命令 `go test ./pkg/hno/graph -run TestP1R17_ -count=1 -race -v` → receipt:6a9536c7-da6d-4585-9605-731505347f78，exitCode 0（6/6 --- PASS）",
+    "重复确定性 `… -count=20 -race` → exit 0，18.153s，0 FAIL / 0 DATA RACE",
+    "包级回归 `go test ./pkg/hno/graph -race -count=1` → exit 0，2.681s，0 DATA RACE（切片 1–16 全部 Test 保持通过）",
+    "go build ./... → exit 0；go vet ./pkg/hno/graph/... → exit 0；gofmt -l pkg/hno/graph/ → 无输出",
+    "结构判据 sh /tmp/p1-b9/struct.sh → sync_dot_graph=0 sync_dot_scheduler=0 recover_scheduler=1 ctx_checks_in_scheduler=4 loc_nonblank_nontest=649 testfunc_total=55",
+    "变异矩阵 11 条重放：/tmp/p1-b9/mutants{,2,3,4,5}.mjs + .out.txt，全部 restoredIdentical=true，恢复后 hash 与最终字节一致（0ce6c3b3…）",
+    "grep agno-go/pkg/hno/graph → 除 docs 与 pkg/hno/graph 内部测试外零命中（无仓库内生产 importer）",
+    "契约逐字变异补跑 node /tmp/p1-b9/mutants6.mjs → L_snap exit 1（D1 + D2）、R_empty exit 1（D1）、X_child / T_lock / U_export exit 0；五条 build-ok，restoredIdentical=true（跑完 hash 仍 0ce6c3b3…）",
+    "结构计数基线与变异侧对照：exportedSymbols 24 → 25（U_export）、sync_dot_scheduler 0 → 1（T_lock）、ctx_checks_in_scheduler 4 → 3（L_snap，快照读点不再匹配 grep）"
+  ],
+  "verdict": {
+    "result": "approve",
+    "blocking": [],
+    "nonBlockingButMustBeAdjudicated": [
+      "S17-SPEC-1 / R17-GAP-1（收窄后：契约 D2.teethMutant 要换成 λ 快照形态；「整条守卫删除」不可达，要不要补 parked-window 夹具由人类定）",
+      "S17-SPEC-5（契约 D5.teethMutant 的 ρ 归属要改到 D1；D5 牙齿重绑 λ/υ）",
+      "S17-SPEC-6（ξ 形态登记为观察面上限，不再当独立牙齿承诺）",
+      "S17-SPEC-2 / R17-GAP-2 + R17-UNADJ-1（D5:419 无变异可达；取消之后是否应停止派发在途批次，仍未裁决）",
+      "S17-SPEC-3 / 母约 §3.3 写回（「统一归一化」与 running==0 刻意不咨询的字面冲突）",
+      "S17-SPEC-4 / R17-GAP-3（超时形状：显式非目标 或 另开一行 RED）",
+      "S17-STD-5（结构判据脚本从 /tmp 搬进 scripts/ 并由票面引用；切片 13–16 同债一并还）",
+      "S17-STD-1 + S17-STD-3（1000000 双写 + 6 位置参数，同一个 fixture 小类型一并解决；纯测试改动）",
+      "S17-STD-2（errProbeEOF 重命名，纯测试改动）",
+      "S17-STD-4（注释引用方式：行号/变异字母 → 票面 B9 + 台账路径，随 B9 写回做）",
+      "承前未裁决：R17-UNADJ-2/3、R16-UNADJ-1/2、S16-STD-1…4、S15-STD-*、R15-UNADJ-*、B7-AMEND-1，以及 15b 遗留「文案不预测执行」仍只到 token 层",
+      "golangci-lint 未运行（`make lint` 工具链未确认），不能声称 lint 干净；gofmt / vet 已过"
+    ],
+    "authorNote": "判 approve 的理由：B9 的验收三个可观察量都有绑定命令的逐轮实跑背书（含 -count=20），两条掩盖路径（安全阀顶掉取消、业务错误顶掉取消）分别由 D1（20/20 确定性）与 κ/λ-快照（竞态与快照两条）钉住，反向的 D6 + μ/ν/ξ 三条变异证明归一化没有越界吞掉业务错误与安全阀结论，结构判据（零锁、LOC 649/1500、无新导出面）在最终字节上仍成立。四条 Standards 发现全是测试可读性、注释耐久性与判据可复现性，零生产行为影响。必须单独说明的两点：(a) 接受证据之后才发现我自己那份变异表用错了字母 —— 契约点名的 5 个形态当时一条没跑，补跑后结论有两处更正（D2 其实有 solo 杀手、D5 的 ρ 杀手落在 D1），这份账本的信用要靠 mutants6.out.txt 的原始输出兜住；(b) golangci-lint 未运行，且矩阵选取仍是作者本人，独立性低于双代理审查。"
+  },
+  "nextSliceOrder": "B9 闭环（写回票面 :68 与母约 §3.3 + 处理 S17-STD-1/2/3/4 与三个 R17-GAP）之后，票面 :188 剩余行为行只有 B11（graph.Typed 的类型不符出口）。若人类选择解 R17-GAP-1，它应在 B11 之前以独立 RED 轮回来（同一张图族，不新增导出面），不与 B11 混片。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-r17-review-verdict.json",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice17.json",
+    "artifact:docs/design/v3-testability-decision-p1r17.json",
+    "artifact:docs/design/v3-red-observation-p1r17.md",
+    "artifact:docs/design/v3-p1-graph-r17-green.md",
+    "artifact:docs/design/v3-p1-graph-r17-refactor.md#2-变异归属矩阵-11-条",
+    "receipt:6a9536c7-da6d-4585-9605-731505347f78",
+    "file:pkg/hno/graph/scheduler.go",
+    "file:pkg/hno/graph/p1r17_cancel_normalization_test.go",
+    "artifact:docs/design/v3-p1-graph-r17-refactor.md#7-契约逐字变异补跑证据接受之后的追加实测",
+    "docs/design/v3-test-scope-p1-graph.md §13（回写落点：三咨询点 + 命中率 + 牙齿归属更正 + 母约同步）",
+    "docs/design/v3-platform.md §3.3「取消」段（已按三咨询点与两处未裁决重写）",
+    "/tmp/p1-b9/mutants7.out.txt（κ/μ/ο/σ 在最终字节上的留档复跑，restoredIdentical=true）"
+  ],
+  "amendedAt": "2026-09-27T19:18:00Z",
+  "postAcceptanceAmendments": [
+    "Evidence 被接受后复查发现：本文件 measuredDuringReview 第 8 项原先只覆盖 11 条作者自选题式的变异，而契约 completionCriteria 第 3 项逐字点了 10 条（κ…υ），其中 5 条与我的同字母不同形态（λ/ξ/ρ/τ/υ）。即当时账面看起来满足第 3 项，实际契约点名的 5 个形态一条未跑。",
+    "补跑已执行：/tmp/p1-b9/mutants6.mjs + mutants6.out.txt，最终字节 scheduler.go 0ce6c3b3… / 测试 cbc8b692…，绑定命令与阶段绑定逐字节一致；5 条全部 build-ok，恢复后 hash 不变（restoredIdentical=true），未改动任何产品或测试字节（因此本文件已接受的 receipt:6a9536c7… 仍描述当前字节）。",
+    "补跑导致的更正三条：(1) S17-SPEC-1 的结论收窄 —— D2 其实有 solo 杀手（契约 λ 形态：取消只在 consume 入口读一次快照，实跑同时判红 D1 与 D2，D2 在一次 -count=1 的第 17/31/32/37… 轮各命中）；不可达的只是「整条守卫删掉」（χ）。(2) 契约 D5.teethMutant 的 ρ 形态（只在 pending 空时咨询）实测判红的是 D1 而不是 D5，杀手归属要改（新增 S17-SPEC-5）。(3) 「用错 ctx 实例」的父子链写法（X_child）实测与正确实现不可区分，属观察面上限而非漏检（新增 S17-SPEC-6）。",
+    "顺带第一次给出 D7 类「命令背书的结构行」的量化牙齿：T_lock 让 6 个 Test 行全绿但 sync_dot_scheduler 0→1；U_export 同样全绿但导出面计数 24→25。两个计数原先没有仓库内的家（新增 S17-STD-5）。",
+    "回写已执行（2026-09-27）：票面 docs/design/v3-test-scope-p1-graph.md 新增 §13（13.1 三咨询点 / 13.2 命中率 / 13.3 牙齿归属更正 / 13.4 母约同步 / 13.5 证据与可重放性），并把 :68 的 B9 行改为指向 §13 的精确措辞；母约 docs/design/v3-platform.md §3.3「取消」段按三咨询点重写，删掉「统一归一化」的越界措辞，并登记 cancelAll/cancels 未实现（节点拿调用方那份 ctx，取消沿 ctx 树传播）与 running==0 路径不带断言这条未裁决项。契约本体按周期冻结，归属更正写在票面 §13.3 作为生效说明。",
+    "留档修正：本文件所依据的 docs/design/v3-p1-graph-r17-refactor.md §2 那张表接受时只登了 11 条，漏了 σ（漏记未漏跑 —— S17-SPEC-2 的证据里一直有 σ 的单跑结果）。现已补为 12 条，并在最终字节上复跑 κ/μ/ο/σ 留档（/tmp/p1-b9/mutants7.out.txt，restoredIdentical=true，跑后 hash 仍 0ce6c3b3…）。σ 单跑 exit 0、6 行全绿、无 DATA RACE：R17-GAP-2 由「只被复合形态 π 间接支持」升级为「契约指定形态本身不可达」。",
+    "§3 的存活计数从三条改为四条（ο、ρ、χ、σ），并在 §3 第 6 条给出 σ 的机制解释与 D5 牙齿的新归属：契约 D5.teethMutant 的 σ 移入观察面上限登记（与 ξ/X_child 同一处置），D5 生效牙齿为「拿掉 select 取消分支 → :410」与「取消被归一化成成功收敛 → :413/:416」。"
+  ]
+}

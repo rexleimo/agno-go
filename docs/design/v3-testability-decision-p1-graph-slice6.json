@@ -1,0 +1,43 @@
+{
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:testability-decision:p1-graph-engine-slice6-r1",
+  "workItemKey": "work-p1-graph-engine-r6-immutable-run",
+  "activationId": "9da04289-9d20-43a6-b32f-015abac4fdea",
+  "commandToken": "c11c9a9c-4f3b-4016-9d91-c31f6d8cb786",
+  "contractRef": "artifact:docs/design/v3-test-scope-p1-graph-slice6.json",
+  "redCandidate": {
+    "publicEntry": "pkg/hno/graph 导出 API（package graph_test 外部观察）：(*Graph).AddNode/AddEdge/AddConditional/Validate/Run 与 Result.Completed()/Output()。断言只比较「入口节点在自己函数体内改图的那次 Run」与「同一次测试运行内实跑得到的未改图参照 Run」三面是否一致，不引用 nodes/edges/successors/snapshot 等未导出字段，不断言错误具体类型，因此不锁死实现。改图动作本身是任意外部调用方都能做的（节点闭包捕获同一个 *Graph），不需要内部知识。",
+    "setup": "工作树含切片 1–5 的实现（builder + 单消费者调度器 + 条件/默认路由 + 构建期拒绝）。本轮只向 pkg/hno/graph/graph_test.go 追加 TestP1G_RunIsolatesTopologyFromConcurrentMutation：S1 运行中 AddEdge(\"a\",\"ghost\")、S2 运行中 AddConditional(\"a\",\"b\",nil)、S3 运行中 AddEdge(\"a\",\"d\")（d 已注册，一旦被读到就会多激活）、S4 对照（Run 返回之后再 AddEdge/SetOutput，第二次 Run 必须看到新声明）。三张被测图与参照图形状相同：a→b、输出 b、节点 d 存在但未连、入口返回自身，因此 Completed()/Output() 同时证明执行了哪些节点以及它们拿到什么值。断言前 gofmt -l pkg/hno/graph 无输出、go vet ./pkg/hno/graph/... 净。实现文件本轮未被触碰：graph.go 68123f3907305c8c4e31e62f9c1a2fdc9c7f4c40、scheduler.go 19dcf6d244f50352577184cc38b4bc6dffcdc713 与 RED 取得后逐字节一致，仅 graph_test.go 变为 cb8c8ea9161c23c8f5bc1b79252b50c5922ef2a7。无网络、无凭据、无跨用例共享可变状态。",
+    "command": {
+      "executable": "go",
+      "args": [
+        "test",
+        "./pkg/hno/graph/...",
+        "-run",
+        "P1G",
+        "-count=1"
+      ],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "退出码非 0 且为行为级断言失败。目标行为：一次 Run 只执行进入 Run 时那份已验证的拓扑，之后对 builder 的结构性修改既不能改变本次路由，也不能让执行崩溃。于是 S1–S3 三张改图 Run 的 Completed()/Output() 必须与同轮实跑的参照图完全一致（[a b] / \"seed\"），err 为 nil，进程活着走完断言；S4 对照在同一命令下今日即通过。",
+    "observed": "主回执 receipt:92c1d7d8-b220-4f75-a7d5-ebf85cacb95a：exit 1，整个 test binary 以 `panic: runtime error: invalid memory address or nil pointer dereference [signal SIGSEGV]` 终止，栈顶为 graph.(*scheduler).spawn.func1() 位于 scheduler.go:86（由 goroutine 76 在 scheduler.go:85 创建），FAIL github.com/rexleimo/agno-go/pkg/hno/graph 1.156s —— 触发点即 S1 的 AddEdge(\"a\",\"ghost\")：运行中追加的边被活读，目标名在 nodes 表里查得 nil 节点并被调用。因单个子用例的 panic 会终止整个二进制，S2/S3 各取一条缩窄到该子用例的补充回执以定位失败点：receipt:bfbbb06b-81f7-4648-8323-c96b13b82e7a exit 1（S2 打印 `--- FAIL: .../运行中追加缺失谓词的条件边不得让执行崩溃` 后 panic 于 e.p(out) 的 nil 解引用）；receipt:3a5d1869-c9f5-4be9-9345-d8e3fdc2c7b1 exit 1（S3 是最干净的行为级失败，无 panic：graph_test.go:502「合法新边: Completed() = [a b d]，未被修改的参照图为 [a b] —— 运行中的 builder 修改推翻了构建期已验证的拓扑」）。S4 对照 receipt:fc2fc286-a12d-4d38-9ad8-842c18422260 exit 0。缩窄 -run 只用于把失败点归到具体子用例，主判据仍是逐字等于契约 focusedCommands 的那条全量命令；契约 environmentNotes 禁止的是用缩窄来掩盖失败形态，此处失败形态（panic/SIGSEGV）被完整记录。",
+    "failureReason": "缺失的是「构建期校验即终局」这条行为本身，不是某个漏判的边种类：scheduler 全程读活对象 s.g.edges（scheduler.go:112 的 range）与 s.g.nodes（scheduler.go:86 的查表），而 Validate 只在 Run 入口跑一次（scheduler.go:36-37）。因此切片 5 落地的 nil 谓词拒绝只在 Run 开始前有效，节点体内一次 AddConditional(...,nil) 就能绕过它并触发 nil 解引用；同理 AddEdge 到一个不存在节点会让切片 2 消灭过的 nil 节点崩溃路径复活（SIGSEGV，主 goroutine recover 不住，宿主进程死亡）；S3 则证明即使新边完全合法，运行中的修改也会直接改写路由结果。cycle5 C5-STD-5 的 liveEvidence 是用 /tmp 外挂程序复现的，本轮同一族缺陷改由包自身的测试取证，故 RED 是天然 RED 而非恢复式。S4 今日通过，说明「快照」必须是每次 Run 各自的捕获，而不是把图终身冻结。",
+    "receiptRef": "receipt:92c1d7d8-b220-4f75-a7d5-ebf85cacb95a",
+    "additionalRefs": [
+      "receipt:3a5d1869-c9f5-4be9-9345-d8e3fdc2c7b1",
+      "receipt:bfbbb06b-81f7-4648-8323-c96b13b82e7a",
+      "receipt:fc2fc286-a12d-4d38-9ad8-842c18422260"
+    ]
+  },
+  "sliceJustification": "S1–S3 是同一条根因（调度器读活拓扑）的三个可观察面，缺任何一个都留绕过口：只修 S1 会留下 nil 谓词 panic，只修 S1+S2 会留下「合法新边悄悄改写路由」。S4 是必须的对照，否则「永久冻结」这种破坏既有二次构造语义的实现也能让 S1–S3 通过。断言强度债（S5）在本切片以恢复式取证随附，因为它是后续所有拒绝类判据有牙的前提。",
+  "nonGoals": "不实现 B2 Join 路由（AddJoin 仍必须在构建期被拒，join-only 拒绝行不得删除）；不实现 B4 stepLimit 与 ErrStepLimitExceeded 的产生点；不实现 B5 无条件环的构建期拒绝；不实现 C5-SPEC-1 的空 AddJoin 拒绝与 C5-SPEC-2 的输出可达性拒绝；不实现 C4-STD-2 (2) 多条 Default 扇出与 (3) 谓词收敛环端到端；不加 B6 余下校验、B7 Warnings、B8 FIFO、B9 取消归一化、B10 节点 panic 转错误（尤其不得用 recover 把本轮的崩溃转成错误来「通过」测试）、B11 Typed 分支测试；不引入 sync/atomic/锁（grep -c 'sync\\.' 必须仍为 0/0）；不新增哨兵错误公共面（C5-STD-3 另案）。若为通过本切片而顺带实现其中任何一项，判为实现越界。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-test-scope-p1-graph-slice6.json",
+    "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle5",
+    "artifact:/tmp/c5probe",
+    "receipt:92c1d7d8-b220-4f75-a7d5-ebf85cacb95a",
+    "receipt:3a5d1869-c9f5-4be9-9345-d8e3fdc2c7b1",
+    "receipt:bfbbb06b-81f7-4648-8323-c96b13b82e7a",
+    "receipt:fc2fc286-a12d-4d38-9ad8-842c18422260"
+  ]
+}

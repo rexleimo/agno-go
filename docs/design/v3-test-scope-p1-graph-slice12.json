@@ -1,0 +1,76 @@
+{
+  "schema": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p1-graph-r12-unreachable-name-teeth",
+  "workflowActivationId": "d3ff8418-8da9-445e-ba21-3c4ee7c6c456",
+  "activationId": "44951411-0736-4921-b560-c2d4923e2bdd",
+  "stage": "design-tests",
+  "recordedAt": "2026-09-27T11:39:00Z",
+  "origin": "切片 11 审查 verdict 的阻断项 F11-SPEC-1（docs/design/v3-p1-graph-slice11-review-verdict.json#axes.spec.findings[0]）＋ 未修的 S10-STD-1。",
+
+  "userGoal": "让「图里有不可达节点时，构建期拒绝只点一个名字、且那个名字是字典序最小的一个」成为有测试担保的公共行为。今天它只是文档：审查实测变异 MU9（把全部不可达名字拼进同一条错误消息）两次运行 exit=0，现有断言全部通过。附带关掉拖了两片的 S10-STD-1（graph_test.go:815-817 把 looping 的文档注释挂在 noCount 上）。",
+
+  "explicitNonGoals": [
+    "不改错误文案的措辞本身（S11-STD-2 说的 unreachable/not reachable 同义重复不在本轮关闭；文案子串 graph: unreachable node 与收尾 through any declared edge 是既有公共锚，改它需要新的契约）。",
+    "不实现聚合诊断（一次报出全部不可达节点）——那是另一条契约，本轮明确保持「只点一个」。",
+    "不动 §3.5 第 2/5/6/8 项、不动 Add* 增量检查（F11-SPEC-2/S10-SPEC-1 需要 wayfinding，不在本轮）。",
+    "不动 pkg/hno/graph/scheduler.go 与任何导出 API。",
+    "不重跑切片 11 已经交付的行为判定，只补牙齿。"
+  ],
+
+  "inScopeBehaviors": [
+    {
+      "id": "T1",
+      "behavior": "非法图被 Validate 拒绝时，错误消息里被点名的不可达节点恰好一个，且等于该图不可达集合的字典序最小者；同一条消息不得点名该图里其它不可达节点。",
+      "observableVia": "graph.Graph.Validate() 返回的 error.Error() 整串",
+      "mapsTo": "契约 amendment「一次只点一个节点名，取字典序第一个」（docs/design/v3-testability-decision-p1-graph-slice11.json#contractAmendment）"
+    },
+    {
+      "id": "T2",
+      "behavior": "同一个缺陷经 Run 传达时，错误整串与 Validate 给出的逐字节相同（不是「都含同一个名字」，而是两条消息完全一致）。",
+      "observableVia": "graph.Graph.Run(ctx, in) 返回的 error 与 Validate 的 error",
+      "mapsTo": "切片 11 A4/A5 的两入口一致性，本轮把子串比较升级为整串比较"
+    },
+    {
+      "id": "T3",
+      "behavior": "同实例与新建实例重复校验都给出同一份文案（现有 16 次循环保留，并补一次对同一 g 的重复调用）。",
+      "observableVia": "多次调用 g.Validate()",
+      "mapsTo": "S11-STD-6 指出的取样面缺口"
+    },
+    {
+      "id": "T4",
+      "behavior": "可达只按正向声明边算：与入口有边相连但方向不可达的节点仍必须被点名。",
+      "observableVia": "unreachable-chain 行（c→d 相连但都从入口不可达）的拒绝与点名",
+      "mapsTo": "审查实测 MU10（相连即算可达）已被 4 行判红，本轮把这行判据留在原位并确认它仍判红"
+    },
+    {
+      "id": "T5",
+      "behavior": "S10-STD-1 的注释错位修好后，同一条测试命令与整包 -race 结果不变（零用户可观察变更）。",
+      "observableVia": "go test ./pkg/hno/graph/... 的退出状态与 PASS 集合",
+      "mapsTo": "AGENTS.md「Document exported symbols with GoDoc comments」＋ 注释不能误导"
+    }
+  ],
+
+  "outOfScopeBehaviors": [
+    "Validate 的调用次序（声明类→可达性→环）已被切片 11 的 A6/A7 钉住，本轮不重开。",
+    "可达性检查是否应在 Add* 时增量执行（F11-SPEC-2）——本轮保持现状：唯一调用点在 Validate。",
+    "join/汇点语义（F11-SPEC-3、§3.5 第 5/6 项）。"
+  ],
+
+  "allowedTestSeam": "外部包 graph_test，只用导出面：graph.New/AddNode/AddEdge/AddConditional/SetEntry/SetOutput/Validate/Run 与 Result.Output/Completed/Value。允许新增子测试行与断言，不允许新增导出 API、不允许直接调用私有 adjacency/rejectUnreachableNodes/alwaysTakenAdjacency，不允许以「断言内部调用次数」代替行为断言。",
+
+  "completionCriteria": [
+    "牙齿复测：MU9（全部名字拼进一条消息）必须被判红，并给出被判红的行名与站点；MU1–MU8 与 MU10 在同一份测试字节上仍全部判红。",
+    "断言只增不减：新增断言站点数、行名集合、既有期望文案逐项对照记录，且没有任何 t.Skip、没有放宽任何既有期望。",
+    "行为不变：同一条聚焦场景命令零退出、pkg/hno/graph 全包 -race 零退出、pkg/hno/agent + pkg/hno/runner 零退出、go build ./... 零退出、gofmt/vet 干净、覆盖率不低于切片 11 的 91.1%。",
+    "S10-STD-1 关闭：graph_test.go 里 looping 的文档注释贴在 looping 上，noCount 有自己的说明或明确并入。"
+  ],
+
+  "forbiddenShortcuts": [
+    "不得把期望改成「消息里出现全部不可达名字也算对」来配合聚合式实现——那正是本轮要拒绝的行为。",
+    "不得删除或跳过切片 11 的任何既有行/断言来让矩阵好看。",
+    "不得把「只点一个名字」实现成对错误字符串的内部解析（例如正则提取）以外的私有依赖。",
+    "不得用「测试私有函数返回值」来替代 Validate/Run 面上的整串比较。"
+  ],
+
+  "baselinePlan": "本切片没有新的用户可观察行为（代码今天就是只点一个名字），因此走 behavior-preserving-hardening：先用现有测试字节跑同一条聚焦场景命令取零退出基线，再在加固后复跑并加牙齿矩阵。若加固过程中发现任何必须改变公共面才能成立的缺口，停止并向 rex-harness 报告测试范围变更需求。"
+}

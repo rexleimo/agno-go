@@ -1,0 +1,126 @@
+{
+  "schema": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p1-graph-engine-r11-reachability",
+  "activationId": "5b1846bf-d374-438c-8e4c-901c55011b61",
+  "slice": "P1 graph engine slice 11 —— §3.5 第 4 项「不可达节点报错而非静默」",
+  "createdAt": "2026-09-27T10:06Z",
+  "specSources": [
+    "docs/design/v3-platform.md:219（§3.5 第 4 项：不可达节点（从入口 BFS 不可达 → 报错而非静默））",
+    "docs/design/v3-platform.md:214（§3.5 前言：Run 前全量复查）",
+    "artifact:docs/design/v3-p1-graph-slice10-review-verdict.json#spec.S10-SPEC-3（本轮要裁定的不自洽）",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice9.json#acceptanceMapping（切片 9 的「不得交出 err==nil 而 Output()==nil」承诺）"
+  ],
+
+  "userGoal": "让「注册了但永远轮不到」的声明在构建期就报错，特别是被声明为输出节点却不可达的情况——今天它会让 Run 返回 err==nil 而 Output()==nil，正是切片 9 已经承诺不再出现的那类静默错误结果。同时把 cycle10 实测出的不自洽（不可达的无条件环被拒、不可达的普通节点放行）收敛成一条自洽的可达性规则。",
+  "explicitNonGoals": [
+    "不实现 §3.5 第 5 项「无出口的非输出节点」（B9 实测今天放行，本轮不动，继续挂号）。",
+    "不实现 §3.5 第 2 项重名 AddNode（R9-SPEC-2）、空节点名（R9-SPEC-1）。",
+    "不做「Add* 时增量检查」（S10-SPEC-1），那是需要 wayfinding 的 API 形状决策。",
+    "不动 WithStepLimit / WithMaxConcurrency 的死 API（S10-STD-4 归 G6/P3 与下一轮处置）。",
+    "不引入结构化拒绝错误类型（S10-STD-3 继续承接）。",
+    "不改 scheduler.go：拒绝必须只落在 Validate，执行期零改动。",
+    "不新增导出 API：可达性判定的观察面就是既有的 Validate / Run / Result。"
+  ],
+
+  "measuredBaseline": {
+    "how": "仓库外模块 /tmp/p1-r11-probe（go.mod module p1r11probe + replace github.com/rexleimo/agno-go => /Users/rex/codes/agno-go），只用导出面；每次 Run 都放进带 700ms ctx 超时外加 3s 探针期限的 goroutine，因此探针不可能挂死。基线字节：graph.go e790d40c5e7a05b76c0f39134b91678a593c2220、scheduler.go 87854ffbb7629f9adeb2d45fbb74d91f2032b99d。",
+    "rows": [
+      {"id": "B1", "shape": "entry 无出边 + 注册了 orphan 节点（无任何边）", "observed": "validate=nil；run-err=nil；output=SEED；completed=[entry]；Value(\"orphan\")=<nil>/false", "class": "静默放行"},
+      {"id": "B2", "shape": "SetOutput(\"out\") 而 out 从 entry 不可达", "observed": "validate=nil；run-err=nil；output=nil；completed=[entry]；Value(\"out\")=<nil>/false", "class": "静默交出 err==nil 且 Output()==nil —— 切片 9 已承诺不再出现的形状"},
+      {"id": "B3", "shape": "a→end 无条件 + a→b 条件边（谓词运行期恒 false）", "observed": "validate=nil；run-err=nil；completed=[a end]；Value(\"b\")=<nil>/false", "class": "静态可达但运行期不执行 —— 必须继续放行"},
+      {"id": "B4", "shape": "a 为 entry/output，c→d 一条独立不可达链", "observed": "validate=nil；run-err=nil；completed=[a]", "class": "静默放行（多个不可达节点）"},
+      {"id": "B5", "shape": "只有一个节点，既是 entry 又是 output，无边", "observed": "validate=nil；run-err=nil；output=SEED；completed=[only]", "class": "合法对照"},
+      {"id": "B6", "shape": "a→b、a→c、b→c（c 有两条来路）", "observed": "validate=nil；run-err=nil；output=SEED；completed=[a b c c]", "class": "合法对照：汇聚式多路可达"},
+      {"id": "B7", "shape": "a 为 entry/output，c→d→c 不可达环", "observed": "validate=graph: unconditional cycle \"c\" -> \"d\" -> \"c\"…；run-err 同文案", "class": "cycle10 的不自洽面：不可达但成环 → 今天被拒"},
+      {"id": "B8", "shape": "a→b→a 可达无条件环", "observed": "validate=graph: unconditional cycle \"a\" -> \"b\" -> \"a\"…", "class": "切片 10 已交付，本轮不得回归"},
+      {"id": "B9", "shape": "a→sink（sink 无出边且非输出）、a→end", "observed": "validate=nil；run-err=nil；completed=[a end sink]", "class": "§3.5 第 5 项缺口，本轮明确不做"},
+      {"id": "B10", "shape": "谓词会转假的条件环", "observed": "validate=nil；completed=[a a b b end]", "class": "切片 10 的 A5 对照，本轮不得收紧"}
+    ]
+  },
+
+  "inScopeBehaviors": [
+    {
+      "id": "A1",
+      "behavior": "从入口静态不可达的已注册节点在构建期被拒，错误点名该节点",
+      "publicEntry": "(*graph.Graph).Validate",
+      "assertion": "B1 形状（entry + orphan）：err != nil 且 err.Error() 同时含 \"graph: unreachable node\"、`\"orphan\"`；B4 形状（两个不可达节点）同样被拒且点名被拒的那个节点",
+      "whyUserObservable": "调用方在构建期就拿到「这条声明根本不参与执行」，而不是跑完一张少写了边的图后拿到一个不完整的 Result。"
+    },
+    {
+      "id": "A2",
+      "behavior": "被声明为输出却不可达的节点必须被拒，静默的 err==nil + Output()==nil 从此消失",
+      "publicEntry": "(*graph.Graph).Validate + (*graph.Graph).Run + Result.Output()/Value()",
+      "assertion": "B2 形状：Validate 拒绝且点名 \"out\"；Run 返回 err!=nil 且 res==nil；不允许出现 err==nil 而 Output()==nil",
+      "whyUserObservable": "这是切片 9 承诺（「引擎不会跑完一张图后交出 err==nil 而 Output()==nil」）的另一半：那时判的是输出节点不存在，今天实测到的是输出节点存在但轮不到。"
+    },
+    {
+      "id": "A3",
+      "behavior": "可达性按声明的边算，不按运行期谓词结果算",
+      "publicEntry": "(*graph.Graph).Validate + (*graph.Graph).Run",
+      "assertion": "B3 形状（条件边谓词运行期恒 false，b 因此永不执行）：Validate 必须返回 nil，Run 必须成功且 completed=[a end]、Value(\"b\") 的 ok 为 false",
+      "whyUserObservable": "构建期无法判谓词。若把「可达」实现成「实际执行过」，就等于把一切条件分支都判为非法——本轮新增的拒绝只能砍静默错误，不能砍条件路由。"
+    },
+    {
+      "id": "A4",
+      "behavior": "同一非法声明经 Run 传达为同一拒绝，且零节点执行",
+      "publicEntry": "(*graph.Graph).Run",
+      "assertion": "A1/A2 每个形状：Run 的 err 与 Validate 的 err 文案一致、res==nil、图中所有节点体内计数器为 0、在有界时间内返回",
+      "whyUserObservable": "调用方可以只调 Run；先跑掉 entry 再报错会让「拒绝无副作用」这条既有担保失效。"
+    },
+    {
+      "id": "A5",
+      "behavior": "可达性判定不得误伤合法图：单节点图、多路汇聚、条件环全部照旧",
+      "publicEntry": "(*graph.Graph).Validate + (*graph.Graph).Run",
+      "assertion": "B5 completed=[only]；B6 completed=[a b c c]（c 被两条来路各激活一次，精确等值）；B10 completed=[a a b b end]；三者 Validate 均为 nil",
+      "whyUserObservable": "新增的检查最容易犯的错是把「输出节点被多次写」「同一节点多条来路」当成异常。精确等值而非包含。"
+    },
+    {
+      "id": "A6",
+      "behavior": "既不可达又含无条件环时，报可达性而不是环（本轮显式裁定的优先级）",
+      "publicEntry": "(*graph.Graph).Validate",
+      "assertion": "B7 形状（不可达 c→d→c）：err 含 \"graph: unreachable node\" 且含 `\"c\"`，并且**不**含 \"unconditional cycle\"；B8 形状（可达无条件环）：仍含 \"graph: unconditional cycle\" 且文案与切片 10 逐字一致",
+      "whyUserObservable": "两个检查都对同一张图成立时，报哪个是用户能观察到的契约。不钉这一条，插入位置就是实现者的自由，下轮挪动次序不会有任何测试变红。"
+    },
+    {
+      "id": "A7",
+      "behavior": "既有拒绝的文案与次序不变（不可达检查插在边检查之后、环检查之前）",
+      "publicEntry": "(*graph.Graph).Validate",
+      "assertion": "悬空边、缺谓词的条件边、不可路由边种类、入口缺失、输出指向未注册节点——各造一张同时含不可达节点的图，错误必须是既有那一条而不是可达性错误",
+      "whyUserObservable": "本轮是往既有校验链里加一项，不能把切片 2–9 已交付的可定位诊断抢走或改写。"
+    }
+  ],
+
+  "ambiguityResolutions": [
+    {"topic": "可达的定义", "choice": "从 entry 出发、沿任意已声明边（无条件/条件/兜底，join 已被更前的检查拒绝）的传递闭包；与「本次执行是否真的运行过」无关。", "why": "A3 要求运行期谓词不参与构建期判定；只有静态闭包能同时满足 §3.5 第 4 项的文字与 A3。"},
+    {"topic": "入口自身", "choice": "entry 永远可达（零长度路径），即使它没有出边（B5 实测今天成功）。", "why": "否则单节点图会被误拒，直接撞 A5。"},
+    {"topic": "多个不可达节点报几个", "choice": "点名一个即可，但必须是确定性的（按注册/声明顺序稳定），错误里必须出现被点名的那个名字。", "why": "与既有检查「一次报第一条缺陷」保持一致；全量聚合诊断另立契约（R9-STD-4 在册），本轮不顺手做。"},
+    {"topic": "不可达 vs 环的次序", "choice": "可达性检查在环检查之前（A6 钉住）。", "why": "不可达是更根本的事实：那条环永远不会跑，先报它才能解释为什么它不是运行时风险；同时保证 B8 这类可达环的文案不变。"}
+  ],
+
+  "allowedTestSeam": "外部测试包 graph_test，只用导出面：Graph.New/AddNode/AddEdge/AddConditional/AddDefault/SetEntry/SetOutput/Validate/Run、NodeFunc、Result.Output()/Completed()/Value(name)。挂死防护沿用切片 10 的 runWithinLimit（goroutine + select + cancel + 1s 期限）与聚焦命令的 -timeout 25s；执行计数只用于「拒绝前零副作用」这一条用户可观察事实。不得新增 test-only 产品出口。",
+  "forbidden": [
+    "不得删除、跳过、放宽切片 10 已交付的 8 条子测试断言或改其期望文案。",
+    "不得把 A3 的期望从「放行」改成「拒绝」来迁就实现。",
+    "不得为了通过而把可达性实现成「Run 之后回头看 completed 列表」——那会把检查搬到执行之后，直接违反 A4 的零副作用。",
+    "不得顺手实现第 5 项（B9）或空节点名/重名节点。"
+  ],
+  "completionCriteria": [
+    "A1–A7 每条都有可独立失败的断言行，聚焦命令 RED 真实非零退出且非挂死、GREEN 零退出。",
+    "至少三个单点变异归因：去掉可达性检查、把可达性做成运行期（谓词感知）判定、把可达性放到环检查之后（A6 次序被反转）。",
+    "pkg/hno/graph 全包 -race 零退出；pkg/hno/agent、pkg/hno/runner 无新增失败。",
+    "仓库外公共入口场景模块证明 B1/B2/B4 被拒且 B3/B5/B6/B10 全部照旧。"
+  ],
+  "nextOwed": [
+    "§3.5 第 5 项（B9 实测今天放行）",
+    "R9-SPEC-1 空节点名、R9-SPEC-2 重名 AddNode",
+    "R9-STD-2 存在性检查折叠（触发条件已在 cycle10 记录为满足）",
+    "S10-STD-4 死旋钮处置、S10-STD-3/R9-STD-3/4 结构化拒绝错误",
+    "S10-SPEC-1 Add* 增量检查（需 wayfinding）",
+    "§3.5 母约写回：第 7/8 项冲突、可达性与本切片裁定的次序"
+  ],
+  "focusedCommand": {
+    "executable": "go",
+    "args": ["test", "./pkg/hno/graph/...", "-run", "TestP1G_ValidateRejectsUnreachableNodes", "-count=1", "-timeout", "25s", "-v"],
+    "cwd": "/Users/rex/codes/agno-go"
+  }
+}

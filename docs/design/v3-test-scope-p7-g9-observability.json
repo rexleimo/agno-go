@@ -1,0 +1,283 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p7-g9-observability",
+  "activationId": "pending",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-28T06:00:00Z",
+  "contractRef": "docs/design/v3-test-scope-p7-g9-observability.json",
+  "slice": 25,
+  "series": "P7 第 1 片（母约 G9：观测接线），前置 P0 已满足（runner 内核已存在并被 agent 双路径驱动）",
+  "userGoal": "把今天从未接线的 observability 零件接进 G1 runner 内核：retry 与 breaker 在 runner 的模型调用路径实际生效（可观察触发与恢复），model 级 chat span 带 usage 归集；零值（不配置任何策略/sink）时行为与今天逐字节同形、零开销路径保持。span 的 run/agent 级（invoke_agent）不在本片（见 designConsequence 第 8 条与 explicitNonGoals）。",
+  "whyThisSlice": "母约 :87 把 G9 定义为「观测接线（现有零件接进 G1）」、:534 P7 验收为「retry/breaker 接进 runner；span 覆盖 run/agent/model/tool」，约 ~600 LOC；G9 是唯一没有详细设计节的交付块，设计缝由本契约实测后自立。M1 实测：observability 的 Retry/CircuitBreaker/RateLimiter/StartAgentSpan/StartChatSpan/SetUsage/Estimate 全部零非测试消费方（唯一活线是 agent/tool_executor.go 的 execute_tool span），零件是死的；runner 公共面对 retry|breaker|span|trace 关键词零命中。交付票 work-p7-observability 自己的 verification 只跑 ./pkg/hno/observability/... 与 ./pkg/hno/runner/... —— 测试缝必须落在这两包，这直接决定了接线位置（见 designConsequence 第 2 条）。",
+  "measuredBeforeDesign": [
+    {
+      "id": "M1-今天的公共面形状（仓库结构扫描 + /tmp 公共面行为探针，仓库字节未动）",
+      "scene": "仓库内只读扫描（go doc / grep / 基线测试）；/tmp/g9m1（go.mod module github.com/rexleimo/agno-go，pkg/hno/{types,models,runner,observability} 为仓库逐字节副本，cmd/probe 只调导出 API，cmd/probeneg 为编译负探针）",
+      "commands": [
+        "go test ./pkg/hno/runner/... ./pkg/hno/observability/... -count=1",
+        "go doc -all ./pkg/hno/runner | grep -icE 'retry|breaker|span|trace|observability'",
+        "grep -rn hno/observability pkg internal cmd '--include=*.go' | grep -v _test",
+        "go -C /tmp/g9m1 run ./cmd/probe",
+        "go -C /tmp/g9m1 build ./cmd/probeneg"
+      ],
+      "observations": [
+        "基线：runner+observability 两包 -count=1 exit 0（receipt:f5a5b577-207a-4a5e-b2c2-ebb414fd1d60；收口前复核 receipt:d714ef1b-a14d-4072-ad04-2f84c10e74c5 同 exit 0）。",
+        "SHAPE-1（重试/熔断缺位，行为）：恒失败模型 → 恰 1 次调用、err=`runner: model invoke: boom`、StopReason=model_failure —— 内核 today 不重试不熔断（receipt:49a48838-a76f-459d-acee-96acb35430bc，exit 0）。",
+        "SHAPE-2（零件自身隐患，行为）：observability.Retry 配 MaxAttempts=0 → 返回 nil 且 fn 0 次调用 —— 零值配置是「静默成功」，接线侧必须钳制（同 receipt，exit 0）。",
+        "SHAPE-3（接线面缺位，编译负探针）：runner.Config{Retry: …} → `unknown field Retry in struct literal of type runner.Config`（receipt:8d02d2e6-776c-477b-91ab-5971ecb5d6c6，exit 1，以退码 1 证缺位）。",
+        "结构扫描：`go doc -all ./pkg/hno/runner` 对 retry|breaker|span|trace|observability 命中 0（receipt:eff3bdb5-31a4-44a0-b1c7-4eaa319e7665）；runner 导出符号 23、observability 31；非测试 LOC runner 488 / observability 519。",
+        "消费方扫描：observability 全仓唯一非测试 import 是 pkg/hno/agent/tool_executor.go（execute_tool span，工具级已活）；Retry/CircuitBreaker/RateLimiter/StartAgentSpan/StartChatSpan/SetUsage/Estimate 零非测试消费方（receipt:bc0576d2-738c-49da-9481-de28437d3386）。"
+      ]
+    },
+    {
+      "id": "M2-可行性实验（候选缝整体落在仓库副本上，仓库字节未动）",
+      "scene": "/tmp/g9exp（同 M1 副本 + pkg/hno/runner/resilience.go 新缝文件 + runner.go 的 Config/Runner 私有字段、New 接线与 invokeTurn 调用点替换 + p7g9_resilience_test.go 13 行 TestP7G9_）；/tmp/g9stage1（同一副本但调用点回退为直调 invoker，即 redProtocol 第一段的预演）。副本内 observability/models/types 与仓库逐字节全同（diff -r 复核）",
+      "commands": [
+        "go -C /tmp/g9stage1 test ./pkg/hno/runner -run 'TestP7G9_' -count=1 -v",
+        "go -C /tmp/g9exp test ./pkg/hno/runner ./pkg/hno/observability -count=1",
+        "go -C /tmp/g9exp test ./pkg/hno/runner ./pkg/hno/observability -count=1 -race",
+        "go -C /tmp/g9exp test ./pkg/hno/runner -run 'TestP7G9_' -count=1 -race -v",
+        "go -C /tmp/g9exp doc -all ./pkg/hno/runner | grep -cE '^(func|type|var|const) '"
+      ],
+      "observations": [
+        "第一段预演（API 面已落、语义未接线）：13 行 TestP7G9_ 中 9 行真实判红（RetryRecovers/RetryExhausted/BreakerOpens/OpenBreakerNotRetried/BreakerCountsPostRetry/ChatSpanWithUsage/SpanPerAttemptWithError/CustomInvokerAlsoResilient/RetryDoesNotConsumeTurnBudget），4 行绿（ZeroValueNoPolicy、ZeroAttemptsClampedToOne、BreakerRecovers、NoopTracerZeroCost——反向对照与变异齿行）（receipt:7308e63a-7497-49f9-8fde-591418da5b0a，exit 1）。",
+        "第二段（接线完成）：既有 runner+observability 测试 0 判红，plain（receipt:d6c70648-a75f-4bea-804f-7d8238d551ed）与 -race（receipt:f22f0c14-47ee-4c2a-989f-b7813dcdb438）均 exit 0 —— 零值路径与全部既有锚不被新缝打破。",
+        "13 行 TestP7G9_ 全绿（receipt:5bd127dc-707b-4507-9a84-95d2bec16d89；ErrOpen 改为裸哨兵后的最终字节 receipt:31e318d7-6a7f-4109-aae6-651de94666a0，均 -race -v exit 0）：OBS 重试恢复 calls=3；零值恰 1 次且错误串同形；耗尽交最后错误且 wrap 恰一次；MaxAttempts=0 钳制为真实 1 次；熔断跨 Run 打开后 fail-fast 且 invoker 不被调；冷却后探测成功复位；ErrOpen 不进重试循环；熔断按逻辑回合记 1 次（每尝试记账的变异被杀）；chat span 带 provider/model 与 usage 11/7/18；每尝试一 span、失败尝试记 error 事件、成功尝试带 usage；无 SDK 时零记录且行为同形；自定义 Invoker 同样受益；重试不耗 MaxTurns 预算（MaxTurns=1 下 3 次尝试成功）。",
+        "结构代价（副本实测）：runner 导出符号 23 → 23（新增的全部是私有：2 个 Config 字段、4 个私有字段、1 个私有 invokeTurn、1 个私有钳制函数——无任何新导出符号）；非测试 LOC 488 → 582（runner.go +25、resilience.go +69）；新文件 `sync.` 计数 0（breaker 由调用方持有传入，runner 不新增锁）；go vet、gofmt -l 干净；observability/models/types 字节与仓库全同。",
+        "M2 过程抓出一个错误包装缺陷并已反哺：breaker-open 若在缝内预包 `model invoke: %w` 会与 Run 的唯一 wrap 点叠成「runner: model invoke: model invoke: circuit breaker open」——定形为缝内返回裸 observability.ErrOpen 哨兵，Run 的 wrap 是唯一前缀（designConsequence 第 5 条的由来）。"
+      ]
+    }
+  ],
+  "designConsequence": "八条接线语义在本片定形，实现前写明：（1）挂载边界是 Run 的 StateAwaitModel 里唯一的 TurnInvoker 调用点——私有 invokeTurn 缝按「breaker 门禁 → 每尝试 chat span → 重试循环 → 一次逻辑熔断记账」包络；同步与流式共用这一条缝（流式调用方把聚合藏在自己的 Invoker 里，缝在 Invoker 边界之外天然覆盖两路）；工具阶段不包（票面只要求模型路径，工具韧性归 ToolExecutor 属主）。（2）公共面走加法：Config 新增两个可选字段 Retry *observability.RetryConfig、Breaker *observability.CircuitBreaker，零新导出符号（23 保持 23，副本实测）；交付票「不修改 runner 公共接口」按其第 4 条同义读作「既有公共符号零破坏」——加法字段下既有调用方全部照常编译且零值行为同形（D2 反向对照）；字面读法（一个字段都不许加）只能把包装挪进 agent/kernel.go，测试缝就被赶出交付票自己点名要跑的 runner 包，故不取；此解释登记进 writeBackOwed 待负责人确认。（3）span 的 sink 不新设接口：sink 就是 OTel 全局 TracerProvider，经既有 observability.Tracer()/StartChatSpan/SetUsage 到达——这是 observability 包文档自述的设计（no-op 默认即零开销），测试观察缝用 otel sdk/tracetest 的 InMemoryExporter + SetTracerProvider（与 observability 自己的测试同法）；CacheStore/Checkpointer「在消费包声明 sink」的先例不在此延伸，因为再造第二个 sink 机制等于复制 observability 已有的可插拔面。（4）零值即无操作、不新增 Validate 行：nil Retry=恰一次、nil Breaker=不设门；MaxAttempts<1 在缝内钳制为 1 次（沿切片 22 WithMaxConcurrency 的 guard 钳制先例）——因为裸 observability.Retry 对 MaxAttempts=0 是零次循环返回 nil 的静默成功（M1 SHAPE-2），钳制是接线的责任，不是对零件的修改。（5）失败语义：Run 独占唯一 wrap 点 `runner: model invoke: %w`——重试耗尽交最后一次的错误、经这一个 wrap 交出（不双包、不新增错误类型、StopReason 维持 model_failure）；breaker-open 由缝内返回裸 observability.ErrOpen 哨兵，Run 的 wrap 是唯一前缀、errors.Is 可达（M2 缺陷的修正），StopReason 仍为 model_failure，不新增 StopReason 值。（6）breaker 与 retry 的组合：门禁在重试循环之外（open 不重试、不烧尝试）；记账在重试循环之后、每逻辑回合恰一次 Success/Failure（重试把瞬态故障挡在熔断记账之外）；chat span 按尝试计（每次尝试都是真实模型调用，都可能烧 token——失败尝试记 error 事件，有响应才记 usage）。（7）回合预算：重试内嵌于单个逻辑回合，turn++/MaxTurns 记数不动（沿切片 22「重试不消耗步数预算」同一原则）；span 属性的 provider/model 取自必填的 Config.Model 的 GetProvider/GetName，自定义 Invoker 者同样供出。（8）span 覆盖分级如实切片：model 级（chat+usage）在本片；tool 级已在 agent.executeOneTool 存活（M1 实测，本片以反向对照保护其不变）；run/agent 级（observability.StartAgentSpan 的 invoke_agent）不在本片——runner 天然无 agent 身份（name/runID 无从取），该级属 pkg/hno/agent 的接线（P7 第 2 片）。",
+  "redProtocol": "本片与切片 22/23 同构，取两段（M2 已各自预演并留回执）：第一段落 API 面（Config 两个可选字段 + Runner 私有字段 + New 接线，调用点不动），绑定命令可编译，9 行行为行按 M1 形状真实判红（receipt:7308e63a…：RetryRecovers/RetryExhausted/BreakerOpens/OpenBreakerNotRetried/BreakerCountsPostRetry/ChatSpanWithUsage/SpanPerAttemptWithError/CustomInvokerAlsoResilient/RetryDoesNotConsumeTurnBudget），D2/D4/D6/D11 四行此段即绿（反向对照与变异齿行，判定依据见各自 assertion）；第二段落接线（调用点换 invokeTurn 缝）转绿（receipt:31e318d7…，13/13）。两段各自留 receipt，两段之间测试文件零改动。",
+  "acceptanceMapping": [
+    {
+      "row": "D1",
+      "behavior": "重试正例：模型前两次失败第三次成功，Retry MaxAttempts=3 → 恰 3 次调用，Run 成功、StopReason 正常终止",
+      "publicEntry": "runner.Config{Model, Retry} → Run → (response, messages, StopReason, err)",
+      "assertion": "夹具计数 == 3 且 err == nil 且 StopReason == no_tool_calls（今天 calls=1 且交错，M1 SHAPE-1，故第一段必红）",
+      "independentlyFailable": "对少试/多试与「失败即停」判红"
+    },
+    {
+      "row": "D2",
+      "behavior": "零值反向对照：不配置 Retry/Breaker 的失败模型 → 恰 1 次调用、错误串含 `runner: model invoke: <原错误>`、StopReason == model_failure——与今天逐字同形",
+      "publicEntry": "runner.Config{Model}（两字段 nil）→ Run",
+      "assertion": "calls == 1 且错误串与 StopReason 同形断言——实现前后都必须绿（禁用观测时零开销路径保持的锚）",
+      "independentlyFailable": "对零值改变既有错误形状/次数的实现判红"
+    },
+    {
+      "row": "D3",
+      "behavior": "重试耗尽：恒失败、MaxAttempts=2 → 恰 2 次调用，交出最后一次的错误，且 `runner: model invoke` 在错误链里恰出现一次（不双包、不重复）",
+      "publicEntry": "runner.Config{Retry} → Run 的错误值",
+      "assertion": "calls == 2、错误串含第 2 次标记、错误串中 wrap 前缀计数 == 1（第一段必红；对 off-by-one 与双包实现判红）",
+      "independentlyFailable": "对交第一个错误或叠加 wrap 的实现判红"
+    },
+    {
+      "row": "D4",
+      "behavior": "fail-closed 误配：RetryConfig{MaxAttempts:0} → 钳制为恰 1 次真实调用、模型错误照常交出（绝不允许裸 observability.Retry 的零迭代静默成功）",
+      "publicEntry": "runner.Config{Retry: &RetryConfig{MaxAttempts: 0}} → Run",
+      "assertion": "calls == 1 且 err 非 nil（M1 SHAPE-2 证的隐患；第一段即绿——未接线时天然 1 次，本行的牙齿在变异上：摘掉钳制直接透传 → 静默 nil 成功即红）",
+      "independentlyFailable": "对「误配=静默成功」的实现判红（mutant：钳制函数删除/旁路）"
+    },
+    {
+      "row": "D5",
+      "behavior": "熔断触发：跨 Run 共享同一 Breaker、阈值 2 → 两次失败后第三次 Run fail-fast，错误 errors.Is(observability.ErrOpen)、StopReason == model_failure、模型恰不被调用",
+      "publicEntry": "runner.Config{Breaker}（同一 *CircuitBreaker 传三次）→ 第三次 Run",
+      "assertion": "errors.Is(err, ErrOpen) 且 calls 冻结在开断前读数（今天无此面，第一段必红）",
+      "independentlyFailable": "对门禁缺失或 open 后仍打模型的实现判红"
+    },
+    {
+      "row": "D6",
+      "behavior": "熔断恢复：冷却结束后放行探测，成功一次后复位（后续 Run 照常达模型）",
+      "publicEntry": "runner.Config{Breaker} → 冷却后 Run × 2",
+      "assertion": "恢复 Run 成功、下一次 Run 调用数继续 +1（第一段即绿：无门禁时天然全通——本行与 D5 成对，D5 红钉「没关门」、本行钉「关了之后必须能开」，变异「熔断后永不恢复」由本行杀）",
+      "independentlyFailable": "对永不复位/半开卡死的实现判红"
+    },
+    {
+      "row": "D7",
+      "behavior": "breaker-open 不进重试：即便配置 Retry MaxAttempts=3，open 后的回合恰 0 次模型调用、错误仍 errors.Is 到 ErrOpen",
+      "publicEntry": "runner.Config{Retry, Breaker} × open 状态 → Run",
+      "assertion": "calls 冻结且 errors.Is 成立（第一段必红：无门禁时重试照烧 3 次）",
+      "independentlyFailable": "对把 ErrOpen 当可重试错误烧尝试的实现判红"
+    },
+    {
+      "row": "D8",
+      "behavior": "熔断按逻辑回合记账：Retry MaxAttempts=3 全失败、阈值 2 → 一回合后 failures 恰 1（下一回合仍放行），而非每尝试记账的 3",
+      "publicEntry": "runner.Config{Retry, Breaker} → 相邻两回合的放行行为",
+      "assertion": "第二回合仍打模型（calls 继续按尝试数递增）且第二回合错误非 ErrOpen（观察面是公共放行行为，不读 breaker 私有字段）",
+      "independentlyFailable": "对 per-attempt 记账（一回合烧光阈值）的实现判红（mutant：记账挪进尝试闭包）"
+    },
+    {
+      "row": "D9",
+      "behavior": "model 级 span：成功一回合 → 恰一条 chat span，带 gen_ai.provider.name / gen_ai.request.model（取自 Config.Model）与 gen_ai.usage.* 三键（取自响应 Usage）",
+      "publicEntry": "otel.SetTracerProvider(sdk+tracetest) → runner.Config{Model} → Run → exporter.GetSpans()",
+      "assertion": "span 数 == 1、名称 == observability.SpanChat、五属性值断言（今天 runner 零 span，M1 结构扫描 + 第一段必红）",
+      "independentlyFailable": "对漏发 span / 漏 usage 归集 / 属性取错来源的实现判红"
+    },
+    {
+      "row": "D10",
+      "behavior": "span 按尝试计：3 次尝试（2 败 1 成）→ 恰 3 条 chat span，失败两条各含 error 事件、成功一条含 usage",
+      "publicEntry": "同 D9 的观察缝，Retry MaxAttempts=3",
+      "assertion": "span 数 == 3、含 error 事件数 == 2、含 usage 数 == 1（第一段必红；对「每回合一条」或「只有成功才发」的实现判红）",
+      "independentlyFailable": "对 span 粒度与错误记录缺失的实现判红"
+    },
+    {
+      "row": "D11",
+      "behavior": "无 SDK（默认 noop tracer）时零记录且行为同形：不配置 exporter，同一失败模型 → 与 D2 逐字同形的错误与次数",
+      "publicEntry": "默认全局 provider 下的 Run",
+      "assertion": "calls == 1、错误串/StopReason 同形（禁用全部观测时零开销路径保持；实现前后都绿）",
+      "independentlyFailable": "对 noop 路径引入行为分叉的实现判红"
+    },
+    {
+      "row": "D12",
+      "behavior": "自定义 Invoker 同样受益：非 nil Invoker（如流式聚合 invoker 的形态）下 retry 语义不变——缝在 TurnInvoker 边界，不在默认 Model.Invoke 回退里",
+      "publicEntry": "runner.Config{Invoker: TurnInvokerFunc…, Retry} → Run",
+      "assertion": "invoker 计数 == 3 且成功（第一段必红；杀「只给默认回退路径接线」的变异）",
+      "independentlyFailable": "对流式路径实际无韧性的实现判红"
+    },
+    {
+      "row": "D13",
+      "behavior": "重试不耗回合预算：MaxTurns=1 且 Retry 3 次尝试（2 败 1 成）→ Run 成功，turn 计数仍按逻辑回合",
+      "publicEntry": "runner.Config{MaxTurns: 1, Retry} → Run",
+      "assertion": "calls == 3 且 err == nil（若每尝试计一回合，第 2 次尝试就会撞 StopLimitReached；第一段必红）",
+      "independentlyFailable": "对重试挤占 MaxTurns 的实现判红"
+    }
+  ],
+  "minimalVerticalSlice": "D1 + D2 + D4 + D5 + D9 五行（重试正例、零值反向对照、fail-closed 钳制、熔断触发、model span 正例）。理由：本片全部风险集中在「挂上就生效、不挂零改变、误配不撒谎」三件事与「span 真的从 runner 发得出来」一件事上；D3/D6/D7/D8/D10–D13 是同一缝上的组合语义与变异齿，M2 已把 13 个观察面在副本上各预演一遍。",
+  "allowedTestSeam": {
+    "add": [
+      "pkg/hno/runner/p7g9_resilience_test.go（package runner，与既有两份测试同包；夹具自备 scriptedModel/invoker 计数器、otel sdk tracetest exporter；计数是夹具自己的状态，不是内核读数）"
+    ],
+    "modify": [
+      "无。既有 runner_test.go 与 tool_limit_run_test.go 一份都不许动，observability 九个文件一个字节都不许动 —— M2 已证带缝副本上两包既有测试 0 判红；若实现迫使既有断言改写，回到本契约而不是改测试。"
+    ],
+    "retires": [],
+    "sourceSeam": "pkg/hno/runner/runner.go（Config 两字段、Runner 私有字段、New 接线、StateAwaitModel 调用点换 invokeTurn）、新文件 pkg/hno/runner/resilience.go（invokeTurn 缝 + 钳制，全私有、零锁）。pkg/hno/observability/* 零改动；state.go/stop.go/tool_batch.go 零改动。"
+  },
+  "forbiddenObservations": [
+    "Runner 内部私有字段、breaker 的 state/failures 私有读数、goroutine 数（熔断状态经公共放行行为观察，调用次数经夹具计数观察）",
+    "退避与冷却的真实时钟耗时断言（只断次数、错误身份与放行行为；测试内等待用毫秒级下界，杜绝时钟抖动判红）",
+    "otel SDK 内部（批处理队列等）；观察缝固定为 WithSyncer + InMemoryExporter（与 observability 自己的测试同法）",
+    "跨阶段 span 的全局时序、agent/tool 层级的 span 断言（agent 级不在本片，见 explicitNonGoals）",
+    "为测试导出 Runner/Breaker 内部状态或新增只服务测试的产品出口"
+  ],
+  "baselineBytes": {
+    "pkg/hno/runner/runner.go": "970c701dd90b5229b625ac4c0aed9b8ab38a94ef",
+    "pkg/hno/runner/runner_test.go": "15d85c1f4545d395496dc6079bada97241c95c26",
+    "pkg/hno/runner/state.go": "194c899275e3f5b61c0c8589bad0ffb2dfd5beb6",
+    "pkg/hno/runner/stop.go": "a62d85e74c0cd9681122b34fe52995ab6a5e166b",
+    "pkg/hno/runner/tool_batch.go": "219844923f570e4a27936d358b3b6c1e85dfeead",
+    "pkg/hno/runner/tool_limit_run_test.go": "ab2d2d2853d8a7270c64c61b66cc9aa7e16ea40c",
+    "pkg/hno/observability/breaker.go": "ac4fb9b8b2c33ffafd9448fa826f628073a41c6a",
+    "pkg/hno/observability/cost.go": "3ef5556aeada7b18e73e0efa1e4a106790093a6c",
+    "pkg/hno/observability/cost_test.go": "0c29f6d3eb4ab8a43090f6cd97923a9a4fcbaa0a",
+    "pkg/hno/observability/prompt_cache.go": "1d460fd0faf27491c946f4458a15dfad420d1d8b",
+    "pkg/hno/observability/ratelimit.go": "92a23db32842b49506424c3f6351c9703512e4ee",
+    "pkg/hno/observability/resilience_test.go": "55b4ff385cba058996a4c872266fdb7d207e4e74",
+    "pkg/hno/observability/retry.go": "f2c2568e1b59b1c343b07572e3410ae793fc3f06",
+    "pkg/hno/observability/tracing.go": "ccf7014a9f940b1fbdbbd119cf0c51fc143f7e9a",
+    "pkg/hno/observability/tracing_test.go": "d83c09f59c28f4fa4fda35b636995b2fa4dc3c14",
+    "counters": {
+      "runnerExportedSymbols": 23,
+      "expectedRunnerExportedSymbols": 23,
+      "observabilityExportedSymbols": 31,
+      "runnerNonTestLoc": 488,
+      "expectedFinalRunnerNonTestLocCeiling": 700,
+      "observabilityNonTestLoc": 519,
+      "syncCountInNewSeamFile": 0,
+      "collectionNote": "全部 git hash-object --no-filters 单文件逐一采集；M2 期间与收口前两轮复核全同（同哈希逐字节未动）。"
+    }
+  },
+  "carriedItems": [
+    {
+      "id": "R19-Q2 + D1 材料",
+      "ref": "artifact:docs/design/v3-adjudication-r19-q2-send-join.md（R19-Q2：单前驱 AddJoin 示例与 §3.5 第 6 项相冲）；artifact:docs/design/v3-decision-ticket.md#D1（D1/D1-b：会话事件化不动 Session 对外 JSON）",
+      "carriedIntoDesign": "两者与本片相邻但零代码交点：R19-Q2 是 G5 Send 那片的裁决门槛，落在 pkg/hno/graph 的扇出语义；D1 是 P5 会话事件化的约束，落在 internal/session 契约层。本片不触碰 join 路由与 Session 序列化，裁决材料不因本片变为已决。"
+    },
+    {
+      "id": "S23-SPEC-1",
+      "ref": "切片 23 契约 carriedItems（StreamMode 六模式的运行期生产者接线）",
+      "carriedIntoDesign": "模式生产者未来多落在 runner/agent 一线。本片的 invokeTurn 缝在 TurnInvoker 边界、先于任何事件生产语义，模式生产者接线时不必重做韧性缝；两者无语义冲突，但生产者片不得把重试/熔断再包一层在自己的生产路径里（层归本缝）。"
+    },
+    {
+      "id": "S22-LAYER-1",
+      "ref": "切片 22（graph.RetryConfig，pkg/hno/graph/policy.go）",
+      "carriedIntoDesign": "graph 节点级重试与 runner 回合级重试是不同层：前者（带 ShouldRetry 分类器与 BackoffFactor）重试「整个节点 Run」，后者（observability.RetryConfig，无分类器）重试「单次模型回合」。二者不共享类型、不互相感知（本片禁止 import pkg/hno/graph，票面原文），组合时尝试次数相乘——任何跨层总尝试上限是未来独立裁决，本片不做，登记以免「双重重试」被误读为缺陷。"
+    },
+    {
+      "id": "S25-DEFER-1",
+      "ref": "本契约 designConsequence 第 8 条",
+      "carriedIntoDesign": "run/agent 级 span（observability.StartAgentSpan 的 invoke_agent + runID 归集）推迟到 P7 第 2 片，落点 pkg/hno/agent（Agent 有 name/runID 且 span 需要在 Agent.Run 入口开、包住整条 kernel 调用）。P7 验收行「span 覆盖 run/agent/model/tool」在第 2 片落地前为部分满足，writeBackOwed 登记状态表。"
+    }
+  ],
+  "explicitNonGoals": [
+    "run/agent 级 span（invoke_agent）：runner 无 agent 身份（name/runID），接线属 pkg/hno/agent 的 P7 第 2 片；禁止在 runner 内伪造身份发 invoke_agent。",
+    "RateLimiter / cost.Estimate / PromptCache 的接线（票面只点名 retry/breaker 与 span；其余零件各自成片）。",
+    "工具阶段的 retry/breaker（归 ToolExecutor 属主；本片缝只包模型回合）。",
+    "给 observability.Retry 增加 ShouldRetry 分类器（能力新增，违反「仅接线现有零件」；今天的语义是任何非 nil 错误都重试、尝试间 ctx.Done 已被零件自己尊重）。",
+    "对 observability 包的任何字节修改（含「顺手修」MaxAttempts=0 隐患——钳制在 runner 侧解决；零件侧修正是另一个 behavior-delta）。",
+    "依赖 pkg/hno/graph 或与其 RetryConfig 建立任何类型关系（票面原文；分层见 S22-LAYER-1）。",
+    "新增 StopReason 值或 Validate 拒绝行（breaker-open 与耗尽都维持 model_failure；MaxAttempts<1 走 guard 钳制）。",
+    "改写 agent/tool_executor.go 既有的 execute_tool span 行为（以反向对照保护）。"
+  ],
+  "completionCriteria": [
+    "1. redProtocol 两段各自留 receipt：第一段（API 面、调用点不动）绑定命令可编译且 9 行按 M1 形状判红；第二段（接线）13 行全绿。两段之间除实现字节外测试文件零改动。",
+    "2. 每行牙齿由变异证明，至少覆盖：钳制摘掉（D4 静默成功）、记账挪进尝试闭包（D8 提前开断）、门禁摘掉（D5 红且 D7 烧尝试）、成功/失败记账取反（D5/D6 反向）、span 挪出尝试闭包（D10 粒度变）、重试循环摘掉（D1）、wrap 点重复（D3 计数）、只给默认回退接线（D12）、turn++ 挪进缝内（D13）。等价变异如实登记。",
+    "3. 既有测试文件与 observability 九文件零改动：逐文件 git hash-object --no-filters 复核与 baselineBytes 全同（runner.go 除外——它必须变；state.go/stop.go/tool_batch.go 仍须全同）。",
+    "4. 门禁全 exit 0：go build ./pkg/hno/runner/... ./pkg/hno/observability/...、两包 -count=1 与 -race、go vet 两包、gofmt -l pkg/hno/runner pkg/hno/observability；邻近回归 go test ./pkg/hno/agent/... -count=1（agent 经 newKernel 构造 runner.Config，加法字段不得破坏其编译与行为；待树静后跑）。",
+    "5. 结构判据：runner 导出符号恰 23（go doc -all 口径，副本实测零新增导出；多一个或少一个都要在审查里解释）；runner 非测试 LOC ≤ 700（M2 实测 582）；新缝文件 sync. 计数 0。",
+    "6. 绑定命令在最终字节上重跑并取新回执；-race 无 DATA RACE。",
+    "7. 防碰巧绿：绑定命令 -count=30 -race 与两包整包 -count=5 -race 各一次 exit 0。",
+    "8. 完成后回写：母约 :87 G9 行与 :534 P7 行标注第 1 片交付并附 span 覆盖状态表（model 已接于 runner、tool 已在 agent 既有、run/agent 待第 2 片）+ 交付票 criterion 2 解释的确认记录；状态文档由编排方落笔（见 writeBackOwed）。"
+  ],
+  "forbiddenShortcuts": [
+    "把 retry/breaker 接进 New() 的默认 Invoker 回退里而不是 Run 调用点（自定义 Invoker 者与流式路径将无韧性，D12 杀）。",
+    "给 breaker-open 新设 StopReason 值、吞掉 ErrOpen 换成泛化错误、或在缝内预包造成双前缀（M2 缺陷实证；必须裸哨兵 + Run 唯一 wrap）。",
+    "把 MaxAttempts<1 裸传给 observability.Retry（M1 SHAPE-2 实证零迭代静默成功；D4 杀）。",
+    "每尝试记账熔断（D8 杀）或把门禁放进重试循环（D7 杀）。",
+    "为绕开编译期缺失在测试里 reflect/接口空转（红必须来自公共面形状）。",
+    "修改 observability 包字节或改写既有测试断言来给新缝让路（M2 证明不需要）。",
+    "用 time.Sleep 充当退避/冷却的时序断言（冷却等待允许，但只断放行行为与次数）。"
+  ],
+  "observabilityLimit": [
+    "退避与冷却只断言次数、错误身份与放行行为，不断言真实时钟耗时；Jitter 的随机分布不在公共面（本片测试一律 Jitter=false 或毫秒级等待）。",
+    "breaker 的内部状态（closed/open/half-open 计数）不可直接观察，可观察的只有跨回合放行行为（D5–D8 的公共面口径）。",
+    "chat span 与未来 agent span 的层级关系本片不可断言（invoke_agent 未接线，chat span 挂在调用方传入的 ctx 上）。",
+    "usage 归集以响应携带的 Usage 值透传为限（stub 供多少断多少，不验证真实 provider 的 token 口径）。",
+    "重试间隔内的取消优先序（ctx.Done 抢先 time.After）沿 observability.Retry 既有语义，不在本片 D 行单独可观察。"
+  ],
+  "verificationCommands": [
+    "go test ./pkg/hno/runner -run 'TestP7G9_' -count=1 -race -v   # 本片唯一绑定场景命令，所有 receipt 逐字用这条（cwd 仓库根）",
+    "go build ./pkg/hno/runner/... ./pkg/hno/observability/... ; go test ./pkg/hno/runner/... ./pkg/hno/observability/... -count=1 ; go test -race ./pkg/hno/runner/... ./pkg/hno/observability/... -count=1 ; go vet ./pkg/hno/runner/... ./pkg/hno/observability/... ; gofmt -l pkg/hno/runner pkg/hno/observability",
+    "go test ./pkg/hno/agent/... -count=1   # 邻近回归（树静后）",
+    "go doc -all ./pkg/hno/runner | grep -cE '^(func|type|var|const) '   # 必须恰为 23（副本实测口径）",
+    "find pkg/hno/runner -name '*.go' -not -name '*_test.go' | xargs wc -l   # 必须 ≤ 700（M2 副本实测 582）",
+    "grep -c 'sync\\.' pkg/hno/runner/resilience.go   # 必须 0"
+  ],
+  "writeBackOwed": [
+    "母约 :87 G9 行：标注第 1 片已交付（runner 模型路径韧性 + model 级 span）并附 span 覆盖状态表（model=runner 已接、tool=agent 既有、run/agent=待 P7 第 2 片）；:534 P7 行记部分交付与状态表引用。",
+    "交付票 work-p7-observability：登记 criterion 2「不修改 runner 公共接口」的采纳解释（加法可选字段、零新导出符号、既有调用方零破坏），由负责人确认或改判（若改判为字面读法，接线挪 agent/kernel.go，本契约 D 行的 publicEntry 需随迁，测试行本身不变）。",
+    "状态文档（编排方所有）：P7 小节记录本片交付与 S25-DEFER-1/S22-LAYER-1 携带项；本契约不代写。"
+  ],
+  "adjudicationOptions": [],
+  "notes": "本契约为 design-tests 阶段产物（activationId 待工作项派发后回填）。M1/M2 全部实验在 /tmp/g9m1、/tmp/g9exp、/tmp/g9stage1 副本进行，仓库 runner/observability 字节经两轮 git hash-object 复核逐字节未动；实验全程未对本仓工作树执行任何 git 写操作。实验期间树内存在兄弟切片的在途改动（pkg/hno/graph、pkg/hno/run、docs），均在本片测试模式之外；本片仓库内测试只跑 ./pkg/hno/runner/... 与 ./pkg/hno/observability/...，基线两轮均 exit 0。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-platform.md#87",
+    "artifact:docs/design/v3-platform.md#534",
+    "artifact:docs/design/v3-delivery-ticket.json#work-p7-observability",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice22.json",
+    "receipt:f5a5b577-207a-4a5e-b2c2-ebb414fd1d60",
+    "receipt:d714ef1b-a14d-4072-ad04-2f84c10e74c5",
+    "receipt:eff3bdb5-31a4-44a0-b1c7-4eaa319e7665",
+    "receipt:bc0576d2-738c-49da-9481-de28437d3386",
+    "receipt:49a48838-a76f-459d-acee-96acb35430bc",
+    "receipt:8d02d2e6-776c-477b-91ab-5971ecb5d6c6",
+    "receipt:7308e63a-7497-49f9-8fde-591418da5b0a",
+    "receipt:d6c70648-a75f-4bea-804f-7d8238d551ed",
+    "receipt:f22f0c14-47ee-4c2a-989f-b7813dcdb438",
+    "receipt:5bd127dc-707b-4507-9a84-95d2bec16d89",
+    "receipt:31e318d7-6a7f-4109-aae6-651de94666a0"
+  ]
+}

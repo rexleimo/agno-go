@@ -1,0 +1,60 @@
+{
+  "schema": "rex.testability-decision.v1",
+  "workItemKey": "work-p1-graph-r14-panic-to-error",
+  "workflowActivationId": "2accb916-dddf-4677-989a-9287610c6514",
+  "activationId": "7c5a65a6-f0ed-4036-9e37-e8354337f264",
+  "stageId": "decide-testability",
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:docs/design/v3-testability-decision-p1-graph-slice14.json#decision",
+  "contractRef": "artifact:docs/design/v3-test-scope-p1-graph-slice14.json#inScopeBehaviors",
+  "redCandidate": {
+    "publicEntry": "github.com/rexleimo/agno-go/pkg/hno/graph：graph.New() → AddNode(graph.NodeFunc(\"a\", 崩溃体)) → SetEntry/SetOutput → Graph.Run(ctx, \"seed\") 的 (*Result, error)。测试文件 pkg/hno/graph/p1r14_panic_barrier_test.go 是外部包 graph_test，只用导出面，判据只用 err != nil 与 res == nil，不读 scheduler 字段、不看 queue/running/goroutine 数。",
+    "setup": "最小的单节点图：入口即输出，节点体 panic(\"boom\")。这是一张通过 Validate 的合法图（票面 §4 B10 的原文形状就是「节点内 panic(\"boom\")」），因此失败只能来自执行路径而不是构建期拒绝。夹具全部就地声明，无新导出面、无 sleep。",
+    "command": {
+      "executable": "go",
+      "args": [
+        "test",
+        "./pkg/hno/graph/...",
+        "-run",
+        "TestP1R14",
+        "-count=1",
+        "-timeout",
+        "25s",
+        "-v"
+      ],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "契约 T1：节点 panic 被引擎转成 Run 的非 nil error 且不交出 Result；进程活着，同一次 go test 里的后续测试继续执行（票面 B10 三子句：返回非 nil error、进程不崩、测试不中断）。",
+    "observed": "exitCode=1，输出为 `=== RUN   TestP1R14_NodePanicBecomesRunError` 之后直接 `panic: boom`，栈里 nodeFunc.Run(graph.go:38) ← (*scheduler).spawn.func1(scheduler.go:125) ← created by (*scheduler).spawn in goroutine 21(scheduler.go:124)，末尾 `FAIL github.com/rexleimo/agno-go/pkg/hno/graph 0.083s`。断言行（t.Fatalf/t.Errorf）一行都没执行，Run 的两个返回值从未被读取。非挂死：0.083s 结束。",
+    "failureReason": "pkg/hno/graph 非测试文件里 recover( 出现次数实测为 0：scheduler.spawn 把节点体放进引擎自己创建的 goroutine（scheduler.go:124）却没有任何屏障，而 Go 运行时对 goroutine 内未捕获 panic 的处置是终止整个进程。父 goroutine 无从 recover，这正是母约 §3.3:182 把 recover 指派给生产者的原因。因此「Run 返回 error」在当前字节下不是取错了值，而是根本没有返回值——与缺失行为逐字一致。",
+    "receiptRef": "receipt:dab5ee76-a4a4-4b4e-a25f-9c042b32a880",
+    "independentScenarioRef": "仓库外壳 /tmp/p1-cycle14/{go.mod,main.go}（replace 指向本仓库，三模式各起一进程，输出存 /tmp/p1-cycle14/*.out）：node-panic 与 sibling-panic 均以 exit status 2 终止、栈尾 created by (*scheduler).spawn；pred-panic 顺序相反——main 的 defer 先打印「进程活着」，随后 panic 落在 goroutine 1。这组测量的价值在于它不在测试缝里：崩溃发生在真实进程边界，且兄弟节点在途时一样带走进程。",
+    "commandNote": "redCandidate 场景命令与契约 allowedTestSeam.focusedCommand 逐字相同（-run TestP1R14 / -count=1 / -timeout 25s / -v），receipt 里的 executable+args 即该命令本身。RED 阶段扩出 T2–T8 后沿用同一命令，但各阶段证据只引用本阶段真实执行的 receipt。"
+  },
+  "decision": {
+    "summary": "走 behavior-delta，不走 hardening：这里存在一条今天拿不到、修好后拿得到的调用方可观察事实——同一个公共入口下，调用方目前唯一的可能结局是进程被带走，之后才可能是一个 error。加固路径要求「没有新用户可观察行为」，而本片的公共行为恰恰是从无到有；用 hardening 冒充会把「测试字节变了」当成「公共行为变了」。诚实 RED 已在当前字节下真实复现（receipt:dab5ee76…，exit 1，0.083s 非挂死）。",
+    "redLegitimacy": "预判一条会被追问的判据冲突并先说清：rex-tdd 规定「测试因语法、环境、错误夹具或无关依赖失败时不得记为合法 RED」。本次 RED 形态是测试二进制中止而不是断言失败，它不属于那四类——panic 由被测产品自己的代码路径抛出（栈尾 scheduler.go:124/125，即引擎创建的 goroutine），测试夹具只是一张合法图里一个会崩的节点体；而且票面 B10 把「进程不崩、测试不中断」本身写成判据，所以「测试跑不完」正是被指定的失败表现，不是基础设施噪声。判红的另一面可自证：同一命令在当前字节下对既有测试族（TestP1R13、graph_test.go）全绿，说明环境、编译、夹具都没坏。",
+    "redIndependence": "本轮只前置 T1 一条红，它已足以代表目标行为且能独立失败。后续各条互不遮蔽：T2 的三个 panic 形态里，只处理 panic(string) 的实现会让 runtime error 与 panic(error 值) 两行单独红；T3 的点名断言在 T1/T2 全绿时仍可单独红（统一文案不点名节点）；T4 的「不得悬挂」在恢复逻辑忘了向 queue 投递时单独红（running 永不归零，Run 阻塞到 deadline）；T5 在把屏障做成一次性（如复用同一 done）时单独红；T6/T7 是反向对照，只在恢复逻辑越界改写节点自身 error 或正常路径时被误伤才红。T8（节点 defer 先跑完）钉住屏障的层级，把 recover 放得低于节点帧时它单独红。",
+    "whyThisSliceRepresentsTheGoal": "票面 §2 把 P1 的价值判据落在「调用方可以依赖引擎的执行边界」这一类事实上，而 B10 是其中唯一带进程级后果的一条：一条图里任一节点崩，宿主（agentos 的 HTTP handler、runner 的循环）跟着没。因此「节点 panic → Run 返回非 nil error 且测试不中断」一旦成立并有牙齿，就同时验证了母约 §3.3:182 的三件事分工（生产者只跑节点/转 panic/投递 queue）、验证了可变状态仍只由唯一消费者写（恢复结果必须走 queueItem.err，任何在崩溃 goroutine 里直接写 scheduler 字段的做法都会被 T4/T5 的形态暴露）、并且没有将 goroutine 屏障之外的语义（节点自身 error、取消、步数上限）卷入。选它作为切片也符合上一片审查裁决的排序：先修带进程级后果的缺口。",
+    "scopeDiscipline": {
+      "inThisSlice": "在 scheduler.spawn 创建的那条 goroutine 上加一层 recover，把任意 panic 值转成一条命名了崩溃节点的 error，并经由既有 queueItem.err 交给唯一消费者；恢复路径必须保证 running 正确递减（走同一条投递通道，不新增第二条）。B12 零锁不破：不引入 sync.，不在崩溃 goroutine 里写 scheduler 字段。",
+      "explicitlyNot": "谓词 panic 的引擎侧 recover（契约 rejectedAfterMeasuring 的 R14-REJECT-1：它跑在调用方 goroutine 上、调用方自己的 recover 仍有效，宽到这一层会把调度器内部 bug 一并变成 error）；在 Run/consume 外层整体 recover；新增导出哨兵如 ErrNodePanicked；B7 Warnings()（实测本包对 Warnings() 断言数为 0，仍欠）；B8 WithMaxConcurrency 的 FIFO（唯一剩下的空转旋钮，发布阻塞）；B11 Typed 覆盖（实测 graph.Typed 断言数为 0）；G3/G4/G5/G7/G8/G10；agent/runner/workflow 的任何改动。",
+      "amendmentFlag": "T3（错误必须点名崩溃节点）超出票面 B10 的文字（只写「非 nil error」），属作者裁断，已在契约 inScopeBehaviors.T3 内挂号为 S14-AMEND-1，先例是切片 12 已被接受的「名字牙齿」判据；母约写回之前不算有规格背书。T2 里把 runtime error 与 panic(error 值) 纳入不是裁断——母约 §3.3:182 说的是「recover panic 成 error」，未限定值形态，而真实宿主里最常见的恰是 provider 内一次 nil 解引用。"
+    },
+    "evidenceContractForNextStages": "RED 阶段沿用同一条聚焦命令并扩出 T2–T8 的行，每条各取一次真实非零退出；GREEN 只补 scheduler.go（必要时 graph.go 注释）的实现字节，且必须重跑「recover 后不投递」「只覆盖 panic(string)」「错误不点名」「重新包装节点自身 error」四类错实现方向的观察；REFACTOR 后复核牙齿矩阵并实测 B12 sync. 计数仍为 0、B13 非测试 LOC ≤1500、既有测试字节不变（graph_test.go=425ea030…、p1r13_step_limit_test.go=bc4ab8e7…）。另需包级 go test ./pkg/hno/graph/... -count=1 -race 全绿，因为「测试不中断」这一子句只有在整包跑完时才可观察。进场基线已按上一片登记的流程债快照到 /tmp/p1-cycle14/{scheduler.go.baseline,graph.go.baseline}，实测 hash-object 与切片 13 收尾字节逐字相同。"
+  },
+  "submittedEvidence": {
+    "stage": "design-tests",
+    "expected": [
+      "test-scope-contract-recorded",
+      "acceptance-test-mapping-recorded",
+      "test-seam-recorded"
+    ],
+    "accepted": [
+      "test-scope-contract-recorded=file:docs/design/v3-test-scope-p1-graph-slice14.json#inScopeBehaviors",
+      "acceptance-test-mapping-recorded=file:docs/design/v3-test-scope-p1-graph-slice14.json#T1..T8.observable",
+      "test-seam-recorded=file:docs/design/v3-test-scope-p1-graph-slice14.json#allowedTestSeam"
+    ]
+  },
+  "createdAt": "2026-09-27T13:21:00Z"
+}

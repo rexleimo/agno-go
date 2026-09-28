@@ -1,0 +1,48 @@
+{
+  "kind": "behavior-delta",
+  "decisionRef": "artifact:docs/design/v3-testability-decision-p1-graph-slice15.json",
+  "redCandidate": {
+    "publicEntry": "graph.New() → Graph.AddNode/graph.NodeFunc → AddEdge → AddConditional → (*Graph).Validate() → (*Graph).Warnings() []error",
+    "setup": "一张票面 B7 的触发形状：entry → ping（无条件）、ping ⇄ pong（两条条件边，谓词恒假因此环可断），SetEntry(entry)/SetOutput(entry)，且不带任何 Option（即未显式 WithStepLimit，生效的是 defaultStepLimit=1000）。这条前置本身已实测成立：同一拓扑的 Validate() 返回 nil，因此失败原因不可能是「图被构建期拒了」。",
+    "command": {
+      "executable": "go",
+      "args": [
+        "test",
+        "-count=1",
+        "-run",
+        "TestP1R15_ConditionalCycleWithoutStepLimitWarns",
+        "./pkg/hno/graph/"
+      ],
+      "cwd": "/Users/rex/codes/agno-go"
+    },
+    "expected": "Warnings() 里存在一条点名「步数上限 + 环」的告警（票面 v3-test-scope-p1-graph.md:66 前半句）。",
+    "observed": "--- FAIL: TestP1R15_ConditionalCycleWithoutStepLimitWarns (0.00s) — p1r15_warnings_test.go:62: Warnings() 交出 0 条 []，其中没有一条点名「步数上限 + 环」；包级 FAIL github.com/rexleimo/agno-go/pkg/hno/graph 0.104s，exitCode=1。",
+    "failureReason": "pkg/hno/graph/graph.go:414 的 Warnings() 是 `return nil` 桩，判据 8 在实现层完全缺席：含合法环又没设预算的图得不到任何提示，调用方只能等 Run 跑满 1000 步撞上 ErrStepLimitExceeded 才知道该写 WithStepLimit。失败落在缺失的用户可观察行为上，不是语法、环境或夹具问题。",
+    "receiptRef": "receipt:6568e866-3006-4f1d-b2e7-0e2d17b712bf"
+  },
+  "contract": "artifact:docs/design/v3-test-scope-p1-graph-slice15.json",
+  "workItemKey": "work-p1-graph-r15-warnings",
+  "activationId": "0e0f5412-c714-42cf-b7a8-ea24540f2454",
+  "stageId": "decide-testability",
+  "slice": "P1 切片 15 = 票面 B7 判据 8（stepLimit 缺失告警）",
+  "redLegitimacy": {
+    "whyThisIsNotInfrastructureFailure": "同一个包在同一字节下能编译、能跑、能给出 0.104s 的判定；失败信息就是断言自己写的那句话，指向具体缺失行为（票面 RED 第 3 条不成立）。",
+    "whyNotAlreadyPassing": "Warnings() 实测返回 0 条（见 /tmp/p1-cycle15/main.go 的五种形状），因此本行不可能在产品变更前通过（RED 第 4 条不成立）。",
+    "whyNotMockEvidence": "断言只读 Warnings() 的返回值本身，没有 Mock、没有私有 helper、没有内部调用次数；夹具 conditionalCycleGraph 搭的是真实图对象。",
+    "notARecoveryRed": "本片是先取红再实现，非「实现先于测试」的事后恢复 RED，故后续 Evidence 不得标注 recovered RED。"
+  },
+  "whyNotHardening": "存在新的用户可观察行为（同一张图在 Validate() 仍 nil、Run 仍正常的前提下，Warnings() 从空变为含一条可识别告警），且能通过稳定公共入口真实复现为失败——behavior-preserving-hardening 的前提「没有新用户可观察行为」不成立。",
+  "whyNotBlocked": "验收条件可观察且已观察到：触发形状能通过公共入口搭建，失败/成功的判据都是调用方拿得到的返回值。",
+  "scopeDiscipline": {
+    "explicitlyNot": [
+      "不顺带实现 B8 WithMaxConcurrency（S14-SPEC-4 仍挂发布阻塞，另片处理）。",
+      "不顺带实现 B11 Typed。",
+      "不为「非法图上的 Warnings() 语义」新增期望（契约 R15-UNADJ-1：无治理条款指派）。",
+      "不为告警条数/多环数量新增期望（契约 explicitNonGoals）。",
+      "不新增导出哨兵或错误类型来解开文案耦合——那会改票面 §1 公共面，须人工裁决（B7-AMEND-1 的代价已登记）。",
+      "不清理切片 14 审查的 owed 测试形状项。"
+    ],
+    "specDivergenceCarried": "R15-DIVERGE-1：母约 §3.5 判据 8 的字面触发集（无条件环）被同节判据 7 先行拒绝，恒为空集；本决策按票面 B7 的「合法条件环」执行，并把这个文字矛盾回流给人工，不改母约也不实现成空集。"
+  },
+  "documentKind": "rex.testability-decision.v1"
+}

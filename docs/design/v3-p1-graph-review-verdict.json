@@ -188,15 +188,22 @@
     "summary": "Standards 轴 4 项发现（1 hard）+ 12 项 smell 逐条核查（5 项有发现、7 项未见）；Spec 轴 6 条判据中 2 满足（其中 1 条限当前切片）、2 部分满足、2 未满足，6 项发现（3 hard）。最严重：SPEC-1 —— 一张含未知节点名的图会把宿主进程打成 SIGSEGV，这是库级不可接受行为，且必须在下一个切片最先取得 RED。"
   },
   "evidenceRefs": [
-    "artifact:docs/design/v3-test-scope-p1-graph.md",
-    "artifact:docs/design/v3-p1-graph-test-diff-review.md",
     "artifact:/tmp/p1-green/diff.txt",
-    "receipt:fea0030e-136a-4c56-bf8a-89cf6965cd3f",
+    "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle7",
+    "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle7.axes.spec",
+    "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle7.axes.standards",
+    "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle7.parentVerification",
+    "artifact:docs/design/v3-p1-graph-slice7-hardening.json",
+    "artifact:docs/design/v3-p1-graph-slice7-invariant-review.json",
+    "artifact:docs/design/v3-p1-graph-test-diff-review.md",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice7.json",
+    "artifact:docs/design/v3-test-scope-p1-graph.md",
     "receipt:22bbb684-40fe-4e28-9ae7-859637acd091",
+    "receipt:766b183b-8989-46a5-9e0f-4043f6a847a8",
     "receipt:917a6fe2-8de1-4d20-acb4-b339e6b0ed54",
     "receipt:9d440084-24d4-406e-bb7e-9d9099cbd626",
-    "receipt:766b183b-8989-46a5-9e0f-4043f6a847a8",
-    "receipt:f7f05ddc-5e21-4a38-b2a0-09f68e925a7e"
+    "receipt:f7f05ddc-5e21-4a38-b2a0-09f68e925a7e",
+    "receipt:fea0030e-136a-4c56-bf8a-89cf6965cd3f"
   ],
   "scopeNote": "本工件含两轮审查：顶层 axes/reviewedSlice/verdict = 切片 1（B1 线性 DAG，activation df13074a-3d47-4034-a780-7722c02bf323）；cycle2 = 切片 2（悬空边构建期拒绝，activation c01809a8-9e15-4cf9-9398-7d2a4a81c75e）。cycle2 逐条判定切片 1 阻断项的闭包状态，并对切片 2 的增量差异独立跑两轴。",
   "cycle2": {
@@ -452,5 +459,1483 @@
       "receipt:1395df8f-9067-445c-b6be-587b3eeb3b5c",
       "receipt:0c2d86d4-11ea-4233-b0fc-a5a79238cb0a"
     ]
+  },
+  "cycle3": {
+    "reviewedSlice": "切片 3（R1）—— 未路由边声明的 fail-closed 拒绝（cycle-3 single-slice review）",
+    "fixedPoint": {
+      "ref": "03870005e0f6cb6108cdfd0625b62e5af295f099",
+      "resolved": true,
+      "verification": "git rev-parse HEAD 与该值一致；pkg/hno/graph 已在该提交进入版本控制，因此本切片差异用普通两点 git diff 冻结，不再需要逐文件 untracked 边界。"
+    },
+    "diff": {
+      "boundary": "git diff -- pkg/hno/graph（170 行 diff，artifact:/tmp/p1-review/cycle3-diff.txt）",
+      "stat": "2 files changed, 108 insertions(+), 10 deletions(-)：graph.go +50/-10，graph_test.go +68/-0",
+      "files": [
+        "pkg/hno/graph/graph.go",
+        "pkg/hno/graph/graph_test.go"
+      ],
+      "hashes": {
+        "pkg/hno/graph/graph.go": "5eb0493cd30994d7a34cd4c220c295c3b9ab38d3",
+        "pkg/hno/graph/graph_test.go": "f145df2e797aa0c917967011f4c9065a7aaa8e9f",
+        "pkg/hno/graph/scheduler.go": "754496b8d6687b04eec06350ca034d6aa5117ff5"
+      },
+      "untouchedProof": {
+        "existingTests": "graph_test.go 的 diff 为纯新增（0 deletions）：切片 1 的 TestP1G_LinearDagRunsChain 与切片 2 的 TestP1G_ValidateRejectsDanglingEdge 断言行零改动",
+        "otherPackages": "pkg/hno/agent、pkg/hno/runner、pkg/hno/workflow、internal/ 在本切片零改动；scheduler.go 相对 fixed-point 未变（哈希即证）",
+        "probeCleanup": "审查期间临时探针文件 pkg/hno/graph/scratch_cycle3_probe_test.go 已在 gates 之前删除，删除后 gofmt -l 无输出、go vet 净、P1G exit 0（receipt:c87aa89a-28ea-414c-ad47-549d967d84ce）"
+      }
+    },
+    "standardsSource": "AGENTS.md（Coding Style & Naming Conventions / Testing Guidelines「add regression tests for every behavior change」/ Build-Test-Development Commands）+ Fowler 12 项 smell 基线；gofmt、go vet 已覆盖项不重审。",
+    "axes": {
+      "standards": {
+        "findings": [
+          {
+            "id": "C3-STD-1",
+            "location": "pkg/hno/graph/graph.go:136-146（AddConditional/AddDefault/AddJoin 的 GoDoc）对照 graph.go:188-192（Validate 的拒绝分支）",
+            "evidence": "规则原文：文档须表达导出符号的真实行为（AGENTS.md「Document exported symbols with GoDoc comments」）。注释仍写「源节点输出使谓词为真时激活 to」「to 只在全部前驱完成后激活一次」，而本切片把这些构造器的真实语义改成了「必然被构建期拒绝」。实测探针：AddConditional+AddDefault 的图 → Validate()=graph: conditional edge from \"src\" to \"dst\" is declared but not routable by this engine，Run err 同文。行为变了、注释没变，且新注释与旧注释互相承诺相反，属 cycle-2 C2-STD-1（GoDoc 声称不存在的调度语义）的回退而非闭包。",
+            "severity": "hard",
+            "fix": "在 R2/B2 之前，三个 Add* 的注释必须写明「当前实现会在 Validate/Run 拒绝该声明」；路由真正落地时再改回行为承诺。属文档级修复，不需要新 RED。"
+          },
+          {
+            "id": "C3-STD-2",
+            "location": "pkg/hno/graph/graph.go:139-145 与 pkg/hno/graph/graph_test.go:60-72",
+            "evidence": "规则原文「add regression tests for every behavior change」。本切片把 AddConditional/AddDefault 的可观察行为从「静默接受并忽略」改成「构建期拒绝」，但测试表里只有一行 join-only，条件边与 Default 的拒绝无任何测试担保；实现者自己在测试注释与契约 §12.1 里记了理由（R2 会断言它们被路由，此刻钉住拒绝会与 R2 拆台）。理由成立，但按仓库标准仍是「已实现行为无担保」，与 cycle-1 STD-1（Typed 分支无测试）同源。",
+            "severity": "hard",
+            "fix": "闭包路径已由契约排序锁定：R2 的 RED 必须同时覆盖 conditional 与 default 的「被接受且被正确路由」路径，届时本项才算闭环。R2 之前不得让这两条 builder 的任何一侧（接受/拒绝）在无测试状态下被重构触及。"
+          },
+          {
+            "id": "C3-STD-3",
+            "location": "pkg/hno/graph/graph.go:104-113（unroutedDecl.kind 为自由字符串）",
+            "evidence": "Primitive Obsession / Shotgun Surgery：kind 用裸字符串表达「边类型」这一有限集合，且新增一种可路由边要同时改 Add*、successors、Validate 三处；cycle-2 已登记同类风险，本切片把它固化成了数据结构。",
+            "severity": "judgement",
+            "fix": "B2 落地路由时把 edge/unroutedDecl 合并成单一 edgeDecl{kind, from, to, predicate?}，由 kind 驱动 successors 与校验，避免同一语义散在两张表。本切片不扩大 diff。"
+          },
+          {
+            "id": "C3-STD-4",
+            "location": "pkg/hno/graph/graph_test.go:99-117 对照 :145-163",
+            "evidence": "Duplicated Code：「合法线性图 a→b 反向对照」在切片 2 与切片 3 的测试里各写一遍。实现者在 test-diff-review §8 记了取舍理由（两条契约各自独立证明「一律拒绝」会被抓到，共享夹具会耦合两个切片的红绿信号）。审查认可：MUTANT-3 实测同时命中 graph_test.go:110 与 :156 两处对照，说明重复确实在做双份工作。",
+            "severity": "judgement",
+            "fix": "保留重复，不提取共享夹具。收口阶段若测试数量继续增长，再按「每契约自带控制组」的原则复审。"
+          }
+        ],
+        "smellBaseline": {
+          "Mysterious Name": "未见。unroutedDecl / declareUnrouted 表达的是「已声明但未路由」这一准确语义；REFACTOR 已删掉与之重复的第二处注释。",
+          "Duplicated Code": "见 C3-STD-4（测试控制组重复，判为有意保留）；生产代码未见重复（三条 builder 共用 declareUnrouted 一处 append）。",
+          "Feature Envy": "未见。Validate 读写的是同一 Graph 的字段。",
+          "Data Clumps": "未见。此前 (kind, from, to) 三件套在 Add* 参数间散落，本切片已收进 unroutedDecl。",
+          "Primitive Obsession": "见 C3-STD-3（kind 用裸 string）。",
+          "Repeated Switches": "未见。",
+          "Shotgun Surgery": "见 C3-STD-3。",
+          "Divergent Change": "未见新证据。graph.go 仍因 builder/Result/契约三类原因变化（cycle-1 STD-3 记录在案，收口后拆 builder.go/result.go），本切片未加剧。",
+          "Speculative Generality": "仍在：cfg.maxConcurrency / cfg.stepLimit / cfg.stepLimitSet 无任何读取点，Warnings() 恒 nil。cycle-1 曾以「票面判据 4 + 契约 §1 显式授权」不判违规；但本切片已证明引擎有能力在构建期拒绝，安全阀却依旧不存在（见 C3-SPEC-3），授权理由不再充分。",
+          "Message Chains": "未见。",
+          "Middle Man": "临界：declareUnrouted 只有 append + return g 两行，但它是三条 builder 的唯一写入点并承担「声明即记账」这一真实职责，判为不是转发。",
+          "Refused Bequest": "未见。"
+        }
+      },
+      "spec": {
+        "criteria": [
+          {
+            "criterion": "1 Graph/Node/Predicate 按 §3.2 落地",
+            "verdict": "部分满足",
+            "evidence": "API 面齐备且可编译；但 §3.2 的三条路由型 builder 现在必然被拒（实测），其文档仍承诺路由语义（C3-STD-1）。WithRetry/WithCache/WithDurability/WithStreamMode 依契约非目标未实现（正确）。"
+          },
+          {
+            "criterion": "2 scheduler 单消费者、零锁",
+            "verdict": "满足",
+            "evidence": "grep -c 'sync\\.' → graph.go 0 / scheduler.go 0（本切片未触碰 scheduler.go，哈希 754496b8 与 fixed-point 一致）；go test -race ./pkg/hno/graph/... -count=1 → receipt:740963e2-7d87-4938-b0e9-e89e506f6a18 exit 0。"
+          },
+          {
+            "criterion": "3 §3.5 八项构建期校验全部实现",
+            "verdict": "未满足",
+            "evidence": "已有 2/8（入口缺失、悬空边）+ 一条 §3.5 之外的引擎自加护栏（未路由声明，见 C3-SPEC-6）。探针仍确认缺失：重复节点名静默覆盖（Validate()=<nil>，Output=second）、无条件环不被拒（Validate()=<nil>，Run 直到 300ms ctx deadline 才返回 context deadline exceeded）。"
+          },
+          {
+            "criterion": "4 maxConcurrency 打满进 FIFO，完成后自动派发",
+            "verdict": "未满足",
+            "evidence": "dispatch 仍无条件排空 pending，cfg.maxConcurrency 无读取点；本切片未触及。"
+          },
+          {
+            "criterion": "5 五类图各有端到端测试",
+            "verdict": "部分满足",
+            "evidence": "仍只有 DAG 一类端到端（TestP1G_LinearDagRunsChain）。本切片新增的是构建期拒绝契约，不算第五类图；并行/汇聚/条件路由/环四类无端到端测试。"
+          },
+          {
+            "criterion": "6 引擎核心非测试 LOC ≤ 1500",
+            "verdict": "满足",
+            "evidence": "graph.go 208 + scheduler.go 115 = 323。"
+          }
+        ],
+        "findings": [
+          {
+            "id": "C3-SPEC-1",
+            "location": "pkg/hno/graph/graph.go:104-113, 136-146, 188-192",
+            "evidence": "闭包确认（cycle-2 阻断项 C2-SPEC-1）：三类未路由声明全部进入构建期拒绝，且 Run 复用同一校验。审查侧独立取证：(a) 探针（conditional+default，不在测试表内）→ Validate 与 Run 都返回指名两端的可定位错误；(b) 独立重跑静默丢弃变异（把 declareUnrouted 的 append 改成 _ = unroutedDecl{...}）→ go test ./pkg/hno/graph/... -run P1G -count=1 失败于 graph_test.go:87「声明了引擎未路由的边，Validate 却判定合法」，还原后 git hash-object 与基线一致；(c) 实现者侧四个变异回执（8fba84da / 9d114403 / 1f55bbac / 1851f1ab）分别杀掉「静默丢弃」「报错不可定位」「一律拒绝」「Run 不复查」。",
+            "severity": "judgement",
+            "fix": "无需修复。附带记录一次测试自纠：原 wantHit=\"j\" 会被文案中的 \"join\" 字样偶然满足（MUTANT-2 在该断言下会存活），已改为不会偶然出现的节点名 merge；这一加固发生在 GREEN 之后、REFACTOR 之前，GREEN 回执随以加固后的夹具重取（receipt:749f5817）。"
+          },
+          {
+            "id": "C3-SPEC-2",
+            "location": "pkg/hno/graph/graph.go:124-128（AddNode）",
+            "evidence": "§3.5「重复节点名必须判非法」仍未实现，实测为静默数据丢失：同名节点注册两次 → Validate()=<nil>，Run 后 Output=second、Value(\"a\")=second，第一个节点定义连同其闭包被直接覆盖，调用方得不到任何信号。cycle-2 的 C2-SPEC-4 原样存在。",
+            "severity": "hard",
+            "fix": "按契约 B6 先取 RED 再实现；RED 必须断言「第二次 AddNode 后 Validate 返回指名该节点名的错误」，而不是断言 nodes map 的长度。"
+          },
+          {
+            "id": "C3-SPEC-3",
+            "location": "pkg/hno/graph/graph.go:63-69（WithStepLimit）与 graph.go:115-121（New）",
+            "evidence": "§7 的 recursion_limit 安全阀完全不存在，且注释与实现相反：WithStepLimit 文档写「未设置时默认 1000」，New 从未赋值 stepLimit（零值 0）。实测：WithStepLimit(3) 的线性图正常跑完 err=<nil>；p↔q 无条件环配 WithStepLimit(2) 时 Run 只在 ctx 200ms 超时后返回 context deadline exceeded，graph.ErrStepLimitExceeded 在该包内无任何产生点（ErrStepLimitExceeded=false）。§3.3 明确「图有环就必须有」，因此这不是可选优化而是缺失的安全边界。cycle-1 SPEC-3 + cycle-2 C2-SPEC-2/C2-SPEC-3 合并未闭。",
+            "severity": "hard",
+            "fix": "两条独立 RED，不得合并成一条：(a) B5 —— 无条件环在 Validate 被判非法且错误可定位；(b) B4 —— 合法环图（经条件边收敛）在步数超限时 Run 返回 ErrStepLimitExceeded，且 New 把默认值写成 1000 并用 stepLimitSet 区分显式设置。"
+          },
+          {
+            "id": "C3-SPEC-4",
+            "location": "pkg/hno/graph/graph.go:124-154（Add* 全体）",
+            "evidence": "§3.2 对 Validate 的注释是「Add* 已内建调用，Run 前再校验一次」；后半句本切片已满足（scheduler.go:37 的 MUTANT-4 一旦被移除即判红），前半句仍为 0：链式 Add* 只在自身字段上记账，任何构造期都不报错。于是「非法图被接受、错误推迟到 Run」是当前唯一可观察形态，与 §3.2 承诺的构造期拒绝不符。",
+            "severity": "judgement",
+            "fix": "与 B5/B6 一起落地：Add* 做增量检查、Run 做全量复查，并在测试里分别钉出两处的可观察差异（同一非法构造在哪一步就报错 vs 只在 Run 报错）。cycle-1 SPEC-4 记录的中间态自此成为可闭项。"
+          },
+          {
+            "id": "C3-SPEC-5",
+            "location": "pkg/hno/graph/scheduler.go:53, 84-92（spawn 体内无 recover）",
+            "evidence": "cycle-2 的 C2-SPEC-6（节点 panic 直达宿主进程）代码路径本切片未变，grep 全文只有一处 defer（close(s.done)），无 recover。节点 goroutine 里的 panic 仍会击穿宿主；§3.3 要求的「panic 转错误结果」未实现。",
+            "severity": "hard",
+            "fix": "按契约 B10 先取 RED：断言「节点内 panic 时 Run 返回错误且测试进程存活」，实现为 spawn goroutine 顶层 recover 后归一化为错误 activation。不得用裸 recover 吞掉取消语义。"
+          },
+          {
+            "id": "C3-SPEC-6",
+            "location": "docs/design/v3-platform.md §3.5 对照 pkg/hno/graph/graph.go:188-192",
+            "evidence": "本切片新增的「未路由声明即拒绝」不在 §3.5 的八项清单里，是引擎自加的第 9 条政策。契约 §12.1 已把它记为永久 fail-closed 不变式（拒绝集合随路由落地收缩），审查认可其正当性（它取代的正是「校验通过却跑出空 Result」这一更危险形态），但设计文档与票面判据 3 的「8 项」计数从此与实现漂移。",
+            "severity": "judgement",
+            "fix": "在 v3-platform.md §3.5 增补为「八项 + 一条自加护栏」并写明护栏随路由收缩的语义；否则判据 3 的验收口径不可判定。"
+          }
+        ]
+      }
+    },
+    "verdict": {
+      "status": "request-changes",
+      "workItemComplete": false,
+      "closedThisCycle": [
+        "C2-SPEC-1（未路由边声明被静默丢弃 → 已改为构建期拒绝，且 Run 复用）",
+        "cycle-1 STD-1 的 successors 半边（本切片未新增未测分支，但 Typed 仍无测试，B11 待做）"
+      ],
+      "blocking": [
+        "C3-SPEC-2 重复节点名静默覆盖（实测 Validate()=<nil>、第二定义胜出）",
+        "C3-SPEC-3 stepLimit 安全阀不存在且文档与实现相反（实测 ErrStepLimitExceeded 永不产生）",
+        "C3-SPEC-5 节点 panic 仍击穿宿主（scheduler.go 无 recover）",
+        "C3-STD-1 三条 builder 的 GoDoc 仍承诺已被本切片改成「必然拒绝」的路由语义",
+        "C3-STD-2 conditional/default 的行为变更无测试担保（随 R2 闭包，R2 之前不得重构这两条路径）",
+        "票面判据 3、4 未满足，判据 5 仍为 1/5 类图 → 本 work item 未达完成态"
+      ],
+      "recordedNonBlocking": [
+        "C3-STD-3（kind 裸字符串 / 新增边类型需三处同改，B2 时合并 edgeDecl）",
+        "C3-STD-4（测试控制组重复，判为有意保留）",
+        "C3-SPEC-4（Add* 增量校验仍缺，与 B5/B6 一并闭）",
+        "C3-SPEC-6（§3.5 需补记自加护栏）",
+        "Speculative Generality（maxConcurrency/stepLimit/stepLimitSet 无读取点，授权理由已不再充分）",
+        "cycle-1 STD-2/STD-3（Completed 暴露内部切片、graph.go 多类变化原因）仍未闭，收口后处理"
+      ],
+      "passing": [
+        "本切片差异边界干净：只动 pkg/hno/graph 两个文件，既有测试断言行零删除（graph_test.go 为纯 +68）",
+        "判据 2 成立（零 sync、单消费者、-race 绿）；判据 6 成立（323 ≤ 1500）",
+        "R1 行为级 RED/GREEN 链条完整且可复核：RED receipt:31abe8b8（exit 1，失败点即缺陷）→ GREEN receipt:749f5817（加固夹具后 exit 0）→ REFACTOR receipt:cc74b6a5（exit 0）",
+        "四条变异均被行为断言（非编译失败）杀掉，且作废了一次 build-failed 的无效变异回执（receipt:5cfbd502，已登记不作为推进依据）"
+      ],
+      "summary": "Standards 轴 4 项发现（2 hard）+ 12 项 smell 逐条核查（4 项有发现、8 项未见）；Spec 轴 6 条判据 2 满足、2 部分满足、2 未满足，6 项发现（3 hard）。cycle-2 的最高严重项 C2-SPEC-1 已闭合并经独立变异复证；但同一轮登记的另三项（重复节点名、无条件环/stepLimit、panic 击穿宿主）在本切片零进展，实测仍复现。结论：切片方向正确、红绿可信，work item 继续 request-changes。"
+    },
+    "evidenceRefs": [
+      "artifact:/tmp/p1-review/cycle3-diff.txt",
+      "artifact:docs/design/v3-p1-graph-test-diff-review.md",
+      "artifact:docs/design/v3-test-scope-p1-graph.md",
+      "artifact:docs/design/v3-testability-decision-p1-graph-slice3.json",
+      "receipt:c87aa89a-28ea-414c-ad47-549d967d84ce",
+      "receipt:740963e2-7d87-4938-b0e9-e89e506f6a18",
+      "receipt:05c59e2c-58cf-450c-9278-8dcbeda890b9",
+      "receipt:cc74b6a5-d12c-4ce8-87ed-d2930fe01f1d",
+      "receipt:749f5817-2a35-4656-83aa-9a5c6c58d2d0",
+      "receipt:31abe8b8-843d-4b12-84c9-5699e8808a95",
+      "receipt:8fba84da-5d36-4421-a6aa-e47c715ff313",
+      "receipt:9d114403-f91e-4847-99d9-27b46ae78ab5",
+      "receipt:1f55bbac-52b5-40f1-b1c0-a1ad09e9e276",
+      "receipt:1851f1ab-207d-4f80-8066-58819c6bec63"
+    ],
+    "activationId": "31e4c6f0-d743-4b4b-ae5c-ac0c8e6c291f",
+    "specSources": [
+      "docs/design/v3-delivery-ticket.json#work-p1-graph-engine（outcome + 6 条 completionCriteria + 4 条 verification）",
+      "docs/design/v3-platform.md §3.2/§3.3/§3.4/§3.5/§7",
+      "docs/design/v3-test-scope-p1-graph.md §12（切片 3 精确期望：R1 拒绝集合、§12.2 刻意不做、§12.3 反例条款、§12.4 命令）",
+      "docs/design/v3-testability-decision-p1-graph-slice3.json",
+      "docs/design/v3-p1-graph-test-diff-review.md §8（切片 3 红绿与四条变异台账）"
+    ],
+    "note": "行号漂移说明：实现者侧台账（test-diff-review §8）记录的断言点 graph_test.go:86/:88/:91 取自 REFACTOR 之前的夹具，REFACTOR 注释整理后同一断言下移至 :87/:92 —— 本审查独立复跑观察到的是 :87。另：docs/design/v3-*.md 现被写入闸门锁定（只允许类型化 JSON 决定入册），因此本 cycle3 块是切片 3 审查的权威记录，§8 台账与之冲突时以本块 + 真实回执为准。"
+  },
+  "cycle4": {
+    "reviewedSlice": "切片 4（R2）—— §3.4 规则 1/2/4 的条件边与 Default 路由（cycle-4 single-slice review）",
+    "fixedPoint": {
+      "ref": "03870005e0f6cb6108cdfd0625b62e5af295f099",
+      "resolved": true,
+      "verification": "与 cycle-3 同一 fixed-point（切片 1–3 已提交）。本切片差异为该提交之后的工作树改动，用 git diff -- pkg/hno/graph 冻结。"
+    },
+    "diff": {
+      "boundary": "git diff --stat -- pkg/hno/graph → 3 files changed, 325 insertions(+), 22 deletions(-)（numstat: graph.go +80/-16、graph_test.go +225/-0、scheduler.go +20/-6）；差异工件:/tmp/p1-green/slice4-r2-diff-postrestore.txt（413 行原始 diff，本裁定合入前重冻结）。审查过程中曾以 /tmp/p1-green/slice4-r2-diff.txt（410 行）为基准，见 selfCorrections。",
+      "files": [
+        "pkg/hno/graph/graph.go",
+        "pkg/hno/graph/scheduler.go",
+        "pkg/hno/graph/graph_test.go"
+      ],
+      "hashes": {
+        "pkg/hno/graph/graph.go": "38584f61bc6387c4982b94f0d6631a58c02e40b0",
+        "pkg/hno/graph/graph_test.go": "6de3d4dd03b63edd246d23ef5d7d82aef1dd6d9a",
+        "pkg/hno/graph/scheduler.go": "98b8f6a027f233527c2166ccea755908e5b5d047"
+      },
+      "selfCorrections": [
+        {
+          "id": "C4-SELF-1",
+          "claim": "本裁定初稿写「diff 中删除的 23 行全部落在 graph.go/scheduler.go 的被替换实现里」，并把原始 diff 行数 410 当作 --stat 依据。",
+          "reality": "git diff --numstat 显示 graph_test.go 当时是 225 增 1 删：切片 4 的追加编辑吞掉了 TestP1G_ValidateRejectsDanglingEdge 的首行 GoDoc「TestP1G_ValidateRejectsDanglingEdge 覆盖契约 §11.1（切片 2）与票面判据 3、5。」；410 是 diff 文本行数，不是 --stat 的插入/删除计数。",
+          "severity": "自审发现，非新缺陷",
+          "disposition": "合入裁定前已还原该行（git hash-object 由 c91b529d→6de3d4dd，graph_test.go 现为 225/-0 纯新增），重跑聚焦测试仍 14 条 PASS（receipt:e0875681-af05-4c57-a855-0bb90a86fc33 exit 0），gofmt -l 无输出、go vet 净。被删的是文档注释而非断言，因此不影响 S1–S5 与既有用例的检错力；但它说明「追加即纯增」这一自我声明未经核验，本条留档。"
+        }
+      ],
+      "untouchedProof": {
+        "existingTests": "切片 1/2/3 的三个测试函数体与全部断言行未被修改；graph_test.go 现为纯新增（numstat 225/-0）。审查中曾发现一处文档注释被追加编辑吞掉，已在合入本裁定前还原（C4-SELF-1），未追溯修改任何断言。",
+        "otherPackages": "git status --short 显示改动仅限 pkg/hno/graph 三个文件；邻近回归 go test ./pkg/hno/agent/... ./pkg/hno/runner/... ./internal/session/contract/... -count=1 → receipt:d774cfdc-a8a4-4cfc-a6a6-93a932c840b6 exit 0",
+        "probeCleanup": "审查探针 pkg/hno/graph/scratch_c4_probe_test.go 已删除；删除后 go test ./pkg/hno/graph/... -count=1 ok，gofmt -l 无输出（receipt 边界见 gates）"
+      }
+    },
+    "gates": {
+      "focused": "go test ./pkg/hno/graph/... -run P1G -count=1 → receipt:21593cb0-e30d-4e8d-94c3-192309a59490 exit 0（14 条 PASS）；还原 C4-SELF-1 的注释后同一命令重取 → receipt:e0875681-af05-4c57-a855-0bb90a86fc33 exit 0（仍 14 条 PASS）",
+      "race": "go test -race ./pkg/hno/graph/... -count=1 → receipt:9849b135-e4bf-4161-9a76-1af3e11fbb5c exit 0",
+      "build": "go build ./... → receipt:837cbac0-fd70-4aa3-a35f-68694437bf01 exit 0",
+      "vet": "go vet ./pkg/hno/graph/... 净；gofmt -l pkg/hno/graph 无输出",
+      "structural": "非测试 LOC graph.go 242 + scheduler.go 129 = 371（≤1500）；grep -c 'sync\\.' → 0/0；grep -c 'recover' pkg/hno/graph/*.go → 0"
+    },
+    "axes": {
+      "standards": {
+        "findings": [
+          {
+            "id": "C4-STD-1",
+            "location": "pkg/hno/graph/graph.go:87-90（Result.Completed 的 GoDoc）对照探针实测",
+            "evidence": "文档原文「Completed 返回已完成节点名的字典序切片」，并解释「刻意按字典序而非完成顺序：并行分支之间没有确定的全局时序」。本切片让「同一个节点被激活多次」第一次成为受支持的路径：审查探针（谓词收敛环，a 自环 out<3、兜底 a→b）实测 Completed()=[a a a b]、nodeRuns=3、Output=b<-3。即节点名现在会重复出现，而文档没有说明它是「完成日志」还是「完成集合」；消费侧已隐式按集合理解——切片 1 的 TestP1G_LinearDagRunsChain 用 reflect.DeepEqual 断言 [entry out]，一旦出现重名就会以难以归因的方式失败。这是公共 API 语义缺口，不是内部实现问题。",
+            "severity": "hard",
+            "fix": "二选一并写进 GoDoc + 测试：(a) Completed 定义为去重的完成集合，另在 Result 上暴露可观察的激活计数/步数；(b) 明确定义为「每次完成一条、含重名」的日志。选 (b) 时至少要有一条测试钉住重名形态，否则 R2 引入的环路径没有可断言的公共面。本项需要自己的 RED（不得在审查阶段直接实现）。"
+          },
+          {
+            "id": "C4-STD-2",
+            "location": "pkg/hno/graph/graph.go:214-224（Validate 的边循环）与 pkg/hno/graph/scheduler.go:105-127（successors）",
+            "evidence": "规则原文「add regression tests for every behavior change」。本切片有三处新的可观察行为没有任何测试：(1) 悬空端点检查随边表统一而自动覆盖 conditional/default/join 三种边（审查侧独立确认该路径必要：R2 之后条件边真的会激活 e.to，未知目标名将进入 spawn 的 map 查表，即切片 2 消灭的 nil 指针 SIGSEGV 路径复活）；(2) 同一节点多条 Default 边全部激活（探针实测 Completed()=[a b c]）；(3) 谓词收敛环可正常跑完并给出 Output（见 C4-STD-1 探针）。实现者已在 slice4 台账的 owedRedForNextSlice 中主动登记 (1) 并写明「不追溯补一条今日即绿的测试来冒充 TDD」，本审查认可该处置，但仍按仓库标准判为硬缺口。",
+            "severity": "hard",
+            "fix": "下一切片的第一条 RED 取在 (1)：把 Validate 的端点检查限制回 e.kind == edgeUnconditional，应判红（恢复式 RED，为已存在的行为取得真实检测力）。(2)(3) 各需一条行为级用例，可与 B5/B4 同切片但须独立回执。"
+          },
+          {
+            "id": "C4-STD-3",
+            "location": "pkg/hno/graph/graph.go:116-134（routable/label）与 pkg/hno/graph/scheduler.go:114（switch e.kind）",
+            "evidence": "Repeated Switches：同一 edgeKind 类型上的分支判断现在散在三处（路由 switch、错误文案 switch、可路由白名单比较）。B2 落地 Join 时 successors 还要再加一个 case，三处需同时保持正确——这正是 cycle-1 登记的 Shotgun Surgery 的残余形态，只是从「两张表」换成了「三处 switch」。",
+            "severity": "judgement",
+            "fix": "收口阶段把 label/routable 折成一张按种类索引的表（label + 是否已路由），successors 保留唯一的行为分支点。当前不扩大 diff。"
+          }
+        ],
+        "smellBaseline": {
+          "Mysterious Name": "未见。edgeDecl / declare / edgeKind.routable / label 都表达真实职责。",
+          "Duplicated Code": "未见。边的写入只有 declare 一处，路由扫描只有 successors 一处；切片 3 的 unrouted 专用 append 已被统一表吸收。",
+          "Feature Envy": "未见新增。successors 仍只读 s.g.edges（cycle-1 记 complete 书写 Result 字段一项，仍未闭）。",
+          "Data Clumps": "已闭。cycle-3 的 C3-STD-3（kind/from/to 三件套以裸参数散落）在本切片诞生 edgeDecl 类型，且 p 一并归位。",
+          "Primitive Obsession": "已闭。边类型从 string 提升为 edgeKind 命名类型。",
+          "Repeated Switches": "见 C4-STD-3。",
+          "Shotgun Surgery": "缓解但未消：新增种类需动 const 表 + successors + routable 白名单；白名单方向正确（忘记放行时默认拒绝，不会静默跑错）。",
+          "Divergent Change": "仍记 cycle-1 STD-3（graph.go 同时承载契约/builder/Result 三类变化原因），本切片未加剧也未修。",
+          "Speculative Generality": "仍在：config 的 maxConcurrency/stepLimit/stepLimitSet 三字段无任何读取点（grep 只见赋值），Warnings() 恒 nil。与 C4-SPEC-3 叠加后，这条已不再是「票面授权的中间态」那么无害——安全阀的字段已经在了，行为却不存在。",
+          "Message Chains": "未见。",
+          "Middle Man": "未见。declare 是唯一的写入点而非转发。",
+          "Refused Bequest": "未见。"
+        },
+        "closedFromPriorCycle": [
+          "C3-STD-1：三条 builder 的 GoDoc 已与真实语义一致（AddConditional/AddDefault 写明规则 2/4 及互不排斥/兜底抑制，AddJoin 明写「汇聚屏障路由尚未实现，其声明会被 Validate 判非法、Run 直接拒绝」）。",
+          "C3-STD-2：conditional/default 的行为变更现在有 S1–S5 五个子用例的担保。",
+          "C3-STD-3：见上（Primitive Obsession / Data Clumps 已闭，Shotgun Surgery 缓解）。"
+        ]
+      },
+      "spec": {
+        "criteria": [
+          {
+            "criterion": "1 Graph/Node/Predicate 按 §3.2 落地",
+            "verdict": "部分满足（显著推进）",
+            "evidence": "Predicate 首次成为真实路由输入（谓词实参被子用例钉住等于源节点输出）；AddConditional/AddDefault 语义与 §3.4 一致；AddJoin 仍是受控拒绝（契约 slice4 非目标，正确）。WithRetry/WithCache/WithDurability/WithStreamMode 依非目标未实现。"
+          },
+          {
+            "criterion": "2 scheduler 单消费者、零锁",
+            "verdict": "满足",
+            "evidence": "路由判定全部发生在消费者调用的 successors 内，生产者 goroutine 仍只读 g.edges 并写 queue；sync. 计数 0/0；-race receipt:9849b135 exit 0。"
+          },
+          {
+            "criterion": "3 §3.5 八项构建期校验全部实现",
+            "verdict": "未满足",
+            "evidence": "实质进展：悬空边检查覆盖全部已声明边种类（但无测试，C4-STD-2）。仍缺：重复节点名（探针实测第二定义静默胜出）、不可达节点、非输出汇点、Join 前驱数、无条件环拒绝、stepLimit 告警。新增缺口：nil Predicate 被静默放行（C4-SPEC-2）。"
+          },
+          {
+            "criterion": "4 maxConcurrency 打满进 FIFO，完成后自动派发",
+            "verdict": "未满足",
+            "evidence": "dispatch 仍无条件排空 pending；本切片未触及。"
+          },
+          {
+            "criterion": "5 五类图各有端到端测试",
+            "verdict": "部分满足 2/5",
+            "evidence": "线性 DAG（切片 1）+ 条件路由（本切片 S1–S4）各有端到端。并行汇聚（Join）、含环图两类仍无测试——环路径目前只能靠审查探针观察（C4-STD-2 (3)）。"
+          },
+          {
+            "criterion": "6 引擎核心非测试 LOC ≤ 1500",
+            "verdict": "满足",
+            "evidence": "371 行。"
+          }
+        ],
+        "findings": [
+          {
+            "id": "C4-SPEC-1",
+            "location": "pkg/hno/graph/scheduler.go:105-127",
+            "evidence": "R2 闭包确认：§3.4 规则 1（无条件边全部激活）、规则 2（谓词命中才激活，且多条互不排斥）、规则 4（仅当无任何具体边命中才走兜底）全部经公共面断言；谓词实参被 S5 钉为源节点输出。检错力经四杀：实现者侧 MUTANT-A（兜底无条件并上）receipt:97f837d5、MUTANT-B（条件边互斥）receipt:85e5d6db、MUTANT-C（Join 被静默接受 → 切片 3 的 R1 用例判红）receipt:d3a2e3fa；审查侧独立变异「条件边忽略谓词」receipt:05ac8182 exit 1（S2 报 Completed()=[a b] want [a c]、S4 报多执行了 x），还原哈希 8cfba9c8 逐字节一致。",
+            "severity": "judgement",
+            "fix": "无需修复；R1 的 fail-closed 不变式在路由扩展后仍被 MUTANT-C 证明有牙。"
+          },
+          {
+            "id": "C4-SPEC-2",
+            "location": "pkg/hno/graph/scheduler.go:117（if e.p != nil && e.p(out)）与 graph.go:214-224（Validate 不看 p）",
+            "evidence": "新发现的静默空结果通道，形态与 cycle-2 的 C2-SPEC-1 完全同类：AddConditional(a,b,nil) 的图 → Validate()=<nil>、Run err=<nil>、Completed()=[a]、Output()=<nil>（审查探针实测）。谓词被省略时实现把条件边当作「永不命中」，于是一条本该激活 b 的边静默消失，调用方拿到一个 err==nil 的空 Result。公共 API 没有任何地方声明 nil 谓词合法。",
+            "severity": "hard",
+            "fix": "Validate 必须拒绝 p==nil 的条件边声明（错误文案指名该边两端），并有自己的 RED。禁止用「把 nil 当 true」或对称地静默跳过——那只是换一个静默方向。"
+          },
+          {
+            "id": "C4-SPEC-3",
+            "location": "pkg/hno/graph/graph.go:16-18（ErrStepLimitExceeded 定义）与 §3.3/§7 对照",
+            "evidence": "优先级抬升而非新增：本切片第一次让「环」成为受支持的正当图形态（探针：谓词收敛环跑完 [a a a b]），但没有任何引擎侧步数上界——grep 证实 ErrStepLimitExceeded 在整个包内只有定义、没有产生点；config.stepLimit 无读取者；WithStepLimit 的文档仍宣称默认 1000。于是谓词永不收敛的环会把宿主调用方挂到 ctx 超时或永久，而 §3.3 明确「图有环就必须有」的前提就是 §7 的 recursion_limit。cycle-1 SPEC-3 / cycle-2 C2-SPEC-3 / cycle-3 C3-SPEC-3 连续三轮登记的同一缺陷，如今站在真实可用的环路径上。",
+            "severity": "hard",
+            "fix": "紧随本切片的下一步必须先取 B4/B5 的红：(a) New 落实默认 1000 并用 stepLimitSet 区分显式设置；(b) 消费者按激活步数计数，超限返回 ErrStepLimitExceeded（区分于 ctx 取消）；(c) 无条件边成环在 Validate 判非法。三者各需独立 RED 与回执，不得合并成一条。"
+          },
+          {
+            "id": "C4-SPEC-4",
+            "location": "docs/design/v3-platform.md §3.4 第 5 条 对照 pkg/hno/graph/scheduler.go:105-127",
+            "evidence": "规格要求但缺失且未被挂号：§3.4 列出「5. 扇出时给每个分支打 sub-branch（隔离 LLM 历史）」。实现里扇出分支拿到的是同一个 in 值（C1 对照用例：b 与 c 都收到 a-out，断言正是依赖这一点），没有任何 sub-branch 标识或历史隔离。契约 slice4 只覆盖规则 1/2/4，前序契约也未把规则 5 排进任何 RED 次序——它既非非目标（无书面理由），也非待做项，属规格与交付台账之间的黑洞。",
+            "severity": "hard",
+            "fix": "由测试设计侧做一次显式处置：要么在契约里把规则 5 登记为非目标并写明归属切片（其自然归属是 P5 事件/HITL 或 P4 StreamMode，因为隔离的是 LLM 历史而非图拓扑），要么为它单独取 RED。不得默认沉默。"
+          },
+          {
+            "id": "C4-SPEC-5",
+            "location": "pkg/hno/graph/graph.go:155-158（AddNode）/ graph.go:208-212（SetEntry/SetOutput 无复查）/ scheduler.go:83-93（spawn 无 recover）",
+            "evidence": "carry-over 复核，全部仍然成立：(1) C3-SPEC-2 —— 重名 AddNode 仍静默覆盖（cycle-3 探针实测 Output=second、Validate()=<nil>，本切片未触及该行）；(2) C3-SPEC-4 —— §3.2 承诺的「Add* 已内建调用 Validate」仍无任何实现，链式构造期不报错；(3) C3-SPEC-5 —— grep -c 'recover' pkg/hno/graph/*.go = 0，节点 panic 仍击穿宿主进程；(4) C3-SPEC-6 —— §3.5 清单与本切片统一表带来的「悬空检查覆盖全种类」仍未回写设计文档，判据 3 的「八项」口径继续漂移。",
+            "severity": "hard",
+            "fix": "按 B6（余下校验：重名/不可达/非输出汇点/Join 前驱数）、B5、B10（panic 转错误）、B9（取消归一化）各自取红；Add* 增量校验与 §3.5 文档回写可与 B6 同切片完成。"
+          }
+        ]
+      }
+    },
+    "verdict": {
+      "status": "request-changes",
+      "workItemComplete": false,
+      "closedThisCycle": [
+        "C3-STD-1（GoDoc 与真实语义相反）",
+        "C3-STD-2（conditional/default 行为变更无测试担保）",
+        "C3-STD-3 的主体（裸 string kind → edgeKind + edgeDecl，Primitive Obsession/Data Clumps 闭）",
+        "§3.4 规则 1/2/4 的路由本身（判据 1 与判据 5 各推进一档：五类图现有 2 类端到端）"
+      ],
+      "blocking": [
+        "C4-SPEC-2 nil Predicate 被静默放行 → 又一条 Validate 通过、err==nil、Output()==nil 的空结果通道（探针实测）",
+        "C4-SPEC-3 环路径已真实可用而步数安全阀仍不存在（ErrStepLimitExceeded 全包无产生点）",
+        "C4-STD-1 Result.Completed 的重名语义未定义且文档未说明（探针实测 [a a a b]）",
+        "C4-STD-2 三处新行为无回归担保，其中「悬空端点检查覆盖全部边种类」是 R2 引入的 SIGSEGV 复活的唯一防线",
+        "C4-SPEC-4 §3.4 规则 5（扇出 sub-branch 隔离 LLM 历史）既未实现也未在任何契约里挂号",
+        "C4-SPEC-5 carry-over 四项（重名覆盖、Add* 增量校验、panic 击穿宿主、§3.5 文档回写）在 cycle-2/3/4 连续三轮零进展",
+        "票面判据 3、4 未满足 → 本 work item 未达完成态"
+      ],
+      "recordedNonBlocking": [
+        "C4-STD-3（edgeKind 三处 switch，收口时折成按种类的表）",
+        "cycle-1 STD-2（Completed 暴露内部切片）/ STD-3（graph.go 多类变化原因）",
+        "Speculative Generality（config 三字段无读取点）—— 与 C4-SPEC-3 同因，随 B4 一并消解",
+        "Feature Envy（complete 书写 Result 字段）/ Mysterious Name 类历史 judgement 项"
+      ],
+      "passing": [
+        "R2 的红绿链完整且检错力经四杀（含审查侧独立变异），R1 的 fail-closed 不变式未被削弱",
+        "判据 2 成立（零 sync、单消费者、路由决策全部在消费者内、-race 绿）；判据 6 成立（371 ≤ 1500）",
+        "切片 1/2/3 的全部既有用例在同一命令下继续 PASS（14 条 PASS，还原前后各一次回执），diff 未删除任何既有断言；唯一被删过的行是一段文档注释，已还原（C4-SELF-1）",
+        "邻近包零改动且回归绿（receipt:d774cfdc）"
+      ],
+      "summary": "Standards 轴 3 项发现（2 hard）+ 12 项 smell 逐条核查（4 项有发现、2 项本切片闭、6 项未见）；Spec 轴 6 条判据 2 满足、2 部分满足、2 未满足，5 项发现（4 hard）。方向正确且闭掉三项 cycle-3 发现，但 R2 同时打开两个新的静默通道（nil Predicate 空结果、可用环而无步数阀），并要求先做规格处置（§3.4 规则 5 与 Completed 语义）。下一切片次序建议：C4-STD-2 (1) 的恢复式 RED → C4-SPEC-2 nil 谓词 → B5 无条件环拒绝 → B4 stepLimit（含默认 1000）→ Completed 语义决定；B2 Join 排在其后，以免在没有安全阀的图上叠加汇聚复杂度。 自审修正：初稿把 graph_test.go 说成纯新增、并把原始 diff 行数当作 --stat 数字，实测该文件当时有 1 行删除（切片 2 测试的 GoDoc 首行被追加编辑吞掉）；合入本裁定前已还原（numstat 225/-0，哈希 6de3d4dd），聚焦测试还原前后各一次 exit 0 回执，被删内容为注释而非断言，故不改变任何 finding 的判定。"
+    },
+    "evidenceRefs": [
+      "artifact:/tmp/p1-green/slice4-r2-diff-postrestore.txt",
+      "artifact:/tmp/p1-green/slice4-r2-diff.txt",
+      "artifact:docs/design/v3-test-scope-p1-graph-slice4.json",
+      "artifact:docs/design/v3-testability-decision-p1-graph-slice4.json",
+      "artifact:docs/design/v3-p1-graph-slice4-test-diff-review.json",
+      "receipt:fe1b6446-bf78-4af1-8750-249c60d979c4",
+      "receipt:e0f2e299-ae5c-4df0-91c9-43b98353c9df",
+      "receipt:6b3281ad-1b4c-440b-9369-4ab268030e66",
+      "receipt:97f837d5-2bef-4ea1-bd7e-7e7f5a0335a9",
+      "receipt:85e5d6db-9967-40e2-ae5e-b226c1e7a498",
+      "receipt:d3a2e3fa-1c52-4b99-b079-5eb5a41d4e4b",
+      "receipt:05ac8182-cad9-4912-9206-98681a8ec95c",
+      "receipt:21593cb0-e30d-4e8d-94c3-192309a59490",
+      "receipt:9849b135-e4bf-4161-9a76-1af3e11fbb5c",
+      "receipt:837cbac0-fd70-4aa3-a35f-68694437bf01",
+      "receipt:d774cfdc-a8a4-4cfc-a6a6-93a932c840b6",
+      "receipt:e0875681-af05-4c57-a855-0bb90a86fc33"
+    ],
+    "activationId": "b3b2eaff-aa97-414d-8f8a-fbbb541f6f54",
+    "commandToken": "71c21970-7937-4b28-ae8f-9fc943dec34f",
+    "reviewedAt": "2026-09-27T05:52:00Z"
+  },
+  "cycle5": {
+    "reviewedSlice": "切片 5：缺失谓词的条件边在构建期被拒（cycle4 C4-SPEC-2）+ 悬空端点检查覆盖各边种类的检测力取证（C4-STD-2 (1)）",
+    "activationId": "0c375aed-fcac-4911-a8cf-bf0fad6f0881",
+    "commandToken": "8e5de24d-2eee-4a5c-8de7-017ae48b94ba",
+    "reviewedAt": "2026-09-27T06:23:00Z",
+    "fixedPoint": {
+      "ref": "03870005e0f6cb6108cdfd0625b62e5af295f099",
+      "resolved": true,
+      "verification": "与 cycle-2/3/4 同一 fixed-point。累计差异 = git diff --numstat 0387000 -- pkg/hno/graph；切片 5 自身差异 = 对 /tmp/p1-green/*.slice4-baseline-reconstructed 逐文件 diff。"
+    },
+    "freeze": {
+      "files": {
+        "pkg/hno/graph/graph.go": "68123f3907305c8c4e31e62f9c1a2fdc9c7f4c40",
+        "pkg/hno/graph/scheduler.go": "19dcf6d244f50352577184cc38b4bc6dffcdc713",
+        "pkg/hno/graph/graph_test.go": "844ccef83f2d809210e3932fc5df83b04f84bd5f"
+      },
+      "verification": "审查全程只读；两个独立观察者（实现者侧与子代理侧 a0d06911b11c5f03b）在审查结束时重取 git hash-object --no-filters，三枚哈希逐字节一致。探针全部落在 /tmp（/tmp/p1review、/tmp/c5probe），git status -- pkg/hno/graph 与开工时一致。"
+    },
+    "diff": {
+      "cumulativeNumstat": "graph.go +85/-16、graph_test.go +329/-0、scheduler.go +21/-6（合计 435 insertions / 22 deletions）",
+      "slice5Only": "graph.go +8/-3、scheduler.go +3/-2、graph_test.go +104/-0（修正值，见 selfCorrections C5-SELF-1）",
+      "nonEmpty": true,
+      "baselineChain": "三枚重建基线的哈希分别等于 cycle4 在册的切片 4 收尾哈希：graph.go 38584f61…、scheduler.go 98b8f6a0…、graph_test.go 6de3d4dd…（本轮以 git hash-object --no-filters 实测复核）。测试文件相对基线纯追加、零删除，故切片 1–4 的断言未被改写。"
+    },
+    "independentReview": {
+      "provider": "子代理 a0d06911b11c5f03b（独立双轴 + 门禁实测，只读仓库）",
+      "reconciled": "其 hard 项逐条由实现者侧复核：C5-STD-1（graph.go:224 新增第 4 处 kind 裸分支）与 C5-SPEC-4（断言未钉边种类、违反契约文本）经源码与契约原文核对成立；最高严重项 C5-STD-5（注释宣称 nil 谓词不会到达 successors）由我另起 /tmp/c5probe 现场复现，见该 finding 的 liveEvidence。",
+      "notAdopted": [
+        "『无法复现反向重建哈希 38584f61/98b8f6a0』不构成反证：按 diff 反向应用时注释文案存在自由度。改用更强的等价链证据（重建文件哈希 == cycle4 在册哈希，逐字节），已记入 diff.baselineChain。"
+      ]
+    },
+    "gates": [
+      {
+        "command": "go test ./pkg/hno/graph/... -run P1G -count=1",
+        "result": "exit 0，23 条 PASS（6 顶层 + 17 子用例 = 基线 14 + 新增 9），与台账一致",
+        "receipt": "receipt:fc4a6847（GREEN）/ receipt:e0107592（REFACTOR 后复跑）"
+      },
+      {
+        "command": "go test -race ./pkg/hno/graph/... -count=1",
+        "result": "exit 0",
+        "receipt": "receipt:e88adbe3"
+      },
+      {
+        "command": "go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1",
+        "result": "exit 0（邻近回归）",
+        "receipt": "receipt:cc498d47"
+      },
+      {
+        "command": "go vet ./pkg/hno/graph/... / gofmt -l pkg/hno/graph / go build ./...",
+        "result": "净 / 无输出 / exit 0"
+      },
+      {
+        "command": "grep -c 'sync\\.' pkg/hno/graph/graph.go pkg/hno/graph/scheduler.go",
+        "result": "0 / 0（单消费者模型未引入锁）"
+      },
+      {
+        "command": "非测试 LOC",
+        "result": "247 + 130 = 377 ≤ 1500"
+      },
+      {
+        "command": "grep -n 'ErrStepLimitExceeded|stepLimit|maxConcurrency' pkg/hno/graph",
+        "result": "仍只有定义与赋值、零读取点；子代理现场以 WithStepLimit(5) + 无条件环实测跑满 300ms ctx 超时且 errors.Is(err, ErrStepLimitExceeded)=false ⇒ 死配置（C5-STD-4）"
+      }
+    ],
+    "axes": {
+      "standards": {
+        "source": "AGENTS.md（Coding Style / Testing Guidelines）+ Fowler smell 基线 12 条逐条过",
+        "findings": [
+          {
+            "id": "C5-STD-1",
+            "location": "pkg/hno/graph/graph.go:224-226（对照同函数 219/222/228 的 e.kind.label() 用法）",
+            "evidence": "同一函数里紧邻三行用 e.kind.label() 生成文案，新分支却把 \"conditional edge\" 硬编码进 fmt.Errorf，边种类的标签知识被复制第二份（Duplicated Code）。同处又把 kind 知识多开一处裸比较 e.kind == edgeConditional，使 edgeKind 的分支站点从三处（label / routable / successors 的 switch）涨到四处：cycle4 C4-STD-3 登记的『收口时折表』被本切片加剧而非缓解（Repeated Switches）。",
+            "severity": "hard",
+            "fix": "文案改用 e.kind.label()；与 routable()/label() 同址新增 (edgeKind).requiresPredicate() bool，让 Validate 只问策略、不裸比较常量。"
+          },
+          {
+            "id": "C5-STD-2",
+            "location": "pkg/hno/graph/graph_test.go:345-346 与 362-363 用反引号字符串 `\"a\"`/`\"b\"`，而 419 与切片 2 的 294 用裸 ghost",
+            "evidence": "同为「错误必须指名节点」的可定位性断言，两种引号强度并存。后者只要文案出现 ghost 即通过，端点名换成任何含 ghost 字样的文本都杀不掉。",
+            "severity": "judgement",
+            "fix": "全表统一为带引号的 %q 形态（钉住「是端点名而非任意子串」）。",
+            "note": "本项已被更强的 C5-SPEC-4 覆盖：真正缺的不是引号强度而是边种类。"
+          },
+          {
+            "id": "C5-STD-3",
+            "location": "pkg/hno/graph/graph.go:213-232（四个拒绝分支）与调用方",
+            "evidence": "构建期拒绝只能靠读错误字符串判定：包内无任何哨兵错误（errors.Is 不可用），测试因此被推向 Contains 文本匹配——这正是 C5-SPEC-4 断言写不强、以及 S4 join 行『不钉文案就没有牙』的根因（Primitive Obsession：用 string 代替值得有自己类型的领域概念）。",
+            "severity": "judgement",
+            "fix": "导出哨兵（ErrInvalidDeclaration 家族，或带 kind/节点名/原因的结构化错误），使断言按原因与种类判定，与具体句式解耦。"
+          },
+          {
+            "id": "C5-STD-4",
+            "location": "pkg/hno/graph/graph.go:16-18、52-54、57-69（WithStepLimit / WithMaxConcurrency 的 GoDoc）",
+            "evidence": "为规格中未实现的需求保留的公共面与文案：stepLimit/maxConcurrency 字段零读取点，ErrStepLimitExceeded 零产生点，而选项 GoDoc 宣称的行为已被现场探针否证（跑满 ctx 超时、errors.Is 为 false）。本切片未加剧，但已三轮在册未消。",
+            "severity": "hard",
+            "fix": "下一切片落地 B4（默认 1000 + 消费者按激活步数计数 + 产生 ErrStepLimitExceeded）；在此之前二选一：撤回 WithStepLimit/WithMaxConcurrency 导出，或在 GoDoc 首行直书『当前不被执行』，与 AddJoin 已采用的处置保持一致。"
+          },
+          {
+            "id": "C5-STD-5",
+            "location": "pkg/hno/graph/scheduler.go:105-107（注释）、112（for _, e := range s.g.edges）、86（s.g.nodes[act.name].Run）、graph.go:150-158（declare 追加到同一 *Graph）",
+            "evidence": "注释断言『未实现路由的边种类、以及缺少谓词的条件边都不会到达这里 —— Validate 已在构建期拒绝这些声明』，是绝对命题。REFACTOR 据此删掉 successors 里的 e.p != nil 守卫，但 scheduler 全程读活对象 s.g.edges / s.g.nodes，Validate 只在 Run 入口跑一次 ⇒ 该保证的前提『Run 开始后图不再变化』既没有被强制、也没有被写明。",
+            "severity": "hard",
+            "liveEvidence": "/tmp/c5probe（replace 指向本仓库）现场复现两条：(a) 节点闭包持 builder，运行中 g.AddConditional(\"a\",\"b\",nil) ⇒ Run 前 Validate() = <nil>，随后 e.p(out) nil 解引用（可被上层 recover）；(b) 运行中 g.AddEdge(\"a\",\"ghost\") ⇒ scheduler.go:86 map 查表得 nil 节点，spawn 的 goroutine SIGSEGV，主 goroutine recover 不住、进程直接死亡（输出无『main reached end』）。该族崩溃与切片 2 消灭的那次同源，只是换了入口。",
+            "fix": "Run 入口把 nodes/edges 快照进 scheduler（值切片拷贝，约三行），使 Validate 的结论在执行期不可被推翻；快照成立后注释的绝对命题才为真。同时把『Run 开始后不得再改图』写进 Run/Build 的 GoDoc。测试可从公共面取证：先验证通过的图，在节点内改图后 Run 必须给出确定结果而非崩溃。"
+          },
+          {
+            "id": "C5-STD-6",
+            "location": "pkg/hno/graph/graph_test.go:395 测试名 ForEveryEdgeKind 对 401-406 只有 conditional/default 两种",
+            "evidence": "名字宣称穷举，实覆盖 4 种边中的 2 种；省略 join 的理由只在注释里，名字与表都看不见。",
+            "severity": "judgement",
+            "fix": "改名 ForRoutedEdgeKinds，或按 C5-SPEC-4 的修复补 unconditional/join 行。"
+          },
+          {
+            "id": "C5-STD-7",
+            "location": "pkg/hno/graph/graph_test.go:408-425 与 284-300",
+            "evidence": "两处的图骨架与断言形状相同（同一 identity 夹具 + Validate 非 nil + Contains + Run 拒绝），新表只是把种类参数化（Duplicated Code）。",
+            "severity": "judgement",
+            "fix": "把无条件边行并入新表，旧测试只保留它独有的 Run 不崩溃面。"
+          }
+        ],
+        "smellsChecked": {
+          "Mysterious Name": "C5-STD-6",
+          "Duplicated Code": "C5-STD-1（标签知识）、C5-STD-7（夹具）",
+          "Repeated Switches": "C5-STD-1（kind 分支第 4 站点）",
+          "Shotgun Surgery": "缓解未消：新增一种边仍需同动常量、successors 的 switch、routable()、谓词要求四处",
+          "Speculative Generality": "C5-STD-4（硬）；Warnings() 恒 nil 同因",
+          "Primitive Obsession": "C5-STD-3",
+          "Feature Envy": "cycle-1 存量（complete 书写 Result），本切片未加剧",
+          "Divergent Change": "cycle-1 存量（graph.go 承载 builder/校验/结果三类变化原因），本切片未加剧",
+          "Data Clumps": "未见",
+          "Message Chains": "未见",
+          "Middle Man": "未见",
+          "Refused Bequest": "未见（Node/NodeFunc 契约均被使用）",
+          "仓库标准": "错误文案小写并带 graph: 前缀、导出符号有 GoDoc、表驱动、测试 colocate 且为外部包 graph_test ⇒ 符合 AGENTS.md"
+        }
+      },
+      "spec": {
+        "source": "docs/design/v3-test-scope-p1-graph-slice5.json（本周生效契约 S1–S4 + 禁止假通过条款）、docs/design/v3-test-scope-p1-graph.md §3.4/§3.5/§7/§12.1（母契约）、票面判据 3、5",
+        "findings": [
+          {
+            "id": "C5-SPEC-4",
+            "location": "pkg/hno/graph/graph_test.go:345-346（S1）、362-363（S2）、417-421（S4 四行）",
+            "evidence": "契约 S1 原文要求『错误文本同时指名边种类与被声明的两端节点名』，S4 要求三种边各自给出『指名种类与缺失节点名的错误』；实际断言只有节点名字面量，没有任何一处钉边种类。后果可判定：S4 四行彼此不可区分——把 label() 退化成常量、或把 from/to 两条文案互换，四行仍全绿。而契约 falsePassProhibitions 第 6 条恰恰点名『不得把端点期望改成只断言包含 \"ghost\" 这种宽松形式』，419 行正是该形式。另：台账 locatorAssertionRationale 只为 S4 省略 join 行给出理由，S1 未钉种类这一偏差未申报。",
+            "severity": "hard",
+            "fix": "S1/S2 各加一条钉种类的断言（含 conditional），S4 每行携带期望的种类标签与 does not exist 原因词。钉种类与原因即可，不钉整句，以免锁死文案。"
+          },
+          {
+            "id": "C5-SPEC-5",
+            "location": "docs/design/v3-test-scope-p1-graph-slice5.json 的 outOfScope 与 docs/design/v3-p1-graph-slice5-test-diff-review.json 的 owedRedForNextSlice（原 6 项）",
+            "evidence": "cycle4 C4-STD-2 是含三个子项的 hard 发现：(1) 悬空端点覆盖各边种类、(2) 同一节点多条 Default 边全部激活、(3) 谓词收敛环端到端跑完并给出 Output。切片 5 只做 (1)，(2)(3) 既未出现在 slice5 的 outOfScope，也未出现在 owedRedForNextSlice（该表含 B4/B5/S4-join/C4-STD-1/B6–B11/§3.5 回写/C4-STD-3/规则 5，独缺这两项）⇒ 一条 hard 阻断项的子项被静默再顺延。对照：B4/B5/Completed 的顺延都有书面理由，故这是台账漏项而非风格问题。(3) 同时是票面判据 5『五类图含环图端到端』仍为 2/5 的直接原因。",
+            "severity": "hard",
+            "fix": "下一周期设计侧把 (2)(3) 显式入册（范围内或有理由的 outOfScope 二选一）；(3) 与 B5 环拒绝配对做：一条被拒、一条被放行，才构成合法环的对照组。"
+          },
+          {
+            "id": "C5-SPEC-6",
+            "location": "pkg/hno/graph/scheduler.go:118-119（被删守卫）与 ledger implementationDelta.refactor 的理由文本",
+            "evidence": "删除 e.p != nil 属未被本切片要求的产线改动，但已在台账 implementationDelta.refactor 主动披露，且未触及 completionCriteria 的禁列区，故可接受。不可接受的是其论证：『包外无绕过路径』已被 C5-STD-5 的现场复现证伪。",
+            "severity": "judgement",
+            "fix": "保留删守卫（它消除了静默丢边），但把论证改写成成立的形式：以 Run 入口快照作为前提（C5-STD-5 的 fix），而不是声称不存在绕过。"
+          },
+          {
+            "id": "C5-SPEC-1",
+            "location": "pkg/hno/graph/graph.go:184-189（AddJoin 的 for 循环）",
+            "evidence": "从公共面可造出 err == nil 且 Result 为空：AddJoin(nil,\"b\") 或前驱列表全空 ⇒ 一条边都不声明 ⇒ Validate 通过、Run 返回 Completed() 只含入口的静默结果。与 C4-SPEC-2 同类（构建期声明被接受但没有任何行为）。",
+            "severity": "hard",
+            "liveEvidence": "cycle5-partA 探针实测。本轮契约把 Join 路由列为非目标，因此修复只能是构建期拒绝（空前驱集合非法），不含任何汇聚语义。",
+            "fix": "在 B2 之前先加『AddJoin 的空 from 集合在构建期被拒』一条，独立取 RED。"
+          },
+          {
+            "id": "C5-SPEC-2",
+            "location": "pkg/hno/graph/scheduler.go:96-103（output 仅在 item.name == s.g.output 时写）+ graph.go 的 Validate",
+            "evidence": "输出节点从入口不可达时，Run 成功返回但 Output() 恒为 nil：SetOutput 只校验存在性、不校验可达性。契约 §3.5 的『不可达节点』仍挂号（outOfScope B6），但『不可达的输出节点』使 Result 变成静默空值，属于本轮『静默空结果』风险类而非一般性告警。",
+            "severity": "hard",
+            "liveEvidence": "cycle5-partA 探针实测（输出节点未连任何入边 ⇒ err=nil、Output=nil）。",
+            "fix": "归入 B6 簇并优先：输出节点无入边且非入口 ⇒ 构建期拒绝，错误指名节点。"
+          },
+          {
+            "id": "C5-SPEC-3",
+            "location": "pkg/hno/graph/scheduler.go:54-71（消费者循环无步数计数）与 graph.go:16-18",
+            "evidence": "两条不收敛路径可在生产期无界挂住宿主：(a) 谓词恒真的条件自环；(b) 条件边与无条件边交替使每轮都有新激活。stepLimit 与 ErrStepLimitExceeded 已定义却永不产生（§7 默认 1000 未落实）。票面判据 5 的『环图』测试类因此只能证伪不能证实。",
+            "severity": "hard",
+            "fix": "B4 作为下一切片的第一个行为而非附带项：New 落实默认 1000（stepLimitSet 区分显式设置）、消费者按激活步数计数、超限返回 ErrStepLimitExceeded 且与 ctx 取消可区分；B5（无条件边成环构建期拒绝）与它各取独立 RED。"
+          }
+        ],
+        "dischargeOfCycle4": {
+          "C4-SPEC-2": "闭。nil 谓词现在构建期被拒（graph.go:224-226）：天然 RED receipt:736cb312 → GREEN receipt:fc4a6847；MUTANT-1（删掉拒绝分支）receipt:813765d1 与 MUTANT-2（改成对称的『恒不命中』）receipt:a97ed245 均被行为断言杀掉；S2 断 res == nil，故『拒绝但仍交回半填充 Result』也被杀。",
+          "C4-STD-2 (1)": "部分闭。conditional/default 的端点缺失已有表驱动断言 + Run 拒绝面，MUTANT-3（端点检查退回只判无条件边）receipt:17e19928 杀掉 4 行；但检测力不足（C5-SPEC-4：未钉种类 ⇒ 四行互不可分），且 join 行顺延——其技术理由只在弱断言下成立，按契约原文钉『种类 + does not exist』则该行今日即有牙。",
+          "C4-STD-2 (2)(3)": "未闭且此前未挂号 ⇒ 升级为 C5-SPEC-5。"
+        },
+        "testAuthority": "切片 1–4 既有用例在 git diff 上 0 删除，断言未被改写；Recovered RED 标注为 recovered（receipt:c192debb），并附与 cycle4 在册哈希逐字节一致的重建链，未伪装成天然 RED。S3 对照行挡住『Validate 一律返回错误』这种退化实现；每张测试图只含一种缺陷；join-only 继续被拒（R1 不变式未削弱）。放置顺序（谓词检查在悬空检查之后）不构成遮蔽：探针实测各缺陷组合均返回非 nil，仅诊断信息被抢先。"
+      }
+    },
+    "selfCorrections": [
+      {
+        "id": "C5-SELF-1",
+        "claim": "ledger implementationDelta.boundary 把切片 5 自身的测试差异自报为 graph_test.go +95/-0",
+        "correction": "实测为 +104/-0：对哈希已核验的 slice4 基线重建文件做 diff，insertions=104、deletions=0。累计 329/-0 与 shortstat 435/22 无误，只有该行的分片计数偏低。已在 diff.slice5Only 记为修正值，并更正台账原文。",
+        "impact": "不影响任何 finding 的判定（纯数字）。"
+      },
+      {
+        "id": "C5-SELF-2",
+        "claim": "实现者侧自查（/tmp/p1-review/cycle5-partA.json、cycle5-partB-standards.json）",
+        "correction": "自查漏掉两项 hard：断言未钉边种类（违反我自己写的契约文本与禁止假通过条款）、以及 C4-STD-2 (2)(3) 的静默顺延；两项都由独立轴查出。自查也未质疑 REFACTOR 注释的绝对命题，而该命题现场可反证（C5-STD-5）。",
+        "impact": "证明同上下文自查不能替代独立审查轴；后续切片的 review 阶段继续保留只读子代理双轴。"
+      },
+      {
+        "id": "C5-SELF-3",
+        "claim": "台账只为 S4 省略 join 行申报了理由",
+        "correction": "S1 未钉种类同样是对契约文本的偏离，当时未申报。本轮由 C5-SPEC-4 入册，规则确立：inScopeBehaviors 措辞与实际断言强度的任何差值都必须写进台账，不得只挑对自己有利的一条说明。",
+        "impact": "改变下一切片的取证要求（断言强度还债）。"
+      }
+    ],
+    "blocking": [
+      "C5-STD-5 运行中改图可把宿主进程打成 SIGSEGV，且注释与实现相反（两条现场复现）",
+      "C5-SPEC-4 S1/S4 断言未钉边种类，违反契约文本与 falsePassProhibitions，S4 四行互不可区分",
+      "C5-SPEC-5 cycle4 一条 hard 发现的两个子项被静默再顺延（多条 Default 扇出、谓词收敛环端到端）",
+      "C5-SPEC-1 空 AddJoin ⇒ err==nil + 空 Result 的静默通道仍在",
+      "C5-SPEC-2 输出节点不可达 ⇒ Output()==nil 的静默通道仍在",
+      "C5-SPEC-3 无收敛循环可无界挂死宿主（B4 未落实，ErrStepLimitExceeded 是死代码）",
+      "C5-STD-1 / C5-STD-4 kind 标签知识重复且新增裸分支；未实现的 stepLimit/maxConcurrency 公共面继续对外宣称行为",
+      "票面判据 3（§3.5 八项构建期校验）与判据 5（五类图端到端，现 2/5）未满足 ⇒ 母工作项未达完成态"
+    ],
+    "recordedNonBlocking": [
+      "C5-STD-2 断言引号强度不一致（被 C5-SPEC-4 覆盖）",
+      "C5-STD-3 无哨兵错误，可定位性依赖文案（建议随 B6 簇一并解决）",
+      "C5-STD-6 / C5-STD-7 测试命名与夹具重复",
+      "C4-STD-1 Result.Completed() 重名语义未定（新增第 6 处 DeepEqual 钉法扩大了未来改动面，本切片未恶化）",
+      "§3.4 规则 5（扇出 sub-branch 隔离 LLM 历史）已显式判为不属于 P1 图拓扑面、移交 P4/P5（rule5Disposition）",
+      "cycle-1 STD-2/STD-3、Feature Envy、Divergent Change 存量未加剧"
+    ],
+    "passing": [
+      "红绿链完整：天然 RED receipt:736cb312 → GREEN receipt:fc4a6847 → race receipt:e88adbe3 → 邻近 receipt:cc498d47 → REFACTOR receipt:e0107592，另有 recovered RED receipt:c192debb 与四杀回执 receipt:813765d1 / receipt:a97ed245 / receipt:17e19928",
+      "R1 的 fail-closed 不变式未被削弱（conditional/default 从拒绝集合移入真实路由，join 仍被拒），切片 1–4 既有用例继续 PASS，聚焦面 23 PASS",
+      "结构判据全部满足：非测试 LOC 377 ≤ 1500、sync. 计数 0/0、-race 绿、gofmt/vet 净",
+      "AddConditional/AddDefault/AddJoin/Validate 的 GoDoc 与本切片真实语义一致（Validate 已改述为四项覆盖）——但其『不会到达这里』命题需按 C5-STD-5 补前提或被快照实现"
+    ],
+    "verdict": "切片 5 的两个目标行为（C4-SPEC-2 的 nil 谓词拒绝、C4-STD-2 (1) 的端点检测力）确实落地且有检错力，红绿链与变异证据可核验；但独立轴在现场复现出一条新的 hard：本切片删守卫所依据的注释命题为假，运行中改图仍能把宿主打成不可 recover 的 SIGSEGV，说明 Validate 的结论在执行期可被推翻。加上断言强度低于本周期契约文本、以及一条 cycle-4 hard 子项被静默顺延，本周期判阻断。下一周期次序（含理由）：(0) 先还测试债——按 C5-SPEC-4 给 S1/S2/S4 钉边种类与原因词并补回 join 行（纯测试改动，使后续切片的拒绝面有牙）；(1) C5-STD-5 Run 入口快照 nodes/edges 并改正注释（约三行，关闭一整类进程级崩溃，且它是『构建期校验即终局』这条产品承诺的前提）；(2) B4 stepLimit 作为独立行为先于任何新图拓扑（C5-SPEC-3：没有安全阀就不能承诺环图可跑）；(3) B5 无条件环构建期拒绝 + 合法环放行对照（一并兑现 C4-STD-2 (3) 与票面判据 5 的环图类）；(4) C5-SPEC-1 空 AddJoin 与 C5-SPEC-2 输出可达性（同属 B6 簇、同一 Validate 缝，各取独立 RED）；(5) C4-STD-2 (2) 多条 Default 扇出。C5-STD-1/3/6/7 在首次触及 graph.go/scheduler.go 的切片顺带清理。本轮不提交，工作树保持未提交等待用户指示。",
+    "evidenceRefs": [
+      "artifact:/tmp/p1-review/cycle5-partA.json",
+      "artifact:/tmp/p1-review/cycle5-partB-standards.json",
+      "artifact:/tmp/c5probe（C5-STD-5 两条现场复现）",
+      "artifact:docs/design/v3-test-scope-p1-graph-slice5.json",
+      "artifact:docs/design/v3-testability-decision-p1-graph-slice5.json",
+      "artifact:docs/design/v3-p1-graph-slice5-test-diff-review.json",
+      "receipt:736cb312",
+      "receipt:fc4a6847",
+      "receipt:e88adbe3",
+      "receipt:e0107592",
+      "receipt:c192debb",
+      "receipt:813765d1",
+      "receipt:a97ed245",
+      "receipt:17e19928",
+      "receipt:cc498d47",
+      "receipt:d2b9107e-4834-41d9-9669-a4918b2706a3"
+    ]
+  },
+  "cycle6": {
+    "reviewedSlice": "切片 6：一次 Run 只执行进入 Run 时捕获的拓扑快照（cycle5 C5-STD-5）+ 断言债清偿（C5-SPEC-4 的边种类/原因词钉住、C4-STD-2 (1) 的 8 行端点表）",
+    "activationId": "8bad9c72-52fc-40f9-b2b1-f4b4d3097588",
+    "commandToken": "47f83454-a22b-46fd-bed0-8ac4bdda3644",
+    "reviewedAt": "2026-09-27T06:58:00Z",
+    "fixedPoint": {
+      "ref": "0387000 feat(graph): land zero-lock scheduler with build-time edge validation",
+      "resolved": "HEAD（工作树未提交，切片 4–6 全在工作树中）",
+      "verification": "git diff --numstat 0387000 -- pkg/hno/graph = graph.go +91/-16, graph_test.go +433/-0, scheduler.go +51/-11（本轮复测）"
+    },
+    "freeze": {
+      "files": {
+        "pkg/hno/graph/graph.go": "3483783f1e787c96ca6c236341664d095acec5c0",
+        "pkg/hno/graph/scheduler.go": "87854ffbb7629f9adeb2d45fbb74d91f2032b99d",
+        "pkg/hno/graph/graph_test.go": "62e0b2cf5c6369050f2127a42fc33ffafd47aea5"
+      },
+      "verification": "两名独立审查者各自 hash 一致；本轮三次变异后 cp 回写并再 hash，三枚逐字节回到冻结值；恢复后 go test ./pkg/hno/graph/... -count=1 仍 ok。审查期间未编辑 pkg/hno/graph。"
+    },
+    "diff": {
+      "nonEmpty": true,
+      "behaviorUnderReview": "Run 入口捕获 plan{nodes,edges,output}，调度器不再活读 *Graph；契约 S1–S5 声明的可观察面。",
+      "locProof": "非测试 LOC 408 = graph.go 253 + scheduler.go 155（契约上限 1500）"
+    },
+    "independentReview": {
+      "provider": "两名互不通信的只读子代理：a2ec68b97e9f9e4de（派发于 red/green/refactor 之后）与本轮补派的独立双轴审查；各自自带仓库身份预检、冻结哈希、只读约束与 /tmp 隔离探针。",
+      "reconciled": [
+        "两轴共同指向同一根因：注释把隔离机制归给 edges 深拷贝，而真正承载的是不持有 *Graph + nodes map 复制 + 捕获先于任何节点 goroutine 的次序。",
+        "foreground 审查给出的 MUT-A/MUT-B/MUT-C 与 background 的 M1–M5 交叉印证；本轮父代理不采信任何未自证的子代理断言，见 parentVerification。"
+      ],
+      "notAdopted": [
+        "background #4「S1–S3 不断言刺激真的发生」降级为 judgement 并附反驳：Completed() 含 a（且 :489 有绝对断言）传递性证明节点 a 执行过，节点 goroutine 内 panic 会杀掉进程而使测试失败，故 mutate 确已运行；仍采纳「加 applied 标志」作为廉价保险，但不接受『该三例可以是假通过』这一表述。",
+        "background「M3 使 Output()=<nil> 而 32 条全绿」需校准：本轮实测 MUT-C 只使切片 6 自身的隔离用例判不出（receipt:cf8c0d58 exit 0），而全包由 graph_test.go:320 的绝对断言 Output()=seed 抓到（同变异全包 FAIL）。故记为『隔离用例的 Output 面无增量检测力』，不记为『输出丢失无人守』。"
+      ]
+    },
+    "parentVerification": {
+      "note": "以下三条为本轮父代理亲自运行的变异取证，均指向冻结哈希的代码；每次变异后 cp 回写并复算哈希确认复原。",
+      "receipts": [
+        {
+          "id": "receipt:422ce345-f149-4519-9e55-98c609ffada4",
+          "mutation": "MUT-A：edgeConditional 的 label() 返回 \"unconditional edge\"（种类贴错标签）",
+          "command": "go test ./pkg/hno/graph/... -count=1",
+          "exitCode": 0,
+          "meaning": "整套测试对『条件边被冠以无条件之名而拒绝』毫无反应 ⇒ S5 与 :347/:363 的 tc.kind 子串钉住对 conditional 是空断言（因为 \"unconditional edge\" 包含子串 \"conditional\"）。"
+        },
+        {
+          "id": "receipt:ce012bd9-8373-4c29-82a9-4f38ef66dd21",
+          "mutation": "MUT-B：capturePlan 里 nodes := g.nodes（去掉 map 复制，共享活表）",
+          "command": "go test ./pkg/hno/graph/... -count=1",
+          "exitCode": 0,
+          "meaning": "真正挡住运行中 AddNode 覆盖同名节点的那份复制，本切片零测试覆盖。"
+        },
+        {
+          "id": "receipt:cf8c0d58-8629-4b76-8988-e93d6bdd8e1c",
+          "mutation": "MUT-C：plan{... output: \"\"}（抹掉 output 捕获）",
+          "command": "go test ./pkg/hno/graph/... -run TestP1G_RunIsolatesTopologyFromConcurrentMutation -count=1 -v",
+          "exitCode": 0,
+          "meaning": "隔离用例的 Output() 面只与实跑参照值相比（graph_test.go:488/499），参照与受试同向退化 ⇒ 该面不携带任何检测力。"
+        }
+      ],
+      "sourceReads": [
+        "graph.go:197-200 declare 只做 append ⇒ 导出面不存在就地改写 edgeDecl 的路径；已捕获 slice header 的 len 冻结 ⇒ edges 深拷贝为防御性冗余，注释所述的失效模式不成立。",
+        "scheduler.go:70 Run 仍活读 g.entry 构造 pending（entry 未进 plan），安全性依赖『捕获先于任何生产者 goroutine』这一未被注释也未被断言的次序。",
+        "grep 'sync\\.|atomic\\.|recover(' pkg/hno/graph/*.go（非测试）= 0 命中；AddJoin 仍只在构建期被拒；Warnings() 仍返回 nil；stepLimit/maxConcurrency/stepLimitSet/ErrStepLimitExceeded 仍零消费点。"
+      ]
+    },
+    "gates": [
+      "go test ./pkg/hno/graph/... -run TestP1G -count=1 -v ⇒ exit 0，32 条 PASS，0 FAIL/SKIP",
+      "go test -race ./pkg/hno/graph/... -count=1 ⇒ exit 0",
+      "go vet ./pkg/hno/graph/... ⇒ exit 0；gofmt -l pkg/hno/graph ⇒ 无输出",
+      "go build ./... ⇒ exit 0",
+      "go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1 ⇒ exit 0（邻近包无退化）",
+      "非测试 LOC 408 ≤ 1500；grep -c 'sync\\.' graph.go/scheduler.go = 0/0",
+      "git diff --numstat 0387000 -- pkg/hno/graph/graph_test.go = +433/-0（纯增，未删改切片 1–5 任何既有断言）"
+    ],
+    "axes": {
+      "standards": [
+        {
+          "id": "C6-STD-1",
+          "severity": "hard",
+          "location": "pkg/hno/graph/scheduler.go:30-31",
+          "evidence": "「复制是必要的：不复制则调度器读到的是活对象，节点内一次 AddEdge 就能绕过构建期校验（悬空端点或空谓词在执行期崩溃）」",
+          "finding": "机制归错。declare（graph.go:197）只 append，导面无就地改写路径，故已捕获 header 的长度就足以挡住节点内 AddEdge；两名审查者分别以 MUT-A/M1/M5（去掉复制或只去掉 edges 复制）测得全包 exit 0，即该注释描述的必要性与可观察行为相反，且与本周期台账已登记的 MUTANT-1 非击杀自相矛盾。",
+          "fix": "改写为：隔离来自『不持有 *Graph』+ 节点表复制 + header 冻结；edges 深拷贝是防御性冗余，不是失败防线。"
+        },
+        {
+          "id": "C6-STD-2",
+          "severity": "hard",
+          "location": "pkg/hno/graph/scheduler.go:33-39 与 pkg/hno/graph/graph_test.go:504-520",
+          "evidence": "receipt:ce012bd9（共享 nodes map ⇒ 全包绿）；receipt:cf8c0d58（抹掉 output 捕获 ⇒ 隔离用例绿）",
+          "finding": "承载本切片承诺的两处捕获（nodes map、output 值）没有任何测试观察；S1–S3 的刺激只经 append 改图，S4 对照只经 AddEdge/SetOutput-after-Run。AGENTS.md「add regression tests for every behavior change」未满足，且台账 owedRedForNextSlice 首项虽如实登记，本轮绿测仍给出了虚假保证。",
+          "fix": "补两个子用例：节点内 AddNode 覆盖同名节点 b、节点内 SetOutput(\"d\")，均断言与参照一致；再把「去掉 map 复制」「抹掉 output」重跑为真实击杀。"
+        },
+        {
+          "id": "C6-STD-3",
+          "severity": "hard",
+          "location": "pkg/hno/graph/scheduler.go:22-23 与 :131-133、:58-59",
+          "evidence": "「Run 开始之后对 builder 的任何结构修改都不能推翻 Validate」/「运行中改图无法把新声明送进这里」/ 导出 Run 的 GoDoc 只说「Run 返回之后再改图会影响下一次 Run」",
+          "finding": "绝对命题缺 happens-before 前提。两名审查者各自复现：另一 goroutine 无同步改图仍与 Run 入口自身的活读构成 DATA RACE（graph.go:162 写 vs graph.go:220 读，来自 Validate/capturePlan），并且后台审查在阻塞窗口内测得 completed=[a b d×19]、Output 取自本次拓扑之外的节点 —— 未经 Validate 的边确可被路由。加锁/panic 恢复是契约显式非目标（B10 仍欠），故这是文案越界而非实现缺陷。",
+          "fix": "三处统一限定为「与 Run 入口存在 happens-before 的修改（含节点函数体内的顺序修改）不影响本次 Run；其它 goroutine 无同步改图属数据竞争，本机制不覆盖」，并把该 caveat 写进导出的 Run GoDoc，避免被读成『运行中改图安全』。"
+        },
+        {
+          "id": "C6-STD-4",
+          "severity": "judgement",
+          "location": "pkg/hno/graph/scheduler.go:70",
+          "evidence": "pending: []activation{{name: g.entry, in: in}} —— plan 不含 entry",
+          "finding": "入口免疫靠的是「捕获与首次读取发生在任何生产者 goroutine 之前」这条次序，而该次序既无注释也无断言；把 capturePlan 或 entry 读取挪进消费者循环即静默破防。",
+          "fix": "entry 并入 plan（或就近注释这条次序）并加一条会因挪动而判红的断言。"
+        },
+        {
+          "id": "C6-STD-5",
+          "severity": "judgement",
+          "location": "pkg/hno/graph/graph.go:113-135 与 :121",
+          "evidence": "「调用方因此不需要对 edgeKind 常量做裸比较」；现存 4 个种类决策站点：label switch / routable 三段 || / requiresPredicate == / successors switch",
+          "finding": "requiresPredicate 是真实改进（nil 谓词规则只在一处表达，Validate 不再硬编码 \"conditional edge\" 文案，产出文案逐字不变，C5-STD-1 确已闭），但它 relocation 而非消除裸比较，:121 的注释为过度声明；Repeated Switches / Shotgun Surgery 第三周期仍在册，本切片使站点数 +1。",
+          "fix": "一张 edgeKinds 表（label/routable/requiresPredicate 三列）承载全部策略，successors 保留唯一行为 switch 并加 default 由构建期校验兜住。"
+        },
+        {
+          "id": "C6-STD-6",
+          "severity": "judgement",
+          "location": "pkg/hno/graph/scheduler.go:32",
+          "evidence": "capturePlan 是 *Graph 方法却住在 scheduler.go，只读 builder 字段",
+          "finding": "Feature Envy：快照策略与构建器状态分居两文件，plan 的变更理由因此散在两处。",
+          "fix": "移到 graph.go 状态旁，或改为 newPlan(g *Graph) 使归属显式。"
+        },
+        {
+          "id": "C6-STD-7",
+          "severity": "judgement",
+          "location": "pkg/hno/graph/graph.go:137-138 与 graph.go 配置面",
+          "evidence": "label() 的 default: return \"edge\"（edgeKind 未导出且四值穷举，不可达也不可测）；stepLimit/maxConcurrency/stepLimitSet/ErrStepLimitExceeded/Warnings 全无消费点",
+          "finding": "Speculative Generality 延续（后三者为 0387000 既有，非本切片引入，但本切片又新增了一份无测试的防御拷贝）。",
+          "fix": "删不可达 default（靠编译期穷举或 default 里 panic 需另议）；B4 落地时消费 stepLimit，否则删除配置面。"
+        },
+        {
+          "id": "C6-STD-8",
+          "severity": "judgement",
+          "location": "pkg/hno/graph/graph_test.go:347 与 :363",
+          "evidence": "同一必查列表 []string{\"conditional\",\"predicate\",`\"a\"`,`\"b\"`} 与同一循环整段重复",
+          "finding": "Duplicated Code；C5-STD-7 的去重仍未消（切片 2 的 TestP1G_ValidateRejectsDanglingEdge 也依旧并存）。",
+          "fix": "抽一个 assertReasonMentions(t, err, kind, words...) helper，由结构化拒绝原因承接。"
+        },
+        {
+          "id": "C6-STD-smellcoverage",
+          "severity": "note",
+          "evidence": "12 条逐条判定",
+          "finding": "Mysterious Name 未见（plan/capturePlan/declare/concrete/fallback 皆名实相符）；Duplicated Code 见 C6-STD-8；Feature Envy 见 C6-STD-6；Data Clumps 未见（edgeDecl/plan 正是收拢）；Primitive Obsession 存量在册且被本切片在测试面加重（种类与端点靠 prose 子串承载，是 C6-SPEC-1 空断言的根因）；Repeated Switches / Shotgun Surgery 见 C6-STD-5；Divergent Change 轻微（graph.go 同时因构建面与校验策略变化）；Speculative Generality 见 C6-STD-7；Message Chains 未见；Middle Man 未见（AddEdge/AddConditional/AddDefault → declare 是刻意单写入口）；Refused Bequest 未见。谓词策略为真实 relocation、无重复执法：生产代码里 p == nil 判断恰好一处（graph.go:230），successors 无 nil 守卫。",
+          "fix": ""
+        }
+      ],
+      "spec": [
+        {
+          "id": "C6-SPEC-1",
+          "severity": "blocking",
+          "location": "pkg/hno/graph/graph_test.go:408-431（另 :347/:363）",
+          "evidence": "行内 tc.kind 取值为 \"conditional\"，而 label(edgeUnconditional)==\"unconditional edge\" 含子串 \"conditional\"；receipt:422ce345 exit 0",
+          "finding": "契约完成判据「钉住边种类」对 conditional 行是空断言：把条件边的拒绝文案改成无条件边的文案，全包 32 条仍绿。这正是 C5-SPEC-4 要求还的债，本周期名义上还了、实际未还 —— 连续第二个周期在同一类（stringly-typed 断言弱于契约声明）上失手。",
+          "fix": "短期：断言锚定形式 \"graph: \"+tc.kind+\" edge\"（或补一条『不得出现其它种类标签』的负断言）。结构性根治：让 Validate 产出结构化拒绝（typed error 携带 Kind/Endpoint/NodeName 字段），测试断言字段而非子串 —— 同时关闭 C5-STD-3。"
+        },
+        {
+          "id": "C6-SPEC-2",
+          "severity": "blocking",
+          "location": "pkg/hno/graph/graph_test.go:510-514",
+          "evidence": "注入的 g.AddConditional(\"a\", \"b\", nil) 与既有 a→b 无条件边同靶",
+          "finding": "S2 未钉住所声称的因：即使运行中真被活读并『静默跳过缺谓词的边』（即 C4-SPEC-2 的原始缺陷复活，也正是 scheduler.go:131-133 宣称不可能发生的事），Completed()/Output() 与参照仍一致，唯一区分信号只剩 nil 解引用崩溃。",
+          "fix": "改为 AddConditional(\"a\", \"d\", nil)（d 已注册且是新靶），使路由面与崩溃面都能区分；配合 C6-STD-2 的两个新子用例。"
+        },
+        {
+          "id": "C6-SPEC-3",
+          "severity": "blocking",
+          "location": "pkg/hno/graph/graph_test.go:516-530 对照契约 S4 文本",
+          "evidence": "契约 S4 要求「追加节点与边」，测试只覆盖 AddEdge 与 Run 之后的 SetOutput",
+          "finding": "S4 覆盖不完整：AddNode 这条腿（恰是 C6-STD-2 证明的承载腿）未被观察。",
+          "fix": "与 C6-STD-2 合并清偿。"
+        },
+        {
+          "id": "C6-SPEC-4",
+          "severity": "blocking",
+          "location": "docs/design/v3-p1-graph-slice6-test-diff-review.json 的 mutationKills 与完成判据 5(a)",
+          "evidence": "台账把 MUTANT-1 题作「去掉拓扑捕获」，实际去掉的是「复制」；真形（回到持 *Graph 活读）由后台审查实测为 SIGSEGV / exit 1，等于 S1 的天然 RED 而非事后变异",
+          "finding": "取证命名失真，结论不失真：判据 (a) 未以其原形取得事后击杀证据。",
+          "fix": "台账改写命名，并以 M4 形式补一条真实变异取证；后续不得再用标题与操作不符的变异充当判据证据。"
+        },
+        {
+          "id": "C6-SPEC-5",
+          "severity": "clean",
+          "location": "pkg/hno/graph/graph.go + scheduler.go 全量对照契约非目标",
+          "evidence": "无 recover；grep sync./atomic. 0/0；AddJoin 仍只声明 edgeJoin 且构建期被拒（join-only 仍 PASS）；Warnings() 仍 nil；cfg 仍未被读；WithStepLimit(5) + 恒真自环实测仍无限步且不产生 ErrStepLimitExceeded（与 cycle5 同形、未恶化）；环仍未拒；无新导出面",
+          "finding": "越界：未见。B4/B5/B10 与 C5-SPEC-1/2/3 等非目标一律未被偷渡实现。",
+          "fix": ""
+        },
+        {
+          "id": "C6-SPEC-6",
+          "severity": "judgement",
+          "location": "docs/design/v3-test-scope-p1-graph-slice6.json 的 allowedTestSeam 与 graph_test.go:408-411",
+          "evidence": "缝只允许断言「边种类标签 + 原因词」，行内还锁了 to node/from node 方向短语",
+          "finding": "契约内部张力（不是违规）：杀 from/to 互换必须有方向。宜由结构化拒绝原因把方向变成字段，从而既保检测力又不锁 prose。",
+          "fix": "随 C6-SPEC-1 的结构化根治一并解决。"
+        },
+        {
+          "id": "C6-SPEC-7",
+          "severity": "blocking",
+          "location": "docs/design/v3-platform.md §3.3 / §3.5",
+          "evidence": "设计母约仍描述调度器持有 g、无任何捕获语义",
+          "finding": "新的核心不变式（一次 Run = 进入时那份已验证拓扑）只活在 .json 台账与代码注释里，母约未回写；母约是当前唯一对外承诺来源，且它此刻与实现相互矛盾。回写被 PreToolUse 门（禁改 docs/design/v3-*.md）阻塞，属已知债。",
+          "fix": "门解除后把 §3.3 调度模型、§3.4 规则 5、Run 捕获语义三段回写母约；期间以 cycle6 记录为权威。"
+        },
+        {
+          "id": "C6-SPEC-8",
+          "severity": "note",
+          "location": "docs/design/v3-p1-graph-slice6-test-diff-review.json / v3-p1-graph-review-verdict.json cycle5",
+          "evidence": "finalHashes 三枚 ✓；累计 +91/-16、+433/-0、+51/-11 ✓；切片自身 +8/-2、+32/-7、+104、+30/-15 ✓；LOC 408 ✓；32 PASS ✓；备份基线 19dcf6d2/68123f39 与 cycle5 在册一致 ✓",
+          "finding": "台账数字经两名审查者与父代理三方实测全部对得上，既有断言无弱化（相对 fixed point 删除为 0，两处改写是严格合取超集，表由 4 行增至 8 行且原 4 行原样保留）。两处不实：「被删 15 行全部是同一断言点的弱形式」不确（含 3 行注释重写与 1 行 Fatalf→Fatal）；cycle5 的 C5-SPEC-4 闭结声明被 C6-SPEC-1 推翻。",
+          "fix": "台账改写这两句；C5-SPEC-4 重新开为未闭。"
+        },
+        {
+          "id": "C6-SPEC-falsepass",
+          "severity": "clean",
+          "location": "pkg/hno/graph/graph_test.go 全量",
+          "evidence": "+433/-0；无 t.Skip；reference 是实跑参照而非写死期望；:489 的 [a b] 字面量只自检夹具；断言全部经导出 API、从外部包 graph_test 发起",
+          "finding": "falsePassProhibitions 九条逐条核：未见违反。",
+          "fix": ""
+        },
+        {
+          "id": "C6-SPEC-acceptance",
+          "severity": "note",
+          "location": "docs/design/v3-test-scope-p1-graph.md 的 §10 验收",
+          "evidence": "图类型仍 2/5 覆盖；判据 3（Fan-out/Default 扇出）与判据 5（环图）未推进",
+          "finding": "父票 P1 未完成；本切片只推进「构建期校验即终局」这一条产品承诺的前提条件。",
+          "fix": "按 nextSliceOrdering 继续。"
+        }
+      ]
+    },
+    "selfCorrections": [
+      "C5-SPEC-4 的闭结是我自己错的：我在 cycle5 记「给 S1/S2/S4 钉住边种类与原因词」已完成，实际钉住方式是对 prose 子串做包含判断，对 conditional 行是空断言（receipt:422ce345 实证）。连续第二个周期栽在同一类断言强度问题上，故下一次不再做子串微调，改为结构化拒绝原因（字段断言）以结构性根治。",
+      "我在台账里如实记录了 MUTANT-1 未击杀，却没有同步改掉源码里被该变异推翻的那句注释（scheduler.go:30-31），也没有据此补测试 —— 记录的诚实不等于保证的诚实。",
+      "我把「与实跑参照值相等」当成断言强度的来源，未识别它同时是盲区：任何让参照与受试同向退化的缺陷（output 捕获整体失效）在该面上永不可见（receipt:cf8c0d58）。"
+    ],
+    "blocking": [
+      "C6-SPEC-1 种类钉住对 conditional 为空断言（C5-SPEC-4 重开）",
+      "C6-SPEC-2 S2 未钉住因：静默跳过缺谓词边可通过该用例",
+      "C6-STD-2 / C6-SPEC-3 nodes map 与 output 两处承载捕获零测试、S4 少 AddNode 腿",
+      "C6-STD-1 注释把隔离机制归给 edges 深拷贝，与实测相反",
+      "C6-STD-3 捕获语义命题缺 happens-before 前提，导出 GoDoc 会被读成运行中改图安全",
+      "C6-SPEC-4 判据 5(a) 变异取证命名失真",
+      "C6-SPEC-7 母约 §3.3/§3.5 与实现相互矛盾且未回写（受门阻塞）"
+    ],
+    "recordedNonBlocking": [
+      "C6-STD-4 entry 未进 plan，次序不变式无注释无断言",
+      "C6-STD-5 种类决策站点增至 4，:121 注释过度声明",
+      "C6-STD-6 capturePlan 的 Feature Envy",
+      "C6-STD-7 不可达 default 与零消费点配置面",
+      "C6-STD-8 测试必查列表重复、C5-STD-7 未消",
+      "C6-SPEC-6 allowedTestSeam 与方向断言的内部张力"
+    ],
+    "passing": [
+      "快照语义本身在 12 条导出面探针下未被 falsify（节点内加悬空边/空谓词边/合法边/覆盖同名节点、SetEntry/SetOutput/AddJoin、Run 后改再跑、双 Run、无环挂死），除无同步的跨 goroutine 改图（契约非目标 B10）",
+      "S3 为最强观察：AddEdge(\"a\",\"d\") 使 Completed() 真的变化，等式断言钉住「捕获而非活读」，且 ledger 的 S3 RED 记录了 [a b d] vs [a b]",
+      "S5 的 8 行端点表在种类+方向+原因词三重合取下杀掉常量 label（10 处判红）与 from/to 互换（方向短语判红），join 行只断言端点校验而不冒充 Join 路由",
+      "门禁全绿、冻结哈希前后一致、邻近包（agent/runner）无退化、非目标零越界、false-pass 九条零违反"
+    ],
+    "verdict": "实现符合本切片契约声明的行为且无越界，快照语义经多方探针未被推翻；但三张可观察面里有两张（Output 面、AddNode 覆盖面）在本周期取证下被证明不携带检测力，而种类钉住对 conditional 是空断言 —— 亦即 C5-SPEC-4 的债名义已还、实际未还。据此判阻断：证据强度低于本周期自己声明的完成判据，不能以绿测数量代替检错力。下一周期次序（含理由）：(0) 纯测试还债 —— 锚定形式钉种类（\"graph: \"+kind+\" edge\"）、S2 改新靶 AddConditional(\"a\",\"d\",nil)、补节点内 AddNode 覆盖与 SetOutput 两个子用例、给参照加绝对 Output 期望，并以「去 map 复制 / 抹 output / 贴错 label」三个变异复跑为真实击杀（关闭 C6-SPEC-1/2、C6-STD-2、C6-SPEC-3）；(1) 结构化拒绝原因（typed error 带 Kind/Endpoint）—— 同一类断言问题连续两周期失手，必须从子串比较升级为字段断言以结构性根治，顺带关闭 C5-STD-3 与 C6-STD-8、C6-SPEC-6，需自取 RED；(2) 文案诚实化 —— capturePlan 归因、plan GoDoc 的 happens-before 限定、导出 Run 的并发 caveat、entry 进 plan 或注释其次序（不加锁，B10 仍为显式非目标）；(3) B4 stepLimit 落地并消费配置面，使 ErrStepLimitExceeded 可与 ctx 取消区分（C5-SPEC-3：无安全阀就不能承诺环图可跑），必须早于任何环拓扑工作；(4) B5 无条件环构建期拒绝 + 谓词收敛合法环放行对照（兑现 C4-STD-2 (3) 与验收判据 5 的环图类）；(5) C5-SPEC-1 空 AddJoin、C5-SPEC-2 输出可达性、C4-STD-2 (2) 多条 Default 扇出（推进验收判据 3）；(6) C4-STD-3 种类策略折表 + C5-STD-7 测试去重 + capturePlan 归位。台账另需就地改写两句不实陈述（C6-SPEC-4 命名、C6-SPEC-8 的「全部为弱形式」）。本轮不提交，工作树保持未提交等待用户指示。",
+    "evidenceRefs": [
+      "receipt:422ce345-f149-4519-9e55-98c609ffada4",
+      "receipt:ce012bd9-8373-4c29-82a9-4f38ef66dd21",
+      "receipt:cf8c0d58-8629-4b76-8988-e93d6bdd8e1c",
+      "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle6.axes.standards",
+      "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle6.axes.spec",
+      "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle6.parentVerification",
+      "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle6.selfCorrections",
+      "artifact:docs/design/v3-test-scope-p1-graph-slice6.json",
+      "artifact:docs/design/v3-p1-graph-slice6-test-diff-review.json",
+      "file:pkg/hno/graph/scheduler.go#L21-L40",
+      "file:pkg/hno/graph/scheduler.go#L56-L72",
+      "file:pkg/hno/graph/graph.go#L113-L135",
+      "file:pkg/hno/graph/graph.go#L197-L212",
+      "file:pkg/hno/graph/graph.go#L225-L234",
+      "file:pkg/hno/graph/graph_test.go#L398-L442",
+      "file:pkg/hno/graph/graph_test.go#L444-L531",
+      "subagent:a2ec68b97e9f9e4de",
+      "subagent:foreground-independent-review"
+    ],
+    "nextSliceOrdering": [
+      "(0) 纯测试还债：锚定种类断言 + S2 新靶 + AddNode 覆盖与 SetOutput 子用例 + 参照绝对 Output 期望，并以三变异复跑为真实击杀",
+      "(1) 结构化拒绝原因（typed error 带 Kind/Endpoint/NodeName），关闭 C5-STD-3 与本轮 SPEC-1/6、STD-8 的同一根因",
+      "(2) 注释与 GoDoc 诚实化（归因、happens-before 限定、并发 caveat、entry 归位），不加锁",
+      "(3) B4 stepLimit：消费现有配置面并产生可与 ctx 取消区分的 ErrStepLimitExceeded",
+      "(4) B5 无条件环拒绝 + 谓词收敛环放行对照（验收判据 5）",
+      "(5) C5-SPEC-1 空 AddJoin + C5-SPEC-2 输出可达性 + C4-STD-2 (2) 多 Default 扇出（验收判据 3）",
+      "(6) C4-STD-3 种类折表 + C5-STD-7 去重 + capturePlan 归位"
+    ]
+  },
+  "cycle7": {
+    "reviewedSlice": "切片 7（work-p1-graph-engine-r7-assertion-teeth）：只改测试，为切片 5–6 的断言装上牙齿 —— 锚定边种类文案、给参照 Run 加绝对期望、补『运行中覆盖同名节点』与『运行中改写输出节点名』两条捕获腿。",
+    "activationId": "9324b8e8-46f0-4c46-9d0b-5b13f0dab3f5",
+    "commandToken": "b85b6f5d-2b30-42b0-83f6-59f3c37328a3",
+    "reviewedAt": "2026-09-27T07:45:00Z",
+    "fixedPoint": {
+      "commit": "0387000",
+      "subject": "feat(graph): land zero-lock scheduler with build-time edge validation",
+      "resolveVerified": true
+    },
+    "freeze": {
+      "graph.go": "3483783f1e787c96ca6c236341664d095acec5c0",
+      "scheduler.go": "87854ffbb7629f9adeb2d45fbb74d91f2032b99d",
+      "graph_test.go": "0ebcadebed389afe7aa842a6958f3116dc7a9af2",
+      "hashMethod": "git hash-object --no-filters",
+      "note": "父侧在本轮全部变异实验结束后逐文件复算，三个哈希与冻结值一致。"
+    },
+    "diff": {
+      "command": "git diff --numstat 0387000 -- pkg/hno/graph",
+      "graph.go": "+91/-16",
+      "scheduler.go": "+51/-11",
+      "graph_test.go": "+481/-0",
+      "slice7Increment": "+59/-11（相对 cycle6 备份 graph_test.go 62e0b2cf…）",
+      "purity": "测试文件相对 fixed point 删除行为 0，切片 1–4 的既有断言逐字节未动；生产文件与 cycle6 备份哈希相同 ⇒ 本轮零生产代码改动，导出符号面 25→25 无变化。"
+    },
+    "independentReview": {
+      "dispatch": "独立子代理（Agent 描述『Independent slice-7 review』，subagent_type=general-purpose，无父上下文）执行 rex-code-review 双轴，只读加自带 /tmp/r7rev 变异实验，结束时交回冻结哈希。",
+      "standardsFindings": "4 项（1 hard、3 judgement）",
+      "specFindings": "7 项（4 hard、2 judgement、1 项验证限制说明）",
+      "mutationKillClaimsReproduced": "4/4（MUT-1 :349/:365/:435×2、MUT-2 :531、MUT-3 :501、MUT-3b :539 唯一判红）",
+      "treeLeftIntact": true,
+      "reviewerArtifacts": "/tmp/r7rev/{entryprobe.txt,t6.txt,d2.txt,d5.txt,d5b.txt,d5f.txt,n2.txt,o2.txt,mut*.txt,base.txt,cov.txt}"
+    },
+    "parentVerification": {
+      "method": "父侧不复用子代理结论：每个 hardening 判定用真实变异 + rex receipt 复算，历史声明用 cycle6 备份与 grep 复核。",
+      "items": [
+        {
+          "id": "PV-1",
+          "claim": "C7-SPEC-4：Validate 的入口存在性检查（graph.go:220-222）检测力为零。",
+          "measurement": "删除该分支后 go test ./pkg/hno/graph/... -count=1 退出 0；同一份被改代码下，用导出 API 构造『只缺入口』的图：Validate() 返回 <nil>，Run() 以 SIGSEGV 结束（nil Node 接口调用，panic 帧 scheduler.go:110，spawn goroutine 起于 :109）。恢复后同一探针输出 graph: entry node \"ghost\" does not exist，Validate 与 Run 都拒绝。",
+          "receipts": [
+            "receipt:b16b68fd-220c-4f3e-9679-95f111774bdf",
+            "receipt:13e5ca5e-0c62-42f0-8e90-11f5aac80610"
+          ],
+          "ruling": "成立。子代理报告的 panic 行号 scheduler.go:112 是它自己打过补丁的副本；当前文件实测为 :110。",
+          "note": "另有一次同类运行 receipt:e665f5a4-e3d9-421c-a6b3-200dec5799ef 用 `| tail` 掩盖了退出码（exit 0 不可作证据），只作为调用方式错误登记，不作为判定依据。"
+        },
+        {
+          "id": "PV-2",
+          "claim": "C7-STD-1：graph_test.go:574-577 是本轮新增的、按构造不可能为假的断言。",
+          "measurement": "结构证明：reference 是 :494 那次已完成 Run 的 *Result；consume 返回后无人再写 result.completed，而 T6 的 Stimulus 改的是另一个新建图对象（newGraph 每次调用返回新图）。:495 已用 t.Fatalf 断言同一谓词 reference.Completed()==[a b]，失败即中止，故 :574 永无独立判红机会。实测证明：删掉这 4 行后 go test ./pkg/hno/graph/... -count=1 退出 0。",
+          "receipts": [
+            "receipt:37eb1423-1f85-449a-8212-42be72c1e2ec"
+          ],
+          "ruling": "成立。该子用例真正的承重断言是 :570（下一次 Run 必须看见新注册节点 e），它本身已封住『终身冻结』式实现。"
+        },
+        {
+          "id": "PV-3",
+          "claim": "C7 台账的 MUT-2 击杀（capturePlan 不再复制节点表）。",
+          "measurement": "父侧独立复现：nodes := g.nodes 后 go test ./pkg/hno/graph/... -run TestP1G -count=1 退出 1，唯一判红为 graph_test.go:531『Output() = OVERRIDE-B，参照图为 seed』；Completed 面仍是 [a b]，即击杀发生在输出面而非执行面。",
+          "receipts": [
+            "receipt:c6a2575e-9316-41fe-8627-f76c021d706f",
+            "receipt:80d6fe4d-1d18-4f18-912b-3bd7c188bb33"
+          ],
+          "ruling": "成立，且与子代理、hardening 台账三方一致。"
+        },
+        {
+          "id": "PV-4",
+          "claim": "C7-SPEC-2：我在台账与测试注释里写的『旧的同靶写法只对崩溃面敏感』。",
+          "measurement": "cycle6 备份 /tmp/p1-cycle6/graph_test.go:335 的旧刺激是 g.AddConditional(\"a\", \"b\", nil)（同靶）。在『把 nil 谓词当真』的实现下 b 被再次激活，Completed 变为 [a b b] ≠ 参照 [a b] —— 旧写法在 Completed 面本就判红。子代理在 /tmp 隔离副本里实测到同一失败文本（旧文件 :511）。",
+          "receipts": [],
+          "ruling": "我的理由陈述被证伪。改新靶的真实收益只对『Completed 去重』这类实现成立（去重后同靶形态 [a b] 与参照无法区分，新靶 [a b d] 仍可区分），台账与 :522-524 注释都要改写为这个更窄的理由。刺激本身保留。"
+        },
+        {
+          "id": "PV-5",
+          "claim": "C7-SPEC-3 / C7-STD-4：夹具把 d 从透传改为常量 \"D-OUT\" 是一次『收紧』。",
+          "measurement": "grep 计数：\"D-OUT\" 在 graph_test.go 只出现 1 次（:456 定义处），\"E-OUT\" 也只 1 次（:566 定义处），两者都不在任何断言里；唯一执行 d 的子用例（:550 对照）只读 Completed()。T4 场景里 d 从不执行，所以 output 捕获失效时无论 d 返回什么都判红（Output() = <nil>）。",
+          "receipts": [],
+          "ruling": "『收紧』声明不成立，夹具值当前是无断言载荷的死数据。可修法：在 :550 对照里补 Output()==\"D-OUT\" 的绝对期望，让该值第一次承载观察。"
+        },
+        {
+          "id": "PV-6",
+          "claim": "台账行号可追溯性。",
+          "measurement": "实测：锚定的必查列表在 :433（判红输出在 :435），slice5 两处列表在 :347/:363（判红在 :349/:365），对照块 Errorf 在 :556（不是 :554），三个既有隔离子用例现在位于 :515-548（:530-547 是新增的 T3/T4 一对）。",
+          "receipts": [],
+          "ruling": "台账把 :435/:349/:365 写在 change 字段、把 :554 与 :504-520→:530-547 写成漂移，均属字段语义混用或数字错位，需更正。"
+        }
+      ]
+    },
+    "gates": [
+      "go test ./pkg/hno/graph/... -count=1 退出 0（receipt:80d6fe4d-1d18-4f18-912b-3bd7c188bb33）",
+      "go test -race ./pkg/hno/graph/... -count=1 退出 0（子代理实测）",
+      "go vet ./pkg/hno/graph/... 退出 0；gofmt -l pkg/hno/graph 无命中；go build ./... 退出 0（子代理实测）",
+      "go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1 两个 ok（邻近包未受影响）",
+      "聚焦 -run TestP1G -v：35 PASS / 0 FAIL / 0 SKIP，pkg/hno/graph 语句覆盖 84.6%（高于 AGENTS.md 的 70% 地板）",
+      "非测试文件 sync./atomic./recover( 命中 0/0；导出符号集与 fixed point 相同（25→25）"
+    ],
+    "axes": {
+      "standards": {
+        "source": "AGENTS.md（Coding Style / Testing Guidelines：table-driven、colocated、导出符号须有 GoDoc）+ 12 条 smell 基线",
+        "findings": [
+          {
+            "id": "C7-STD-1",
+            "severity": "hard",
+            "location": "pkg/hno/graph/graph_test.go:574-577",
+            "evidence": "新增断言 reference.Completed()==[a b] 与 :495 的 t.Fatalf 谓词完全同一，且 reference 是另一次已完成 Run 的不可变 Result；删除这 4 行后全套件仍退出 0（receipt:37eb1423）。本轮的登记目的正是消灭永真断言（cycle6 receipt:cf8c0d58 的 vacuous-pin），却在本轮新增代码里重新引入了一个，并在台账中把 T6 记为已交付加固项而不归属任何变异 —— 直接违反契约 completionCriteria[6]『每条新增断言都在台账里写明它杀哪个变异』。",
+            "fix": "删除 :574-577；或把它变成可观察：在 :562 子用例里改断『第二次 Run 的绝对 Output()』（此时 output 仍是 b ⇒ \"seed\"），或改用『注册 e 之后新建一份参照 Run』来比较，使泄漏在物理上可能发生。"
+          },
+          {
+            "id": "C7-STD-2",
+            "severity": "judgement",
+            "location": "graph_test.go:515/:521/:530/:538/:544；:347 与 :363",
+            "evidence": "同一形态复制 5 次：assertSameAsReference(t, <label>, mustRun(t, newGraph(func(g){<刺激>})))；另有两处逐字节相同的必查词列表 []string{\"graph: conditional edge\", \"predicate\", `\"a\"`, `\"b\"`}，本轮必须同时改两份拷贝（见 /tmp/p1-cycle6/slice7-test-diff.txt 的 @@ -344 与 @@ -360 两个 hunk）。AGENTS.md Testing Guidelines 要求 table-driven。cycle6 已把同类重复登记为 C6-STD-8 并在契约 nextOwed(1)/(6) 显式推迟，故不是新违规，但本轮把实例数从 3 增至 5。",
+            "fix": "把 5 个隔离子用例改为 []struct{name string; mutate func(*graph.Graph)} 表；抽出 assertReasonMentions(t, err, kind, words...) 消除词表拷贝。"
+          },
+          {
+            "id": "C7-STD-3",
+            "severity": "judgement",
+            "location": "graph_test.go:433（生产侧 graph.go:130-136、:225/:228/:231/:234）",
+            "evidence": "锚定形式 \"graph: \" + tc.kind + \" edge\" 把两条独立的生产文案事实（Validate 的模板与 label() 的 \"%s edge\" 后缀）在测试里重新拼装。两面后果实测：无谓的词面改动会判红（吵，可接受），诊断语义退化却静默通过（见 C7-SPEC-5 的 D1/D1b/D3）。今天无法用符号挂钩钉住，因为 edgeKind 未导出（graph.go:102）。",
+            "fix": "由已排期的结构化拒绝错误（Kind/Endpoint/NodeName 字段的 typed error）替代散文拼装；本轮不引入（契约 explicitNonGoals[1]）。"
+          },
+          {
+            "id": "C7-STD-4",
+            "severity": "judgement",
+            "location": "graph_test.go:453 名称、:456 \"D-OUT\"、:566 \"E-OUT\"",
+            "evidence": "TestP1G_RunIsolatesTopologyFromConcurrentMutation 名不符实：刺激是在节点 a 自己调用内顺序执行的，没有并发（台账 openInvariantsDeclaredFalse[0] 自己承认并发面未覆盖）。两个夹具常量各只出现 1 次且都不被断言。",
+            "fix": "改名 …FromInFlightMutation；夹具值要么被断言（见 C7-SPEC-3 的修法）要么退回透传。"
+          }
+        ],
+        "smellBaseline12": "Mysterious Name→C7-STD-4；Duplicated Code→C7-STD-2；Feature Envy→capturePlan 仍是 scheduler.go:32 上的 *Graph 方法（C6-STD-6，本轮未动，nextOwed(6) 在册）；Data Clumps→(kind, side) 表列是好形态，原因词团是 C7-STD-2；Primitive Obsession→C7-STD-3；Repeated Switches→label/routable/requiresPredicate/successors 四处 kind 级联，本轮零生产行未变；Shotgun Surgery→C7-STD-2（本轮 diff 实测）；Speculative Generality→label() 的 default: 覆盖 0%、Warnings/Typed 0%、外加两个无断言夹具值；Message Chains→未见；Middle Man→未见（declare 是刻意的单一写入口）；Refused Bequest→未见；Divergent Change→本 diff 未见。",
+        "axisSummary": "4 项（1 hard、3 judgement）；最严重：C7-STD-1 —— 以消灭永真断言为目的的切片自己新增了一个永不可能失败的断言，且台账未把它归属任何变异。生产代码本轮零改动，故非测试面无新违规可报。"
+      },
+      "spec": {
+        "sources": [
+          "docs/design/v3-test-scope-p1-graph-slice7.json（本轮测试范围契约：T1–T5、非目标、允许缝、9 条假通过禁令、7 条完成判据）",
+          "docs/design/v3-test-scope-p1-graph.md（母票 §4 B6、§6 判据 3、§12.1 R1、§12.2 推迟项）",
+          "docs/design/v3-platform.md §3.4 路由语义 / §3.5 构建期校验（母约，§3.3/§3.5 回写仍被 gate 阻断）"
+        ],
+        "killReproduction": [
+          "MUT-1 label(edgeConditional)→\"unconditional edge\"：-run TestP1G 退出 1，恰 4 处判红（:349、:365、:435×2），无其他。",
+          "MUT-2 capturePlan 节点表不复制：父侧复现，退出 1（receipt:c6a2575e），唯一判红 :531，且发生在 Output 面（Completed 仍 [a b]）。",
+          "MUT-3 plan.output 捕获抹为 \"\"：退出 1，:501 参照绝对期望判红。附带条件：:501 是 Fatalf，会在任何子用例之前中止；全包范围内该变异在 cycle6 已被 7 处既有断言判红（:40、:116、:235×5、:320）。因此 MUT-3 只在隔离子用例范围内体现切片 7 的增量能力，台账 killedBy 只写 :501 属于低估击杀集。",
+          "MUT-3b 调度器持有 *Graph 并活读 g.output：退出 1，唯一判红 :539，其余 6 个隔离子用例与另 27 处断言全绿 ⇒ 独占检测力成立。"
+        ],
+        "findings": [
+          {
+            "id": "C7-SPEC-1",
+            "severity": "hard",
+            "location": "docs/design/v3-test-scope-p1-graph-slice7.json completionCriteria[0] 的 (d)",
+            "evidence": "(d) 要求『successors 里重新加回 e.p != nil 静默跳过守卫』判红。实测插入 if e.p == nil { continue } 后 -count=1 与 -run TestP1G -v 都退出 0（35/35 绿）。原因是构造性不可达：graph.go:230 拒绝任何 nil 谓词声明，Run 先 Validate 再 capturePlan（scheduler.go:61→:65），复制的边切片里不可能含 nil 谓词 ⇒ 该变异是等价变异，err/Completed/Output/Value 四个面按构造都相同。台账 limitations[0] 的陈述方向正确，缺陷在契约本身：契约仍挂着一条永不可满足的判据，而 hardening 台账把它当作『只差证据』的欠账。",
+            "fix": "把 completionCriteria[0] 的 (d) 改写为 unachievable-by-construction 并给出等价性证明，不再作为欠账传递；可达的替身判据是 (b)/(c) 与 C7-SPEC-2 的去重稳健性。"
+          },
+          {
+            "id": "C7-SPEC-2",
+            "severity": "hard",
+            "location": "docs/design/v3-p1-graph-slice7-hardening.json limitations[0] + graph_test.go:522-524 注释",
+            "evidence": "见 PV-4：旧同靶刺激在 cycle6 备份 :335，『nil 当真』变异让它已在 Completed 面判红（[a b b]）。改新靶的真实收益是对 Completed 去重的实现（去重后台账里 [a b] 与参照无法区分；实测旧文件退出 0 / 新文件退出 1，:525 报 [a b d]）。另需注意：全包运行时这一类会先被前一个悬空边子用例的 SIGSEGV 抓住，T2 的 Completed 信号只在 -run …/<该子用例> 范围内可达。",
+            "fix": "重写 limitations[0] 与 :522-524 注释为去重稳健性论证；刺激保留。"
+          },
+          {
+            "id": "C7-SPEC-3",
+            "severity": "hard",
+            "location": "hardening.json T4 说明 + invariant-review.json assertionDelta[2]『收紧』",
+            "evidence": "见 PV-5：T4 场景里 d 从不执行，MUT-3b 在 identity-d 与 constant-d 两种夹具下给出同一判红（subj Output()=<nil>）；\"D-OUT\" 在测试文件仅定义处出现一次，从未被断言。台账另一句『无任何既有断言因 d 换值而改变通过性』为真，而这恰恰否证了『收紧』；deletedLinesAccounting 的总括『每一处都是收紧』对这一行过头了。",
+            "fix": "在 :550 既有对照里补 mustRun(t,g).Output()==\"D-OUT\" 的绝对期望（在允许缝内），使新夹具值承载观察并给下一次 Run 的输出解析一个绝对锚；同时更正台账措辞。"
+          },
+          {
+            "id": "C7-SPEC-4",
+            "severity": "hard",
+            "location": "graph.go:220-222（Validate 入口存在性）+ graph_test.go:404-418 表",
+            "evidence": "见 PV-1：删除该检查后 35/35 全绿（receipt:b16b68fd），导出 API 层面把一次干净的构建期拒绝换成杀死宿主的 SIGSEGV（panic 帧 scheduler.go:110）。覆盖画像独立佐证：块 graph.go:220.36,222.3 计数 0。范围归属：v3-platform.md §3.5 必检项 3『无入口 / 入口不存在』、母票 §4 B6 与 §6 判据 3『每种非法图一个表驱动子用例』都在册，§12.2 只推迟了重复名/不可达/非输出汇点/Join 前驱数 —— 故这不是被推迟项。同形态的另一处：删掉 \"is declared but not routable by this engine\" 原因短语也退出 0，但母票 §12.1 R1 只要求『节点名或边类型』可定位，属 judgement。",
+            "fix": "给 :404-418 表补 entry-missing / entry-not-a-node 两行，并锚定 not-routable 原因短语；两者都是纯测试新增，落在本轮契约缝内。"
+          },
+          {
+            "id": "C7-SPEC-5",
+            "severity": "judgement",
+            "location": "graph_test.go:433 锚定机制；graph.go:137-138（label 的 default:）",
+            "evidence": "锚定买到的是可测的真实改进：MUT-1 死在 4 处；对调 :225/:228 的 from/to 角色死在 8 处；四种误标都死（标签由 tc.kind 导出，行是对称的）。仍静默通过的三个退化：D1 对调 no-predicate 文案的角色、D1b 对调 not-routable 文案的角色、D3 新增第五种 edgeKind 与导出声明器却忘记 label() 分支（落 default:，覆盖 0%）⇒ 报错退化为 \"graph: edge from \\\"a\\\" to \\\"b\\\" …\"，边种类从诊断里消失，35 个断言仍全绿。契约禁令 #8（不得做四标签快照）在字面上被遵守（表由 tc.kind 导出），但机制仍是枚举 + 字符串重拼。台账 limitations[0] 只点出一个残留洞，实测是三个。",
+            "fix": "由结构化错误（已排期 nextOwed(1)）承担角色与穷尽性约束，另为每条原因短语各设一行表，使穷尽性被结构化断言。"
+          },
+          {
+            "id": "C7-SPEC-6",
+            "severity": "note（含验证限制）",
+            "location": "docs/design/v3-p1-graph-slice7-hardening.json / -invariant-review.json",
+            "evidence": "可核验部分全部复现：numstat +91/-16、+481/-0、+51/-11；切片增量 +59/-11；11 处删除行全属切片 5/6 内容（2 份词表、1 处表断言、1 个夹具、1 个刺激、6 行注释），两处词表编辑是裸子串形式的严格超集；LOC 408=253+155；35 PASS/0 FAIL/0 SKIP；hashAfter 与冻结一致；fixed point 主题引用准确；非测试文件零 sync./atomic./recover(；导出面 25→25；BS-5 下游场景逐字复跑 BASELINE-OK（含 next-run-visible completed=[a b d] output=D-OUT）。不符部分见 PV-6（:528→应为 :556 而非 :554；:504-520→现在 :515-548，:530-547 是新增对；change 字段里的 :435/:349/:365 实为 :433/:347/:363）。验证限制更正：子代理环境没有 rex-harness 且它查找的是 .harness/，因此自报 9 个 receipt UUID 无法回查；父侧确认工作项存储实为 .rex-harness/receipts/<id>.json，本轮引用的五个回执（b16b68fd、37eb1423、c6a2575e、80d6fe4d、13e5ca5e）已逐个 grep 到文件，不是悬空引用。",
+            "fix": "台账更正行号并区分 change/killedBy 两个语义；对 :501 的 killedBy 补注全包范围的 7 处既有击杀，避免低估击杀集。"
+          },
+          {
+            "id": "C7-SPEC-7",
+            "severity": "hard（承前）",
+            "location": "cycle6 阻断项清单",
+            "evidence": "逐条裁定：C6-SPEC-1 闭结（MUT-1 实测 4 处判红）；C6-SPEC-2 部分闭结且如实声明（静默跳过形态仍全绿 = C7-SPEC-1，理由陈述错 = C7-SPEC-2）；C6-STD-2/C6-SPEC-3 对两个捕获机制闭结，但新增了一条惰性断言（C7-STD-1）并过度声明了 T4 夹具（C7-SPEC-3）；C6-STD-1 仍开放且声明在案（scheduler.go:30-31 文案未改，edges 深拷贝按构造不可杀，父侧同意：declare 只追加）；C6-STD-3 仍开放（:21-23、:57-59 文案，limitations[2]/openInvariantsDeclaredFalse[0]）；C6-SPEC-4 闭结（cycle6 台账已改名 MUTANT-1-attempted-not-a-kill 并加 supersededClaims）；C6-STD-4 仍开放（scheduler.go:70 仍活读 g.entry，父侧同样构造不出可杀变异）；C6-SPEC-7 仍开放且被 gate 阻断（v3-platform.md 未出现在 git status，§3.3 仍写 g *graph 且无捕获语义）。补充：本轮 MUT-3b 恰好就是母约 §3.3 记载的形状，现已由 :539 判红钉住 —— 回写时应把它作为反例证据。cycle6 非阻断 C6-STD-5/6/7/8 与 C6-SPEC-6 全部仍开放、全部如实停在 nextOwed(1)/(6)，本轮零生产行未使其倒退。",
+            "fix": "见 blocking 与 nextSliceOrdering。"
+          }
+        ],
+        "axisSummary": "7 项（4 hard、2 judgement、1 说明含验证限制）；最严重：C7-SPEC-4 —— 母约 §3.5 必检项『入口不存在』在构建期校验里是实现了，但测试面对它检测力为零，删除后 35 个断言全绿而导出 API 把拒绝换成 SIGSEGV；该项在母票在册、不属于 §12.2 的推迟清单。"
+      }
+    },
+    "selfCorrections": [
+      "我声明『旧的同靶写法只对崩溃面敏感』→ 证伪：它在 Completed 面本就判红（PV-4）。真实且更窄的理由是 Completed 去重稳健性。",
+      "我声明夹具 d 改为 \"D-OUT\" 是一次『收紧』→ 证伪：T4 不执行 d，且 \"D-OUT\" 从未被断言（PV-5）。",
+      "我在契约里写了完成判据 (d)『重新加回 e.p != nil 必须判红』→ 构造性不可满足的判据（等价变异），却以欠账形式传递（PV/C7-SPEC-1）。契约需改写为 unachievable-by-construction。",
+      "我在 T6 新增了一条按构造不可能为假的断言（:574-577）并未在台账归属任何变异 → 与本轮登记目的直接冲突（PV-2）。",
+      "我在台账里把判红行与改动行混记，并把对照块行号写错（:554/:504-520 → 实测 :556/:515-548）（PV-6）。",
+      "我对子代理 panic 行号 :112 未复核即准备引用 → 父侧实测当前文件为 :110（:112 是子代理自己打过补丁的副本）。"
+    ],
+    "blocking": [
+      {
+        "id": "B7-1",
+        "item": "graph_test.go:574-577 删除或改为可观察（C7-STD-1）",
+        "kind": "test-strength",
+        "note": "本轮 delivered，必须先撤掉自己的永真断言才能宣称牙齿已装齐。"
+      },
+      {
+        "id": "B7-2",
+        "item": "给 :404-418 悬空端点表补 entry-missing / entry-not-a-node 两行，并锚定 not-routable 原因短语（C7-SPEC-4）",
+        "kind": "coverage",
+        "note": "纯测试新增，落在本轮允许缝内；与 §3.5 必检项 3、母票 B6/判据 3 对齐。"
+      },
+      {
+        "id": "B7-3",
+        "item": "在 :550 对照补 Output()==\"D-OUT\" 绝对期望，或退回透传夹具（C7-SPEC-3 / C7-STD-4）",
+        "kind": "test-strength"
+      },
+      {
+        "id": "B7-4",
+        "item": "契约 completionCriteria[0] 的 (d) 改为 unachievable-by-construction 并附等价性证明（C7-SPEC-1）",
+        "kind": "contract-authoring"
+      },
+      {
+        "id": "B7-5",
+        "item": "台账更正：T2 理由改为去重稳健性；T4 夹具不再声称收紧；行号区分 change/killedBy 并修正 :556/:515-548；:501 的 killedBy 补注全包 7 处既有击杀（C7-SPEC-2/3/6）",
+        "kind": "ledger-honesty"
+      },
+      {
+        "id": "B7-6",
+        "item": "承前未闭结：C6-STD-1（:30-31 复制理由文案错指 edges）、C6-STD-3（Run GoDoc 缺 happens-before 与并发告诫）、C6-STD-4（scheduler.go:70 活读 g.entry）",
+        "kind": "carried"
+      },
+      {
+        "id": "B7-7",
+        "item": "承前未闭结：C6-SPEC-7 母约 §3.3/§3.5 回写被 PreToolUse gate 阻断，需换 .json 台账外的载体或由用户解除 gate",
+        "kind": "carried-blocked"
+      }
+    ],
+    "recordedNonBlocking": [
+      "C7-STD-2：5 份同形隔离子用例 + 2 份逐字节相同的必查词表 → 表驱动化与 assertReasonMentions 抽取（nextOwed(1)/(6)）。",
+      "C7-STD-3：散文重拼的锚定，由 typed error 取代（nextOwed(1)，行为差异切片，需自己的 RED）。",
+      "C7-STD-4：测试名 FromConcurrentMutation 名不符实 → InFlightMutation。",
+      "C7-SPEC-5：三条静默退化 D1/D1b/D3（角色对调 ×2、第五种 edgeKind 落 default:）作为结构化错误切片的判据来源。",
+      "MUT-3 的 killedBy 低估击杀集（隔离范围 vs 全包范围）—— 记录，属台账表达而非证据造假。",
+      "C6-STD-5/6/7/8、C6-SPEC-6 全部仍开放且在册。"
+    ],
+    "passing": [
+      "4 个变异的击杀全部由独立子代理与父侧各自复现（MUT-2 父侧 receipt:c6a2575e 非零，恢复后 receipt:80d6fe4d 零）。",
+      "MUT-3b 的独占检测力成立：唯一判红 :539，其余 33 处全绿。",
+      "本轮纯度：零生产行改动、导出面不变、测试文件相对 fixed point 删除行为 0、gofmt/vet/race/build 全绿、覆盖 84.6%。",
+      "下游真实场景基线（BS-1…BS-5）逐字复跑 BASELINE-OK，包含『Run 之后声明对下一次 Run 可见』的正向对照。"
+    ],
+    "verdict": "实现面本轮无改动，因此审查落点全在测试担保与台账诚实度两处。切片 7 确实交付了它宣称的牙齿：锚定后条件边种类被 4 处独立判红钉住（cycle6 的子串歧义缺陷 C6-SPEC-1 真实闭结），两个捕获机制（节点表、output 值）各有一条只在它失效时才红的断言，其中 :539 具备独占检测力，MUT-2 由父侧独立复现。但同一轮里出现了三类必须回炉的诚实度问题：一是我新增了一条按构造不可能为假的断言（graph_test.go:574-577，删除后全套件仍零退出，receipt:37eb1423），而本轮的登记目的正是消灭这类断言；二是台账对 T2 改靶与 T4 夹具的两条理由被实测证伪（旧刺激本就在 Completed 面判红；\"D-OUT\" 从未被任何断言读取）；三是母约 §3.5 必检项『入口不存在』对应的 graph.go:220-222 在测试面上检测力为零（删除后 35/35 绿，receipt:b16b68fd），而导出 API 的真实后果是把构建期拒绝换成杀死宿主的 SIGSEGV（panic 帧 scheduler.go:110），该项不在母票 §12.2 的推迟清单内。另有契约自身的缺陷：完成判据 (d) 要求击杀一个等价变异，属构造性不可满足，应以 unachievable-by-construction 结案而非继续欠账。裁定：本轮不闭结，B7-1…B7-5 为阻断项，B7-6/B7-7 为承前端口；结构化拒绝错误仍是下一个行为差异切片（需要自己的 RED），注释诚实化与入口校验覆盖可与之并行作为纯测试/纯文案轮。",
+    "evidenceRefs": [
+      "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle7",
+      "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle7.axes.standards",
+      "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle7.axes.spec",
+      "artifact:docs/design/v3-p1-graph-review-verdict.json#cycle7.parentVerification",
+      "artifact:docs/design/v3-p1-graph-slice7-hardening.json",
+      "artifact:docs/design/v3-p1-graph-slice7-invariant-review.json",
+      "artifact:docs/design/v3-test-scope-p1-graph-slice7.json",
+      "file:pkg/hno/graph/graph_test.go:433",
+      "file:pkg/hno/graph/graph_test.go:495",
+      "file:pkg/hno/graph/graph_test.go:501",
+      "file:pkg/hno/graph/graph_test.go:525",
+      "file:pkg/hno/graph/graph_test.go:531",
+      "file:pkg/hno/graph/graph_test.go:539",
+      "file:pkg/hno/graph/graph_test.go:550",
+      "file:pkg/hno/graph/graph_test.go:562",
+      "file:pkg/hno/graph/graph_test.go:574",
+      "file:pkg/hno/graph/graph.go:220",
+      "file:pkg/hno/graph/scheduler.go:109",
+      "file:pkg/hno/graph/scheduler.go:110",
+      "file:/tmp/p1-cycle6/graph_test.go:335",
+      "receipt:b16b68fd-220c-4f3e-9679-95f111774bdf",
+      "receipt:37eb1423-1f85-449a-8212-42be72c1e2ec",
+      "receipt:c6a2575e-9316-41fe-8627-f76c021d706f",
+      "receipt:80d6fe4d-1d18-4f18-912b-3bd7c188bb33",
+      "receipt:13e5ca5e-0c62-42f0-8e90-11f5aac80610"
+    ],
+    "nextSliceOrdering": [
+      "(1) 立即回炉（同一切片内可完成，纯测试/纯台账）：删或改 :574-577（B7-1）；:404-418 补 entry 两行 + 锚定 not-routable 原因短语（B7-2）；:550 补 Output()==\"D-OUT\" 或退回透传（B7-3）；契约 (d) 改 unachievable-by-construction（B7-4）；台账三处理由与行号更正（B7-5）。这一轮完成后切片 7 才可判闭结。",
+      "(2) 行为差异切片（需自己的 RED 与公共 API 决策，不得偷渡）：结构化拒绝错误（typed error 携带 Kind/Endpoint/NodeName），同时消解 C7-STD-3 与 C7-SPEC-5 的 D1/D1b/D3 三条静默退化。",
+      "(3) 纯文案轮：C6-STD-1（:30-31 复制理由）、C6-STD-3（Run GoDoc 的 happens-before 与并发告诫）、C6-STD-4（scheduler.go:70 的 entry 次序）——含『把结论限定到实际能承诺的范围』。",
+      "(4) 结构轮：5 份隔离子用例表驱动化 + assertReasonMentions 抽取（C7-STD-2）；capturePlan 归属（C6-STD-6）。",
+      "(5) 能力轮：B4 stepLimit、B5 无条件环拒绝、B2 Join 路由、C5-SPEC-1 空 AddJoin、C5-SPEC-2 输出可达性、C4-STD-2 (2) 多 Default 扇出 —— 每个都先取 RED。",
+      "(6) 治理：母约 §3.3/§3.5 回写（gate 阻断，需在 v3-*.md 之外留痕或请用户解除），回写时把 MUT-3b 作为『母约形状已被判红钉住』的证据。",
+      "(7) P1 验收 §10 仍是 2/5 图类；P2…P9 主计划未动。"
+    ]
+  },
+  "cycle8": {
+    "verdictRef": "artifact:docs/design/v3-p1-graph-slice8-review-verdict.json",
+    "activationId": "108791f2-30e0-43de-82cd-f387119c214e",
+    "independence": "作者自审（独立审查子代理派发被拒），已在 verdict.independence 里如实降级",
+    "standardsFindings": [
+      "S8-STD-1 hard/已修：注释行号锚点失效 :637→:550",
+      "S8-STD-2 judgement：文案断言循环重复 5 处、identity fixture 重复 6 处",
+      "S8-STD-3 judgement：error 文案子串耦合",
+      "S8-STD-4 judgement：测试名 ConcurrentMutation 与同步 in-flight 语义不符",
+      "S8-STD-5 hard：悬空端点行只判 err，未判 Result==nil"
+    ],
+    "specFindings": [
+      "S8-SPEC-1 hard：§3.5 八项必查没有输出声明项，实测 SetOutput(ghost) 与未声明 SetOutput 都 err==nil / Output()==nil —— 契约与实现同缺",
+      "S8-SPEC-2 judgement：M-C 杀伤不唯一",
+      "S8-SPEC-3 judgement：never-declared 行由 %q 空串天然满足，与空名节点不可分",
+      "S8-SPEC-4 confirmed：A1..A5 中 A1/A2/A4/A5 有回执，非目标全守住",
+      "S8-SPEC-5 no-creep"
+    ],
+    "blocking": [
+      "S8-SPEC-1：输出声明从不校验（母约 §3.5 亦漏列）——须先改契约再取 RED。",
+      "S8-STD-5：悬空端点行的 Run 面只判 err，未判 Result==nil。"
+    ],
+    "owedCount": 7,
+    "measuredDelta": "断言点 10→47；测试删除行数 0；生产哈希 3483783f/87854ffb 未变；graph_test.go 0c5076ff→08783b5e（仅注释锚点）",
+    "verdict": "切片 8 自身的完成判据成立（三个被测零检测力位点已恢复牙齿，且逐位点有非零/零退出回执与覆盖率佐证，生产行为字节未变）。本家族不闭结：2 项 blocking、7 项 owed，其中 S8-SPEC-1 是先改契约再取 RED 的新行为缺口，不属于加固可修范围。另需承认独立性缺陷：本轮为作者自审，cycle7 那种外部审查强度未复现。"
+  },
+  "cycle9": {
+    "verdictRef": "artifact:docs/design/v3-p1-graph-slice9-review-verdict.json",
+    "activationId": "4178ab9b-9b18-46fa-a768-a0aef4c6392d",
+    "stage": "review（software.review.standards-spec / rex-code-review）",
+    "independence": "作者自审 + 三个包外真实探针模块实测（独立审查子代理派发此前被用户拒绝）；三条 hard 发现全部是跑出来的，不是读出来的",
+    "standardsFindings": [
+      "R9-STD-1 hard/已修：SetOutput GoDoc 过度声称「从未调用本方法即被拒」，探针实测空名节点可绕过 → 审查后仅改注释加边界句",
+      "R9-STD-2 judgement：Validate 内 entry/output 两条 3 行存在性检查同形，N=2 时折叠被拒（等第三个必查项出现再做 requireNode）",
+      "R9-STD-3 judgement：文案子串断言由 5 处涨到 6 处，缺结构化拒绝错误（Primitive Obsession）",
+      "R9-STD-4 judgement：拒绝次序与聚合诊断无显式契约，Warnings() 仍是死代码"
+    ],
+    "specFindings": [
+      "R9-SPEC-1 hard：注册名为 \"\" 的节点后，「从未声明入口/输出」与「声明为空名节点」在公共面不可区分（实测 validate=<nil> run-err=<nil> output=EMPTY-NODE-OUT）",
+      "R9-SPEC-2 hard：重名 AddNode 静默覆盖，§3.5 必查项 2 未实现（实测 winner=second，构建期与执行期都不报错）",
+      "R9-SPEC-3 hard/优先级提升：无条件自环使 Run 永不返回（探针挂死约 15 分钟后被外部终止，无 receipt），WithStepLimit/stepLimit/ErrStepLimitExceeded 全部是可调用的死 API",
+      "R9-SPEC-4 none：A1..A5 逐条有回执，6 项非目标未被侵犯，无 scope creep",
+      "R9-SPEC-5 judgement：§3.5 缺「输出声明」项，母约写回被 rex-self-sediment-gate 挡住，只能在 .json 账本记录"
+    ],
+    "blocking": [
+      "R9-SPEC-1：空节点名绕开本轮新校验。",
+      "R9-SPEC-2：重名 AddNode 静默覆盖（§3.5 第 2 项）。",
+      "R9-SPEC-3：无条件环 → Run 非终止；stepLimit 安全阀无效（产品级风险，建议下一批先做 B5/B4）。"
+    ],
+    "owedCount": 6,
+    "measuredDelta": "断言点 47→58；测试删除行数 0；graph.go 3483783f→b4e6051e（3 行校验 + 4 处文档，其中 1 处为审查后注释修正 eeb07f1c→b4e6051e）；scheduler.go 87854ffb 全程未变；graph_test.go e314979c→279078ae（A5 加强）；聚焦与全包 -race 均零退出",
+    "verdict": "切片 9 的行为差异闭环成立：新校验有真实行为级 RED（exit 1）/GREEN、两条唯一归因变异、包外公共入口复现同一结论，且没有把「输出值为 nil」误判为非法。本家族不闭结：本轮实测出三条新的规格缺口，其中 R9-SPEC-3 是无条件环导致执行非终止且规格承诺的安全阀完全无效，属使用者可触发的产品级风险，已从「下一轮再做」提升为「下一批先做」；独立性仍弱，需下一轮外部审查补足。"
+  },
+  "cycle10": {
+    "verdictRef": "artifact:docs/design/v3-p1-graph-slice10-review-verdict.json",
+    "activationId": "325307f4-3408-4207-bfd0-36fa84247b8c",
+    "stage": "review（software.review.standards-spec / rex-code-review）",
+    "slice": "切片 10 —— §3.5 第 7 项：由必定被走的边构成的环在构建期被拒",
+    "independence": "作者自审（独立审查子代理派发此前被用户拒绝）。缓解方式是不用读代码下结论：变异矩阵在 post-refactor 字节上重跑、取消与 goroutine 回收用仓库外模块实测、不可达节点 vs 不可达环用第二支探针实测、覆盖率与 vet/gofmt 取工具输出。残留风险：规格解释（尤其 AR1「兜底边有条件替代即可断开」）仍只有作者一人读过契约原文。",
+    "diffBoundary": "fixed point 0387000 与 HEAD 相同，三点 diff 为空；差异按工作树 vs 0387000 的 pkg/hno/graph 冻结（+1108/-27，属切片 2–10 累计），本轮增量按哈希链表达：graph.go b4e6051e→6ab6388a→e790d40c、graph_test.go →2d0625d5→a14299e6、scheduler.go 87854ffb 全程未变。",
+    "standardsFindings": [
+      "S10-STD-1 hard：graph_test.go:815-824 的 looping 文档注释挂在 noCount 上，两个函数同时被误述（Go 文档关联规则）",
+      "S10-STD-2 judgement：edgeKind 的种类判定簇被内联扩展（graph.go:256/263 vs :118/:124/:132），新增边种类时存在静默按「可断开」处理的风险",
+      "S10-STD-3 judgement/阻断：字符串化拒绝，本轮在两个入口 5 行里新增 10 个文案锚点，给结构化拒绝错误（R9-STD-3/4）加价",
+      "S10-STD-4 judgement/阻断：WithStepLimit 与 WithMaxConcurrency 两个导出旋钮写入字段后无任何非测试读取点（grep 实测），本轮之后 stepLimit 更具误导性",
+      "S10-STD-5 judgement/本切片内已闭环：alwaysTaken→alwaysTakenAdjacency 复查通过，记录以示未漏查",
+      "S10-STD-6 judgement：测试函数名只说 Validate 面但断言覆盖 Run 面（A4）；本轮不改名，因名字绑定在 RED 回执 argv 上",
+      "S10-STD-7 judgement：Validate 注释以散文重复 §3.5 已覆盖项清单，本轮为此把「五项」改成「六项」，且 cycle9 已记录过同类引用 rot"
+    ],
+    "specFindings": [
+      "S10-SPEC-1 hard/阻断：母约 §3.5 前言要求「全部在 Add* 时增量检查，Run 前全量复查」，实现只有后者（declare 仅 append，graph.go:198）；10 个切片后增量检查这一半仍为零，且从未进入任何切片契约",
+      "S10-SPEC-2 hard/阻断：§3.5 第 7 项与第 8 项互斥（无条件环已是错误，则「存在无条件环且未设 stepLimit → 警告」永不可达），Warnings() 恒返回 nil 已是该状态",
+      "S10-SPEC-3 hard/阻断：实测不自洽——不可达孤立节点 validate=<nil>，而不可达的无条件环被拒（c→d→c，nodesExecuted=0）。引擎拒掉零风险的声明、放行母约明确要求报错的声明",
+      "S10-SPEC-4 judgement：with-always-true-exit 行在冻结的 A1–A3 形状表之外，方向与第 7 项字面一致但需契约所有者确认",
+      "S10-SPEC-5 none：A1–A6 逐条有断言与回执；取消时序另经实测（err=context canceled，200ms 内 86,685 次执行，goroutine 由 3 回到基线 1，不泄漏）",
+      "S10-SPEC-6 none：无 scope creep，未新增导出面，scheduler.go 逐字节未变"
+    ],
+    "blocking": [
+      "S10-SPEC-1：§3.5 增量检查半壁未交付，需一次显式设计裁定（Add* 返回 error / panic / 明文规定首个观察点就是 Validate）。",
+      "S10-SPEC-3：可达性与第 4 项必须一起裁定，不得用测试悄悄固化现状。",
+      "S10-STD-4：两个死旋钮要在下一切片前处置（实现，或在 GoDoc 写明不生效，并加「导出 Option 字段必须被非测试代码读取」的守护测试）。",
+      "S10-STD-3：结构化拒绝错误（承接 R9-STD-3/4）。",
+      "S10-SPEC-2：母约第 7/8 项冲突写回，仍被 rex-self-sediment-gate 挡住。"
+    ],
+    "resolvedFromCycle9": [
+      "R9-SPEC-3（无条件环使 Run 非终止、安全阀无效）：本轮从根上改变可观察拒绝集——五类不可断开环全部构建期被拒且零节点执行；安全阀本身仍无效的部分移交 G6/P3（恒真条件环实测 2 秒 567,297 次执行）。",
+      "R9-STD-2 的触发条件已满足：该条写的是「等第三个必查项出现再做 requireNode 折叠」。现在 Validate 里同形存在性检查已有四处（entry :226、output :229、边 from :233、边 to :236），折叠的时机到了。此条是提交 verdict 之后才测出的观察，因此记在家族账本而不是回写已接受的 verdict 文件。"
+    ],
+    "owedCount": 8,
+    "owedList": [
+      "S10-SPEC-1 Add* 增量检查裁定（新设计决策，非 TDD 切片可直接吞下）",
+      "S10-SPEC-3 可达性 + §3.5 第 4 项不可达节点",
+      "S10-STD-4 死旋钮处置 + 导出面守护测试",
+      "S10-STD-3/R9-STD-3/4 结构化拒绝错误类型",
+      "S10-SPEC-2 §3.5 第 7/8 项冲突与输出轴、AR1 措辞的母约写回（gate 阻断，记 .json）",
+      "R9-SPEC-1 空节点名绕过",
+      "R9-SPEC-2 重名 AddNode 静默覆盖（§3.5 第 2 项）",
+      "R9-STD-2 存在性检查折叠 requireNode（触发条件本轮已满足）"
+    ],
+    "measuredDelta": "断言点 58→82；测试删除行数 0（纯新增 graph_test.go:597-824 + 两个 import）；graph.go b4e6051e→e790d40c（+90 行：strings import、Validate 收尾一行、三个私有函数、两处文档）；scheduler.go 87854ffb 未变；覆盖率 89.7 %，四个新/改函数各 100.0 %；gofmt 与 vet 净；聚焦 0.299s、全包 -race 1.337s、邻居 agent+runner 全零退出；post-refactor 变异矩阵 5 个变异行集 5/4/2/1/5 与 GREEN 逐项一致，站点整体 +3 恰等于 anchors 插入的一行位移。",
+    "verdict": "切片 10 自身判为闭环：契约 A1–A6 全部有实测担保，RED 是真实非零退出且非挂死，GREEN 未新增导出面，REFACTOR 未削弱任何断言。P1 家族不闭结：本轮把 §3.5 的两个结构性缺口暴露成硬阻断——增量检查半壁未交付（S10-SPEC-1），可达性语义未裁定且已出现比母约更严的不自洽行为（S10-SPEC-3）。下一批按 S10-SPEC-3 → R9-STD-2 折叠 → S10-STD-4 处置 → R9-SPEC-1/2 → 结构化错误 → S10-SPEC-1 裁定的次序推进，S10-SPEC-1 需 wayfinding 而非直接写测试。"
+  },
+  "cycle11": {
+    "verdictRef": "artifact:docs/design/v3-p1-graph-slice11-review-verdict.json",
+    "activationId": "bd2ded0d-7217-41e3-8eb4-b17364b7e277",
+    "stage": "review（software.review.standards-spec / rex-code-review）",
+    "slice": "切片 11 —— §3.5 第 4 项：从入口 BFS 不可达的节点构建期被拒，并裁定 S10-SPEC-3",
+    "independence": "作者自审（独立审查子代理派发此前被用户拒绝）。缓解方式：本阶段新造两个变异 MU9/MU10 并真实跑出结果（不是复述前阶段账本），覆盖率/vet/gofmt 取工具输出，跨切片改动用场景字节相同 + 上一片判据仍判红来担保。残留风险：契约解释（可达性只看正向边、一次只点一个名字）仍只有作者一人读过原文。",
+    "diffBoundary": "fixed point 0387000 与 HEAD 相同，三点 diff 为空（0 行）；改用工作树+哈希链：graph.go e790d40c→9d650037（GREEN）→e75d58d5（REFACTOR），/tmp/p1-cycle11/graph-go-slice10-to-11-final.diff 共 72 行变更；graph_test.go a14299e6→8b48c5cb（RED）→d60690eb（GREEN 后未再变），但切片 10/RED 的测试字节没有文件备份，测试侧只能按新增函数全文审，这是审查边界的已知缺口；scheduler.go 87854ffb 全程未变。",
+    "standardsFindings": [
+      "S11-STD-1 judgement：graph.go:264 用恒真谓词表达「保留所有边」，与 :314 的实质筛选共用一个参数位（Mysterious Name/参数语义稀释）",
+      "S11-STD-2 judgement：graph.go:288 文案 unreachable + not reachable 同义两遍；改文案会动测试锚 :1047 的子串，需新的 RED",
+      "S11-STD-3 judgement：graph_test.go:1053-1055 注释引用一次性变异矩阵编号与账本文件名，属任务过程记录，会腐烂",
+      "S11-STD-4 judgement（观察项）：graph.go 399 行同址承载构建器/校验/诊断文案，等 §3.5 剩余项落地再评估拆 validate.go",
+      "S11-STD-5 未见：新测试复用 looping/passthrough/runWithinLimit/noCount，没有另起 harness；RF1 反而删掉了两处重复的邻接表构造",
+      "S11-STD-6 judgement：graph_test.go:1056-1065 的 16 次确定性比较全部是「新实例 vs 首实例」，同实例重复 Validate 的稳定性没被单独钉",
+      "S10-STD-1 仍未修（本轮实测复现）：graph_test.go:815-817 的 looping 文档注释挂在 noCount 上，looping 自身无文档——切片 10 判为 hard，切片 11 结束后仍在原地",
+      "smell 基线 12 条逐条查过：Feature Envy/Data Clumps/Primitive Obsession/Repeated Switches/Shotgun Surgery/Speculative Generality/Message Chains/Middle Man/Refused Bequest 均未见",
+      "AGENTS.md 合规面：gofmt 空输出、go vet 零退出、覆盖率 91.1%（门槛 70%）、表驱动且同目录、无新导出面、无凭据/manifest 改动"
+    ],
+    "specFindings": [
+      "F11-SPEC-1 blocking（断言牙齿）：契约 amendment「一次只点一个节点名，取字典序第一个」没有被钉住——实测变异 MU9（把全部不可达名字拼进一条消息）两次运行 exit=0 / 0 条 FAIL；对照 MU10（相连即算可达）被 4 行判红（:1051/:1131/:1134）",
+      "F11-SPEC-2 hard（延续 S10-SPEC-1）：母约 v3-platform.md:214 要求「全部在 Add* 时增量检查」，rejectUnreachableNodes 唯一调用点是 graph.go:248 的 Validate 路径",
+      "F11-SPEC-3 judgement：第 4 项与第 5/6 项的合取语义未裁定——B9-sink-not-output 实测仍 validate=nil；join 节点若另一前驱链不可达，正向 BFS 仍判它可达",
+      "F11-SPEC-4 judgement：RF1/RF2 改了切片 10 的 alwaysTakenAdjacency（:314），非本轮契约要求，但已用「场景输出逐字节相同 receipt:57bb0fcb」+「MU8 仍被 :784 判红」担保为行为不变",
+      "F11-SPEC-5 judgement（流程）：GREEN 阶段 3 次 evidence-invalid 的真因是同一证据项混入非场景命令收据（harness-cli validate-command-evidence.mjs:44）+ 沿用压缩前的旧 executionToken；已沉淀记忆条目"
+    ],
+    "blocking": [
+      "F11-SPEC-1"
+    ],
+    "resolvedFromCycle10": [
+      "S10-SPEC-3（不可达的无条件环被拒、不可达的普通节点被放行的不自洽）：本轮裁定并实现——不可达一律先报可达性（B7/测试 :1131-:1134），可达环文案一字未动（B8 整行与切片 10 逐字节相同，测试 :1147 起对照仍在）。",
+      "§3.5 第 4 项本体：B1/B2/B4/B7 四类不可达声明构建期被拒且节点执行计数实测为 0，check-before-effect 在该项同样成立。",
+      "S10-STD-7（Validate 文档枚举覆盖项）：新文档不再枚举「落了哪几项」，只固定调用方依赖的次序。"
+    ],
+    "owedCount": 10,
+    "owedList": [
+      "F11-SPEC-1：精确形状断言 + 排除其它不可达名字，重跑 MU9 必须判红",
+      "S10-STD-1：把 looping 的文档注释移回它真正的函数上（一行修复，已拖两片）",
+      "F11-SPEC-2 / S10-SPEC-1：Add* 增量语义需要 wayfinding，不能直接写测试",
+      "S10-STD-4：死配置项处置 + 导出项守卫测试",
+      "R9-STD-2：Validate 里四处同形存在性检查的折叠（触发条件在切片 10 已满足）",
+      "R9-SPEC-1：空节点名与「从未声明」同形",
+      "R9-SPEC-2 / §3.5 第 2 项：重复节点名",
+      "§3.5 第 5 项：无出口汇点（B9 实测仍放行）",
+      "F11-SPEC-3：join 可达性语义随第 6 项一并裁定",
+      "S10-STD-3 结构化拒绝错误 / 母约写回（被治理门阻挡）/ G6-P3 WithStepLimit 兜底"
+    ],
+    "measuredDelta": [
+      "receipt:2c6eefed（聚焦场景命令 exit 0，12 行 PASS）",
+      "receipt:ae43dcd6（重构后同一场景命令 exit 0）",
+      "receipt:e1db08ce（整包 -race exit 0）/ receipt:d612e2a8（agent+runner exit 0）/ receipt:2a01583e（go build ./... exit 0）",
+      "receipt:57bb0fcb（仓库外场景模块 10 形状 + 每节点执行计数，重构前后 cmp 相同）",
+      "变异矩阵：GREEN 字节 6 个可编译变异 + REFACTOR 字节 8 个变异全部判红（/tmp/p1-cycle11/matrix3.txt），MU4 因编译失败被判为非变异并如实剔除；本阶段新增 MU9 存活（缺口）、MU10 判红",
+      "go test ./pkg/hno/graph/ -count=1 -cover → 91.1%"
+    ],
+    "verdict": "切片 11 判为有条件通过、不闭结：第 4 项的行为面有实测担保（不可达四类被拒且零执行、次序契约由 MU3 唯一站点钉住、切片 10 的文案与判据未被抢走），但契约自己的「只点一个名字」条款没有测试担保——MU9 实测存活。下一批次序：F11-SPEC-1 → S10-STD-1 → R9-STD-2 折叠 → S10-STD-4 → R9-SPEC-1/2 → §3.5 第 5 项 → 结构化错误 → S10-SPEC-1/F11-SPEC-2 的 wayfinding。P1 家族仍欠 10 条。"
+  },
+  "cycle12": {
+    "verdictRef": "artifact:docs/design/v3-p1-graph-slice12-review-verdict.json",
+    "activationId": "0df88d33-0d5f-4710-ac2b-6f9f0d50b57d",
+    "commandTokenAtReview": "913b4658-5c63-41ba-a93e-6eb1e26edc6e",
+    "stage": "review（software.review.standards-spec / rex-code-review）",
+    "slice": "切片 12 —— 不可达节点拒绝文案「一次只点字典序最小名字」的断言牙齿加固（behavior-preserving-hardening）",
+    "independence": "作者自审（独立审查子代理派发在此前被用户明确拒绝，本阶段没有再次尝试）。缓解方式按「不能靠复述自己账本」设计：(1) 差分边界、行数、断言站点数、t.Skip 计数、覆盖率、gofmt/vet 全部在审查阶段用工具重测，其中 numstat 109/4 与账本记的 110/5 不一致，已作为 S12-SPEC-3 报出；(2) 契约完成判据逐条对照实测而非引用结论；(3) 变异矩阵按行名归因复核，确认 MU5「取字典序最后一个」确实被 :1161 判红（这是 T1「最小」那一半的唯一独立担保）。残留风险：契约文字（T1 是否应当升为公共契约、T4 的方向语义）只有作者一人读过母约原文，且 S12-SPEC-2 指出被冻结规则的权威来源是作者自己的 amendment——这条只能靠母约写回 + rex 之外的评审关闭。",
+    "diffBoundary": "fixed point 不可用作 git 端点：切片 11 收尾测试字节 d60690eb 只是 blob 值、不是本仓库可寻址对象（git cat-file -t 失败，三点差分报 Invalid symmetric difference expression），HEAD 仍停在 0387000。改用工作树+哈希链+仓库外逐字节对照：graph.go e75d58d5 与 scheduler.go 87854ffb 加固前后同值（生产零变更），graph_test.go d60690eb→425ea030，两份字节留在 /tmp/p1-cycle12/，差分 graph-test-slice12.diff 实测 109 insertions / 4 deletions（1243→1348 行）。",
+    "standardsFindings": [
+      "S12-STD-1 judgement：graph_test.go:1157-1158 的 len(names)!=2 比契约 T1 更紧（把整条消息只有两个引号段也变成约束）——保留，它是牙齿本体",
+      "S12-STD-2 judgement：:1160-1164 依赖「入口名 ≠ 被点名不可达名」的隐含夹具前提；按构造同名行不可能出现，前版的永假 t.Fatalf 自校验已删",
+      "S12-STD-3 judgement（Duplicated Code + Data Clumps）：wantNodes/anchors 子串判定与 entry/wantName/alsoUnreachable 精确计数判定描述同一期望，两个来源；本轮禁止删减既有站点，故欠单",
+      "S12-STD-4 judgement（Primitive Obsession）:828-859 两个 helper 手写解析 error.Error() 的引号段，文案一改牙齿会静默全失效；根治=已欠的 S10-STD-3 结构化拒绝错误",
+      "S12-STD-5 judgement（Duplicated Code）:1127-1135 与 :1138-1146 两段同形稳定性循环，第三条同类循环出现时提取 assertSameMessage",
+      "smell 基线 12 条逐条查过：Mysterious Name 未见（H1 关闭 S10-STD-1）、Repeated Switches/Shotgun Surgery/Divergent Change/Speculative Generality/Message Chains/Middle Man/Refused Bequest 均未见",
+      "AGENTS.md 合规面：gofmt -l 空输出、go vet 零退出（本阶段重跑）、覆盖率 91.1%（门槛 70%）、表驱动同目录、零新导出面、无凭据/manifest 改动；未提交故 Conventional Commits 条款未触发（P1 连续 12 片产物全在工作树，已在 fixedPoint.disclosure 记为风险）"
+    ],
+    "specFindings": [
+      "S12-SPEC-1 hard→行为面已闭合：契约 T4 的 observableVia 指向 unreachable-chain，但该行观察不到边方向——加固前矩阵实测 MU10 三次 exit=0 存活。补行 reverse-edge-connected（:1081-1096）后 MU10 被该行唯一判红；契约文件文字仍是错的映射，列为编辑性更正欠单 S12-SPEC-1b",
+      "S12-SPEC-2 judgement：被牙齿冻结的「一次只点字典序最小者」规则来源是切片 11 作者单方 contractAmendment，母约 §3.5 第 4 项没有这句话；母约写回被 rex-self-sediment-gate 阻挡，必须先于任何聚合诊断工作项",
+      "S12-SPEC-3 judgement：加固账本记「+110/−5」并枚举 6 项删除行，权威 numstat 为 109/4（110/5 含文件头两行；func noCount() {} 与空行是上下文行未被删）。实质判据独立重测通过：站点 104→111、测试内 22→29、t.Skip 0、4 条既有期望文案未改",
+      "S12-SPEC-4 judgement（覆盖形状，非缺口）：T1 的「选哪个名字」只由 unreachable-chain/unreachable-many 两行担保（MU4b/MU5/MU9/MU9b 行集恒为 [2,2,2]），删这两行会让 T1 静默失去担保——后续触及该表的改动必须重跑同一矩阵"
+    ],
+    "blocking": [],
+    "resolvedFromCycle11": [
+      "F11-SPEC-1（阻断项：聚合式实现实测存活，exit=0 两次）——关闭：MU9/MU9b 现于 :1158 与 :1168 判红，行名 unreachable-chain / unreachable-many。",
+      "S10-STD-1（拖两片的文档注释错位）——关闭：:815-821，looping 的注释回到 looping，noCount 有自己的说明并写明对照行为什么传它。",
+      "S11-STD-6（确定性比较只取样新建实例）——关闭：同实例重复 Validate 3 次（:1138-1146），与 16 次新建实例并列。"
+    ],
+    "measuredDelta": [
+      "receipt:d94c1a9c-5434-4697-b9f8-11a7f3e0cbf6 —— 12 变异矩阵零退出（脚本判据=无存活 + 每次注入后 graph.go 哈希还原为 e75d58d5 + 收尾整包零退出），行集三次一致，无编译失败伪变异",
+      "receipt:9b87291f-7151-490a-8d24-f738ec95d12a —— 聚焦命令（仓库外公共 API 场景 + 聚焦测试 + 包级 -race 三段）exit 0",
+      "receipt:da4710fb-c620-4089-b870-2aaa16d9a37c —— agent + runner 回归、go build ./...、vet、覆盖率 91.1% 对照切片 11 未下降",
+      "receipt:88af33a8-6b3d-4d25-8db0-b05437a32d9a —— 审查阶段重跑同一条聚焦命令：exit 0，14 条 --- PASS / 0 FAIL / 0 SKIP",
+      "仓库外场景 /tmp/p1-cycle12-scenario 加固前后输出逐字节相同（6 形状点名名字 [orphan entry]/[c a]/[alpha a]/[out entry]/[c a] + 条件环放行）",
+      "审查阶段独立重测：git hash-object 三文件、numstat 109/4、断言站点 104→111 与 22→29、t.Skip=0、私有符号 grep=0、helper 全仓库唯一、gofmt/vet/coverage"
+    ],
+    "owedCount": 12,
+    "owedList": [
+      "S12-SPEC-1b：契约文件 docs/design/v3-test-scope-p1-graph-slice12.json 的 T4 observableVia 更正为 reverse-edge-connected 行（纯记录更正，不改行为）。",
+      "S12-STD-3：不可达测试表去掉 wantNodes/anchors 双来源，把 entry/wantName/alsoUnreachable 收进一个小结构体（需要允许删减既有断言站点的批次）。",
+      "S12-STD-4 / S10-STD-3：结构化拒绝错误（携带缺陷类别、节点名、入口名），把牙齿从格式化字符串上摘下来；S12-STD-1 的文案耦合一并随之消解。",
+      "F11-SPEC-2 / S10-SPEC-1：§3.5 前言要求 Add* 增量检查，唯一调用点仍在 Validate —— 需要先做 wayfinding 再决定，不在普通切片里直接写测试。",
+      "S10-STD-4：死配置项处置 + 导出项守卫测试。",
+      "R9-STD-2：Validate 里四处同形存在性检查的折叠（graph.go:228/231/235/238，全是 if _, ok := g.nodes[...]; !ok）。",
+      "R9-SPEC-1：空节点名与「从未声明」同形。",
+      "R9-SPEC-2 / §3.5 第 2 项：重复节点名。",
+      "§3.5 第 5 项：无出口汇点（B9 实测仍 validate=nil）。",
+      "F11-SPEC-3：join 可达性语义，随第 6 项一并裁定。",
+      "S12-SPEC-2：母约 §3.5 第 4 项写回（docs/design/v3-platform.md 被 rex-self-sediment-gate 阻挡，需显式授权）；必须先于任何聚合诊断工作项。",
+      "G6/P3：WithStepLimit 执行兜底（谓词恒真的环由步数上限兜住，尚未落地）。"
+    ],
+    "verdict": "切片 12 通过、无阻断项，工作项可闭结：契约四条完成判据全部实测成立（MU9 判红且给出行名与站点；断言只增不减；生产字节零变更 + 场景输出逐字节相同 ⇒ 行为不变；S10-STD-1 关闭）。两项如实记账不掩盖：S12-SPEC-1（契约 T4 的映射行本来就测不到边方向，靠补行才闭合，契约文字仍待更正）与 S12-SPEC-2（牙齿冻结的是作者单方 amendment，母约写回被治理门挡住）。Standards 轴 5 条全为 judgement 且各有处置，其中 S12-STD-3/4 的根治被本轮契约禁止，转入欠单。P1 家族欠单 12 条，下一片建议顺序：S10-STD-3 结构化拒绝错误（一并消解 S12-STD-1/4）→ §3.5 第 5 项无出口汇点 → R9-SPEC-1/2 声明类 → F11-SPEC-2/S10-SPEC-1 的 wayfinding → 母约写回授权。"
   }
 }

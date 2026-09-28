@@ -1,0 +1,111 @@
+{
+  "schema": "rex.tdd-refactor-record.v1",
+  "workItemKey": "work-p1-graph-engine-r9-output-contract",
+  "activationId": "b0469c9c-438d-4ac7-b3b5-34bd3bcedd87",
+  "stageId": "refactor",
+  "contractRef": "docs/design/v3-test-scope-p1-graph-slice9.json",
+  "implementationChangedDuringRefactor": false,
+  "hashes": {
+    "graph.go": {
+      "afterGreen": "eeb07f1c27a12fcf082d37e92b89c153e7e6fb80",
+      "afterRefactor": "eeb07f1c27a12fcf082d37e92b89c153e7e6fb80"
+    },
+    "scheduler.go": {
+      "beforeSlice9": "87854ffbb7629f9adeb2d45fbb74d91f2032b99d",
+      "afterRefactor": "87854ffbb7629f9adeb2d45fbb74d91f2032b99d"
+    },
+    "graph_test.go": {
+      "afterGreen": "e314979c341a8033df1ed60f6096e3d1c5236384",
+      "afterRefactor": "279078aecbdfcd4256d582fd2ee73a6ab2c0701e"
+    }
+  },
+  "refactorDone": [
+    {
+      "id": "A5/S8-STD-5",
+      "what": "TestP1G_ValidateRejectsDanglingEndpointForEveryEdgeKind 的 Run 面补判 Result==nil（pkg/hno/graph/graph_test.go:444-450），与同文件另两处拒绝用例的观察面对齐。",
+      "mutationEvidence": {
+        "id": "M4-result-alongside-error",
+        "mutation": "Run 在 Validate 失败时返回 &Result{}, err 而不是 nil, err",
+        "observed": "graph_test.go:449 判红 8 次（表内每一行各一次），补判之前这些行只判 err 因而全绿；包级退出码经 receipt:8b085bd5-f6a9-4069-84fb-d56f4a27a672 内的 `test $? -eq 1` 门证明为 1",
+        "uniqueAttribution": false,
+        "honestNote": "套件层面无唯一性：TestP1G_ValidateRejectsConditionalWithoutPredicate 等既有 res!=nil 断言也会同时判红。这条补判的增量是「悬空端点这一类声明自己的行」第一次被钉住拒绝面，而不是新增一个全局守卫。"
+      }
+    }
+  ],
+  "refactorsConsideredAndDeclined": [
+    {
+      "candidate": "把 Validate 里入口/输出两条同构的存在性检查折叠成一张 (role, name) 表或抽 helper",
+      "decision": "不做",
+      "why": "只有两个站点、两条文案语义不同（entry node / output node），折叠后错误文案仍要按 role 拼装，可读性净下降；契约 explicitNonGoals 也明令本轮不做表驱动折叠（S8-STD-2 的债务另轮处理）。留简单实现。"
+    },
+    {
+      "candidate": "把 5 处「遍历短语列表并 strings.Contains」抽成 assertRejectNames",
+      "decision": "不做",
+      "why": "契约把它列为本切片非目标；且该抽取的价值取决于结构化拒绝错误是否落地，先抽等于给一个即将被淘汰的形状加固。"
+    },
+    {
+      "candidate": "顺带修 scheduler.go:70 活读 g.entry / 测试改名 FromInFlightMutation",
+      "decision": "不做",
+      "why": "与本轮行为差异无因果关系，属 C6-STD-4 与命名轮，混做会让本轮 diff 的归因失效。"
+    }
+  ],
+  "testDiffReview": {
+    "againstFixedPoint": "git diff --numstat 0387000 -- pkg/hno/graph/graph_test.go → 638 0（纯新增，删除行数 0）",
+    "assertionSites": "切片 8 收口时 47 → 新增输出测试后 56 → A5 补判后 58；无任何期望被放宽或改成当前错误输出",
+    "seam": "pkg/hno/graph/graph_test.go 仍是外部测试包 graph_test，只用 New/AddNode/AddEdge/AddConditional/AddDefault/SetEntry/SetOutput/Validate/Run 与 Result.Output/Value/Completed；未新增导出 API，未新增 test-only 产品出口",
+    "skips": "t.Skip 出现 0 次",
+    "controlsRetained": "A3/A4 两条反向对照与 M3 变异证据同存：新校验被证明只判「声明不合法」，不判「输出值为 nil」",
+    "noWeakeningFound": "本轮 RED 之后测试文件只被允许新增；GREEN 期间哈希 e314979c 未变，REFACTOR 期间唯一改动是 A5 的两条新增断言（e314979c → 279078ae）"
+  },
+  "postRefactorVerification": {
+    "focused": {
+      "command": "go test ./pkg/hno/graph/... -run TestP1G_ValidateRejectsMissingOrUnknownOutput -count=1 -v",
+      "exitStatus": 0,
+      "receiptRef": "receipt:da70d1ec-2822-4990-b6fd-10fd1987b579"
+    },
+    "mutationRecheckAfterRefactor": [
+      {
+        "id": "M1-absent-check",
+        "exitStatus": 1,
+        "killedBy": "never-declared + not-a-node 两行"
+      },
+      {
+        "id": "M2-degraded-to-non-empty",
+        "exitStatus": 1,
+        "killedBy": "仅 not-a-node 行（唯一归因保持）"
+      },
+      {
+        "id": "M3-over-tightened-on-value",
+        "exitStatus": 1,
+        "killedBy": "仅 A4 对照行（唯一归因保持）"
+      }
+    ],
+    "mutationRecheckNote": "三个变异体在 REFACTOR 之后重跑仍各自判红，脚本在每轮结束断言还原后的字节与 GREEN 备份逐字节相同（graph.go/scheduler.go）。",
+    "gates": {
+      "command": "gofmt -l pkg/hno/graph 为空；go build ./...；go vet ./pkg/hno/graph/...；go test ./pkg/hno/graph/... -count=1 -race；go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1",
+      "exitStatus": 0,
+      "receiptRef": "receipt:fd48826b-b784-45c0-8eb1-65df635b3025",
+      "packageCounts": "pkg/hno/graph 43 PASS / 0 FAIL"
+    }
+  },
+  "stillOpen": [
+    "输出节点已注册却未被执行到 → 仍 err==nil 且 Output()==nil（包外场景实测 output-unreachable executed=2）。归 §3.5 第 4 项不可达节点，下一轮 B6 RED。",
+    "§3.5/B6 清单需要增列「输出声明不合法」这一必查项（本轮已实现但母约文字未记）；母约是 .md，PreToolUse 治理门阻断写入，需求记在 slice9 契约的 contractAmendmentNeeded。",
+    "A5 的杀伤非唯一（见上），若未来重构掉其它 res!=nil 断言，需重新取证。",
+    "slice8 遗留：S8-STD-2 文案断言循环 5 处 / identity fixture 6 处、S8-STD-3 结构化拒绝错误、S8-STD-4 测试改名、S8-SPEC-2 逐断言归因、C6-STD-1/3/4 注释诚实性与 g.entry 活读、B4 stepLimit、B5 环检测、B2 Join 路由。"
+  ],
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-slice9-refactor.json",
+    "artifact:docs/design/v3-p1-graph-slice9-green.json",
+    "artifact:docs/design/v3-p1-graph-slice9-red.json",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice9.json#explicitNonGoals",
+    "receipt:da70d1ec-2822-4990-b6fd-10fd1987b579",
+    "receipt:fd48826b-b784-45c0-8eb1-65df635b3025",
+    "receipt:8b085bd5-f6a9-4069-84fb-d56f4a27a672",
+    "receipt:d09d0e0f-e349-4d61-8a94-75777ee00170",
+    "receipt:795383c7-f346-4a7a-8739-78d32d706a2f",
+    "receipt:2665050f-2d1a-4963-8f1b-57a8e5a09f7d",
+    "receipt:f6e70495-a388-4b60-9647-65d9f9cf9e5e",
+    "receipt:5ffde403-20f4-45ef-8c0a-b3715f840774"
+  ]
+}

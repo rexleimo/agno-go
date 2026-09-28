@@ -1,0 +1,176 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p1-graph-r15-warnings",
+  "activationId": "0e0f5412-c714-42cf-b7a8-ea24540f2454",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "slice": "P1 切片 15 = 票面 B7 判据 8（stepLimit 缺失告警）",
+  "designedAt": "2026-09-27T13:49:30Z",
+
+  "userGoal": "让 (*Graph).Warnings() 从「永远返回空的导出承诺」变成票面 B7 的判据 8 告警：含合法环且未显式 WithStepLimit 的图，调用方能从公共面读到一条指名旋钮的提示；这条提示既不改变 Validate() 的致命语义，也不改变 Run 的可观察结果。",
+  "whyThisSlice": "切片 13/14 的审查两度把它排在 B8 之前：Warnings() 目前是 pkg/hno/graph/graph.go:414 的 `return nil` 桩，且全包 0 处断言（实测 grep `Warnings(` 在 graph_test.go / p1r13_step_limit_test.go / p1r14_panic_barrier_test.go 均为 0 命中）。它是 P1 判据缺口里唯一「导出了但完全无实现、也无人观测」的一项，机制侧（stepLimitSet、adjacency、cycleOf）已由 B4/B5 备好，成本最低、收益是补上一条静默的公共 API。",
+
+  "measuredBeforeDesign": {
+    "purpose": "契约不建立在推断上：触发形状是否被 Validate() 放行、当前 Warnings() 到底返回什么，先测再定行。",
+    "artifact": "artifact:/tmp/p1-cycle15/main.go",
+    "observations": [
+      "cond-self-loop（body --conditional--> body，未设上限）：Validate()=<nil>，Warnings() 长度 0，Run 收敛 completed=[body entry] output=seed → 自环条件边是当前合法图，T5 的前提成立。",
+      "cond-two-cycle（ping ⇄ pong 两条条件边，未设上限）：Validate()=<nil>，Warnings() 长度 0，Run 收敛 completed=[entry ping]。",
+      "acyclic（entry → last，未设上限）：Validate()=<nil>，Warnings() 长度 0。",
+      "cond-two-cycle + WithStepLimit(50)：Validate()=<nil>，Warnings() 长度 0。",
+      "uncond-cycle（x → x 无条件边）：Validate() 与 Run 都返回 `graph: unconditional cycle \"x\" -> \"x\": every edge on it is always taken, so Run cannot terminate` → §3.5 第 7 项先拒，故第 8 项的字面触发集为空（见 specDivergence）。"
+    ]
+  },
+
+  "specDivergence": {
+    "id": "R15-DIVERGE-1",
+    "severity": "hard（规格文本层，不是代码缺陷）",
+    "finding": "母约 §3.5 判据 8 原文写的是「`stepLimit` 校验：存在**无条件环**时若未设 `stepLimit` → 警告」（docs/design/v3-platform.md，§3.5 列表第 8 项），而同节判据 7 规定「无条件边成环 = 错误」。两者叠加后判据 8 的触发集恒为空：任何含无条件环的图都先被 Validate() 拒掉，永远轮不到一句警告。票面 B7 把触发形状改写成「含**合法条件环**且未显式 WithStepLimit」，方向正确但没有说明它改的是母约文字。",
+    "decision": "本契约按票面 B7 执行（触发集=通过构建期校验且含环的图），理由：判据 8 的动机是「有环而无预算的 Run 永不返回」（graph.go:52-56 的 defaultStepLimit 注释同此），只有能被放行的环才需要警告；把警告实现成母约字面意义上的空集等于什么都不做。",
+    "notDoneHere": "不改母约文字，也不把这次改写当作已获治理确认——回流义务登记在 writeBackOwed，交人工裁决（判据 8 应改读为「存在环」，或明确废弃该判据）。"
+  },
+
+  "inScopeBehaviors": [
+    {
+      "id": "T1",
+      "behavior": "含合法条件环且未显式 WithStepLimit 的图：Warnings() 含这条告警。",
+      "observable": "对 ping ⇄ pong 条件环图，`Validate()` 返回 nil，且 `Warnings()` 里存在一条其文案同时点明「这是步数上限」与「这是环」的 error（调用方读一遍就知道该加 WithStepLimit）。",
+      "source": "票面 v3-test-scope-p1-graph.md:66 前半句 + §1:22（Warnings 是非致命构建期提示）",
+      "minimumNotEnough": "只断 len(Warnings())>0 不算通过：实现随手 return []error{errors.New(\"x\")} 也满足。断言必须能识别出这一条告警本身（见 B7-AMEND-1）。"
+    },
+    {
+      "id": "T2",
+      "behavior": "同一张图显式 WithStepLimit(n) 后，Warnings() 不含这条告警。",
+      "observable": "graph.New(graph.WithStepLimit(50)) 建同一拓扑 → `Warnings()` 里找不到 T1 认出的那条告警（返回空切片亦可）。",
+      "source": "票面 :66 后半句"
+    },
+    {
+      "id": "T3",
+      "behavior": "无环图且未设上限时不得出现这条告警。",
+      "observable": "entry → last 的无环图、不带任何 Option → `Validate()` nil 且 `Warnings()` 不含步数上限告警。",
+      "source": "判据 8 的触发条件「存在…环时」（母约 §3.5 第 8 项的 conditional 部分，与环的种类之争无关）",
+      "kills": "把警告实现成「只要没显式设上限就提示」的偷懒版本——它能同时骗过 T1 与 T2。"
+    },
+    {
+      "id": "T4",
+      "behavior": "告警不改变致命语义，也不改变执行。",
+      "observable": "被警告的环图：`Validate()` 仍为 nil（错误里没有 warning 字样），`Run` 正常收敛且 Completed()/Output() 与实现前实测全等（completed=[entry ping]、output=seed）。",
+      "source": "票面 :66「Validate() 为 nil、Run 正常」+ :119「不得塞进 error 返回值污染 Validate() 的致命语义」",
+      "note": "这一行是本片对「告警 vs 拒绝」这条边界的担保，也是 R15-DIVERGE-1 取票面读法的可行性前提。"
+    },
+    {
+      "id": "T5",
+      "behavior": "环的定义覆盖自环：单条条件边 body → body 也算含环。",
+      "observable": "自环条件边图（已实测 Validate() 放行）→ `Warnings()` 含这条告警。",
+      "source": "母约 §3.5 判据 7「合法环需由条件边构成」——自环同样由条件边构成，票面 :66 的「合法条件环」未把环长限定为 ≥2。",
+      "kills": "只在两节点互相指认时才想起找环的实现。"
+    },
+    {
+      "id": "T6",
+      "behavior": "同一张图重复询问得到确定答案。",
+      "observable": "对同一张含环图连续两次调用 `Warnings()`：两次长度相等，且第一条文案逐字节全等。",
+      "source": "仓库既有约定而非本片新增愿望：graph.go rejectUnreachableNodes 注释已确立「一次只点一个可定位对象、取字典序第一个，稳定文案优先」；nodes 是 map，不排序就不可复现。",
+      "label": "judgement-derived-from-repo-convention"
+    },
+    {
+      "id": "T7",
+      "behavior": "Warnings() 只读：询问告警不改变图本身。",
+      "observable": "先调用 `Warnings()` 再 `Run`，其 Completed()/Output() 与「不先调用 Warnings()」的另一张同形图全等；且第二次 Warnings() 不再因「已被询问过」而消失。",
+      "source": "§1:22 把它定义为「提示」；提示若把 cfg.stepLimit 顺手补上，就把非致命判据变成了静默的执行变更，正撞票面 :119 的反面。",
+      "kills": "以写代读的实现（warn 时惰性设预算）。"
+    }
+  ],
+
+  "amendment": {
+    "id": "B7-AMEND-1",
+    "statement": "T1/T5 的断言要求告警文案可被识别为「步数上限 + 环」这一条，而不是任意一条 error。",
+    "whyForced": "票面 :66 的第二半句要求「显式设置后 Warnings() 不含**它**」——要在两次调用之间认出同一个对象，就必须有稳定的识别手段。票面 §1:22 把公共面固定为 `Warnings() []error`，没有列任何导出哨兵或错误类型，因此当前唯一合法的识别面是文案本身。",
+    "cost": "与 S14-STD-3 同一类耦合：改文案会让 T1/T5 判红而票面一字未违。已登记 writeBackOwed，二选一（回流措辞要求 / 未来引入 errors.As 可识别的类型后撤掉字符串断言）。"
+  },
+
+  "explicitNonGoals": [
+    "不动 B8 WithMaxConcurrency（graph.go:63-66 的导出口径仍无实现，仍由切片 14 审查的 S14-SPEC-4 挂为 P1 收尾发布阻塞；本片顺带修它会扩大 diff）。",
+    "不动 B11 Typed（仍 0 断言）。",
+    "不裁决「Validate() 已返回错误的图上 Warnings() 该说什么」——母约与票面都没给这条指派，实测当前 E 形状返回 0 条。本片不为其新增断言，只登记为未裁决面（unadjudicatedBelow），避免造出无治理归属的期望。",
+    "不承诺告警条数语义（一张图含两个环是 1 条还是 2 条）：票面只要求「含/不含该告警」，条数留给 T6 的等长断言之外不强加。",
+    "不新增导出类型、哨兵 error、Option 或配置键；不动 §1 公共面表。",
+    "不做告警的分层/去重/i18n/聚合诊断（聚合诊断在 rejectUnreachableNodes 注释里已被记为「另立契约」）。",
+    "不清理切片 14 审查的 owed 测试形状项（S14-STD-1/2/5）——它们与本片的正确判据无关，混做会让两片的归属都变糊。"
+  ],
+
+  "unadjudicated": [
+    {
+      "id": "R15-UNADJ-1",
+      "question": "非法图（Validate() 非 nil）上调用 Warnings() 应该返回什么？",
+      "currentMeasured": "含无条件环的图：Validate() 报错，Warnings() 长度 0。",
+      "posture": "本片不测不承诺；登记给人工，因为任何期望（返回 nil / 返回同一批提示 / panic 禁止）都无治理条款支持。"
+    },
+    {
+      "id": "R15-UNADJ-2",
+      "question": "判据 8 字面上的「无条件环」与判据 7 的互斥是否意味着该判据应废弃？",
+      "posture": "由 R15-DIVERGE-1 承载，等人工裁决；本契约采取票面读法并留痕。"
+    }
+  ],
+
+  "allowedTestSeam": {
+    "entries": [
+      "graph.New(opts ...Option)（含/不含 graph.WithStepLimit）",
+      "Graph.AddNode / graph.NodeFunc / AddEdge / AddConditional",
+      "(*Graph).Validate() error",
+      "(*Graph).Warnings() []error",
+      "(*Graph).Run(ctx, in) (*Result, error) 与 (*Result).Completed()/Output()"
+    ],
+    "shape": "全部行都搭在「建图 → Validate/Warnings/Run → 断言返回值」这条调用方唯一可得的通路上；同包新增文件 p1r15_warnings_test.go（票面 §5 允许新增 pkg/hno/graph 下同包测试文件），不改现有三个测试文件字节。",
+    "forbiddenObservation": "不读 g.cfg（含 stepLimitSet/stepLimit）、不调用 adjacency/alwaysTakenAdjacency/cycleOf/reject* 等私有 helper、不断言内部调用次数或环检测的遍历次序、不以 error 的具体类型（未导出）作断言依据。"
+  },
+
+  "acceptanceMappingNote": "票面 :91 把判据 3 的观察面写为「每种非法图一个表驱动子用例……告警项断 Validate() nil + Warnings() 命中/不命中」。本片 T1/T2 就是那对「命中/不命中」，T3/T5 是把「命中」的触发条件钉到含环这一维上，T4 兑现 :119 的禁止条款，T6/T7 守住仓库既有约定。T3 与 T5 是票面未逐字列出、但偷实现必然穿透的两格，已各自标出治理来源（判据 8 的 conditional / 判据 7 的环定义），不是新增目标。",
+
+  "completionCriteria": [
+    "T1–T7 全绿，聚焦命令：go test -race -count=1 -run 'TestP1R15' ./pkg/hno/graph/（须以 rex-harness receipt 记录，零退出）。",
+    "包级不回归：go test -race -count=1 ./pkg/hno/graph/ 全绿，且 graph_test.go(425ea030…) / p1r13_step_limit_test.go(bc4ab8e7…) / p1r14_panic_barrier_test.go(0ed607db…) 三个字节与登记全等。",
+    "RED 真实存在：本片必须先在 T1 上观察到「Warnings() 里没有那条告警」的真实非零回执（当前实测长度 0 已是前提）；桩实现不得被记成 GREEN。",
+    "变异担保（本片牙齿的唯一诚实度量）：至少构造并实跑下列变异，每个都必须被指定行击杀，且击杀它的行在每个 trial 里都是红的——(a) 永不告警 → T1；(b) 无条件告警（不看环） → T3；(c) 只在显式设置上限时告警 → T1/T2；(d) 只认多节点环、漏自环 → T5；(e) 告警文案不含旋钮名 → T1；(f) 遍历 map 不做确定性排序 → T6；(g) 告警时顺手写 cfg.stepLimit → T7（并观察 T4 是否也红）。矩阵若发现某行没有可信变异，照实登记而不是补一个假变异凑数（切片 14 的 T8 即为此类已披露缺口）。",
+    "结构判据（连同精确命令一起登记，兑现 S14-STD-6）：`for f in pkg/hno/graph/*.go; do case $f in *_test.go) continue;; esac; awk '!/^[[:space:]]*$/' $f; done | wc -l` 结果 ≤ 1500（当前 551）；`grep -c 'sync\\.' pkg/hno/graph/graph.go pkg/hno/graph/scheduler.go` 均为 0。",
+    "差分有界：产品侧改动只落在 Warnings() 及其所需 helper（预期 graph.go），scheduler.go 除非必要不动；graph_test.go/p1r13/p1r14 零改动。"
+  ],
+
+  "forbiddenShortcuts": [
+    "不得为了通过 T1 而放宽成「Warnings() 非空即可」，也不得把 T2 改成「不断言」——T1/T2 是一对识别性断言，缺一即退化为噪声。",
+    "不得用 t.Skip、删除断言、扩大容差、把期望值改成当前空返回值来换取绿。",
+    "不得把告警实现成 panic、log.Fatal 或任何打印副作用（票面 :119），也不得把它塞进 Validate() 的 error。",
+    "不得为绕过文案耦合而临时新增导出哨兵/类型——那会改 §1 公共面，属规格变更，须先走人工裁决。",
+    "不得顺带实现 B8/B11，或顺手清理切片 14 的测试形状 owed。",
+    "不得把 R15-DIVERGE-1 用「按母约字面实现成永不触发」的方式解决——那是把规格矛盾转嫁成静默无功能。"
+  ],
+
+  "baselinePlan": {
+    "kind": "behavior-delta",
+    "reason": "存在新的、可通过稳定公共入口真实复现为失败的用户可观察行为：Warnings() 今天对含环图返回 0 条，T1 的含告警断言必红（实测已备）。",
+    "redCandidatePreview": "公共入口 graph.New() → AddNode/AddConditional 建 ping ⇄ pong 条件环 → (*Graph).Warnings()；预期含步数上限告警；实测长度 0；精确命令与失败回执在 decide-testability 阶段以真实 receipt 提交。"
+  },
+
+  "sedimentCarried": [
+    "切片 13（B4）已把 stepLimitSet 与 defaultStepLimit=1000 备好，本片的触发条件直接读它，不需新旋钮。",
+    "切片 12/13 确立的名字牙齿手法（quotedNames/occurrences 而非 strings.Contains 单点）可复用于 T1 的节点归属，但本片不得断言具体环路径写法（条数与顺序未裁决）。",
+    "切片 14 的 goroutine 边界结论不变：本片的告警是构建期只读判据，不进生产者帧，也不新增 recover（当前 recover( 计数 1 应保持不变，作为回归观察）。",
+    "P1 未了结面：B7（本片）→ S13/S14 测试形状 owed → B8（发布阻塞）→ B11。"
+  ],
+
+  "writeBackOwed": [
+    "R15-DIVERGE-1：判据 8 的「无条件环」需人工改读为「存在（可放行的）环」或明确废弃。",
+    "B7-AMEND-1：告警须可被识别（文案点名旋钮）这条要求需回流票面 §1，或在将来引入可识别错误类型后撤掉字符串断言。",
+    "R15-UNADJ-1/2：非法图上的 Warnings() 语义、以及判据 7/8 的互斥处置。"
+  ],
+
+  "evidenceRefs": [
+    "artifact:docs/design/v3-test-scope-p1-graph.md#B7-L66",
+    "artifact:docs/design/v3-test-scope-p1-graph.md#L22",
+    "artifact:docs/design/v3-test-scope-p1-graph.md#L119",
+    "artifact:docs/design/v3-platform.md#3.5-item7-item8",
+    "artifact:/tmp/p1-cycle15/main.go",
+    "file:pkg/hno/graph/graph.go#L414",
+    "artifact:docs/design/v3-p1-graph-slice14-review-verdict.json#axes.spec.findings"
+  ]
+}
