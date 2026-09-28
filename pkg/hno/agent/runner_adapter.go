@@ -2,7 +2,6 @@ package agent
 
 import (
 	"context"
-	"sync"
 
 	"github.com/rexleimo/agno-go/pkg/hno/models"
 	"github.com/rexleimo/agno-go/pkg/hno/runner"
@@ -40,39 +39,6 @@ type agentToolExecutor struct {
 }
 
 func (e *agentToolExecutor) Execute(ctx context.Context, calls []types.ToolCall) ([]runner.ToolCallOutcome, error) {
-	if len(calls) == 0 {
-		return nil, nil
-	}
-
-	index := e.agent.buildFunctionIndex()
-
-	// 并发执行所有工具调用，保持结果顺序
-	// Execute all tool calls concurrently, preserve result order
-	results := make([]toolResult, len(calls))
-	var wg sync.WaitGroup
-
-	for i, tc := range calls {
-		wg.Add(1)
-		go func(idx int, call types.ToolCall) {
-			defer wg.Done()
-			results[idx] = e.agent.executeOneTool(ctx, index, call)
-		}(i, tc)
-	}
-	wg.Wait()
-
-	// 转换为 runner.ToolCallOutcome 并同步写入 Memory
-	// Convert to runner.ToolCallOutcome and sync write to Memory
-	outcomes := make([]runner.ToolCallOutcome, len(results))
-	for i, res := range results {
-		msg := types.NewToolMessage(res.callID, res.message)
-		e.agent.Memory.Add(msg, e.agent.UserID)
-
-		outcomes[i] = runner.ToolCallOutcome{
-			Call:     calls[i],
-			Message:  msg,
-			StopLoop: res.stopLoop,
-		}
-	}
-
+	outcomes, _ := e.agent.runToolBatch(ctx, calls)
 	return outcomes, nil
 }

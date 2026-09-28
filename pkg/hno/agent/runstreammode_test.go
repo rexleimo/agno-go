@@ -175,11 +175,11 @@ func TestP4G4_RunStreamEquivalentToRunStreamModeMessages(t *testing.T) {
 // TestP4G4_RunStreamModeUnsupportedModesFailClosed 钉 D10：其余任一模式 → 返回可
 // errors.Is 到 ErrUnsupportedStreamMode 的错误且不启动流（stub 零调用、无结果对象）；
 // 无模式默认 StreamMessages（与 RunStream 同形）；与 Messages 混入其它模式同样 fail-closed。
+// Tasks 的生产者已随切片 31 落地（母约 §5 的解禁），其正向判据搬家到 stream_tasks_test.go。
 func TestP4G4_RunStreamModeUnsupportedModesFailClosed(t *testing.T) {
 	unsupported := []run.StreamMode{
 		run.StreamValues,
 		run.StreamUpdates,
-		run.StreamTasks,
 		run.StreamCheckpoints,
 		run.StreamDebug,
 		run.StreamCustom,

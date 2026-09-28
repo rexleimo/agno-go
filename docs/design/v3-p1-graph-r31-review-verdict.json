@@ -1,0 +1,243 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p4-streammode-producers",
+  "activationId": "pending",
+  "capabilityId": "software.review.standards-spec",
+  "stageId": "review",
+  "recordedAt": "2026-09-28T19:55:00Z",
+  "independenceDisclosure": "作者自查，非独立审查者（用户此前已拒绝对 P1/P4 派发独立审查子代理，先例见 r17/r21/r30 的同类披露）。本片审查重心与 r30 相反：**它有新增行为**（145 行生产代码 + 693 行测试），所以重心在三处：(1) 新事件族是否只在被选中的族里出现（用 m-gate/m-degrade 的杀红证明，不用注释自证），(2) 分类是否真的不读文本（Contains 与 HasPrefix 两种嗅探分别实测，一个杀得动、一个杀不动并给出杀不动的根因），(3) 既有 Messages/同步路径是否零漂移（31 条锚逐字节全同 + 邻面 team/workflow/session-contract 实测绿）。可复现命令逐字写在两份账本里。",
+  "fixedPoint": {
+    "note": "契约 baselineBytes 三段（anchors 31 / changedBefore 7 / outOfSeam 5）+ newFileExpectedAbsent 2。HEAD=4d58ea5；本片的固定点由「实现窗口内字节不变」定义，其中 pkg/hno/graph 的绝对 md5 锚已被兄弟片合法落地作废，见 findings[1]。",
+    "anchors31": "31/31 逐字节全同（采集 receipt:98498dcc-a45a-4cc8-bb80-370457e56248；机器核对脚本逐条比对契约值，输出 identical=31 mismatched=0）",
+    "changedBefore7": "7/7 变动，before→after 全表见 docs/design/v3-p1-graph-r31-green.md §6",
+    "outOfSeam5": "5/5 同哈希（cache.go / message_builder.go / output.go 等）",
+    "newFiles": "只多出 pkg/hno/agent/stream_producers.go（2f16a32b060338110c379ece747fe8d846956e9e，145 行）与 pkg/hno/agent/stream_tasks_test.go（107e4b9cd8c0ef3b9f82b4b36f04d8f83b03a7d5，693 行）；执行体 scripts/mutation/p4s31-tasks-producer.mjs（a5488069e66a9ad53d4568711847d8f5508e79b5）",
+    "graphDirManifest": "639f37dbb16f4a20ce2e796e4586caac（receipt:e90876aa-5e1c-4c82-93e8-2f31b54ed754）；同一条命令在 b44b588 复现契约锚 ae3c22445eb8167f500ad832513046ca；git status/diff 对 pkg/hno/graph 双空",
+    "exportedSymbols": "agent 21（与开工基线 9826367c 同值 ⇒ 本片新增导出 0）；run 77、runner 23 不变（receipt:6d88cf17-3b8f-41d5-88bb-859fd47bdd8a）",
+    "agentNontestLOC": "1727（契约上限 1727，贴顶；初稿 1731 超限 4 行，以压缩注释冗余到位，未申请放宽）",
+    "carriedFinding": "S19-STD-6（变异脚本未接进 make）本片不结；S31-STD-1 由本片更新为「文案形态已成判据」；新增 S31-GAP-1、S31-NAMING-1"
+  },
+  "diffRef": {
+    "how": "git diff --numstat HEAD -- pkg/hno/agent + 逐文件 before→after git-blob 哈希",
+    "changedFiles": [
+      {
+        "path": "pkg/hno/agent/stream_producers.go",
+        "before": null,
+        "after": "2f16a32b060338110c379ece747fe8d846956e9e",
+        "scope": "本片新增：wiredStreamModes 模式表 + normalizeStreamModes（集合归一 + fail-closed 点名）+ streamEmitter（按族门控 / 账本 / 序列号单一出口）+ taskToolExecutor（started 派发前按声明序、结束事件汇合后按结果序）+ tasksExecutor 安装决策"
+      },
+      {
+        "path": "pkg/hno/agent/stream_tasks_test.go",
+        "before": null,
+        "after": "107e4b9cd8c0ef3b9f82b4b36f04d8f83b03a7d5",
+        "scope": "本片新增：D1–D9 判据（外部测试包 agent_test），手写 fake 模型按脚本回放回合，无网络无真模型"
+      },
+      {
+        "path": "pkg/hno/agent/tool_executor.go",
+        "before": "c2e9ec1c85cf889c5d8f55c0192deb28719bafd2",
+        "after": "22f2228fe39e5475f00b35d14c8ec923d89364ec",
+        "lines": "+59/-16",
+        "scope": "executeToolCalls 收拢为 runToolBatch 的三行委托；toolResult 增 node/err 两字段，四个失败位挂上原始 error（分类只读 err）；成功路径与消息文本措辞逐字不变"
+      },
+      {
+        "path": "pkg/hno/agent/stream.go",
+        "before": "bd3583dc512b0aa7c81874e0cb566ba42b36ebe4",
+        "after": "4abb334bb9cecd11b98b4db28f7a378e8fccbfb5",
+        "lines": "+28/-30",
+        "scope": "runStreamMessages 接收已归一的模式集合，构造 emitter 并把 emitter.tasksExecutor(a) 作为第 7 参交给内核；streamOnce 的 content 分支改走 emitter.content（族门在这里）"
+      },
+      {
+        "path": "pkg/hno/agent/agent.go",
+        "before": "9813b86af2e7c455dec6c7c36f187f0bf7627da0",
+        "after": "54b5dad514d280f89e1587d11875d3602abc528a",
+        "lines": "+12/-15",
+        "scope": "RunStreamMode 先 normalizeStreamModes 再进流（未接线模式不启动流）；RunStream 仍是 StreamMessages 纯包装"
+      },
+      {
+        "path": "pkg/hno/agent/kernel.go",
+        "before": "6140b5803e44c534264dd807c0cc090e98330e7f",
+        "after": "f68fa51023ec8b1237247ba2a67b77240f27b4a4",
+        "lines": "+12/-1",
+        "scope": "newKernel 增第 7 参 toolExecutor，nil 时落回既有 agentToolExecutor —— 注入口住在内核构造处而不是调用方"
+      },
+      {
+        "path": "pkg/hno/agent/runner_adapter.go",
+        "before": "8a7f36da27f0f186f86591a76b91c36793f8f386",
+        "after": "9f05be715e8c36b361184c76083710196e66381d",
+        "lines": "+1/-35",
+        "scope": "Execute 改成调用同一个 runToolBatch（同步路径与 Tasks 路径共用批次，不可能在次序或分类上漂移）；sync 导入随之撤销"
+      },
+      {
+        "path": "pkg/hno/agent/run.go",
+        "before": "8c2dea551cefd7035822879d568af318691a63df",
+        "after": "b445f570b705961aadbe166c7b3fe600c8b65ea6",
+        "lines": "+1/-1",
+        "scope": "newKernel 调用补第 7 参 nil（同步路径行为不变）"
+      },
+      {
+        "path": "pkg/hno/agent/runstreammode_test.go",
+        "before": "6c809c23d81949b196fd213ab5199d74047ebdab",
+        "after": "7c3599763fabbfc193e4e3f3c6b4a293c109d06d",
+        "lines": "+1/-1",
+        "scope": "契约唯一授权的既有测试改动：删 run.StreamTasks, 一行 + 一行迁移注释；正向判据搬家到 stream_tasks_test.go"
+      },
+      {
+        "path": "scripts/mutation/p4s31-tasks-producer.mjs",
+        "before": null,
+        "scope": "本片新增：9 条变异矩阵执行体（/tmp 副本注入、锚唯一性 --check、13 行覆盖完整性强制、三条反空转分型）"
+      },
+      {
+        "path": "docs/design/v3-platform.md",
+        "scope": "写回：§5 七模式状态表（StreamTasks → 已接（切片 31：agent 工具批次生产者），其余五行补 P4 第 3 片 / S31-SPEC-1 指针，收尾行「六模式」改「五模式」）+ §10 P4 行记第 2 片落地"
+      },
+      {
+        "path": "docs/design/v3-p1-graph-status.md",
+        "scope": "写回：§4af 交付条目（含 14 条现取回执、结构读数、两条口径登记）+ §5 新增 S31-GAP-1 / S31-NAMING-1 / S31-STD-1 更新 / S19-STD-6 沿用"
+      },
+      {
+        "path": "docs/design/v3-test-scope-p1-graph-slice31.json",
+        "scope": "契约收口写回：evidenceRefs 追加 14 条现取回执、notes 追加收口登记段；30 键形状复测仍为 30"
+      },
+      {
+        "path": "docs/design/v3-p1-graph-r31-green.md",
+        "scope": "第一段账本（两段边界 + 门禁全表 + 结构读数 + 字节锚 + 两条口径登记 + 最终字节清单）"
+      },
+      {
+        "path": "docs/design/v3-p1-graph-r31-refactor.md",
+        "scope": "第二段账本（9 条变异归属 + 等价变异实测根因 + 判定脚本自纠 + 两条不可区分说明）"
+      }
+    ]
+  },
+  "standardsAxis": {
+    "gates": [
+      {
+        "gate": "go test ./pkg/hno/agent -run TestP4S31_ -count=1 -race -v（契约唯一绑定场景命令）",
+        "result": "exit 0，9 条顶级行全绿；同命令明文复跑 9 PASS / 0 FAIL / 0 DATA RACE（receipt:d5b15e9f-f846-4997-a1bc-934704397187，/tmp/s31/final/r1-raw.txt）"
+      },
+      {
+        "gate": "同绑定命令 -count=30 -race -v（防碰巧绿）",
+        "result": "exit 0，270 条 PASS / 0 FAIL / 0 DATA RACE（receipt:94ad35fd-f482-403e-b428-7ab3fbddeb25，/tmp/s31/final/r2-raw.txt）"
+      },
+      {
+        "gate": "go test ./pkg/hno/agent ./pkg/hno/run -count=5 -race",
+        "result": "exit 0（receipt:a34fc717-b50e-4432-aba0-a43a88449395）"
+      },
+      {
+        "gate": "go build ./...",
+        "result": "exit 0（receipt:74982c41-a205-4015-bc33-dc59cb6101c8）"
+      },
+      {
+        "gate": "go test ./pkg/hno/run/... ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1",
+        "result": "三包全 ok（receipt:4184d4e4-9f93-4565-9410-febaf296c74c）"
+      },
+      {
+        "gate": "go test -race 同上三包 -count=1",
+        "result": "三包全 ok，无 DATA RACE（receipt:d8f0127d-73cf-4083-9fe1-3e4402cc47c7）"
+      },
+      {
+        "gate": "go vet 三包 + gofmt -l 三包",
+        "result": "双 exit 0，gofmt 空输出（receipt:768dd0a9-d193-4324-8e07-2aa026ee39f1 / receipt:12fdb6e5-2013-4e1a-8e8e-8ec46de7f79e）"
+      },
+      {
+        "gate": "邻近消费面 go test ./pkg/hno/team/... ./pkg/hno/workflow/... ./internal/session/contract/... -count=1",
+        "result": "三行 ok（receipt:81b5953c-0568-4eb3-9b49-a4d324d53394）—— 工具批次被它们消费，实测不红"
+      },
+      {
+        "gate": "矩阵 node scripts/mutation/p4s31-tasks-producer.mjs（最终字节）",
+        "result": "exit 0，9 条变异 0 违规，finalCheck 副本与仓库同字节=true（receipt:5fa2e070-4258-4382-a812-6f11745faee7，/tmp/s31/final/matrix-final.txt）"
+      },
+      {
+        "gate": "禁跑项：pkg/hno/graph 的 test/build 动作",
+        "result": "本片全程未执行（其 TestP1R17_* 高负载偶发红不得被误判为本片回归，契约 verificationCommands[2] 明令）"
+      }
+    ],
+    "forbiddenShortcutsAudit": "契约 forbiddenShortcuts 逐条对账：(1) 未放宽族门——门控只住在 emitter.enabled，m-gate 摘掉即双行判红；(2) 未做文本嗅探——Contains 版被 D5 第二段杀、HasPrefix 版不可杀之处已作为缺口登记而不是隐瞒；(3) 未在 executeOneTool 的 goroutine 内发射——发射点住在驱动内核的那条协程上，故无新增锁（agent 非测试 sync. 反而由 4 降到 3）；(4) 未新增 run 包导出（run exported=77 不变，构造点只在 agent）；(5) 未把 Debug 当 Tasks 别名（D8/debug + m-degrade 双证）；(6) 未动 run_completed 的记录位（D3 断言账本=通道+末位旧 run_completed，实测 len(recorded)==len(events)+1）；(7) 未以零事件流冒充降级（m-degrade 使 D2 十条判红，fail-closed 有牙）。全部收口回执 ID 现取现贴并逐个 ls 复核存在，无凭印象引用。"
+  },
+  "specAxis": {
+    "rowsAudit": [
+      { "row": "D1", "verdict": "兑现", "evidence": "TestP4S31_TasksModeIsWiredAndStartsTheStream 段 1 即绿（Tasks 不再 fail-closed 且流真的启动）" },
+      { "row": "D2", "verdict": "兑现", "evidence": "10 条子例（5 单模式 + 5 Tasks 混合）全绿；混合子例断言错误点名首个未接线模式；m-degrade 专杀此行" },
+      { "row": "D3", "verdict": "兑现", "evidence": "绝对 kind 序列 + 无 run_content 泄漏 + 账本=通道+1 且末位为旧 RunCompletedEvent；m-gate/m-order 双杀" },
+      { "row": "D4", "verdict": "兑现", "evidence": "逐字段 + JSON 往返；两条 m-payload 专杀" },
+      { "row": "D5", "verdict": "兑现（含一段已知不可杀面）", "evidence": "err 段与 lookalike 段都绿；Contains 嗅探被杀、HasPrefix 嗅探不可杀的根因与补法登记为 S31-GAP-1" },
+      { "row": "D6", "verdict": "兑现", "evidence": "两个并发批次 8 事件 + node 名单逐位；m-order 专杀" },
+      { "row": "D7", "verdict": "兑现", "evidence": "RunStream / 无模式 / StreamMessages 三条各断 [run_content run_content] 且 Sequence 连续；m-gate 使三条同红" },
+      { "row": "D8", "verdict": "兑现", "evidence": "换序无差、重复去重（m-dup 专杀）、无模式=Messages、Debug 不当别名（m-degrade 点名）" },
+      { "row": "D9", "verdict": "兑现", "evidence": "ToolCallLimit=1 时 [node_started,node_completed] 且事件名里无 boom；m-skip 专杀" },
+      { "row": "D10", "verdict": "兑现", "evidence": "结构计数由 shell 读数而非 Go 断言（契约口径）；见 green 账本 §3，两条口径偏差登记在 §5" }
+    ],
+    "designConsequenceCheck": " emitter 作为「产出值→事件」的单一出口、族门住在成员方法、Tasks 的门控住在安装决策 —— 三处按契约设计落位；未把 tracing 塞进事件发射路径（S25-DEFER-1 交点遵守），未上浮 HTTP 面（切片 28 第 3 片范围）。"
+  },
+  "findings": [
+    {
+      "id": "S31-GAP-1",
+      "severity": "medium",
+      "status": "已登记，交后续片",
+      "statement": "HasPrefix 式文本嗅探在当前 13 条接手行上不可杀（实测 exit 0）。根因不是实现错，是 D 行没覆盖 not-found / 参数解析 / 参数校验三个失败位。补法（给 D5 加第三个失败位子例）与不在本片补的理由（契约钉死两段之间测试文件零改动）都写进 refactor 账本 §3 与状态文档 §5。"
+    },
+    {
+      "id": "口径偏差-1",
+      "severity": "low",
+      "status": "已登记",
+      "statement": "agent 非测试 sync. 实测 3 而非契约预测 4：批次实现收拢进单个 runToolBatch 后 WaitGroup 少一处，严格优于预测。按现值登记，不重算成契约想要的数字。"
+    },
+    {
+      "id": "口径偏差-2",
+      "severity": "medium",
+      "status": "已登记，程序级",
+      "statement": "pkg/hno/graph 目录清单 md5 的绝对常数锚不可跨片沿用：契约起草 HEAD b44b588 复现 ae3c2244…，而 HEAD 4d58ea5（含兄弟片 0387000 对图目录的合法改动）为 639f37db…。本片用「git status/diff 对 pkg/hno/graph 双空」证明实现窗口内零变动，并建议后续契约把锚改成「同一条命令在实现前后同输出」+ 记录起草时 HEAD。"
+    },
+    {
+      "id": "S31-NAMING-1",
+      "severity": "low",
+      "status": "已登记，未动",
+      "statement": "runStreamMessages 现在承载整条流式路径（含 Tasks 族），名字里的 Messages 已从「唯一族」变成「默认族」；改名不在本片 sourceSeam 授权内，按契约保持并在模式表注释里写明归属。"
+    },
+    {
+      "id": "S31-STD-1",
+      "severity": "low",
+      "status": "更新（原登记已过期）",
+      "statement": "fail-closed 文案仍只带序数不带模式名，但本片 D2 的 5 条混合子例已把「stream mode N」这一形态断成判据 ⇒ 文案可读化不再是零判据改动，须与断言同片改。"
+    },
+    {
+      "id": "LOC-贴顶",
+      "severity": "low",
+      "status": "已处置",
+      "statement": "agent 非测试 LOC 初稿 1731 超契约上限 1727；处置是压缩新文件三处双语注释的冗余到 1727，不动判据、不申请放宽上限。风险留给下一片：该包已无 LOC 余量。"
+    }
+  ],
+  "completionAudit": {
+    "criterion1": "达成：段 0 receipt:3deb2151（8 行红/1 行绿）、段 1 receipt:4781e1a7（D1/D2/D7 绿，D3/D4/D5/D6/D8/D9 行为红，判据行逐条留档）、段 2 receipt:d5b15e9f 全绿；测试文件三段同行号对齐证明零改动。",
+    "criterion2": "达成：契约点名七条变异全部杀红（m-payload 拆两段），等价变异按契约如实登记并升级为实测。",
+    "criterion3": "达成：既有测试改动恰好 runstreammode_test.go +1/-1；31 锚全同；7 changedBefore 全变；5 outOfSeam 不变；图目录锚漂移来路已证（见 findings 口径偏差-2）。",
+    "criterion4": "达成：绑定命令/build/三包 plain+race/vet/gofmt/邻近回归全部 exit 0，14 条回执现取现贴。",
+    "criterion5": "部分按现值登记：run/runner 与目标逐位相同；agent exported=21（新增 0）、LOC 1727 贴顶、sync. 3（预测 4，登记为优于）；新文件 sync.=0。",
+    "criterion6": "达成：最终字节上重跑绑定命令（receipt:d5b15e9f）与 count=30（receipt:94ad35fd），未沿用契约 M 行副本回执。",
+    "criterion7": "达成：母约 §5 状态表 + §10 P4 行 + 状态文档 §4af/§5 + 契约 evidenceRefs/notes 写回；S23-SPEC-1 未代改。",
+    "criterion8": "达成：-count=30 -race exit 0（270 PASS/0 FAIL）与 agent+run -count=5 -race exit 0。"
+  },
+  "verdict": "PASS（本片按契约收口，含 6 条如实登记的发现项，其中 S31-GAP-1 与「图目录绝对 md5 锚不可跨片沿用」两条需由编排方决定是否另开票）",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-test-scope-p1-graph-slice31.json",
+    "artifact:docs/design/v3-p1-graph-r31-green.md",
+    "artifact:docs/design/v3-p1-graph-r31-refactor.md",
+    "artifact:scripts/mutation/p4s31-tasks-producer.mjs",
+    "receipt:3deb2151-60e5-4a52-814a-09292bfae800",
+    "receipt:4781e1a7-c84c-4f2b-88d2-bb6523e00e8c",
+    "receipt:d5b15e9f-f846-4997-a1bc-934704397187",
+    "receipt:94ad35fd-f482-403e-b428-7ab3fbddeb25",
+    "receipt:a34fc717-b50e-4432-aba0-a43a88449395",
+    "receipt:74982c41-a205-4015-bc33-dc59cb6101c8",
+    "receipt:4184d4e4-9f93-4565-9410-febaf296c74c",
+    "receipt:d8f0127d-73cf-4083-9fe1-3e4402cc47c7",
+    "receipt:768dd0a9-d193-4324-8e07-2aa026ee39f1",
+    "receipt:12fdb6e5-2013-4e1a-8e8e-8ec46de7f79e",
+    "receipt:81b5953c-0568-4eb3-9b49-a4d324d53394",
+    "receipt:6d88cf17-3b8f-41d5-88bb-859fd47bdd8a",
+    "receipt:e90876aa-5e1c-4c82-93e8-2f31b54ed754",
+    "receipt:98498dcc-a45a-4cc8-bb80-370457e56248",
+    "receipt:9e06fb0e-180d-4df7-87f0-8c1c90a49f20",
+    "receipt:5fa2e070-4258-4382-a812-6f11745faee7"
+  ]
+}

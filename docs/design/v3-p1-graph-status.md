@@ -352,6 +352,67 @@ B12/B13（§1 的结构命令输出，切片 19 后重测仍为 0 / 838）。
       命中守卫文案判 `PREMISE_RED`（不计牙齿）。修后 m11 才是真 `exit 0`，其余接手行不变。
       教训与切片 26 的 D2 空转绿同型，只是这次藏在判定脚本里：**判定脚本自己也要有牙齿。**
 
+4af. **切片 31（P4 第 2 片：`StreamTasks` 生产者接线）实现收口，母约 §5 的六模式清单结一项**：
+    证据两份账本 —— `docs/design/v3-p1-graph-r31-green.md`（两段 RED/GREEN + 门禁 + 结构读数）与
+    `docs/design/v3-p1-graph-r31-refactor.md`（9 条变异矩阵 + 接手行归属 + 等价变异实测确认）。
+    生产侧落位 `pkg/hno/agent/stream_producers.go`（新增 145 行）：`wiredStreamModes` 模式表 +
+    `streamEmitter`（按族门控、账本、序列号的单一出口）+ `taskToolExecutor`（`started` 在并发派发
+    **之前**按调用声明序、结束事件在批次汇合**之后**按结果序）。分类只读 `toolResult.err`，
+    不读消息文本；被 `ToolCallLimit` 截断的调用到不了 `Execute`，故「不发声」是构造后果。
+    `pkg/hno/run`、`pkg/hno/runner`、`pkg/hno/graph` 三包本片零改动（31 条锚逐字节全同，见下）。
+    - **行为 delta 的定性（母约写回项第 3 条要求的那句话）**：`runstreammode_test.go` 删掉
+      `run.StreamTasks,` 一行**是切片 23 D10 早已授权的解禁，不是放宽判据** —— 那条断言的原文是
+      「六个未接线模式一律 fail-closed」，其条件句是「各自生产者接线片落地时解禁（S23-SPEC-1）」；
+      本片正是那个生产者片，且正向判据没有消失，而是搬家到 `stream_tasks_test.go` 的 D1–D9
+      （覆盖面从「报错」一条扩到「族门/分类/次序/截断」四条）。反向判据仍在原地且逐字未动：
+      其余五个未接线模式照旧必须 fail-closed。
+    - **实测读数（全部现取现贴，绑定命令逐字为 `go test ./pkg/hno/agent -run TestP4S31_ -count=1 -race -v`）**：
+      `-count=1 -race -v` exit 0（`receipt:d5b15e9f-f846-4997-a1bc-934704397187`，明文复跑 9 条 PASS×0 FAIL×0 DATA RACE）、
+      `-count=30 -race -v` exit 0（`receipt:94ad35fd-f482-403e-b428-7ab3fbddeb25`，明文复跑 270 条 PASS×0 FAIL×0 DATA RACE）、
+      `./pkg/hno/agent ./pkg/hno/run -count=5 -race` exit 0（`receipt:a34fc717-b50e-4432-aba0-a43a88449395`）、
+      `go build ./...`（`receipt:74982c41-a205-4015-bc33-dc59cb6101c8`）、三包 `-count=1`
+      （`receipt:4184d4e4-9f93-4565-9410-febaf296c74c`）、三包 `-race -count=1`
+      （`receipt:d8f0127d-73cf-4083-9fe1-3e4402cc47c7`）、三包 `go vet`
+      （`receipt:768dd0a9-d193-4324-8e07-2aa026ee39f1`）、`gofmt -l` 空输出
+      （`receipt:12fdb6e5-2013-4e1a-8e8e-8ec46de7f79e`）、邻近消费面 team/workflow/session-contract
+      `-count=1` 全绿（`receipt:81b5953c-0568-4eb3-9b49-a4d324d53394`）、结构计数（`receipt:6d88cf17-3b8f-41d5-88bb-859fd47bdd8a`）、
+      图目录清单（`receipt:e90876aa-5e1c-4c82-93e8-2f31b54ed754`）、31 条锚采集
+      （`receipt:98498dcc-a45a-4cc8-bb80-370457e56248`）、任务族构造点 grep（`receipt:9e06fb0e-180d-4df7-87f0-8c1c90a49f20`）、
+      完整矩阵 exit 0（`receipt:5fa2e070-4258-4382-a812-6f11745faee7`）。
+    - **结构判据读数**：run `exported=77 nontestLOC=889 allLOC=1723 syncNontest=1`、
+      runner `23/582/1601/0`、agent `exported=21`（新增导出符号 **0**，与开工回执 `9826367c` 的基线同值）
+      `nontestLOC=1727`（**贴顶通过**：契约上限 1727，实现初稿 1731 超限 4 行，按注释冗余压缩到位，
+      未申请放宽上限）、新文件 `sync.` 计数 0。
+    - **两条口径如实登记（不靠重算蒙过去）**：
+      (1) agent 非测试 `sync.` 实测 **3** 而非契约预测的 4 —— 因为 `executeToolCalls` 与
+      `agentToolExecutor.Execute` 现在共用同一个 `WaitGroup`（`tool_executor.go:51-85` 收拢为
+      `runToolBatch`），锁计数**严格优于**预测，本片意图（不新增锁）达成。
+      (2) 图目录清单 md5 读得 `639f37dbb16f4a20ce2e796e4586caac`，与契约锚 `ae3c22445eb8167f500ad832513046ca`
+      不同 —— 已用同一条命令在历史提交上复算定位来路：`b44b588`（契约起草时的 HEAD）⇒
+      `ae3c22445eb8167f500ad832513046ca` 逐字符复现，`HEAD`（= `4d58ea5`，含兄弟片 `0387000` 落进
+      `pkg/hno/graph/` 的 scheduler 加固与新增测试）⇒ `639f37db…`。同时 `git status --porcelain pkg/hno/graph`
+      与 `git diff --numstat HEAD -- pkg/hno/graph` 双空 ⇒ **本片的实现窗口内图目录字节零变动**，
+      锚值是兄弟片合法落地造成的目录内容演进，不是本片越界。这条漂移登记给后续任何用该 md5 的片：
+      锚要按「实现前后同一条命令同输出」判，不能按一个绝对常数判。
+    - **变异矩阵 9 条全落（`scripts/mutation/p4s31-tasks-producer.mjs`，exit 0，0 违规）**：
+      `m-gate`→D3,D7（另六行绝对序列同时点名）、`m-degrade`→D2（+D8/debug）、`m-sniff`(Contains)→D5 第二段（+D6）、
+      `m-order`→D3,D6（+D4,D8/swap,D8/dup）、`m-skip`→D9、`m-payload` 两段→D4,D6、`m-dup`→D8 第二段。
+      契约登记的 **等价变异 `HasPrefix` 式嗅探实测 exit 0**（13 条接手行全绿），等价登记由测量确认而不再
+      只是叙述；其成立的根因也测出来了：成功结果文本是 JSON 串（带引号），前缀判据与 `err` 判据在这套夹具
+      上同解 —— 换言之 **D 行没有覆盖 not-found / 参数解析 / 参数校验三个失败位**，属测试面已知缺口，
+      交 §5 挂账（不在本片补 D 段，契约 completionCriteria 1 钉了「两段之间测试文件零改动」）。
+    - **执行体入库的纪律差异**：与切片 30 的执行体不同，本片的矩阵**不碰仓库工作树** —— 每条变异先把源码
+      整份复制到 `$S31_MUT_WORK`（排除 `.git/website/node_modules/bin/dist/.rex-harness`），用
+      `go -C <副本>` 跑同一条绑定命令，跑完整份重拷，并在收尾断言「副本与仓库同字节 = true」。
+      理由写进脚本头注释：同仓有兄弟代理并发提交并移动文件，「注入后复原 + 哈希复核」在这种现场里
+      是多余风险。
+    - **过程如实登记（判定脚本第二课）**：矩阵第一版把 4 条变异记成 `ATTRIBUTION_LEAK`、1 条记成
+      `BUILD_FAILED` —— 三条是真发现（`m-degrade` 撤掉 `Errorf` 后 `fmt` 变未使用导入而编译不过；
+      门控/嗅探/次序三条各有额外的绝对序列判据同时判红，说明牙齿比初稿声明的更密），一条是我的接手行
+      声明写漏（`expectGreen` 少列 `D8/swap`）。修法是让脚本自己强制**覆盖完整性**：每条变异必须把 13 个
+      接手行全部署名为「主杀 / 额外红 / 应当绿」，缺一条即 `--check` 直接抛错；额外红单列 `alsoKills` 并
+      要求复现，不再允许「泄漏」这种把脚本自己的错记成测试的错的口径。
+
 ## 5. 本片仍带着的未裁决项（沿用，不借本审计变成已决）
 
 
@@ -435,6 +496,32 @@ B12/B13（§1 的结构命令输出，切片 19 后重测仍为 0 / 838）。
   - **纪律修正（对本轮之后的所有派发有效）**：引用 harness 对象时必须写对前缀（`receipt:` / `activation:` / `evidence:`），
     并在停笔前跑一次自动对账而不是自述「已抽查」；切片 31 的 `notes` 自写了这条纪律仍有 3 个脑补 id，
     说明「靠散文提醒」不解决问题，对账必须是**一条命令**（已落成 `scripts/evidence-audit.mjs`，本轮实测 exit 1）。
+
+- **`S31-GAP-1`（切片 31 收口实测登记，测试面缺口，不是实现缺陷）**：`m-sniff-prefix`（`HasPrefix(res.message, "tool execution error:")`
+  式分类）在 13 条接手行上 **exit 0 全绿**，是契约预先登记、本片用测量确认的等价变异。根因测清了：成功结果文本经
+  `FormatResult` 是 JSON 串（首字符是引号），前缀判据与 `toolResult.err` 判据在这套夹具上同解；而
+  **D 行没有覆盖 not-found / 参数解析失败 / 参数校验失败三个失败位**（`tool_executor.go:106-132`），那三处的消息文本
+  都不以该前缀开头，真嗅探实现能在那里被抓住。本片不补：契约 completionCriteria 1 钉了「两段之间测试文件零改动」，
+  且新增 D 段要回契约改 rows 表。**交后续片**：给 D5 加第三个失败位子例，把这条等价变异从「登记」变成「杀得动」。
+- **`S31-NAMING-1`（本片造成，未动）**：`runStreamMessages` 现在承载的是整条流式路径（含 Tasks 族），名字里的
+  `Messages` 已从「唯一族」变成「默认族」。改名超出本片 `allowedTestSeam.sourceSeam` 授权（它只授权改函数体的
+  发射出口），且会连带 `stream.go` 的既有锚，故本片按契约保持名字，并在 `stream_producers.go` 的模式表注释里
+  写明归属。任一后续片改名时须同时回写 `pkg/hno/agent/stream.go` 的锚值。
+- **`S31-STD-1` 沿用（未结）**：fail-closed 的错误文案仍只带模式**序数**不带模式**名**
+  （实测 `agent: stream mode 5 has no wired producer`）。本片 D2 的混合模式子例为了可断言，
+  已经把这串文案的形态（`stream mode N`）钉成了判据 —— 也就是说**改名可读化现在是一条有牙齿的改动**：
+  它会让 D2 的 5 条混合子例判红，必须与断言同片改。原登记（只 errors.Is、不比文案）已过期，按此更新。
+- **`ADJ-S31-1` / `ADJ-S31-2` 仍未落笔（沿用，不借本片变成已决）**：切片 31 契约的两条裁决材料
+  （`docs/design/v3-test-scope-p1-graph-slice31.json` adjudicationOptions）负责人尚未裁。
+  本片**没有等它们**，因为两条都不改变本片的实现形状：`ADJ-S31-1`（StreamCustom 写入口归 agent 还是归
+  P4 第 3 片）取的是「归第 3 片」这一默认，即本片只解锁 Messages+Tasks 两模式，agent 公共面保持
+  新增导出 0；`ADJ-S31-2`（旧 `run_completed` 与模式选择的关系）取的是实测现状 (a) —— 它无条件进
+  `output.Events`、从不上通道，本片 D3 的记账判据即按 (a) 写（`len(recorded)==len(events)+1` 且末位为
+  `*run.RunCompletedEvent`）。**若日后裁 (b)**，那是切片 23 已交付兼容面的一次实质行为变更，须新登记
+  behavior-delta 并复核 `team/inheritance.go`、`workflow/run.go`、`workflow/step.go` 三个 `output.Events`
+  消费方，不能作为任一生产片的顺手改动。
+- **`S19-STD-6` 仍不结**：切片 31 的执行体（`scripts/mutation/p4s31-tasks-producer.mjs`）照旧只靠人工调用，
+  没接进 `make`；`make lint` 在本程序里仍从未跑过。
 
 ## 6. 过程如实登记（写作本文件时的自纠）
 

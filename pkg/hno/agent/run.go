@@ -122,7 +122,7 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 			cacheKey = a.buildCacheKey(req)
 		}
 		a.tryCacheSet(ctx, cacheKey, resp)
-	})
+	}, nil)
 	if err != nil {
 		a.logger.Error("failed to create runner", "error", err)
 		return nil, types.NewError(types.ErrCodeUnknown, "failed to create runner", err)

@@ -24,26 +24,25 @@ func (a *Agent) RunStream(ctx context.Context, input string) (*RunStreamResult, 
 	return a.RunStreamMode(ctx, input, run.StreamMessages)
 }
 
-// runStreamMessages is the StreamMessages producer: it executes the agent
-// through the same runner kernel as Run, driving each model turn through the
-// model's streaming API and returning a pair of channels: one for incremental
-// content events and one that carries the final RunOutput once aggregation
-// completes.
+// runStreamMessages is the streaming entry for every wired stream mode: it executes the
+// agent through the same runner kernel as Run, driving each model turn through the
+// model's streaming API and returning a pair of channels. Which event families reach
+// the caller is decided by the emitter built from the selected mode set, so a family
+// that was not asked for is neither recorded nor sent.
+// runStreamMessages 是所有已接线流模式的共同入口：通过与 Run 相同的 runner 内核执行
+// agent，每次模型回合走模型的流式 API。哪些事件族到达调用方由按模式集合构造的
+// 发射门决定；未被选择的族既不记账也不上通道。
 //
 // The tool-call loop itself lives in pkg/hno/runner; this function only decides
 // how a single turn is invoked (stream, fan chunks out as content events,
 // aggregate them) and how the kernel's verdict is reported back to the caller.
-// runStreamMessages 是 StreamMessages 的生产者：通过与 Run 相同的 runner 内核执行
-// agent，每次模型回合走模型的流式 API，并返回一对通道：一个用于增量内容事件，
-// 一个在聚合完成后携带最终的 RunOutput。
-//
 // tool 循环本身住在 pkg/hno/runner；本函数只决定单次回合怎么调用（流式、把分块扇出为
 // 内容事件、聚合它们），以及内核的判定怎么回报给调用方。
 //
 // Cache is bypassed for streaming runs: a streamed turn is never looked up in
 // nor written back to the response cache.
 // 流式运行绕过缓存：流式回合既不查缓存，也不回写缓存。
-func (a *Agent) runStreamMessages(ctx context.Context, input string) (*RunStreamResult, error) {
+func (a *Agent) runStreamMessages(ctx context.Context, input string, modes map[run.StreamMode]bool) (*RunStreamResult, error) {
 	defer a.ClearTempInstructions()
 
 	if strings.TrimSpace(input) == "" {
@@ -96,7 +95,13 @@ func (a *Agent) runStreamMessages(ctx context.Context, input string) (*RunStream
 	}
 
 	state := &kernelState{}
-	sequence := 0
+	emitter := &streamEmitter{
+		modes:    modes,
+		runID:    runID,
+		agentID:  a.ID,
+		eventsCh: eventsCh,
+		output:   output,
+	}
 
 	go func() {
 		defer close(eventsCh)
@@ -114,10 +119,10 @@ func (a *Agent) runStreamMessages(ctx context.Context, input string) (*RunStream
 		}
 
 		invoker := runner.TurnInvokerFunc(func(turnCtx context.Context, req *models.InvokeRequest) (*types.ModelResponse, error) {
-			return a.streamOnce(turnCtx, req, eventsCh, output, &sequence)
+			return a.streamOnce(turnCtx, req, emitter)
 		})
 
-		r, err := a.newKernel(ctx, tools, currentInstructions, state, invoker, nil)
+		r, err := a.newKernel(ctx, tools, currentInstructions, state, invoker, nil, emitter.tasksExecutor(a))
 		if err != nil {
 			a.logger.Error("failed to create runner (stream)", "error", err)
 			// The loop never started, so there is no stage to blame; the error
@@ -192,12 +197,14 @@ func (a *Agent) runStreamMessages(ctx context.Context, input string) (*RunStream
 	return result, nil
 }
 
-// streamOnce consumes a single streaming model invocation: it fans chunks out
-// to eventsCh as incremental content events while aggregating them into one
-// ModelResponse. It returns the aggregated response (with tool calls, if any).
-// streamOnce 消费单次流式模型调用：将分块作为增量内容事件扇出到 eventsCh，
-// 同时将它们聚合为一个 ModelResponse。返回聚合后的响应（可能含工具调用）。
-func (a *Agent) streamOnce(ctx context.Context, req *models.InvokeRequest, eventsCh chan<- run.BaseRunOutputEvent, output *RunOutput, sequence *int) (*types.ModelResponse, error) {
+// streamOnce consumes a single streaming model invocation: it fans chunks out as
+// content events through the emitter (which owns the mode gate, the ledger and the
+// sequence numbers) while aggregating them into one ModelResponse. It returns the
+// aggregated response (with tool calls, if any).
+// streamOnce 消费单次流式模型调用：把分块经发射门作为内容事件扇出（模式门、记账、
+// 序列号都归发射门所有），同时将它们聚合为一个 ModelResponse。
+// 返回聚合后的响应（可能含工具调用）。
+func (a *Agent) streamOnce(ctx context.Context, req *models.InvokeRequest, emitter *streamEmitter) (*types.ModelResponse, error) {
 	stream, err := a.Model.InvokeStream(ctx, req)
 	if err != nil {
 		return nil, err
@@ -223,9 +230,6 @@ func (a *Agent) streamOnce(ctx context.Context, req *models.InvokeRequest, event
 			aggregatorClosed = true
 		}
 	}
-
-	runID := output.RunID
-	agentID := a.ID
 
 	for {
 		select {
@@ -269,16 +273,10 @@ func (a *Agent) streamOnce(ctx context.Context, req *models.InvokeRequest, event
 			}
 
 			if chunk.Content != "" {
-				evt := run.NewRunContentEvent(runID, agentID, string(types.RoleAssistant), chunk.Content, *sequence)
-				*sequence++
-				output.appendEvent(evt)
-
-				select {
-				case eventsCh <- evt:
-				case <-ctx.Done():
+				if err := emitter.content(ctx, chunk.Content); err != nil {
 					closeAggregator()
 					<-doneAgg
-					return nil, ctx.Err()
+					return nil, err
 				}
 			}
 		}

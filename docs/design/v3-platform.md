@@ -342,19 +342,21 @@ type Event interface {
 
 > **已交付（切片 23，协议层）**：`pkg/hno/run/modes.go`（StreamMode 七常量 + 六个新事件 wire 名 + `ErrUnsupportedStreamMode`）、`pkg/hno/run/stream_events.go`（六事件类型 + New\* 构造函数 + canonical JSON）、`decodeEvent` 精确匹配块（先于 contains 归一化，次序由 D12 钉死）、`Agent.RunStreamMode` 选择器（`pkg/hno/agent/agent.go`；`RunStream` 成为它的 `StreamMessages` 纯包装）。旧 `run_content`/`run_completed` 的 wire 形状与既有测试逐字节零改动。判据 D1–D12、两段 RED/GREEN、6 条变异矩阵见 `docs/design/v3-test-scope-p1-graph-slice23.json` 与 `docs/design/v3-red-observation-p4g4.md` / `v3-p4-run-g4-green.md` / `v3-p4-run-g4-refactor.md`。
 >
+> **已交付（切片 31，Tasks 生产者）**：`run.StreamTasks` 在 `pkg/hno/agent` 侧接上运行期生产者 —— `stream_producers.go` 的 `wiredStreamModes` 模式表 + `streamEmitter`（按族门控、账本、序列号单一出口）+ `taskToolExecutor`（在被截断之后、并发派发之前按调用声明序发 `node_started`，批次汇合后按结果序发 `node_completed`/`task_error`）。分类只读 `toolResult.err`，不读消息文本；`ToolCallLimit` 截掉的调用不发事件。并集语义定形：模式选择是集合 ⇒ 给出次序无关、重复去重、`Debug` 不当 `Tasks` 别名。`pkg/hno/run`、`pkg/hno/runner`、`pkg/hno/graph` 本片零改动。判据 D1–D10、两段 RED/GREEN、9 条变异矩阵（含 1 条如实登记的等价变异）见 `docs/design/v3-test-scope-p1-graph-slice31.json` 与 `docs/design/v3-p1-graph-r31-green.md` / `-r31-refactor.md`。
+>
 > **七模式解禁状态**：
 >
 > | 模式 | 状态 |
 > |---|---|
 > | `StreamMessages` | **已接**（`runStreamMessages` 生产者，`RunStream`/`RunStreamMode` 同形） |
-> | `StreamValues` | fail-closed 待生产者片（graph 节点事件桥接） |
-> | `StreamUpdates` | fail-closed 待生产者片（graph 节点事件桥接） |
-> | `StreamTasks` | fail-closed 待生产者片 |
-> | `StreamCheckpoints` | fail-closed 待生产者片（检查点生产者） |
-> | `StreamDebug` | fail-closed 待生产者片（依赖 Tasks/Checkpoints 的并集发射） |
-> | `StreamCustom` | fail-closed 待生产者片（节点内自定义写入入口） |
+> | `StreamValues` | fail-closed 待生产者片（归属 P4 第 3 片：图侧事件桥接，门槛见 S31-SPEC-1） |
+> | `StreamUpdates` | fail-closed 待生产者片（归属 P4 第 3 片：图侧事件桥接，门槛见 S31-SPEC-1） |
+> | `StreamTasks` | **已接**（切片 31：agent 工具批次生产者） |
+> | `StreamCheckpoints` | fail-closed 待生产者片（归属 P4 第 3 片：检查点生产者，门槛见 S31-SPEC-1） |
+> | `StreamDebug` | fail-closed 待生产者片（依赖 Tasks/Checkpoints 的并集发射；归属 P4 第 3 片，等价判据见 S31-SPEC-1(d)） |
+> | `StreamCustom` | fail-closed 待生产者片（节点内自定义写入入口，仓库今天零现成入口；归属 P4 第 3 片） |
 >
-> 其余六模式在 `RunStreamMode` 上返回包装 `ErrUnsupportedStreamMode` 的错误、不启动流；各自生产者接线片落地时解禁（S23-SPEC-1）。
+> 其余五模式在 `RunStreamMode` 上返回包装 `ErrUnsupportedStreamMode` 的错误、不启动流（fail-closed，不静默降级成零事件流）；各自生产者接线片落地时解禁（S23-SPEC-1 → 交 S31-SPEC-1）。
 
 ---
 
@@ -587,7 +589,7 @@ func (g *Graph) Resume(ctx context.Context, responses map[string]any) (*Result, 
 | **P1** | G2 图引擎 v1 | P0 | `pkg/hno/graph` | 5 类图（DAG/并行/汇聚/条件/环）端到端测试；`-race` 全绿 |
 | **P2** | G3 策略四合一 | P1 | ~~Retry/Cache/Timeout/Trace~~ **已交付（切片 22）** | 每个策略独立测试 + 组合测试（D1–D14 + 9 条变异矩阵） |
 | **P3** | G5 Send + G6 Durability/StepLimit | P1 | 动态扇出 + 安全阀 | **全清**：**G5 Send 已交付（切片 26：动态扇出 Send + AddJoinSend，R19-Q2 裁决 OPT-C 落地，map-reduce 端到端 D1–D9 + 6 杀红变异）**；**G6 Durability 已交付（切片 24）**；StepLimit 已随切片 13 交付 |
-| **P4** | G4 StreamMode | P0 | 七模式 + 旧类型兼容 **协议层已交付（切片 23）**；六模式生产者接线待各自成片 | 旧 `run_content`/`run_completed` 行为不变 |
+| **P4** | G4 StreamMode | P0 | 七模式 + 旧类型兼容 **协议层已交付（切片 23）**；**`StreamTasks` 生产者已接（切片 31 = P4 第 2 片：一模式落地 + 并集语义定形）**；其余五模式生产者接线归 P4 第 3 片（图侧事件桥接，S31-SPEC-1） | 旧 `run_content`/`run_completed` 行为不变 |
 | **P5** | G7 事件化 + HITL | ~~P0 + 决策 D1~~ **全清（切片 27 引擎核心 + 28 侧车/跨进程恢复）** | 事件存储 + Resume **全部交付（27：引擎核心；28：`pkg/hno/session/sidecar` + `internal/hitlbridge` + `graph/restore.go`，D1–D10 + 10 杀红变异）** | 审批场景跨进程恢复**实测达成（双档端到端）**；重复 Resume 幂等**实测达成（跨重启）**；**契约测试绿（8 边界锚逐字节）** |
 | **P6** | G10 workflow 迁移 | P1–P4 | **范围已裁 OPT-β（负责人 2026-09-28）**：线性 + 条件 + 并行 + loop 编译进图，会话/历史/持久化/取消留 workflow（原「线性 []Step 编译为链式图」是 α 口径，已被裁决替换） | **现有用户零改动**；`make test` 绿。**开工前置未清，β 不得建切片契约**：(i) `S19-STD-1` 必须先裁——`ExecutionContext` 入图取**引用语义**还是**值语义**（引用 ⇒ 任何扇出/汇聚都要在 workflow 侧克隆，等于把 `parallel.go` 再写一遍；值 ⇒ `Data`/`Metadata`/`SessionState` 的拷贝规则本身变成 today 没有的新公共语义）；(ii) 互斥分支原语二选一——workflow 侧写互补谓词（一漏即两分支同跑）还是给 `pkg/hno/graph` 加 `Branch`/`Router` 公共面（动导出数字，硬门禁，且图目录是兄弟片在途领地）；(iii) Router 未命中语义不等价（today 报错 `router.go:63` vs 图侧走兜底 `scheduler.go:411-418`），β 取「保留报错」，须在适配器里显式复刻 |
 | **P7** | G9 观测接线 | P0 | retry/breaker 接进 runner **模型阶段已交付（切片 25，D1–D13 + 9 杀红变异矩阵）**；run/agent 级 span 待第 2 片（S25-DEFER-1） | span 覆盖状态表：**model=已接于 runner**（每尝试 chat span + usage 归集）；**tool=已在 agent 既有**（execute_tool）；**run/agent=待 P7 第 2 片**（pkg/hno/agent） |

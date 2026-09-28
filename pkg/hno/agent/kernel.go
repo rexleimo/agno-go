@@ -21,9 +21,15 @@ type kernelState struct {
 // invoker decides how one model turn is called; nil uses the kernel default of
 // a synchronous Model.Invoke.
 //
+// toolExecutor decides who executes a tool batch; nil uses the plain agent executor.
+// The StreamTasks producer passes a wrapper that emits task events around that same
+// batch, which is why the injection point lives here rather than in the caller.
+//
 // newKernel 构造 Agent.Run 与 Agent.RunStream 共用的唯一循环。循环策略只在此处
 // 接线，使同步与流式两条路径无法各自漂移。
 // invoker 决定单次回合怎么调用；nil 时内核默认走 Model.Invoke。
+// toolExecutor 决定谁执行工具批次；nil 时走既有的 agent 执行器。StreamTasks 生产者传入
+// 一个在同一批次外围发射任务事件的包装件，所以注入口住在这里而不是调用方。
 func (a *Agent) newKernel(
 	ctx context.Context,
 	tools []models.ToolDefinition,
@@ -31,7 +37,12 @@ func (a *Agent) newKernel(
 	state *kernelState,
 	invoker runner.TurnInvoker,
 	onAssistantTurn func(*types.ModelResponse),
+	toolExecutor runner.ToolExecutor,
 ) (*runner.Runner, error) {
+	if toolExecutor == nil {
+		toolExecutor = &agentToolExecutor{agent: a}
+	}
+
 	return runner.New(runner.Config{
 		Model:         a.Model,
 		Invoker:       invoker,
@@ -43,7 +54,7 @@ func (a *Agent) newKernel(
 			instructions: instructions,
 			tools:        tools,
 		},
-		ToolExecutor: &agentToolExecutor{agent: a},
+		ToolExecutor: toolExecutor,
 		OnStep: func(evt runner.StepEvent) {
 			if evt.State != runner.StateAwaitModel {
 				return
