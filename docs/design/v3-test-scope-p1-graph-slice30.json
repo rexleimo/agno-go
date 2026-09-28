@@ -1,0 +1,350 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p1-graph-r17-load-hardening",
+  "activationId": "pending",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-28T09:05:00Z",
+  "contractRef": "docs/design/v3-test-scope-p1-graph-slice30.json",
+  "slice": 30,
+  "series": "P1 系列第 30 片（R17 夹具负载加固，S24-STD-2 欠项；判据零改动、生产字节零改动）",
+  "userGoal": "让 `pkg/hno/graph` 的 R17 取消归一化族（票面 B9）在并行开发负载下变成**可解释的绿灯**：三条负载敏感行（D1「取消优先于步数安全阀」、D2「取消不得被伪装成节点业务错误」跨轮 0 容忍、D5 第二段「上限让派发停住时也是取消语义」）今天把「取消时图仍在派发」这个前提建立在**观测**上（等到第一个后继节点开始运行、探一次结果通道还没值），于是机器一忙，前提就没建立、或者前提「看起来成立」而结论仍然红——状态文档 §5 记的 223 负载均值那轮和后续三轮实测都是这件事。本片把前提的**建立方式**换成确定性会合：借既有公共缝（`DurabilitySync` 下 `Checkpointer.Append` 由唯一消费者在 `complete` 之后、下一次 `dispatch` 之前同步调用）把消费者停在可证明的位置上，让「取消时刻预算尚未耗尽」「业务错误已在手上且 ctx 仍干净」成为夹具自己的**位置证明**而不是运气；一条判据都不改（26 处 `t.Error*` 逐字保留）、生产字节一行不动、每行必须交得出把真实回归杀红的变异牙齿，并在同一负载协议下连续多轮全绿。",
+  "whyThisSlice": "状态文档 `docs/design/v3-p1-graph-status.md` §5 的 **S24-STD-2** 与其复发实测：(1) :283-:289——切片 24 的 anti-flake 首轮单次判红 `TestP1R17_CancellationWinsOverStepLimitDuringDispatch`（失败点在其前置守卫），隔离复现实验证明**基线字节同样偶发**（6 核合成负载下 2/3 轮判红，`v3-p3-graph-g6-refactor.md` §2.2 的基线对照：基线第 2 轮红 2 条、带缝 3 轮全绿），结论是既有 R17 夹具的性质、与接缝无关；(2) :290-:296——第三轮并行收口时机器负载均值 **223**（宿主应用，非本仓测试进程），`TestP1R17_*` 三条再次判红，文案全是夹具自己的守卫（「派发窗口没建立」「先加强夹具而不是放宽判据」），且 graph 包字节与切片 24 收口态逐字节相同——**欠项登记**原文：「R17 夹具需要一次负载加固片（把『取消时仍在派发』的前提从时序竞赛改成确定性形状——夹具自己的守卫文案已经指出方向），独立成契约再做，不在收口里顺手改。」(3) :297-:313——提交后全仓门禁在负载均值 100.98→120.44 下**稳定判红**（`receipt:196ed0f4-9ac9-4516-9da0-ef0348fc4bc2`），并诚实披露这次不只是前提没建立：出现一条「前提成立却判红」（`:211` 量到取消时刻已启动 1/2000，`p1r17:219/:223` 仍交出 `step limit exceeded`），留下读法 **(a) 守卫读的是过期瞬时值** 与 **(b) 引擎在单次 dispatch 循环内真的不回头咨询 ctx**，并明写「**(a)/(b) 的分辨属 R17 加固片（切片 30）的契约职责**：加固后的夹具必须能*证明*取消时刻预算尚未耗尽（不是读一个可能过期的计数），并让『预算在取消之后才被耗尽』成为测试可控的事件」；在此之前撞到这三条红的收口既不得记回归、也不得记通过。票面侧同族欠项：`v3-test-scope-p1-graph.md` §13.3 第 1 条把「整条删除 ②」登记为**不可达形态**（`R17-GAP-1`，「缺一个 parked-window 夹具」）、§13.1 :230 说 ② 处的判据正是「两件事同时成立而 select 会随机挑」；§13.1 末条把 ο（预算判据抢在取消判据之前）登记为等价变异，理由是同一次循环里次序不可观察。本片的 M1/M2 实测把这三条一并处理：负载复现取到真实红率、确定性形状在现行字节上取到全绿、变异矩阵把 (a) 证实并把 `R17-GAP-1` 的形态变成可观察。这是**测试夹具加固**，不是放宽判据，也不是实现新功能。",
+  "measuredBeforeDesign": [
+    {
+      "id": "M1-仓库内真实负载复现（现行字节 + 现行夹具，只读测量）",
+      "scene": "/Users/rex/codes/agno-go（未改任何字节）。负载生成：`bash /tmp/r17exp/load.sh 14 900` = 14 个 `/usr/bin/yes > /dev/null` CPU 压载循环（本机 `sysctl hw.ncpu` = 8，取 14 使 load average 明显高于核数；与 g6 §2.2 的「6 个 CPU 压载循环」同族、按核数放大），到点自杀并按 pids 精确回收。轮次协议 A：`bash /tmp/r17exp/rounds2.sh <TAG> <目录> <轮数> <-run 正则> -race` —— 每轮一次 `go test ./pkg/hno/graph -run <正则> -count=1 -race -v`，原始输出落 `/tmp/r17exp/<TAG>.$i.txt`，任一红即整命令 exit 1。轮次协议 B（新写，把负载数值与判红行锁进同一份 stdout）：`bash /tmp/r17exp/rounds4.sh ...` —— 同一命令内先起 14 workers、每轮把 `sysctl -n vm.loadavg` 写进该轮文件首行再跑测试。",
+      "commands": [
+        "sysctl hw.ncpu   # 8",
+        "node /tmp/rex-receipt.mjs -- bash /tmp/r17exp/rounds.sh /Users/rex/codes/agno-go 3 'TestP1R17_(CancellationWinsOverStepLimitDuringDispatch|CancellationIsNotDisguisedAsNodeBusinessErrorAcrossRounds|CancellationWhileQueueHasBacklog)$' -race   # 无负载串行基线",
+        "node /tmp/rex-receipt.mjs -- bash /tmp/r17exp/rounds2.sh loadA /Users/rex/codes/agno-go 6 'TestP1R17_(CancellationWinsOverStepLimitDuringDispatch|CancellationIsNotDisguisedAsNodeBusinessErrorAcrossRounds|CancellationWhileQueueHasBacklog)$' -race   # 14 workers 负载下 6 轮",
+        "node /tmp/rex-receipt.mjs -- bash /tmp/r17exp/rounds2.sh loadB /Users/rex/codes/agno-go 10 'TestP1R17_(CancellationWinsOverStepLimitDuringDispatch|CancellationIsNotDisguisedAsNodeBusinessErrorAcrossRounds|CancellationWhileQueueHasBacklog)$' -race   # 同负载 10 轮",
+        "node /tmp/rex-receipt.mjs -- bash /tmp/r17exp/wholepkg.sh wp /Users/rex/codes/agno-go 3 -race   # 切片 24 的防碰巧绿协议：整包 go test ./pkg/hno/graph -count=5 -race × 3 轮",
+        "node /tmp/rex-receipt.mjs -- bash /tmp/r17exp/rounds4.sh freshA /tmp/r17exp/copy 6 'TestP1R17_(CancellationWinsOverStepLimitDuringDispatch|CancellationIsNotDisguisedAsNodeBusinessErrorAcrossRounds|CancellationWhileQueueHasBacklog)$' -race   # 新取：逐轮 loadavg 写进同一文件；副本生产字节与仓库逐位同（见 M3）",
+        "sysctl -n vm.loadavg   # 四次取样回执 05524c15 / e01c118d / f6faed24 / 5134091e（stdout 以 sha256 存档，数值另由轮次文件首行自证）"
+      ],
+      "observations": [
+        "无负载串行基线绿：3 轮 `-count=1 -race` 全 exit 0（`receipt:a4530080-f304-4c58-b896-cc96f9b7deaf`）——红不是来自字节，而是来自负载，与 §5 :286「基线字节同样偶发」同结论。",
+        "负载下真实红率（协议 A）：loadA **4/6 轮判红**（第 1/2/4/5 轮，`receipt:07ec241b-934b-44ba-a857-cc2a2d29a249`，exit=1）；loadB **4/10 轮判红**（第 1/4/5/8 轮，`receipt:fab3b1c7-8eb2-417f-b98f-8304b20a7cec`，exit=1）；切片 24 的整包协议（`go test ./pkg/hno/graph -count=5 -race`）**2/3 轮判红**（第 1 轮 5 次里红 2 次、第 2 轮红 1 次，第 3 轮 ok，`receipt:8244595a-cd27-45c9-a16e-a63e3eec0bb3`，exit=1）。",
+        "新取的逐轮带 loadavg 复现（协议 B，freshA）：**1/6 轮判红**（第 4 轮；`receipt:1372ec78-ccda-4e00-81c7-8c88cd0736d2`，exit=1），红在真实断言而非守卫：`p1r17_cancel_normalization_test.go:219`「取消落在派发窗口内时 Run 的错误 = graph: step limit 100 reached… want errors.Is(err, context.Canceled)（取消时刻已启动 15/2000 个后继，安全阀是在那之后才撞上的）」+ `:223`「取消被报成步数超限」。该轮首行自证 `loadavg={ 17.96 14.46 23.11 }`、workers=14；六轮 1 分钟均值序列 4.21 → 7.55 → 11.43 → 17.96 → 17.96 → 24.05（`/tmp/r17exp/freshA.1.txt`…`freshA.6.txt`）。",
+        "负载下判红的行**只有 D1 一条**：定向三行协议共 22 轮（loadA 6 + loadB 10 + freshA 6）里 9 轮判红，加上下述 M2 的 A/B 二进制 8 轮里 2 轮，合计 **11/30 轮（37%）**，红点 100% 是 `TestP1R17_CancellationWinsOverStepLimitDuringDispatch`；D2 与 D5 第二段共用同一个 `p1r17AwaitDispatchWindow`（:211/:253/:431），它们的前提建立方式与 D1 完全同构，因此「本轮侥幸没红」不等于「不受负载影响」——加固必须覆盖这三行。",
+        "§5 :304-:312 的 (a)/(b) 分辨有了实测落点：本轮红的形状是「守卫量到 started=15（远小于预算 100、也远小于 succ 2000），而 Run 交出的是安全阀错误」——`started` 计的是**节点体已开始**的数量，消费者 `dispatch` 计的是**激活已交出**的数量（`spawn` 之后节点体未必跑起来，`scheduler.go:252-255` 每交出一个就 `steps++`），两者在负载下可以差一个数量级。所以「前提成立」这句自证读的是一个**不能约束预算**的过期瞬时值 ⇒ 读法 (a) 得到证实；(b) 是否成立要由 M2 的确定性形状裁决。",
+        "夹具自己的守卫文案（:169「取消之前 Run 已经交出…派发窗口没建立，本行前提不成立」、:175-:176「先加强夹具而不是放宽判据」、:178-:180 预算守卫、:183）正是加固方向：加固后仍要有前提红/语义红两类失败的分型，只是前提红必须来自**位置证明**失败。"
+      ]
+    },
+    {
+      "id": "M2-确定性会合形状预演 + 变异矩阵（仓库外副本，仓库字节未动）",
+      "scene": "/tmp/r17exp/copy —— 与仓库逐字节相同的副本模块（`module github.com/rexleimo/agno-go`、`go 1.24`），只新增一份预演测试文件 `/tmp/r17exp/copy/pkg/hno/graph/p1r17_hardened_test.go`（三行加固形 `TestP1R17HardD1` / `TestP1R17HardD2` / `TestP1R17HardD5b`）；变异注入只落在副本 `pkg/hno/graph/scheduler.go`（脚本 `/tmp/r17exp/mutate.py`、`teeth.py`、`teeth2.py`，每条变异后用 `git hash-object --no-filters` 复核恢复字节 == `dfd6c1ba…`）。7 份非测试字节与仓库全同的复核回执：`receipt:bec6af21-e414-4fc1-908f-6475dc2aac6c`（exit=0）。",
+      "commands": [
+        "node /tmp/rex-receipt.mjs -- bash /tmp/r17exp/rounds2.sh hardload /tmp/r17exp/copy 10 TestP1R17Hard -race   # 加固形在 14 workers 负载下 10 轮",
+        "node /tmp/rex-receipt.mjs -- bash /tmp/r17exp/rounds4.sh freshB /tmp/r17exp/copy 6 TestP1R17Hard -race   # 加固形，负载数值写进轮次文件",
+        "node /tmp/rex-receipt.mjs -- bash /tmp/r17exp/rounds2.sh hardab /tmp/r17exp/copy 8 TestP1R17 -race   # 同一二进制里原始行与加固行的 A/B 对照，负载下 8 轮",
+        "node /tmp/rex-receipt.mjs -- go -C /tmp/r17exp/copy test ./pkg/hno/graph -run TestP1R17Hard -count=30 -race   # 无负载 30 连跑防碰巧绿",
+        "node /tmp/rex-receipt.mjs -- bash /tmp/r17exp/rounds.sh /Users/rex/codes/agno-go 3 'TestP1R17_(...)$' -race   # 见 M1（仓库原件对照）",
+        "python3 -u /tmp/r17exp/mutate.py | tee /tmp/r17exp/matrix-v2.txt   # 8 条变异 × -count=3，区分「加固行判红」与「原始行判红」",
+        "python3 -u /tmp/r17exp/teeth.py > /tmp/r17exp/teeth.txt ; python3 -u /tmp/r17exp/teeth2.py > /tmp/r17exp/teeth2.txt ; python3 -u - <<PY > /tmp/r17exp/m11.txt（σ 单条，5 次独立执行）",
+        "node /tmp/rex-receipt.mjs -- cat /tmp/r17exp/matrix-v2.txt /tmp/r17exp/teeth.txt /tmp/r17exp/teeth2.txt /tmp/r17exp/m11.txt   # 把四份账本钉进一条回执（exit=0）：receipt:834bddef-b9e2-44f6-88b8-9f0f15dc5ad8"
+      ],
+      "observations": [
+        "会合点找到了，而且只用既有公共面：`graph.WithCheckpointer(sink) + graph.WithDurability(graph.DurabilitySync)`（`DurabilitySync` 是 `iota` 零值即默认档）下，`Checkpointer.Append` 由**唯一消费者**在 `consume` 取到队列项、`complete` 之后、下一轮 `dispatch` 之前同步调用（`scheduler.go:170-175` 的落位 + `durability.go` 的 Sync 档），因此「Append 进来了」就是消费者位置证明，且它恰好停在 ②（:155）已咨询过、③（:243）尚未咨询的那个点上——这是公共 API 里唯一能把消费者停在派发循环之间的缝。预演的 sink 只在 `cp.Node == holdOn` 的那一次提交上停（`stopped <- cp; <-release`），其余提交直接放行，`open()` 用 `sync.Once` 保证幂等（v1 曾因 `defer close(release)` 与显式 close 双关而 panic「close of closed channel」，已如实计入迭代）。",
+        "加固形负载全绿：hardload **10/10 轮全绿**（`receipt:2d16b820-9349-4bb5-9807-c939db9da1c7`，exit=0）；freshB **6/6 轮全绿**，且这组的负载比 M1 里出现红的 freshA 第 4 轮更高（首行自证 29.71 → 32.94 的 1 分钟 loadavg，`receipt:3aeb1e33-d87c-4c97-bce1-109146420a54`，exit=0）——负载强度不是加固全绿的解释。",
+        "同一二进制、同一负载下的 A/B（hardab 8 轮，`receipt:7bceb104-c3f9-4f0a-88f0-1a95c26e46f0`，exit=1）：第 7、8 轮红的是**原始** D1 行，加固三行 8/8 轮 0 红。原始与加固跑在同一个测试二进制里，字节相同、负载相同 ⇒ 差别只在夹具如何建立前提。",
+        "无负载防碰巧绿：`-run TestP1R17Hard -count=30 -race` exit 0（`receipt:0b934fd9-a02d-4981-b2c5-2d1a6ce1f19b`）= 加固 D1 30 次、加固 D2 30×100 = **3000 轮**零泄漏、D5b 30 次。",
+        "变异矩阵（副本 `scheduler.go`，8 条 × `-count=3`，账本 `/tmp/r17exp/matrix-v2.txt`；命中率另用 `-count=1` × 5 次独立执行，账本 `/tmp/r17exp/teeth.txt`、`teeth2.txt`、`m11.txt`）：原始字节基线 `rc=0`（三行加固 + 六行原始全绿，即加固形在现行字节上不是行为红）；**m1 τ**（删派发循环头取消守卫 ③）⇒ `HardD1` 红 **5/5 次独立执行**；**m2 ο**（把预算判据挪到取消判据之前，两条仍在 spawn 之前）⇒ `HardD1` 红 **5/5**，而**原始行全绿**；**m3 λ/L_snap**（② 位置不动、读 `consume` 入口的一次性快照）⇒ `HardD2` 红 **5/5**，每次执行命中 20–38/100 轮；**m4 κ**（②③ 两条守卫全拿掉）⇒ `HardD1`+`HardD2` 红，原始 D1/D2 同执判红；**m5**（删 select 的取消分支 ①）⇒ `HardD5b` 红 **5/5**，原始 D5 同执判红；**m8**（取消被归一化成成功收敛：`case <-Done: return s.result, nil`）⇒ `HardD2`+`HardD5b` 红，原始 D4/D5 判红；**m6 μ / m7 ξ**（一切结论先交 `ctx.Err()`；未取消时把阀报成取消）⇒ 只有原始 **D6** 判红（反向牙齿，加固形不接手，符合票面 §13.1 末条归属）；矩阵每条之后 `restoredIdentical=true`。",
+        "**票面 §13.3 第 1 条的 `R17-GAP-1`（「整条删除 ②」这一形态在 ③ 还在时不可达）在加固形下变成可观察**：m9 = 只删 ②（`scheduler.go:155-157` 整条）⇒ `HardD2` 红 **5/5 次独立执行**（每次命中 21–37/100 轮），而**同一执行里原始 D2 判绿**（`/tmp/r17exp/teeth2.txt`）。可达的原因是加固形让 `tail` 停在提交回车时 `pending` 恰为空（entry 的三条后继在同一次派发里全部交出、tail 无出边），消费者放行后只能回到 select ⇒ ③ 不再挡在差别点之前，正是票面点名「缺一个 parked-window 夹具」的那个窗口。",
+        "`R17-GAP-2` 不动、并升级为实测：σ（取消后把并发上限守卫视为失效、继续放出积压，m11 = `running >= maxConcurrency` 加 `&& s.ctx.Err() == nil`）在加固形上 3 次 + 原始+加固 1 次**全部 rc=0**（`/tmp/r17exp/m11.txt`）⇒ 只要 ③ 还在，取消一旦成立就轮不到容量守卫 ⇒ 继续登记为等价变异，`:419` 那类「取消停在派发之前」的断言行保留但不计入牙齿账（与票面 §13.3 第 2 条同一处置）。",
+        "§5 :304-:312 的 (b) 被排除：加固 D1 把「取消时刻预算尚未耗尽」变成位置证明（停靠点落在 `entry` 的提交上，此刻 `steps` 恰为 1、`started == 0`、`pending` 还压着整批后继），预算形状取 `WithStepLimit(1)`，于是安全阀**只能**在被放行之后撞上「同一个循环头」，而取消在放行之前就已送达——现行字节上 30+24 次执行全绿（`0b934fd9`、`2d16b820`、`3aeb1e33`），同时 m1/m2 各 5/5 杀红 ⇒ 今天的负载红来自读法 (a)（过期瞬时值），不是引擎在派发途中真的把阀先交给调用方。"
+      ]
+    },
+    {
+      "id": "M3-公共面盘点（有没有必要/有没有必要新增钩子）",
+      "scene": "/Users/rex/codes/agno-go 只读盘点：`go doc -all ./pkg/hno/graph`、`grep` 夹具可用的构造，以及副本上「只用这些面能不能写出加固形」的 M2 反证。",
+      "commands": [
+        "go doc -all ./pkg/hno/graph | grep -cE '^(func|type|var|const) '",
+        "go doc -all ./pkg/hno/graph | grep -E '^func (New|\\(g \\*Graph\\)|With)' | head -40",
+        "grep -n 'Append' pkg/hno/graph/durability.go | head",
+        "go test ./pkg/hno/graph -run 'TestP1R17_' -count=1 -race",
+        "git hash-object --no-filters $(ls pkg/hno/graph/*.go | grep -v _test.go)",
+        "git status --porcelain pkg/hno/graph"
+      ],
+      "observations": [
+        "导出符号面 64 项（`go doc -all` 计数），图侧选项只有 `WithStepLimit`/`WithMaxConcurrency`/`WithCheckpointer`/`WithDurability` + 节点选项；**没有任何测试专用入口，也不需要**：M2 证明「只用 `Checkpointer.Append` + `DurabilitySync` + channel 闸门」已能把三行前提变成位置证明 ⇒ 任何「为夹具加导出钩子」的提案在本片属多余（`forbiddenShortcuts` 第 1 条）。",
+        "`Append` 是既有耐久性契约面（切片 24 / G3 交付，票面 §13.5 收口字节 `durability.go 11075cfe…`），签名 `Append(ctx context.Context, cp Checkpoint) error` 不变；本片把它**借**作会合点，不重定义、不扩字段、不新增 `Kind`，也不得改变 Sync 档的落位语义。",
+        "仓库 7 份非测试 `.go` 与 14 份测试 `.go` 的当前字节已取锚（见 `baselineBytes`，M1 期间 `git status --porcelain pkg/hno/graph` 为空）；预演期间副本 `scheduler.go` 被反复改写，但每次都用 `git hash-object` 复核回到 `dfd6c1ba1c2a9c35bf4ccb613ee986dd80a7c736`，仓库工作树全程未参与变异。",
+        "作废回执登记：`receipt:bd3a9cda-a067-43f0-8f43-5599362df164`（笔误的 toolchain 绝对路径，exit=127，非测试结论，已用 `receipt:0b934fd9` 的正确命令取代）；`/tmp/r17exp/rounds.sh` 第一版把每轮结果 echo 成不匹配 `^--- FAIL:` 的行且恒退 0，导致首份负载回执读不出判红（`receipt:a4530080` 那组），已由 `rounds2.sh`/`rounds4.sh`（红轮 ⇒ exit 1）取代。两条都是测量工具自身的返工，如实登记。"
+      ]
+    }
+  ],
+  "designConsequence": "四条线在本片定形（M2 已按此实现并实测）：（1）**判据不变、只换前提**——D1/D2/D5 第二段的全部 `t.Error*` 表达式、文案、次序逐字保留，加固只重写「前提如何成立」：从「观测到第一个后继节点开始运行 + 非阻塞探一次结果通道」改成「消费者停在可证明的位置」；夹具里 52 处 `t.Fatal*/t.Error*` 的普查必须逐条映射（26 处 `t.Error*` 判据不动、5 处构建期 `Validate` 拒绝不动、5 处派发窗口守卫一一对应改写成停靠点守卫且仍属前提红分型）。这条映射表由实现片写进测试文件头注释，供人逐行核对，不允许「语义等价所以合并/删除」。（2）**唯一合法的会合缝是 Sync 提交回车**：`DurabilitySync` 下 `Append` 由消费者在 `complete` 之后、下一轮 `dispatch` 之前同步调用，它是公共面上唯一能把消费者停在 ② 已问、③ 未问之间的位置证明点；派发循环本身没有任何公共阻塞点，因此**字面的「取消正落在派发一大批的途中」不可能被确定性构造**（这是本片对母约/票面的诚实回答，见 `adjudicationOptions` OPT-C）。加固形把判据的核心因果保留为可证的形式：取消送达时，「安全阀只能在放行之后、与 ③ 同一个循环头上撞上」是夹具的构造性事实。（3）**D2 的形状从『赌 select 挑哪支』改成『两支都必须指向取消』**——`pending` 在停靠点恰为空的三后继图（failer 由夹具放行、holder 永不完成、tail 立即完成且为输出节点）让「业务错误已在手上」与「调用方已取消」两件事由夹具的放行次序构造成**同时成立**；判据形式仍是跨轮 0 容忍、`p1r17RaceRounds` 仍是 100（实测每轮命中 20–38/100，行级杀红 5/5 执行，比今天 5.8%/轮、约 17/20 执行的形状更硬）。（4）**两处判据升级必须登记、不得当作放宽**：(i) D1 的预算形状从 `WithStepLimit(100)` 改成 `WithStepLimit(1)`（`p1r17StepBudget` 常量保留并继续被 D5 第二段/反向对照使用，不得删），换来「取消与阀在同一循环头争答」的可证形状；(ii) ο 从票面 §13.1 末条登记的**等价变异**升级为加固 D1 的 **solo 杀手**（5/5 杀红、原始行绿）——票面那句「次序不是判据」的实测前提是阀当时还没到期，加固形下前提变了，因此写回时要把措辞限定成「在阀未到期的形状下次序不可观察；在阀同一循环头到期的形状下次序可观察，且两条都必须在交给节点之前问到」，而不是允许把预算判据提到取消判据之前。（5）**负载协议成为收口判据的一部分**：不再只看串行 `-count=1`，收口要在同一合成负载协议下连续 ≥10 轮全绿，并把每轮 loadavg 与判红行写进同一份输出，让「绿」可归因。",
+  "redProtocol": "本片的「红」不来自新行为（引擎语义未变，M2 实测加固形在现行字节上 30/30 + 负载下 16/16 全绿），而来自**回归注入**与**负载协议**，因此两段制的分工与既有片不同，必须按下面执行，缺任一段即本片未交付。第一段（只动测试文件）：加固形落地即跑负载协议 ≥10 轮 + 串行 `-count=1/-count=30/-race`；此时任何「前提红」（停靠点没建立）都判为**加固未完成**，禁止用加大 sleep、放大 succ、缩小轮数、放宽守卫的方式绕过——夹具守卫文案「先加强夹具而不是放宽判据」是本段的裁判；若出现「前提成立却判红」的语义红（即 §5 :304 的读法 (b)），**不得就地修引擎、不得改判据**，停止并按 `adjudicationOptions` 上交裁决。第二段（变异矩阵，逐条注入 → 跑 → 立即恢复 → `git hash-object` 复核）：8 条以上回归，每行至少一条 solo 杀手（M2 已实测的归属：`HardD1 ← {τ(m1), ο(m2), κ(m4)}`、`HardD2 ← {L_snap(m3), 删 ②(m9), κ(m4), 取消报成功(m8)}`、`HardD5b ← {删 select 取消分支(m5), 取消报成功(m8)}`，反向牙齿 `D6 ← {μ(m6), ξ(m7)}` 保持由原始行接手）；杀红必须是**断言行红**（`t.Error*` 的判据行），守卫红一律不计入牙齿。两段各自留 receipt，两段之间测试文件零改动。空转绿是本系列的惯犯（状态文档 :157：切片 26 阶段 1 的 D2 因「无派发即无激活」空转绿，牙齿只能由变异补证）⇒ 本契约明文规定：只凭「跑不出红」的行不算交付。",
+  "acceptanceMapping": [
+    {
+      "row": "D1",
+      "behavior": "「取消优先于步数安全阀」这一行的前提加固（票面 B9 / 切片 17 D1，测试体 `TestP1R17_CancellationWinsOverStepLimitDuringDispatch`，断言行 `:216`/`:219`/`:223`/`:226`）。加固前如何建立前提：`close(start)` 放行 spawner，`p1r17AwaitDispatchWindow` 等**第一个后继节点体开始运行**（`firstStarted`），再读 `started` 断言 `started < 2000` 且 `started < 预算 100`，再非阻塞探结果通道 ⇒ 「取消时预算尚未耗尽」是一句对**过期瞬时值**的观测（`started` 数的是节点体启动，`steps` 数的是激活交出，负载下可差一个数量级，M1 实测取消时刻 started=15 而阀随后撞上）。加固后如何建立前提：同一张 entry→{failer, spawner→2000 后继→exit} 图挂上 `WithCheckpointer(sink)+WithDurability(DurabilitySync)`，sink 只在 `cp.Node==\"entry\"` 那次提交停靠；`<-sink.stopped` 返回即位置证明消费者已停在 ② 之后、③ 之前，此刻 `steps` 恰为 1、`started == 0`、整批后继仍在 `pending`；随后 `cancel(); sink.open()` ⇒ 安全阀只能在放行之后、与 ③ 同一个循环头撞上。",
+      "publicEntry": "graph.New + WithStepLimit(1) + WithMaxConcurrency 默认 + AddNode/AddEdge/SetEntry/SetOutput + Validate + Run + Checkpointer.Append（既有导出面，零新增；预演形状 /tmp/r17exp/copy/pkg/hno/graph/p1r17_hardened_test.go 的 TestP1R17HardD1）",
+      "assertion": "四条判据逐字保留：stalled ⇒ `t.Fatal(\"取消后 Run 未在有界阀内返回…\")`；`!errors.Is(res.err, context.Canceled)` ⇒ `:219` 原文（含「取消时刻已启动 %d/%d 个后继」的自证插值，插值来源改成位置证明读数并如实注释）；`errors.Is(res.err, graph.ErrStepLimitExceeded)` ⇒ `:223` 原文；`res.res != nil` ⇒ `:226` 原文。前提守卫由 5 处映射为停靠点守卫（停靠点没建立 / cp.Node 不是 entry / started≠0 / Run 已交出），仍是「前提红」分型。今天（现行字节 + 现行夹具）在 14 workers 负载下 11 个判红轮全部点名本行；加固形在同一协议下 16/16 轮绿。",
+      "independentlyFailable": "solo 杀手：m1 τ（删 ③）杀本行 5/5 次独立执行；m2 ο（预算判据抢在取消判据之前）杀本行 5/5 且**原始夹具同执行判绿** ⇒ 本行新增一条票面登记为等价变异的杀手（升级登记见 writeBackOwed）；m4 κ（两条守卫全删）也杀。对「取消被报成 ErrStepLimitExceeded」「把次序改成阀先答」的实现判红；对「停靠点没建立却把结论记在取消语义上」的假加固，由前提守卫 + m1 命中数（5/5）暴露。"
+    },
+    {
+      "row": "D2",
+      "behavior": "「取消不得被伪装成节点业务错误」跨轮 0 容忍这一行的前提加固（票面 :68 后半句，`TestP1R17_CancellationIsNotDisguisedAsNodeBusinessErrorAcrossRounds`，断言行 `:259`/`:262`/`:265`/`:268`）。加固前如何建立前提：与 D1 同一个 `p1r17AwaitDispatchWindow`（`firstStarted` + `started` 读数 + 探结果通道）后 `cancel()`，指望「消费者恰好 parked 在 select 且队列里已有一条业务错误」——票面 §13.2 量到 35/600 轮 ≈ 5.8%/轮，且 §13.3 第 1 条明写「把 ② 整条删除」这一形态在 ③ 还在时**走不到差别点**（`R17-GAP-1`，缺 parked-window 夹具）。加固后如何建立前提：entry 的三条后继 {failer（夹具 `failGate` 放行后才交出 `errP1R17Business`）、holder（`release` 前永不完成）、tail（立即完成、无出边、是输出节点）} + sink 停在 `cp.Node==\"tail\"` 的提交上；停靠即 `pending` 为空（tail 无出边、三条后继在同一次派发里全部交出）⇒ 放行后消费者只能回到 select，「业务错误已在手上」与「ctx 已取消」由夹具的放行次序（`ungate(); cancel(); sink.open()`）构造成同时成立，不再指望运气。",
+      "publicEntry": "同上（三后继图 + DurabilitySync 停靠缝）；预演 TestP1R17HardD2，轮数仍取 p1r17RaceRounds=100，每轮一座全新图实例",
+      "assertion": "判据形式（跨轮 0 容忍）与四条判据逐字保留：`errors.Is(res.err, errP1R17Business) && !errors.Is(res.err, context.Canceled)` ⇒ `:262` 原文；`else if !errors.Is(res.err, context.Canceled)` ⇒ `:265` 原文；`res.res != nil` ⇒ `:268` 原文；stalled ⇒ `:259` 原文。`p1r17RaceRounds` 不得下调（M2 实测：正确实现下 30 次执行 = 3000 轮零泄漏；m3/m9 注入下每次执行命中 20–38 轮、行级 5/5 执行杀红）。",
+      "independentlyFailable": "solo 杀手：m3 λ/L_snap（② 读 `consume` 入口快照）杀本行 5/5；**m9（整条删除 ②，票面登记为不可达形态）杀本行 5/5 —— 本片闭合 `R17-GAP-1`**，且同一执行里原始 D2 判绿，证明接手的是加固形而不是巧合；m8（取消报成功）与 m4 κ 也杀。对「取到 item.err 就原样 return」的实现判红。空转自查：若某轮形状实际让 ① 独自回答（例如 `pending` 非空、消费者回到 ③），m3/m9 会 0 命中 ⇒ 该行按空转绿处理、回本契约。"
+    },
+    {
+      "row": "D3",
+      "behavior": "「上限让派发停住时也是取消语义」（D5 第二段，`TestP1R17_CancellationWhileQueueHasBacklog/上限让派发停住时也是取消语义`，断言行 `:436`/`:439`/`:443`）的前提加固。加固前如何建立前提：`p1r17RaceGraph(...WithStepLimit(100), WithMaxConcurrency(5))` + 同一个 `p1r17AwaitDispatchWindow`（观测 `firstStarted`/`started`）⇒ 「派发停住」是被**看到**的，负载下窗口不成立。加固后如何建立前提：entry 一次性声明 2000 条无条件后继、全部节点体闸在 `release` 上（零投递），`fifthStarted` 在第 5 个（= 上限）节点体启动时关闭 ⇒ 「槽位派满、派发停住、消费者回到 select、积压仍在 `pending`」是上限与闸门的**算术后果**而不是观察；`started == capN` 的守卫仍保留。",
+      "publicEntry": "graph.New + WithStepLimit(p1r17StepBudget) + WithMaxConcurrency(5) + AddNode/AddEdge + Run（不需要停靠缝；预演 TestP1R17HardD5b）",
+      "assertion": "三条判据逐字保留：stalled ⇒ `:436`；`!errors.Is(res.err, context.Canceled)` ⇒ `:439` 原文（含「预算 %d 在取消之后才可能撞上（取消时刻已启动 %d 个后继）」插值）；`errors.Is(res.err, graph.ErrStepLimitExceeded)` ⇒ `:443`。M2 v1 返工如实登记：早期形状把 failer 留在图里 ⇒ 拿掉 ① 之后仍由 ② 交出取消 ⇒ m5 判绿、该行空转；v2 把 failer 摘出本行、全部后继闸住才拿到 solo 杀手。",
+      "independentlyFailable": "solo 杀手：m5（删 select 的取消分支 ①）杀本行 5/5（取消后只剩挂死，由「未在有界阀内返回」接住，与票面 §13.3 第 4 条「拿掉 ① 由 D5 接手而不是 D4」同归属）；m8（取消报成功）杀本行（`res.res != nil`/错误非取消）。对「取消之后继续放出积压」的 σ 形态**不**接手（M2 实测 4/4 全绿，等价变异，见 observabilityLimit）。"
+    },
+    {
+      "row": "D4",
+      "behavior": "不需要加固的行的**逐字不变量**：D3（预先取消的三种形状）、D4（节点阻塞期间取消，三种出口）、D5 第一段（一个槽位且有积压，含 `:419`「取消之后不得再放出积压」）、D6（未取消时业务错误原样交出 / 正常收敛不受影响 / 未取消的步数超限仍报超限）。它们的前提已由构造或 channel 会合担保（`blocked` 关闭、`firstStarted` + 上限=1 的算术、`cancel()` 先于 `Run`），M1 与 A/B 合计 11 个红轮里没有一条点名它们。",
+      "publicEntry": "既有夹具 helper `p1r17SmallFan`/`p1r17WideChain`/`p1r17BlockingGraph`/`p1r17CappedBacklogGraph` 与其调用点",
+      "assertion": "本行的验收是**反事实**：加固片结束时，这些 Test 体的断言行与 `p1r17_cancel_normalization_test.go` 现行字节（`cbc8b692a84ed5ce23b461a8ed40b9ba3870d386`）逐行对照，除 D1/D2/D5 第二段的前提建立部分外**一字不改**；`:419` 那行即使无变异可达也必须保留（删行等于放宽，票面 §13.3 第 2 条）。",
+      "independentlyFailable": "接手反向牙齿：m6 μ（一切结论先交 `ctx.Err()`）与 m7 ξ（未取消时把阀报成取消）只被本行族的 D6 子例判红（M2 实测：二者 `加固行判红=[]`、原始 `TestP1R17_UncancelledBusinessErrorStillSurfacesVerbatim` 判红）⇒ 若加固片把这些行改成「取消也算过」，本行判红；若整族被删除或跳过，`git hash-object` 锚与断言普查同时失配。"
+    },
+    {
+      "row": "D5",
+      "behavior": "负载判据（S24-STD-2 的收口口径升级）：R17 族必须在**合成负载协议**下判定，而不是只在串行门禁下碰运气。协议 = 14 个 `yes > /dev/null` CPU 压载循环（本机 8 核）+ 每轮 `go test ./pkg/hno/graph -run <R17 族> -count=1 -race -v` + 每轮把 `sysctl -n vm.loadavg` 写进同一份输出文件 + 任一红即命令 exit 1。",
+      "publicEntry": "测量脚本（实现片须把负载协议落进仓库，取代留在 /tmp 的先例：`scripts/mutation/p1r17-cancel-window.mjs` 与一份可复跑的负载轮次脚本），被观察对象仍是 `pkg/hno/graph` 的公共入口",
+      "assertion": "加固后同一负载协议连续 **≥10 轮 0 判红**（M2 预演已取 16 轮：hardload 10 + freshB 6，且 freshB 的 loadavg 高于 M1 出现红的轮次）；对照锚 = 本片 M1 的原始夹具红率 **定向三行协议 9/22 轮红 + 同二进制 A/B 2/8 轮红 = 11/30 轮红，另整包 `-count=5 -race` 协议 2/3 轮红**；串行侧 `-count=1`、`-count=30`、`-race -count=30`、整包 `-count=5 -race` 三组全 exit 0。",
+      "independentlyFailable": "对「只在空闲机器上绿」的加固判红：本行把负载写成命令与阈值，实现片若跳过负载段或把阈值写成「偶发红可接受」即违规（`forbiddenShortcuts` 第 3/4 条）；`p1r17RaceRounds` 下调同样落在这里，因为跨轮 0 容忍与负载轮次是同一件事的两个方向。"
+    },
+    {
+      "row": "D6",
+      "behavior": "反空转绿：三行加固各自必须交得出把真实回归杀红的牙齿，且杀红必须是断言行红；矩阵执行体必须入库可复跑（`S17-STD-5`/`S18-STD-6` 的教训：判定脚本落在 /tmp 时，别人无法复现「这行有牙齿」）。",
+      "publicEntry": "`scripts/mutation/p1r17-cancel-window.mjs`（node，精确串锚唯一性 `--check`、注入→跑→立即恢复→`git hash-object` 自检；先例 `scripts/mutation/p1r21-duplicate-node.mjs`），被注入的是 `pkg/hno/graph/scheduler.go` 的临时副本态",
+      "assertion": "至少 **8 条变异、每行 ≥1 条 solo 杀手**：m1/m2/m3/m5/m8/m9 六条指定为「加固行 solo 杀手」（M2 实测各 5/5 次独立执行杀红，m2/m9 的同一执行里原始行判绿）；m4 κ 与 m6/m7 为复合与反向对照；m11 σ 允许全绿但必须**如实登记为等价变异**（不许拿它充当牙齿）。每条恢复后 `scheduler.go` 必须回到 `dfd6c1ba…`。",
+      "independentlyFailable": "对「加固形其实没建立会合点」的实现判红：m3/m9 若 0 命中 ⇒ D2 空转（M2 已实测 v1 就是这个形状，账本在 /tmp/r17exp 的 mutate-v1 记录里）；m1/m2 若 0 命中 ⇒ D1 空转；m5/m8 若 0 命中 ⇒ D5 第二段空转。对「把引擎改得让某条牙齿失效」由 `baselineBytes` 的 7 份非测试字节锚拦下。"
+    },
+    {
+      "row": "D7",
+      "behavior": "生产字节零改动（本片的物理边界）：加固只发生在测试文件里；引擎不新增导出符号、不新增测试专用入口、不调整咨询点次序、不改 `Checkpointer` 契约。",
+      "publicEntry": "`baselineBytes`（`git hash-object --no-filters` 的 7 份非测试 `.go` + `go doc -all` 的 64 项导出面计数）",
+      "assertion": "实现片结束时 7 份非测试文件与本片登记的哈希逐位全同；导出符号计数仍为 64；`pkg/hno/graph` 内 `grep -rn 'test-only|debugHook|exportTest'` 不新增任何形状；`go build ./... && go vet ./pkg/hno/graph/...` exit 0。",
+      "independentlyFailable": "对「为了让夹具确定性而改引擎」的任何写法判红——包括把 ③ 挪位置、把 Sync 提交改异步、把 `Append` 扩成观察总线；这些都会撞在字节锚上，而不是撞在断言文案上（文案不改正是本行的意义）。"
+    },
+    {
+      "row": "D8",
+      "behavior": "失败分型不混：任何一次红必须归入 (i) 语义红（`t.Error*` 判据行）/(ii) 前提红（停靠点/窗口守卫）/(iii) 环境红（负载、链接、宿主应用）三类之一，并留下可复跑的原始输出。S24-STD-2 之所以悬了三轮，正是因为这三类被混着记成「R17 flaky」。",
+      "publicEntry": "测试文件自己的 `t.Fatalf` 守卫文案 + 负载轮次脚本的每轮文件 + 回执（stdout 以 sha256 存档，判红行与 loadavg 同文件）",
+      "assertion": "收口报告必须写：加固后负载轮次里 0 条前提红（出现即视为加固未完成，回去改形状，禁止加重试或改判据）；变异矩阵里的杀红全部是判据行；本片 M1 那 11 个红轮的原始输出文件路径逐条列账（`/tmp/r17exp/loadA.*.txt`、`loadB.*.txt`、`wp.*.txt`、`freshA.*.txt`、`hardab.*.txt`）。",
+      "independentlyFailable": "对「拿重跑就好当收口」的实现判红：本行要求每一红有名有姓有分类；把 (ii) 记成 (iii)（「宿主太忙了」）或对 (i) 记「已知 flaky 忽略」都属违规。"
+    }
+  ],
+  "minimalVerticalSlice": "D1 + D2 + D3 + D5 + D6 五行（三行加固 + 负载判据 + 反空转判据）。理由：这三行是 S24-STD-2 的全部判红来源与 §5 :304 (a)/(b) 分辨的落点，缺一即欠项没闭；D5/D6 是本片的「绿是否可信」，缺了就会重演切片 26 阶段 1 的空转绿。D4（逐字不变量）、D7（字节零改动）、D8（失败分型）是护栏行，两段都应绿，其牙齿分别由断言普查 + 字节锚 + 轮次账本提供。",
+  "allowedTestSeam": {
+    "add": [
+      "scripts/mutation/p1r17-cancel-window.mjs（变异矩阵执行体入库，node，锚唯一性 --check + 恢复自检；先例 scripts/mutation/p1r21-duplicate-node.mjs 的形与用法注释）",
+      "scripts/mutation/p1r17-load-rounds.sh（或 .mjs）：把 M1 的负载协议（14 个 yes 压载循环 + 逐轮 loadavg 写进轮次文件 + 任一红即 exit 1）从 /tmp 收进仓库，命令与阈值由本契约 D5/D6 绑定",
+      "可选 pkg/hno/graph/p1r17_cancel_window_test.go：**仅当** in-place 改写会让 `p1r17AwaitDispatchWindow` 的两套前提互相纠缠时才新增；此时被加固的旧行必须退役（同一判据不得留两份长期夹具，一份绿一份被忽略）"
+    ],
+    "modify": [
+      "pkg/hno/graph/p1r17_cancel_normalization_test.go（唯一允许改写的既有测试文件；只动 D1/D2/D5 第二段的**前提建立部分**与其夹具构造、helper 注释与文件头说明；26 处 `t.Error*` 判据逐字保留、5 处派发窗口守卫一一对应改写成停靠点守卫、5 处构建期 `Validate` 拒绝不动；`p1r17Grace`/`p1r17Succ`/`p1r17StepBudget`/`p1r17RaceRounds` 四个常量值不动，D1 的 `WithStepLimit` 取值允许改为「停靠点上再撞一次即到期」的形状并在注释里写明为什么这不是放宽）",
+      "graph_test.go 等其余 13 份既有测试文件：一份都不许动（M1 未观察到它们参与负载红；若被迫改写，回到本契约）"
+    ],
+    "retires": [],
+    "sourceSeam": "无新源码头。只用既有公共面：`graph.New` + `WithStepLimit`/`WithMaxConcurrency`/`WithCheckpointer`/`WithDurability`、`Graph.AddNode/AddEdge/SetEntry/SetOutput/Validate/Run`、`Checkpointer.Append(context.Context, Checkpoint) error`（Sync 档由消费者同步调用，切片 24/G3 既有语义）与夹具自持的 channel/atomic。预演形状：/tmp/r17exp/copy/pkg/hno/graph/p1r17_hardened_test.go（v2；v1 的两处空转由变异矩阵实测出来并已在其文件头登记）。"
+  },
+  "forbiddenObservations": [
+    "调度器私有状态（pending/running/steps/result/queue 长度、goroutine 数）——票面 :40 明令禁止，本族一行都不碰；加固形的位置证明只能来自「Append 被调用」这一公共事件与其 Checkpoint.Node 字段。",
+    "`Checkpoint` 的 Seq/At/Payload 内容与耐久性语义（属切片 24 判据；本片只把 `Append` 借作会合点，不得在此断言或改动持久化语义）。",
+    "select 两支的**挑选次序**：加固把「两支同时就绪」变成构造，但哪一支先被服务仍是引擎内部选择，不得写成断言（否则就把等价变异升格成判据）。",
+    "time.Sleep/墙钟差值参与定序（`p1r17Grace` 只作上界阀：到点报停摆失败，不作「没超时就算过」）。",
+    "为观察派发而新增的导出内部态（把 pending/steps 暴露出来供夹具读，是本片最诱人的捷径，明令禁止）。"
+  ],
+  "baselineBytes": {
+    "note": "本片与实现片都不得改 `pkg/hno/graph` 的任何非测试 `.go`。下列 7 份是 2026-09-28T09:0xZ 现取的 `git hash-object --no-filters`，实现片收口必须逐位全同（D7）。测试侧：14 份既有测试文件中只允许 `p1r17_cancel_normalization_test.go` 变化（其加固前基线哈希一并登记为 `fixtureBefore`，用于断言普查的左半边），其余 13 份逐位不变。",
+    "anchorsCommand": "ls -1 pkg/hno/graph/*.go | grep -v _test.go | xargs git hash-object --no-filters",
+    "anchors": {
+      "pkg/hno/graph/durability.go": "11075cfeb7a68274d89fcc9d87fe10bb276cda08",
+      "pkg/hno/graph/graph.go": "efa9a4ba1c13baf9fdc7e6883665c6e13050ce2e",
+      "pkg/hno/graph/hitl.go": "75756a1445baa9228b45577688283d99b6e19ba6",
+      "pkg/hno/graph/policy.go": "6d71fa47ba73c769c8e1bc7d697d39d355e5210f",
+      "pkg/hno/graph/restore.go": "feebb79925ef159a40e09fbd00b8f2a320b54f06",
+      "pkg/hno/graph/scheduler.go": "dfd6c1ba1c2a9c35bf4ccb613ee986dd80a7c736",
+      "pkg/hno/graph/send.go": "dcd046612fcf716bbdec5373744cb2ffb714ab7e"
+    },
+    "fixtureBefore": {
+      "pkg/hno/graph/p1r17_cancel_normalization_test.go": "cbc8b692a84ed5ce23b461a8ed40b9ba3870d386",
+      "pkg/hno/graph/graph_test.go": "624f19624c6f4fa3c04ee6619e722b03de83336c",
+      "pkg/hno/graph/p3g6_durability_test.go": "bdeb8ef95f728534295b10336c6a51dc704b5658",
+      "pkg/hno/graph/p1r21_duplicate_node_test.go": "a8a936ed101cbf3c2883205fc9ecd280826e7255"
+    },
+    "counters": {
+      "nontestGoFiles": 7,
+      "testGoFiles": 14,
+      "allowedModifiedTestFiles": 1,
+      "exportedSymbols_goDoc": 64,
+      "assertionCalls_inFixture": 52,
+      "assertionCalls_tError": 26,
+      "assertionCalls_inTestBodies": 42,
+      "premiseGuards_inAwaitDispatchWindow": 5,
+      "buildTimeValidateGuards": 5,
+      "p1r17RaceRounds": 100,
+      "expectedNewExportedSymbols": 0,
+      "expectedNontestFilesChanged": 0
+    }
+  },
+  "carriedItems": [
+    {
+      "id": "S24-STD-2",
+      "ref": "artifact:docs/design/v3-p1-graph-status.md §5 :283-:313（三条：复发实测、223 负载那轮、提交后全仓门禁的稳定判红与 (a)/(b) 读法）",
+      "carriedIntoDesign": "本片即其「欠项登记」的独立契约。§5 :311-:312 交给本片的职责已被 M1/M2 完成分辨：`started` 与 `steps` 的语义差（节点体启动 vs 激活交出）使 (a)「守卫读过期瞬时值」得到实测证实；加固形在现行字节上 16 负载轮 + 30 串行连跑全绿、而 m1/m2 各 5/5 杀红 ⇒ (b)「引擎在派发途中真的把阀先交出去」在本片能构造的位置上不成立。收口前那三条红既不得记回归也不得记通过（§5 :313），本片交付后由状态文档改写这条口径。"
+    },
+    {
+      "id": "R17-GAP-1",
+      "ref": "artifact:docs/design/v3-test-scope-p1-graph.md §13.3 第 1 条 + §13.1 :230",
+      "carriedIntoDesign": "原文：「把 ② 整条删除」这一形态要可达，缺一个 parked-window 夹具。本片 M2 实测 m9（只删 ②）在加固 D2 上 5/5 次独立执行杀红（每次命中 21–37/100 轮）而原始 D2 同执行判绿 ⇒ 缺口由停靠点形状闭合，票面 §13.3 第 1 条与 §13.1 :230 的「不可达」标注需在收口时写回（writeBackOwed），并同步 D2.teethMutant 的生效归属。"
+    },
+    {
+      "id": "R17-GAP-2",
+      "ref": "artifact:docs/design/v3-test-scope-p1-graph.md §13.3 第 2 条（σ 与 :419 那行无任何变异可达）",
+      "carriedIntoDesign": "本片**不**闭合它，并把它从推断升级为实测：M2 的 m11 σ（取消后让上限守卫失效）在加固形 + 原始行 4 次独立执行全 rc=0 ⇒ 只要 ③ 还在就轮不到容量守卫。`:419` 类断言（「取消之后不得再放出积压」）继续保留但不计入牙齿账（D4 行）。要真让它可达，得把取消咨询点搬到容量守卫之前/让派发可协作——那是引擎语义变更，属 OPT-C，不在本片。"
+    },
+    {
+      "id": "R17-GAP-3",
+      "ref": "artifact:docs/design/v3-p1-graph-r17-refactor.md §6 第 1 条（超时形状，review verdict S17-SPEC-4）",
+      "carriedIntoDesign": "本片不动超时/退避形状（属 `runNode` 包络，P2 G3 的 Timeout/Retry 面）。登记为「加固片不处理的第三条缺口」，避免下一个读者以为 S24-STD-2 的加固顺带把它关了。"
+    },
+    {
+      "id": "S17-SPEC-3 / R17-UNADJ-1",
+      "ref": "artifact:docs/design/v3-platform.md §3.3（:192 附近，「取消后是否也必须报取消」未决 + 成功路径不咨询这条取舍）",
+      "carriedIntoDesign": "本片判据不动 ⇒ 不需要先裁决这条未决项；加固形仍只要求「已成立的取消不得被冒充成别的结论」。若实现片出现「前提成立却判红」的新形态（即 (b) 在别的形状上复活），它属该未决项的语义面，停止并转 `adjudicationOptions`，不得由实现片自行放宽或改引擎。"
+    },
+    {
+      "id": "切片 26 阶段 1 D2 空转绿",
+      "ref": "artifact:docs/design/v3-p1-graph-status.md :157-:158",
+      "carriedIntoDesign": "「无派发即无激活」式的空转必须由变异补证——本片把它写成硬判据（D6 行 + redProtocol 第二段 + completionCriteria 第 3 条），并登记本片自己躲过一次：预演 v1 的 D2 与 D5b 就是空转形（m3/m4 0/300 命中、m5 仍被 ② 接住），账本见预演文件头注释。"
+    },
+    {
+      "id": "S17-STD-5 / S18-STD-6（执行体不入库）",
+      "ref": "artifact:docs/design/v3-p1-graph-status.md :280-:282、:322 与 v3-p1-graph-r17-refactor.md §6 第 4 条",
+      "carriedIntoDesign": "票面 R17 的 `mutants*.mjs` 一直躺在 /tmp，别人无法复现「这行有牙齿」。本片的 D6 行要求把加固后的矩阵执行体与负载轮次脚本一并入库（`scripts/mutation/`），沿用 p1r19/p1r21 已有的锚唯一性与 `git hash-object` 恢复自检形制。"
+    },
+    {
+      "id": "g6 §2.2 负载对照先例",
+      "ref": "artifact:docs/design/v3-p3-graph-g6-refactor.md §2.2（:56-:70）",
+      "carriedIntoDesign": "它的「基线字节同样偶发」结论靠 6 个 CPU 压载循环 + 隔离副本 A/B 取得；本片沿用同一形制并把协议升级两处：负载强度按核数放大（14 workers），以及**加固形与原始形同二进制同负载 A/B**（hardab 8 轮，原始第 7/8 轮红、加固 0 红），使「绿来自形状而不是来自运气/机器变闲」这一点单条回执内自证。"
+    }
+  ],
+  "explicitNonGoals": [
+    "不改引擎取消语义：三咨询点的位置、条数（`ctx_checks_in_scheduler=4`）、先后次序一律不动；不把 ③ 搬进/搬出派发循环，不让派发可协作。",
+    "不实现「派发中途可观察」的新公共钩子（OPT-C 的形状），也不为测试导出 pending/steps/running。",
+    "不放宽/重写票面 :68、:63 的判据本身；不改 `ErrStepLimitExceeded`、`context.Canceled` 的归一化文案与包装链。",
+    "不做 flake 抑制基础设施（测试重试、CI 侧屏蔽、`-race` 关闭、并发降参），那与本片目的相反。",
+    "不改 `Checkpointer`/`Durability` 的接口语义、档位默认值或 Sync 落位（本片只借它作会合点）。",
+    "不动超时/退避形状（`R17-GAP-3`）、成功路径不咨询这条未裁决取舍（`S17-SPEC-3`）、以及 HITL 挂起/恢复语义（切片 27）。",
+    "不触碰 `pkg/hno/agent`、`pkg/hno/runner`、`internal/hitlbridge` 等消费者面（除作为回归门禁的邻居命令）。",
+    "不在本片收口 `S19-STD-6`（变异执行体接进 `make`）——只入库本片那一份，接线属基础设施片。"
+  ],
+  "completionCriteria": [
+    "1. redProtocol 两段各留 receipt，两段之间测试文件零改动；第一段（加固落地、无引擎改动）在负载协议 ≥10 轮 0 红 + 串行 `-count=1`/`-count=30`/`-race`/`-race -count=30`/整包 `-count=5 -race` 全 exit 0；第二段（变异矩阵）逐条留账本。",
+    "2. 负载判据（D5）：与 M1 同一协议（14 个 `yes > /dev/null` workers、每轮 `-count=1 -race -v`、每轮 loadavg 写进同一输出、任一红即 exit 1）连续 **≥10 轮全绿**，并以本片 M1 的 **定向协议 9/22 轮红 + A/B 二进制 2/8 轮红（合计 11/30，37%）与整包协议 2/3 轮红** 作对照锚；对照实验要求同二进制内保留一次「原始夹具 vs 加固形」的 A/B 记录（可临时，账本入库即可，长期夹具不留双胞胎行）。",
+    "3. 至少 **8 条变异杀红、每行 ≥1 条 solo 杀手**（D6）：`HardD1 ← m1 τ + m2 ο`、`HardD2 ← m3 L_snap + m9 删 ②`、`HardD5b ← m5 删 ① 取消分支`；`m4 κ`、`m8 取消报成功` 为复合补强（m8 亦杀 HardD2/HardD5b）；`m6 μ`/`m7 ξ` 由 D6 反向行接手（加固行不得接手它们，接手即说明判据被改坏）；`m11 σ` 允许全绿但必须登记为等价变异。每条之后 `git hash-object` 复核 `scheduler.go == dfd6c1ba…`；杀红必须是 `t.Error*` 判据行，守卫红不计。",
+    "4. 判据不变量（D1–D4）：测试文件头注释落成「加固前如何建立前提 → 加固后如何建立」逐子用例对照表；`fixtureBefore` 哈希与收口哈希的 diff 里，26 处 `t.Error*` 判据行零改动（允许自证插值的取值来源变化，但必须注释写明）；5 处派发窗口守卫一一映射为停靠点守卫且仍属前提红分型；`p1r17RaceRounds==100`、`p1r17Succ==2000`、`p1r17Grace==10s`、`p1r17StepBudget` 常量值不变。",
+    "5. 字节零改动（D7）：`baselineBytes.anchors` 的 7 份非测试文件逐位全同；`go doc -all ./pkg/hno/graph | grep -cE '^(func|type|var|const) '` 仍为 64；其余 13 份测试文件逐位全同；`go build ./... && go vet ./pkg/hno/graph/... && gofmt -l pkg/hno/graph` 全 exit 0/无输出。",
+    "6. 执行体入库（D6/S17-STD-5）：`scripts/mutation/p1r17-cancel-window.mjs` + 负载轮次脚本入 `scripts/`，`--check` 预检锚唯一性，跑一次完整矩阵留 receipt。",
+    "7. 失败分型账（D8）：收口报告列出负载轮次的每一红（若无则写 0）并归类；本片 M1 的 11 个红轮原始文件路径列入证据。",
+    "8. 写回 owed 全部落笔（见 `writeBackOwed`；母约与状态文档由编排方写，本契约只登记条目与措辞建议）。",
+    "9. 最终字节重跑绑定命令取新回执；`-race` 无 DATA RACE；`git status --porcelain` 除本契约/实现片允许文件外为空。"
+  ],
+  "forbiddenShortcuts": [
+    "为了让夹具确定性而给引擎加导出钩子/测试专用入口（`WithDispatchHook`、导出 pending/steps、`newTestScheduler`、把 Sync 提交改成可注入回调等）——M3 已证只用既有公共面就够，本片一律禁止。",
+    "改引擎的咨询点位置或次序来「让红消失」（包括把 ③ 挪到阀之后、把 ② 删掉、把取消包进节点错误链）——那属 S17-SPEC-3/R17-UNADJ-1 的语义裁决，转 OPT 而不是动手。",
+    "放宽判据：删除或软化 `:219`/`:223`/`:262`/`:419`/`:443` 任一条、把 `errors.Is` 换成文案匹配、把「取消优先」写成「取消或超限都算过」、把 `p1r17RaceRounds` 从 100 往下调、把跨轮 0 容忍改成百分比容差、用 `t.Skip` 绕开负载下的红。",
+    "用 `time.Sleep`/加大 sleep 余量/调大 `p1r17Grace` 去「撑开窗口」——那是把时序竞赛换成赌注，守卫文案 :175-:176 已点名禁止这种走法。",
+    "把 `Checkpointer.Append` 用成事件观察总线（在 Append 里读引擎内部态、断言持久化形状、或改动 Sync 语义）；缝只用作会合点。",
+    "空转绿交付：任一行拿不出 solo 杀手（尤其 D5 第二段 v1 那种「拿掉 ① 之后仍被 ② 接住」的形状）就以「行存在且跑绿」计入交付。",
+    "对仓库工作树执行 git 破坏性命令（checkout/reset/stash/clean）来做变异或恢复——切片 21 曾因此几乎丢掉整个未提交序列；变异一律在副本，或改前先取哈希并在同一条命令内恢复复核。",
+    "跑全仓 `make test`/`go test ./...` 作为本片门禁（并行测量期间会互相污染负载判据）；本片门禁按 verificationCommands 的包面枚举。",
+    "凭印象写回执 ID 或负载数值（本系列已为脑补返工两次：状态文档 §4l、§6）；每条数字必须能指到回执或 on-disk 轮次文件。"
+  ],
+  "observabilityLimit": [
+    "字面形状「取消正落在消费者一次性派发一大批后继的循环途中」不可确定性构造：`dispatch`（`scheduler.go:241-258`）内部没有任何公共阻塞点，公共面上能把消费者停在 ② 与 ③ 之间的只有 Sync 提交回车。加固形因此证明的是同一因果的更强形式（取消送达时，阀与 ③ 在同一个循环头争答，③ 必须先答），不是复刻途中观测。这一点连同处置见 `adjudicationOptions` OPT-A/OPT-C。",
+    "select 两支（① 与 queue）谁先被服务仍不可观察，也不得升格为判据；加固只保证「两支都只能交出取消语义」，因此 D2 每轮的**命中数**仍是概率的（实测 20–38/100），行级杀红才是确定判据（5/5 次独立执行）。",
+    "σ（`R17-GAP-2`）在加固形上仍等价（M2 实测 4/4 rc=0）；`:419` 那类断言继续保留但不计牙齿。`R17-GAP-3`（超时形状）本片不触及。",
+    "前提守卫仍可能在极端负载下报「停靠点没建立」：那是夹具的位置证明失败（前提红），不是放宽的理由，也不是回归；反复撞到就回本契约改形状，禁止以 sleep/重试消化。",
+    "负载协议是**合成**负载（CPU 压载循环），不复现宿主应用造成的调度抖动细节；M1 里 223 那种负载来自宿主（状态文档 :290-:292），本片只能声明「加固后的绿对负载不再敏感」并以 ≥10 轮实测背书，不能声明已复现 223。",
+    "预演副本 `/tmp/r17exp/copy` 的 7 份非测试字节与仓库逐位同（`receipt:bec6af21`），但加固预演文件本身只在 /tmp；收口时以仓库字节重跑绑定命令取新回执，旧回执只作设计期证据。"
+  ],
+  "verificationCommands": [
+    "go test ./pkg/hno/graph -run 'TestP1R17_' -count=1 -race -v   # 本片绑定场景命令（cwd 仓库根）",
+    "bash scripts/mutation/p1r17-load-rounds.sh 14 10 'TestP1R17_'   # 负载协议 ≥10 轮（每轮 loadavg 写进轮次文件、任一红即 exit 1）；脚本入库后以仓库版为准，设计期等价命令：node /tmp/rex-receipt.mjs -- bash /tmp/r17exp/rounds4.sh freshB /tmp/r17exp/copy 6 TestP1R17Hard -race",
+    "go test ./pkg/hno/graph -run 'TestP1R17_' -count=30 -race   # 防碰巧绿（M2 预演：receipt:0b934fd9 exit=0）",
+    "go test ./pkg/hno/graph -count=5 -race   # 切片 24 的整包协议，连续 3 轮全绿（M1 基线：2/3 轮红，receipt:8244595a exit=1）",
+    "go build ./... ; go vet ./pkg/hno/graph/... ; gofmt -l pkg/hno/graph ; go test ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1   # 邻居回归，禁全仓 make test",
+    "node scripts/mutation/p1r17-cancel-window.mjs --check ; node scripts/mutation/p1r17-cancel-window.mjs   # 完整矩阵（≥8 条），逐条打印接手行并自检恢复",
+    "ls -1 pkg/hno/graph/*.go | grep -v _test.go | xargs git hash-object --no-filters   # 必须与 baselineBytes.anchors 逐位全同",
+    "go doc -all ./pkg/hno/graph | grep -cE '^(func|type|var|const) '   # 必须仍为 64（零新增导出面）",
+    "git status --porcelain   # 除本契约与实现片允许文件（1 份测试文件 + scripts/ 两份）外为空；工作树逐字节不动的自证"
+  ],
+  "writeBackOwed": [
+    "票面 `docs/design/v3-test-scope-p1-graph.md` §13.1 :230 与 §13.3 第 1 条：`R17-GAP-1` 由本片闭合，「整条删除 ②」从不可达形态升级为 `HardD2` 的 solo 杀手（实测 5/5 次执行杀红、每次 21–37/100 轮，原始 D2 同执行绿）；D2.teethMutant 生效归属补 {m9 删 ②, m3 L_snap, m4 κ, m8 取消报成功}。由编排方落笔。",
+    "票面 §13.1 末条「次序不是判据」：加限定——在阀未到期的形状下次序不可观察（原实测结论保留），在阀与取消同处一个循环头的形状下 ο 可观察并成为 D1 加固形的杀手（M2 实测 5/5）；`scheduler.go:237-240` 的注释同批核对（本片不改字节，注释更新属未来某片，登记不代改）。",
+    "票面 §13.2 命中率表：补一行加固形命中率（每轮 22–38/100 的杀红命中、正确实现下 3000 轮零泄漏）与负载红率对照（原始夹具 11/30 轮红 vs 加固形 ≥10 轮 0）。",
+    "状态文档 §4 欠项登记与 §5 S24-STD-2 三条（:283-:313）：收口为「R17 夹具负载加固已交付」，并写明 (a)/(b) 分辨结论（(a) 证实、(b) 在本片可构造的位置上不成立）与「负载协议纳入收口口径」；由编排方独占写回，本契约只登记条目。",
+    "母约 `docs/design/v3-platform.md` §3.3「取消」段：本片**不改**语义，只在收口后追加一句测试侧指针（三咨询点的夹具可证形式，切片 30）。由编排方落笔。",
+    "`R17-GAP-2`（σ 等价，M2 实测）、`R17-GAP-3`（超时形状，本片不触及）继续挂账，收口时逐条标注「本片未处理」，避免读者以为 S24-STD-2 的加固顺带关了它们。",
+    "本契约自身的写回：`activationId` 待派发回填；实现片收口后按仓库最终字节重跑 `verificationCommands` 并追加 `receipt:` 指针（票面 §13.5 或 refactor 材料内登记）。"
+  ],
+  "adjudicationOptions": [
+    {
+      "id": "OPT-A",
+      "option": "采纳本片形状：以既有 `DurabilitySync` 提交回车作为唯一公共会合点，就地加固 D1/D2/D5 第二段的前提建立部分，26 处判据逐字不动，并把 ο 从等价变异升格为 D1 加固形的杀手（附票面 §13.1 两条写回）。",
+      "consequence": "S24-STD-2 闭、R17-GAP-1 闭、R17-GAP-2/3 继续挂账；生产字节零改动、无新增导出面；代价是 D1 的形状从「观察 started」改成「证明 steps」，票面 §13.1 末条与 §13.2 的两处措辞要加限定，且 D2 每轮命中数仍概率（行级判据确定）。本片按此撰写，M2 全部实测支持。"
+    },
+    {
+      "id": "OPT-B",
+      "option": "只做窗口加宽（保留观测式前提，把 succ/预算/轮数调大、加 sleep 余量），把它当作环境性 flake 挂账不加固形状。",
+      "consequence": "负载红率只能下降不能归零：M1 已见「前提成立却判红」（取消时刻 started=15、阀随后撞上），加宽窗口等于把同一因果赌得更大；且守卫文案 :175-:176「先加强夹具而不是放宽判据」直接否定这条走法。不解决 §5 :313 的收口口径悬置，三轮并案观察会续到第四轮。本片拒绝。"
+    },
+    {
+      "id": "OPT-C",
+      "option": "要求复刻字面「取消正落在派发一大批的途中」，即新增一个可让测试停在派发循环内的公共钩子（导出派发游标、把 ③ 改成可注入回调、或让 dispatch 协作式分批）。",
+      "consequence": "这是引擎语义/性能面的行为改动（新增导出符号、改变消费者单写者不变量或 `ctx_checks_in_scheduler=4` 这条结构计数），超出「夹具加固」范围且撞本片 forbiddenShortcuts 第 1/2 条；它还把当前不可观察的 select 次序暴露成契约面。若负责人要这条，应另开一张引擎片契约并附性能账，本片不做——但本片登记：OPT-A 之下「途中观察」这条语义确实不在测试可证范围内（见 observabilityLimit 第 1 条）。"
+    }
+  ],
+  "notes": "本契约由测试设计代理写成；M1 全部在仓库只读实测（只跑 `pkg/hno/graph` 的 R17 族与其包面，未跑全仓 `make test`），M2 全程在 /tmp 副本（`/tmp/r17exp/copy`，7 份非测试字节与仓库逐位同 `receipt:bec6af21`），变异注入只落副本且每次跑完用 `git hash-object` 复核回到 `dfd6c1ba…`；仓库工作树除本契约文件外逐字节不动（收口前 `git status --porcelain` 自证：开工时为 ` M yarn.lock` + 他人并行新增的契约文件，本代理未触碰 `.go`）。回执 ID 全部现取现贴并逐个 `ls` 复核存在；一条作废回执（`receipt:bd3a9cda`，toolchain 路径笔误 exit=127）与 `rounds.sh` 首版不可读回执（`receipt:a4530080` 那组的输出形态）已在 M3 如实登记，未被静默丢弃。开发中实测到的两处自身返工也登记在 M2/预演文件头：v1 加固形的 D2 与 D5b 是空转绿（m3/m4 0/300 命中、m5 被 ② 接住），以及 `close of closed channel` panic 与「failer 抢占了 D5b 的前 5 个槽位导致前提永不成立」两次夹具缺陷——都由变异矩阵而非人工检查发现。`.rex-harness/`（回执目录）在 .gitignore:62，故轮次原始输出另存 `/tmp/r17exp/`，账本路径写进 D6/D8 与 completionCriteria。activationId 待派发回填。"
+  ,
+  "evidenceRefs": [
+    "artifact:docs/design/v3-p1-graph-status.md#5",
+    "artifact:docs/design/v3-p1-graph-status.md#4",
+    "artifact:docs/design/v3-test-scope-p1-graph.md#13",
+    "artifact:docs/design/v3-p1-graph-r17-refactor.md#6",
+    "artifact:docs/design/v3-p3-graph-g6-refactor.md#2.2",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice17.json",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice24.json",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice26.json",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice28.json",
+    "artifact:pkg/hno/graph/p1r17_cancel_normalization_test.go",
+    "artifact:pkg/hno/graph/scheduler.go",
+    "artifact:pkg/hno/graph/durability.go",
+    "artifact:/tmp/r17exp/copy/pkg/hno/graph/p1r17_hardened_test.go",
+    "artifact:/tmp/r17exp/matrix-v2.txt",
+    "artifact:/tmp/r17exp/teeth.txt",
+    "artifact:/tmp/r17exp/teeth2.txt",
+    "artifact:/tmp/r17exp/m11.txt",
+    "artifact:/tmp/r17exp/freshA.4.txt",
+    "receipt:a4530080-f304-4c58-b896-cc96f9b7deaf",
+    "receipt:07ec241b-934b-44ba-a857-cc2a2d29a249",
+    "receipt:fab3b1c7-8eb2-417f-b98f-8304b20a7cec",
+    "receipt:8244595a-cd27-45c9-a16e-a63e3eec0bb3",
+    "receipt:05524c15-c660-4e5c-b8f3-751eead77f80",
+    "receipt:e01c118d-c5c8-470a-bf90-92dc60703d77",
+    "receipt:f6faed24-4499-423e-9580-e5671eb21804",
+    "receipt:5134091e-7601-4bfc-a6d3-67a3809ec69f",
+    "receipt:1372ec78-ccda-4e00-81c7-8c88cd0736d2",
+    "receipt:3aeb1e33-d87c-4c97-bce1-109146420a54",
+    "receipt:2d16b820-9349-4bb5-9807-c939db9da1c7",
+    "receipt:7bceb104-c3f9-4f0a-88f0-1a95c26e46f0",
+    "receipt:0b934fd9-a02d-4981-b2c5-2d1a6ce1f19b",
+    "receipt:834bddef-b9e2-44f6-88b8-9f0f15dc5ad8",
+    "receipt:bec6af21-e414-4fc1-908f-6475dc2aac6c",
+    "receipt:bd3a9cda-a067-43f0-8f43-5599362df164"
+  ]
+}

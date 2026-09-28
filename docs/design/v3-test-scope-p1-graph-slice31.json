@@ -1,0 +1,394 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p4-streammode-producers",
+  "activationId": "pending",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-28T08:40:00Z",
+  "contractRef": "docs/design/v3-test-scope-p1-graph-slice31.json",
+  "slice": 31,
+  "series": "P4 第 2 片（G4 StreamMode 生产者接线，协议层见切片 23）",
+  "userGoal": "把切片 23 交付的「死协议」接上今天确实存在的生产者：逐模式盘点生产者落点后，本片只接 agent/runner 路径就能产出的那一族——StreamTasks（模型请求的工具调用作为任务：node_started/node_completed/task_error 三类事件、载荷映射、批内确定性次序），并把多模式并选的语义一次定形（并集、与参数次序无关、重复模式不重发、无模式默认 Messages、任一未接线模式仍整体 fail-closed）。其余五模式（Values/Updates/Checkpoints/Debug/Custom）的语义按图节点或检查点键控，本片逐模式给出归属片号并继续 fail-closed，一条都不默默缩水；接线本身要能从 fail-closed 集合里逐模式看到迁移（已接线不再报错、未接线仍报错的反向对照同片共存）。",
+  "whyThisSlice": "母约 §5 的七模式状态表（docs/design/v3-platform.md 切片 23 交付段之后）只解锁了 StreamMessages，其余六行写着「fail-closed 待生产者片」；实测六个新事件构造函数在 pkg/hno/run 之外**零调用方**（各 4 处引用全部落在协议文件与其自身测试里，receipt:0cab2a99-df24-400f-9506-52b4b2c1b11f），即整条流式协议在生产侧仍是空的。生产者不能一片全包：M3 实测 pkg/hno/graph 的导出面里 Stream|Events|<-chan 命中 0、只有 Run/Resume 两个终结式方法（receipt:0110b4fb-1be1-4588-abc9-1b308db48ec8），Values/Updates/Checkpoints 的语义必须由图侧事件桥接承载，而 pkg/hno/graph 是兄弟片在途领地（本契约起草期间该目录未被执行过任何 test，只按逐文件哈希取字节锚）。反过来，Tasks 的生产者完全落在允许包内（agent 的工具批次 + runner 的批次切分），且它需要的三个事件类型（node_started/node_completed/task_error）协议层已经备好——最小纵向就在这里。Custom 的入口（节点体内主动写入）仓库今天根本不存在（实测 customwriter|WriterFrom|EmitCustom = 0），属新公共面，随图侧桥接片或负责人另裁（ADJ-S31-1），不塞进本片。",
+  "measuredBeforeDesign": [
+    {
+      "id": "M1-今天七个模式的实际行为与全部既有锚（仓库只读 + 未改动副本探针）",
+      "scene": "仓库 /Users/rex/codes/agno-go（只读测量；测试只跑 ./pkg/hno/run/... ./pkg/hno/agent/... ./pkg/hno/runner/...，绝未对 pkg/hno/graph 执行任何 test）+  pristine 副本 /tmp/g4base（仓库逐字节复制、加 cmd/g4probe 只调导出 API、手写稳定 fake model，无网络无真模型）",
+      "commands": [
+        "go test ./pkg/hno/run/... ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1",
+        "go test -race ./pkg/hno/run/... ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1",
+        "go build ./...",
+        "gofmt -l pkg/hno/run pkg/hno/agent pkg/hno/runner",
+        "go -C /tmp/g4base vet ./cmd/g4probe",
+        "go -C /tmp/g4base run ./cmd/g4probe",
+        "bash -c \"for p in run agent runner; do printf '%s exported=%s nontest=%s all=%s syncNontest=%s\\n' $p $(go doc -all ./pkg/hno/$p | grep -cE '^(func|type|var|const) ') $(find pkg/hno/$p -maxdepth 1 -name '*.go' -not -name '*_test.go' | xargs cat | wc -l | tr -d ' ') $(find pkg/hno/$p -maxdepth 1 -name '*.go' | xargs cat | wc -l | tr -d ' ') $(grep -rn 'sync\\.' pkg/hno/$p --include='*.go' | grep -v _test | wc -l | tr -d ' '); done\"",
+        "bash -c \"for k in NewNodeStartedEvent NewNodeCompletedEvent NewTaskErrorEvent NewCheckpointEvent NewStateUpdateEvent NewCustomEvent; do printf '%s total=%s outside_run_protocol=%s\\n' $k $(grep -rn $k --include='*.go' pkg internal cmd examples | wc -l | tr -d ' ') $(grep -rn $k --include='*.go' pkg internal cmd examples | grep -vE 'pkg/hno/run/(stream_events|streammode_test)' | wc -l | tr -d ' '); done; grep -rniE 'customwriter|WriterFrom|EmitCustom' --include='*.go' pkg | wc -l\"",
+        "git hash-object --no-filters pkg/hno/run/context.go pkg/hno/run/events.go pkg/hno/run/events_json.go pkg/hno/run/events_test.go pkg/hno/run/loop.go pkg/hno/run/loop_extend_test.go pkg/hno/run/loop_test.go pkg/hno/run/modes.go pkg/hno/run/stream_events.go pkg/hno/run/streammode_test.go pkg/hno/runner/resilience.go pkg/hno/runner/runner.go pkg/hno/runner/state.go pkg/hno/runner/stop.go pkg/hno/runner/tool_batch.go pkg/hno/agent/agent.go pkg/hno/agent/stream.go pkg/hno/agent/kernel.go pkg/hno/agent/runner_adapter.go pkg/hno/agent/tool_executor.go pkg/hno/agent/runstreammode_test.go"
+      ],
+      "observations": [
+        "基线全绿：允许三包 -count=1 exit 0（receipt:b36b27aa-a183-464d-ae5f-6511b837bbd4）、-race exit 0（receipt:ce532e1e-7953-457a-afb3-cbeef4cc38fc）、go build ./... exit 0（receipt:7c62983f-cb82-4e8e-b57b-89ea179dc9cb）、gofmt 无输出 exit 0（receipt:7821dedf-835c-442b-8c8f-71e39b3ed4b8）。",
+        "逐模式实际行为（pristine 副本探针，receipt:92058d9e-d16e-496a-a799-6498ea77c996 exit 0，探针编译门 receipt:a5462451-49fa-4b21-b069-a83467a7dd24 exit 0（`go -C /tmp/g4base vet ./cmd/g4probe`；同命令的第二次执行 receipt:06f98eeb-b063-4a41-8968-12f633f26321 登记为冗余，不作独立证据））：Values/Updates/Tasks/Checkpoints/Debug/Custom 六个模式**全部**在启动流之前返回同形错误 —— 实读文案逐字为「agent: stream mode N has no wired producer: run: stream mode has no wired producer」（N=0/1/3/4/5/6），errors.Is(ErrUnsupportedStreamMode)=true、result==nil、fake model 的 InvokeStream 调用数 0（fail-closed 不降级为零事件流，切片 23 D10 的形状今日仍成立）。Messages（N=2）返回非 nil 结果、不报错。",
+        "变参并选今天的实际行为（同一探针 OBS-2）：无模式 == Messages（成功）；Messages+Messages 成功（重复不报错）；Messages+Tasks、Tasks+Messages（换序）、Messages+Values 一律 fail-closed，错误点名**首个**未接线模式（Tasks+Messages 报 mode 3、Messages+Values 报 mode 0）；单独 Debug 报 mode 5。→ 并集语义今天没有被任何实现路径行使过，本片要定形并由 D8 钉住。",
+        "Messages 生产者的事件线格式（同一探针 OBS-3，实测两条通道事件 + 三条记账事件）：result.Events 上只有 run_content（sequence 从 0 连续递增、跨模型回合不重置）；run_completed **只**进 done.Output.Events 末位、**从不**上通道（源码位点 pkg/hno/agent/stream.go:184-185 appendEvent 与 :271-283 通道发送的不对称，实测确认）。RunStream 与 RunStreamMode(Messages) 的通道序列逐事件相同。",
+        "任务族的缺口为真（同一探针 OBS-4）：一次「模型请求 2 个工具调用（1 成 1 败）」的流式运行，通道上仍然只有 2 条 run_content、output.Events 只有 2 条 run_content + run_completed；工具调用与失败在流上**完全不可见**，失败只活在两处：进程日志与工具消息文本「tool execution error: handler exploded」，done.Err==nil、stopReason=no_tool_calls。→ StreamTasks 的语义缺口是运行期的，不是协议层的。",
+        "包约束复核（计数命令 exit 0，receipt:6b833f42-4545-48e6-942c-5b1d549a22c7；数值由同一条命令明文复跑读取）：run 导出符号 77、非测试 LOC 889、全文件 LOC 1723、非测试 sync. 计数 1（唯一一处在 pkg/hno/run/context.go:26 的 sync.RWMutex，切片 23 之前既有）；agent 导出 21、非测试 1567、全文件 5360、非测试 sync. 4；runner 导出 23、非测试 582、非测试 sync. 0。**口径更正（诚实登记）**：任务书与状态文档 §4c 写的「非测试 LOC 1723」「sync.=0」实为「全文件 LOC 1723」与「切片 23 两个新增文件 sync.=0」（见 docs/design/v3-p4-run-g4-green.md:78-79、-refactor.md:70 原文），包内 sync. 并非 0。本契约按实测口径下判据。",
+        "生产者缺席的另一半证据：六个 New* 构造函数在 pkg/hno/run 之外零调用方、仓库内 run.New{NodeStarted,NodeCompleted,TaskError,Checkpoint,StateUpdate,Custom}Event 的非测试调用点为 0（receipt:0cab2a99-df24-400f-9506-52b4b2c1b11f exit 0）；自定义写入入口（customwriter|WriterFrom|EmitCustom）命中 0 → StreamCustom 连「写入口」这个前置物都不存在。",
+        "既有 fail-closed 锚的逐行清单（会被本片打破的行，全部在 pkg/hno/agent/runstreammode_test.go，字节锚 receipt:ee1df90e-ad7d-468f-963c-2b0ff2a50613 exit 0（changedBefore 自配对清单，现值 6c809c23d81949b196fd213ab5199d74047ebdab；同文件的开工/收口双回执 6a3e3d88-16ed-455e-a063-b8465de39917 与 86016cd0-c10a-40f7-8fe9-3519f4550dca 的 stdoutSha256 相同 1a1a29202582bb18…，即谈判期间该文件一字未动））：:179-186 的 unsupported 名单里 **:182 的 run.StreamTasks 一行**是本片唯一必须删除的既有断言（同名单 :180/:181/:183/:184/:185 五行 Values/Updates/Checkpoints/Debug/Custom 本片保持不动）；:187-204 的循环体（errors.Is + result==nil + streamCalls==0 三判据）逐模式子用例名 mode-0/1/3/4/5/6；:206-215 mixed 子用例用的是 StreamValues，不受本片影响；:217-229 无模式默认子用例不受影响。pkg/hno/run/streammode_test.go:25 的 StreamTasks 出现处是 D1 的 iota 序表（**接线不改变常量序数**，该文件本片零改动，实测见 M2）。"
+      ]
+    },
+    {
+      "id": "M2-候选接线副本预演（StreamTasks 生产者 + 模式集合 + 并集门）",
+      "scene": "/tmp/g4probe（仓库逐字节副本上施加候选：新文件 producers.go 117 行、改 agent.go/stream.go/kernel.go/runner_adapter.go/tool_executor.go/run.go、既有 runstreammode_test.go 删 1 行加 3 行注释、新增预演测试 280 行）。diff -rq 实测：候选副本与 pristine 副本在 pkg/hno/run、pkg/hno/runner、pkg/hno/graph 三目录**逐文件全同**（三条 diff 命令均 exit 0），差异全部落在 pkg/hno/agent。仓库字节未被实验改动。",
+      "commands": [
+        "go -C /tmp/g4probe run ./cmd/g4probe",
+        "go -C /tmp/g4probe test ./pkg/hno/agent/... ./pkg/hno/run/... ./pkg/hno/runner/... -count=1",
+        "go -C /tmp/g4probe test ./pkg/hno/agent -count=1 -run TestP4G4 -v",
+        "go -C /tmp/g4probe test ./pkg/hno/agent/... ./pkg/hno/run/... ./pkg/hno/runner/... -count=1",
+        "go -C /tmp/g4probe test -race ./pkg/hno/agent/... ./pkg/hno/run/... ./pkg/hno/runner/... -count=1",
+        "go -C /tmp/g4probe test -race ./pkg/hno/agent -count=30 -run TestP4S31_|TestP4G4_|TestRunStream",
+        "go -C /tmp/g4probe vet ./pkg/hno/agent/... ./pkg/hno/run/... ./pkg/hno/runner/...",
+        "bash -c \"for p in run agent runner; do printf 'CANDIDATE %-7s exported=%s nontest=%s all=%s syncNontest=%s\\n' $p $(go -C /tmp/g4probe doc -all ./pkg/hno/$p | grep -cE '^(func|type|var|const) ') $(find /tmp/g4probe/pkg/hno/$p -maxdepth 1 -name '*.go' -not -name '*_test.go' | xargs cat | wc -l | tr -d ' ') $(find /tmp/g4probe/pkg/hno/$p -maxdepth 1 -name '*.go' | xargs cat | wc -l | tr -d ' ') $(grep -rn 'sync\\.' /tmp/g4probe/pkg/hno/$p --include='*.go' | grep -v _test | wc -l | tr -d ' '); done\"",
+        "go -C /tmp/g4probe test ./pkg/hno/agent -count=1 -run TestP4S31_|TestP4G4_"
+      ],
+      "observations": [
+        "候选行为（探针 receipt:250b7dff-f9e1-4b55-b45f-1d61659bacc3 exit 0）：Tasks 不再报错且吐实流 —— Tasks-only 通道 = [node_started node_started node_completed task_error]、记账 = 同序 + 末位 run_completed；Messages+Tasks 与 Tasks+Messages（换参序）通道逐事件相同 = [node_started node_started node_completed task_error run_content run_content]；Messages-only 仍是 [run_content run_content]（无任务事件泄漏）；Tasks+Checkpoints 仍整体 fail-closed 并点名 mode 4。载荷实读：node_started.input = 模型给出的原始 arguments 文本、node 字段 = 工具函数名、attempt=1；node_completed.output = 工具消息文本（成功值经 toolkit.FormatResult 的 JSON 引号包裹）；task_error.message = 包装后的 handler 错误文本。",
+        "「接线一个模式会撞哪条既有测试」用执行担保（不是走查）：候选施加后、**未**调整既有测试前跑三包，receipt:b94e4566-1eb3-43ff-a082-6e315ff7dde1 exit 1（`go -C /tmp/g4probe test ./pkg/hno/agent/... ./pkg/hno/run/... ./pkg/hno/runner/... -count=1`），整仓库唯一判红是 TestP4G4_RunStreamModeUnsupportedModesFailClosed；同一场景的逐子用例 -v 复跑有独立回执：receipt:0eede7da-94fa-4595-9dfc-531f5c63cf61 exit 1（`go -C /tmp/g4probe test ./pkg/hno/agent -count=1 -v -run TestP4G4_RunStreamModeUnsupportedModesFailClosed`），实读 **只有 mode-3 判红**，mode-0/1/4/5/6、mixed_with_messages_still_fails_closed、no_modes_defaults_to_messages_semantics 七条子用例全 PASS；删掉 :182 那一行后同一条 -v 命令转绿 receipt:eb7079a2-34a5-438e-8a9e-3774a31e64f8 exit 0，同一条三包命令也转绿 receipt:44ab23b2-bb8a-47e0-9a3f-ff213b99c71a exit 0 → 行为 delta 精确到一行（:182），且「RunStream 与 Messages 模式零漂移」是有执行担保的事实，不是推断。",
+        "调整该行 + 补齐本片测试后：三包 -count=1 exit 0（receipt:a16be0be-05eb-48a1-9f0c-8a4798edf208）、三包 -race exit 0（receipt:d36e8098-e51d-41e6-9c90-5226cf1eeea5）、三包 go vet exit 0（receipt:7d6f40ef-ab34-480b-95eb-3c47107deb35）、本片场景族 -race -count=30 exit 0（receipt:20141850-7974-4d3a-b16f-9d38a968ab13）→ 「批内 started 按调用声明序、结束事件按结果序」的确定性在 30 次重复 + race 下无 flake（工具执行本身是并发的，见 tool_executor.go:46-63）。",
+        "三条变异在候选字节上实跑判红（每条施加→跑→还原，还原后复跑 exit 0 receipt:f750083c-659d-4faa-9a1d-a449b97e6fff）：m-gate 摘掉按族门控 → 3 行判红（receipt:7e9c78e9-08a6-44d7-aa25-70dbd50e9fc4：Tasks-only 泄漏 run_content、重复模式重发、lookalike 子用例受累）；m-sniff 用结果文本 Contains(「tool execution error」) 判失败而非看得到的 error → 判红（receipt:7925e36b-b21b-45ea-83a7-af3d54a366c3：成功返回该字样的处理器被误判为 task_error）；m-degrade 去掉 fail-closed 校验（静默接受任何模式）→ 本片新行与**既有** TestP4G4_RunStreamModeUnsupportedModesFailClosed/mode-0 同时判红（receipt:c7032573-acf8-4511-b3b3-84107e12818b exit 1）。**牙齿边界如实登记**：把嗅探改成 HasPrefix(「tool execution error」) 的变异**不被**本片任何判据杀死（实测该变体三包 exit 0）——原因是成功路径的结果文本经 JSON 编码带前导引号，前缀式嗅探天然落不到它上面；因此本片判据的诚实表述是「按 handler 返回的 error 分类」+ 可分辨夹具（成功返回「tool execution error: handler exploded」文本必须落 node_completed），它杀 Contains 式分类器、不杀 HasPrefix 式，二者的差异另由 forbiddenShortcuts 第 2 条以规则形式禁掉。",
+        "结构代价（计数命令 exit 0，receipt:1c9a045b-a11e-40ec-a1aa-730dd5eb6797）：run 包 77/889/1723/sync 1 **逐值不变**（本片在 run 包零改动、零新符号）；runner 23/582/sync 0 不变；agent 导出符号 21 → 21（新增物全未导出），非测试 LOC 1567 → 1685（+118，含候选文件里两条本应删除的死语句，正式实现预算 ≤ +160），非测试 sync. 4 → 4（WaitGroup 从 runner_adapter 迁进共享批次助手，新增文件 producers.go 的 sync. 计数实测 0），全文件 LOC 5360 → 5682（+322 = 产品 +118 + 预演测试 280 + 既有测试 +4）。",
+        "预演中途的 exit≠0 归类（不静默丢弃）：一次判红来自预演夹具本身（断言 output.Events==4 实为 5）——它不是缺陷而是本片必须写进契约的**发现**：run_completed 由内核驱动在 stream.go:184-185 无条件 appendEvent，与模式选择无关，故 Tasks-only 流的记账序列末位仍是旧 run_completed 而通道上永不出现它（该事实由 D3 钉住，并派生 ADJ-S31-2）。其余 exit 1 全部是上面三条故意的变异。"
+      ]
+    },
+    {
+      "id": "M3-其余五模式的生产者落点盘点（为什么必须推迟，以及推迟给谁）",
+      "scene": "仓库只读读码 + go doc 计数（pkg/hno/graph 只读其导出面与字段，从未执行其测试）",
+      "commands": [
+        "bash -c \"printf 'Graph Run/Resume=%s\\n' $(go doc -all ./pkg/hno/graph | grep -cE 'func \\(g \\*Graph\\) (Run|Resume)'); printf 'graph doc Stream|Events|<-chan=%s\\n' $(go doc -all ./pkg/hno/graph | grep -cE 'Stream|Events|<-chan'); printf 'graph nontest chan lines=%s\\n' $(grep -rn 'chan ' pkg/hno/graph/*.go | grep -v _test | wc -l | tr -d ' '); printf 'consumer seams=%s\\n' $(go doc -all ./pkg/hno/graph | grep -cE 'WithTrace|WithCheckpointer|NodeEvent')\"",
+        "bash -c \"for f in $(ls pkg/hno/graph/*.go); do printf '%s %s\\n' $f $(git hash-object --no-filters $f); done | md5\"",
+        "grep -n 'type Result' -A 20 pkg/hno/graph/graph.go",
+        "grep -n 'type TraceConfig' -A 12 pkg/hno/graph/policy.go",
+        "grep -n 'type config struct' -A 8 pkg/hno/graph/graph.go",
+        "grep -n 'type Checkpoint struct' -A 12 pkg/hno/graph/durability.go"
+      ],
+      "observations": [
+        "图侧今天没有任何流式出口（计数命令 exit 0，receipt:0110b4fb-1be1-4588-abc9-1b308db48ec8）：Graph 只有 Run/Resume 两个终结式方法（返回 *Result），导出面里 Stream/Events/<-chan 命中 0（包内 8 处 chan 全是调度器内部未导出通道）。→ Values/Updates/Checkpoints/Custom 四模式若要在本片接，唯一路径是给 pkg/hno/graph 加流式面，那是兄弟片在途领地 + 另一张票的导出面预算，不在本片允许面内。",
+        "消费侧桥接的既有材料够不够（逐模式落点结论）：Tasks 的图侧对应物是 NodeEvent{Node,Attempt,Err,In,Out}（policy.go:58-64），但它是**逐节点 Option**（WithTrace 挂在 nodePolicy.trace，policy.go:74/80），图级 config 只有 maxConcurrency/stepLimit/durability/checkpointer（graph.go:68-74）→ 图侧任务事件要逐节点挂 sink，属第 3 片；Checkpoints 的对应物是图级 Checkpointer.Append(Checkpoint{Seq,Node,Output,Kind,Input,Interrupt})（durability.go:43-56），消费侧实现一个装饰器即可发 checkpoint{run_id,label,payload}，同样第 3 片；Values/Updates 的「完整状态」在图侧只有运行结束后的 Result{output,values,completed}（graph.go:95-113，且 Completed() 刻意按字典序返回，注释明写「并行分支之间没有确定的全局时序」）→ 消费侧只能按「已完成节点 → 输出」**重建**状态，步中态不可外部观察，这一限制必须写进第 3 片而不是假装能接；Custom 需要节点体内写入入口，仓库今天不存在（M1 实测 0 命中）。",
+        "agent/runner 路径的发射点盘点（本片生产者的实际落点，file:line 级）：token/内容事件 pkg/hno/agent/stream.go:271-283（chunk→NewRunContentEvent→appendEvent+通道）；完成事件 pkg/hno/agent/stream.go:184-185（只记账）；工具批次切分 pkg/hno/runner/runner.go:305-346（decideToolBatch 于 :317 决定 toRun/skipped，:320 调 ToolExecutor.Execute，:344-346 发 StepEvent(StateToolCallsPending)）；工具执行与结果归并 pkg/hno/agent/runner_adapter.go:42-78（并发批 + 按调用序归并 + 同步写 Memory）；逐调用成败 pkg/hno/agent/tool_executor.go:75-109（executeOneTool：未找到/参数解析/校验/handler 错误四类失败**今天全部塌成消息文本**，返回值 toolResult{callID,message,stopLoop} 没有 error 字段）。→ 结论：任务族三个事件所需的每一手信息都在 agent 包内可得，且发射点在驱动内核的那条协程里（Execute 的调用方），与 content 事件同协程串行 → 不需要任何锁、不需要定序探针（实测 candidates 的 producers 文件 sync. = 0）。",
+        "图目录字节锚（本片绝不可触碰）：逐文件 git hash-object 排序清单的 md5 = **ae3c22445eb8167f500ad832513046ca**（开工回执 receipt:e4ee2cd0-6d60-4f43-a024-bda787748d63 exit 0 与收口复采 receipt:d4f30d3c-ec3d-4342-9045-b10a795ff2c2 exit 0 的 stdoutSha256 同为 7ac4fe6cb5d5d605…，即两条命令输出逐字节相同 → 图目录在本契约谈判期间零变动，且这两次采集的采集命令与 M3 第 2 条逐字相同，无配对错位风险：每条哈希由同一循环内的同一表达式产出）。"
+      ]
+    }
+  ],
+  "designConsequence": "七条语义在本片定形（其中第 2–5 条已在副本上按此实现并实测）：（1）**逐模式生产者归属表**——Messages=已接（切片 23）；Tasks=**本片接，agent/runner 路径**（工具调用即任务）；Values/Updates/Checkpoints=必须有图节点/检查点才成立（按节点键控、图侧无流式面、Result 是终态账本）→ P4 第 3 片（graph→run 事件桥接）；Debug=checkpoints∪tasks，checkpoints 未接前不得降级为 tasks 别名 → 第 3 片；Custom=需要一个今天根本不存在的体内写入口 → 第 3 片或 ADJ-S31-1。（2）**Tasks 的事件线格式（逐字段映射，复用切片 23 协议且不改它一个字）**：一次被派发的工具调用 = node_started{run_id, node=工具函数名, attempt=1, input=模型给出的原始 arguments 文本}；其成功结束 = node_completed{run_id, node, attempt, output=写入 Memory 的工具消息文本}；其失败 = task_error{run_id, node, message=包装后的 handler 错误文本}；三事件同时进 result.Events（活流）与 output.Events（记账），时间戳构造时盖章。（3）**成败分类只看得到的 error**：给 agent 包内部结构 toolResult 增加 err 字段（四类失败：函数未找到 / 参数解析 / 参数校验 / handler 返回错误），task_error 当且仅当 err!=nil；禁止任何按结果文本嗅探的分类器（可分辨夹具见 D5；变异实测见 M2 的 m-sniff 与「HasPrefix 变体杀不掉」的诚实披露）。（4）**并发批次的确定性次序规则**：started 在派发 goroutine **之前**按调用声明序串行发出，结束事件在批次汇合**之后**按结果序（= 声明序）发出；被 ToolCallLimit 截断的调用不发声（它从未执行，配对消息仍走既有 OnSkippedToolCalls 路径）；发射住在驱动内核的协程里，与 content 事件同协程 → 全序列确定、零锁。（5）**按族门控 + 旧记账不变**：模式集合归一化（去重）后作为发射门；某族未选中则该族既不也不上通道、也不记账；唯一例外是既有的 run_completed 记账（stream.go:184-185 无条件，切片 23 的旧行为线），本片保持它原样（ADJ-S31-2 给出反向选项）；通道上的 run_content 归属 Messages 族、任务三事件归属 Tasks 族，互不泄漏。（6）**并集语义**：RunStreamMode 的 modes 是并集，参数次序不影响序列（实测换序逐事件相同）；重复模式不重复发事件；无模式默认 Messages（与 RunStream 同形，切片 23 D8/D9 的锚保持）；**任一**未接线模式混入 → 整次调用 fail-closed（不产出「能接的那部分」，因为半条流会让调用方误判模式生效）。（7）**fail-closed 集合迁移 6→5 的形状**：agent.go 的模式校验从「只允许 Messages」改为查一张本片内的已接线模式表（未导出），Values/Updates/Checkpoints/Debug/Custom 五条仍返回包装 ErrUnsupportedStreamMode 的同形错误、仍在启动流之前、仍 result==nil；错误文案保留「agent: stream mode %d has no wired producer」的现有形状（本片不改文案，避免与切片 23 的既有锚打架），模式名的可读化留给后续片（登记 S31-STD-1）。",
+  "redProtocol": "两段制，段间测试文件零改动。第一段落 = 模式集合归一 + 已接线模式表 + 发射门 + Tasks 分支的**最小可编译形状**（此时 D1 立即可断，D3/D4/D5/D6/D8/D9 按 M1 实测形状真实判红：今天 Tasks 一律 fail-closed、通道上任何任务事件都不存在，故这些行是**行为红而非编译红**）；D2（未接线五模式仍报错）、D7（Messages/RunStream 零漂移）、D10（结构门禁）是反向对照行，两段都绿、其牙齿由变异提供。第二段落 = 精确分类（toolResult.err）、批次次序（started 派发前 / 结束汇合后）、截断调用静默三处接线补齐，全绿。M2 副本即两段的完整预演（含三段变异实跑与 -count=30 -race）。",
+  "acceptanceMapping": [
+    {
+      "row": "D1",
+      "behavior": "接线迁移的正方向：StreamTasks 从 fail-closed 集合移出 —— RunStreamMode(ctx,in,StreamTasks) 返回非 nil 结果、err==nil、!errors.Is(err,ErrUnsupportedStreamMode)，且稳定 fake model 的 InvokeStream 确实被调用（流启动了）",
+      "publicEntry": "Agent.RunStreamMode + RunStreamResult.Events/Done",
+      "assertion": "err==nil 且 result!=nil 且模型调用计数>=1（今天 M1 实测该模式返回「agent: stream mode 3 has no wired producer: …」，故第一段实现前必红）",
+      "independentlyFailable": "对「模式表漏加 Tasks」与「加了表但忘了接生产者（返回零事件流）」的实现判红（后半由 D3 的族内容断言杀）"
+    },
+    {
+      "row": "D2",
+      "behavior": "接线迁移的反方向对照（fail-closed 不变量保持）：Values/Updates/Checkpoints/Debug/Custom 五个模式逐个仍返回可 errors.Is 到 ErrUnsupportedStreamMode 的错误、result==nil、模型零调用；且与 Tasks 混选时整次调用仍 fail-closed 并点名首个未接线模式",
+      "publicEntry": "Agent.RunStreamMode × 五模式 + 五组 (Tasks,未接线) 混选",
+      "assertion": "十条子用例三判据齐全（实现前后都必须绿；第一段若把校验整体摘掉即红 —— m-degrade 变异实测同时打破本片行与既有 TestP4G4 行，receipt:c7032573-acf8-4511-b3b3-84107e12818b）",
+      "independentlyFailable": "对「为接一个模式而放宽整个校验」「把未接线模式当 Messages 别名跑」的实现判红"
+    },
+    {
+      "row": "D3",
+      "behavior": "按族门控：Tasks-only 的通道序列只含 node_started/node_completed/task_error，绝不含 run_content；output.Events = 同序任务事件 + 末位旧 run_completed（记账事实，M2 实测 4+1 而非 4）",
+      "publicEntry": "RunStreamResult.Events（活流）与 Done.Output.Events（记账）双观察面",
+      "assertion": "通道 EventType 序列逐位断言 + 记账序列长度 = 通道长度+1 且末位为 *run.RunCompletedEvent（实现前必红：今天 Tasks 根本不成流）",
+      "independentlyFailable": "对「门控摘掉导致族间泄漏」「把 run_completed 也塞上通道」「按模式抑制旧记账」的实现判红（第一方向由 m-gate 变异实测杀红，receipt:7e9c78e9-08a6-44d7-aa25-70dbd50e9fc4）"
+    },
+    {
+      "row": "D4",
+      "behavior": "任务事件载荷与线格式（designConsequence 第 2 条逐字段）：node_started{node=函数名,attempt=1,input=原始 arguments 文本} / node_completed{output=工具消息文本} / task_error{message=包装后的错误文本}，三者的 run_id 非空、时间戳非零；经 run.Events JSON 往返仍还原为具体类型（复用切片 23 协议，不得改协议）",
+      "publicEntry": "Agent.RunStreamMode(Tasks) 产出的事件对象 + run.Events 编解码",
+      "assertion": "逐字段等值断言 + Timestamp().IsZero()==false + 对通道产出事件做 json.Marshal(run.Events{...}) 再解回断 %T 与载荷（实现前必红）",
+      "independentlyFailable": "对「node 填了 agentID/工具调用 ID」「input 丢了原始参数文本」「output 用了 Go %v 文本而非工具消息」的实现判红"
+    },
+    {
+      "row": "D5",
+      "behavior": "成败精确归类：handler 返回 error → task_error；handler 成功但结果文本与失败文案一字不差（成功返回「tool execution error: handler exploded」）→ node_completed。分类判据是拿到的 error，不是结果文本",
+      "publicEntry": "Agent.RunStreamMode(Tasks) × 两个处理器的 toolkit 夹具（一个真失败、一个成功但文本像失败）",
+      "assertion": "两方向子用例：真失败事件种类==task_error 且 message 含 handler 错误；lookalike 事件种类==node_completed 且 output==该文本的 JSON 形态（实现前必红；Contains 式嗅探变异实测被该行杀死，HasPrefix 式杀不掉——牙齿边界已在 M2 如实登记，规则另禁）",
+      "independentlyFailable": "对文本嗅探分类器、对「把工具消息文本当 error」的实现判红"
+    },
+    {
+      "row": "D6",
+      "behavior": "并发批次的确定性次序：同批 N 个调用 → started 恰 N 条且按调用声明序，结束事件按结果序（= 声明序）全部跟随其后；跨批次（模型回合 2）不与本批交织；-race 与重复运行下序列不变",
+      "publicEntry": "Agent.RunStreamMode(Tasks) 的通道序列 + 场景命令 -race -count=30",
+      "assertion": "事件序列逐位断言（两批各一次的夹具：批 1 = [started a, started b, completed a, error b]，批 2 依此类推），绑定场景命令 -race -count=30 一次 exit 0（M2 实测 receipt:20141850-7974-4d3a-b16f-9d38a968ab13）",
+      "independentlyFailable": "对「在工具 goroutine 内发射导致交织」「started 与结束事件成对紧邻但批内乱序」的实现判红"
+    },
+    {
+      "row": "D7",
+      "behavior": "Messages/RunStream 零漂移（反向对照）：含工具调用的运行里，RunStream 与 RunStreamMode(ctx,in) 与 RunStreamMode(ctx,in,Messages) 三者通道序列逐事件同型同内容，且不含任何任务事件",
+      "publicEntry": "Agent.RunStream / Agent.RunStreamMode",
+      "assertion": "三条路径序列一致 + 事件种类集合=={run_content}；切片 23 既有 D8/D9 两条测试**零改动**通过（M2 实测在候选字节上全绿，receipt:0eede7da-94fa-4595-9dfc-531f5c63cf61 中唯二未红的场景测试）",
+      "independentlyFailable": "对「把 RunStream 改成同时代管任务发射」「content 与 task 共用一条被改写的发送路径」的实现判红"
+    },
+    {
+      "row": "D8",
+      "behavior": "多模式并选 = 并集且与参数次序无关：Messages+Tasks 与 Tasks+Messages 逐事件相同；重复模式（Tasks+Tasks / Messages+Messages）不重发任何事件；无模式==Messages；Debug 不得被当作 Tasks 别名接受",
+      "publicEntry": "Agent.RunStreamMode 的变参面",
+      "assertion": "四组子用例：换序序列逐事件相等、重复模式序列长度==单次模式长度、无模式与 Messages 相等、Debug 仍报 ErrUnsupportedStreamMode（前两组的今天在 M1 OBS-2 里根本没有可达路径 → 实现前必红）",
+      "independentlyFailable": "对「取首个模式生效」「模式集合用 slice 导致重复发射」「把 Debug 近似实现成 Tasks」的实现判红"
+    },
+    {
+      "row": "D9",
+      "behavior": "被上限截断的工具调用不发声：ToolCallLimit 使批次只跑前 k 个时，只有那 k 个调用产生 started 与结束事件，被跳过者零事件（其配对消息仍走既有 OnSkippedToolCalls 记忆路径，行为不变）",
+      "publicEntry": "Agent.RunStreamMode(Tasks) × Config.ToolCallLimit",
+      "assertion": "两调用 + limit==1 夹具：序列长度==2 且为 [node_started,node_completed]（M2 实测该形状在候选上成立；实现前无流可断）",
+      "independentlyFailable": "对「对 skipped 调用也发 started」「对 skipped 发 task_error」的实现判红"
+    },
+    {
+      "row": "D10",
+      "behavior": "结构门禁不放宽：pkg/hno/run 本片零改动（导出符号恰 77、非测试 LOC 恰 889、全文件 LOC 恰 1723、新文件 sync. 计数 0 且包内 sync. 仍为 context.go:26 一处既有）；pkg/hno/runner 零改动（23/582/1601/sync 0）；agent 包导出符号仍恰 21、非测试 LOC ≤ 1727（现值 1567 + 预算 160，M2 实测 +118）、非测试 sync. 计数不变（4）；pkg/hno/graph 全目录逐字节不变；31 个锚文件逐字节同哈希（baselineBytes.anchors 全清单），changedBefore 的 7 份必须变动、outOfSeamNoChangeExpected 的 5 份必须不变",
+      "publicEntry": "go doc 计数 + find/wc + grep -c + git hash-object",
+      "assertion": "数值逐字等于 baselineBytes.counters 与本片预算 + 锚清单全同 + graph 目录哈希清单 md5==ae3c22445eb8167f500ad832513046ca（实现前后都绿；任一变动即本行红）",
+      "independentlyFailable": "对「顺手给 run 包加个 Emitter 符号图方便」「把桥接代码塞进 graph」的实现判红"
+    }
+  ],
+  "minimalVerticalSlice": "D1 + D2 + D3 + D5 + D8 五行。理由：D1/D2 是 fail-closed 迁移的正反两方向（只钉一边就等于允许「静默扩集」或「一刀切放宽」两种作弊）；D3 是「模式选择器不撒谎」的族隔离线（本片唯一新增的观察者可见承诺）；D5 是本片最容易被走捷径的一手（把成败塌回文本），有实测可分辨夹具与变异支撑；D8 是母约 §5 七模式并选语义第一次成为可执行契约的落点，Debug 的反向断言也挂在这里。D4/D6/D9 是载荷字段、次序与边界的补强，D7/D10 是反向对照与结构门禁。",
+  "allowedTestSeam": {
+    "add": [
+      "pkg/hno/agent/stream_tasks_test.go（package agent_test 外部包，只用导出 API；TestP4S31_* 命名；覆盖 D1/D3/D4/D5/D6/D8/D9；夹具 = 手写稳定 fake model（第 1 回合吐工具调用、第 2 回合吐固定分块）+ 手写 toolkit（成功处理器 / 真失败处理器 / 文本 lookalike 处理器三件），零网络零真模型。副本预演形状 = /tmp/g4probe/pkg/hno/agent/p4s31_tasks_rehearsal_test.go 280 行，六条测试在候选字节上全绿）"
+    ],
+    "modify": [
+      "pkg/hno/agent/runstreammode_test.go —— **本片唯一被授权的既有测试改动，且只有一行**：删除 :182 的「run.StreamTasks,」（名单里其余五行、循环体、mixed 与 no-modes 两个子用例逐字保留），并在该测试的注释里加一行迁移说明（「Tasks 的生产者已随切片 31 落地，其正向判据搬家到 stream_tasks_test.go」）。为什么必须改：切片 23 契约 D10 自己写明「其余模式的生产者接线在各自后续片落地时解禁（S23-SPEC-1）」，本片即 Tasks 的解禁片，该名单继续包含 Tasks 与本片的存在互相矛盾——这是母约授权的迁移，不是放宽。改动范围由执行担保精确化：候选字节上整包只有 TestP4G4_RunStreamModeUnsupportedModesFailClosed/mode-3 一条判红，其余七条子用例与 D8/D9 全绿（receipt:0eede7da-94fa-4595-9dfc-531f5c63cf61 exit 1 + 其 -v 复跑逐子用例读数）。任何超出该行的改动（改文案断言、改循环体、删别的模式）都属违约。"
+    ],
+    "retires": [],
+    "sourceSeam": "pkg/hno/agent/agent.go（RunStreamMode 的模式校验从「只允许 Messages」改为查已接线模式表；错误文案与 wrap 形状不变）、新文件 pkg/hno/agent/stream_producers.go（模式集合归一 + 按族门控的 emitter + 任务发射的工具批次包装；候选实测 117 行、其中两条死语句应删，正式实现预算 ≤110）、pkg/hno/agent/stream.go（content 发射改走 emitter，序列号与通道语义不变；streamOnce 签名收窄）、pkg/hno/agent/kernel.go（newKernel 增一个未导出的 ToolExecutor 注入口，nil 时走既有 agentToolExecutor → Agent.Run 同步路径逐字不变）、pkg/hno/agent/run.go（调用点适配一行）、pkg/hno/agent/tool_executor.go（toolResult 增 err 字段 + 抽出共享的批次执行助手）、pkg/hno/agent/runner_adapter.go（Execute 改为委托共享助手）。**pkg/hno/run 与 pkg/hno/runner 零改动**（M2 diff -rq 实测），**pkg/hno/graph 零改动**（本片不接图侧四模式）。"
+  },
+  "forbiddenObservations": [
+    "agent 内部结构体字段、通道容量、goroutine 数、WaitGroup 存在性（票面 :40 同族）——一切断言只经 result.Events / Done.Output.Events / RunStreamDone 与事件导出字段。",
+    "time.Sleep 定序、时间戳数值比较：本片次序由构造（同协程串行 + 声明序）保证，测试只断序列与载荷；Timestamp() 只断非零。",
+    "output.Events 与通道事件的**共同**前缀之外的记账细节（run_completed 记账的存在性是 D3 的断言，其 created_at 数值与 JSON 形状属切片 23 的锚，不在本片重复断）。",
+    "为测试导出模式表、emitter 或任务包装器（本片新增公共导出符号数必须为 0，D10 计数）。",
+    "断言 Values/Updates/Checkpoints/Debug/Custom 的任何运行期形状（生产者未接线；本片只断它们仍 fail-closed，M1 实测错误文案与 result==nil）。",
+    "断言 ToolCallOutcome/runner 层的内部字段（runner 包本片零改动，截断调用的可观察后果只有「不发声」一条）。"
+  ],
+  "baselineBytes": {
+    "note": "三段结构：**anchors** = 本片必须逐字节不动的 31 个文件（run 全部 10 份 + runner 全部 8 份 + agent 的 12 份既有测试除 runstreammode_test.go + agent/config.go）；**changedBefore** = 本片会改的 7 个文件的开工真值，收口时逐个必须不同且差异只落在 allowedTestSeam.sourceSeam 列出的范围内；**outOfSeamNoChangeExpected** = agent 包内既不在 anchors 也不在 sourceSeam 的 5 个非测试文件，它们的哈希同样登记——实现若必须触碰其中之一，那是新的行为 delta，须回来登记而不是静默改。采集口径：anchors 由一条自配对命令一次采齐（文件名与哈希同 printf，避免切片 23 correctionNote 的配对错位复发），明文复跑与回执逐字同命令（receipt:1ee4e99e-9091-4ddb-ab3c-e252a278699c exit 0；带行数自证的同族形式 receipt:039d6f8f-b47e-47a5-8abf-9bd3f2f3b8c5 exit 0 读到 31 行）。changedBefore / outOfSeam 两份表用同一 printf 形式与同一命令逐文件采集（与 verificationCommands 第 5 条逐字相同）。包级计数（run 77/889/1723/sync 1、runner 23/582/1601/sync 0、agent 21/1567/sync 4）由 receipt:86a55861-c33f-4ce5-a571-89c6d118aee0 收口复采，与开工值 receipt:6b833f42-4545-48e6-942c-5b1d549a22c7 逐字段相同（口径为 verificationCommands 第 4 条）。图目录整目录锚：manifest md5 = **ae3c22445eb8167f500ad832513046ca**（收口复采 receipt:d4f30d3c-ec3d-4342-9045-b10a795ff2c2 exit 0；开工值 receipt:e4ee2cd0-6d60-4f43-a024-bda787748d63 exit 0）。**登记一处本契约初稿的自纠**：初稿把该 md5 写成 ae3c22445eb8167f500ad8325029036f（尾段抄错），收口复采时被抓出；`git diff --numstat b994f02..HEAD -- pkg/hno/graph` 为空 + 目录对 HEAD 干净，证明图目录内容未变、是转写错误而非兄弟代理改动——真值以上面复采为准，已同步改到 D10 与 notes。",
+    "anchorsCommand": "bash -c \"for f in pkg/hno/run/*.go pkg/hno/runner/*.go pkg/hno/agent/agent_bench_test.go pkg/hno/agent/agent_instructions_test.go pkg/hno/agent/agent_storage_test.go pkg/hno/agent/agent_test.go pkg/hno/agent/p0b_red_test.go pkg/hno/agent/p0stream_red_test.go pkg/hno/agent/p0stream_v2_red_test.go pkg/hno/agent/runcontext_test.go pkg/hno/agent/stream_aggregator_test.go pkg/hno/agent/stream_doubles_test.go pkg/hno/agent/stream_tool_loop_test.go pkg/hno/agent/tool_executor_test.go pkg/hno/agent/config.go; do printf '%s %s\\n' $f $(git hash-object --no-filters $f); done\"   # 与 receipt:1ee4e99e-9091-4ddb-ab3c-e252a278699c 逐字同命令；收口时输出必须与下表 31 行逐字节全同",
+    "anchors": {
+      "pkg/hno/run/context.go": "07ca1c3202379087cb8671f04c319664fb172f74",
+      "pkg/hno/run/events.go": "d8150162cbfd1aca62d867f02b61345da7114984",
+      "pkg/hno/run/events_json.go": "6380d017b3b55864827ece0cd42cd6d45847398a",
+      "pkg/hno/run/events_test.go": "295b7307150f5f100133108a1ae9d2218be950c0",
+      "pkg/hno/run/loop.go": "2cd6d212bf5dcf1efa043e18b3109d3cc6aa399f",
+      "pkg/hno/run/loop_extend_test.go": "fcb7f6e3b02ea289d504a8285eda614aa41bb737",
+      "pkg/hno/run/loop_test.go": "be2c91a76542feea733c72f7415e318fd5f266b2",
+      "pkg/hno/run/modes.go": "fcf1d18839a5460187759be8795534ef1a6efab0",
+      "pkg/hno/run/stream_events.go": "25e7f45cdb773ab2a6f981312980a3b4894ee7fc",
+      "pkg/hno/run/streammode_test.go": "1830e69a6e7961b42cdda0caba5e8d597712c261",
+      "pkg/hno/runner/p7g9_resilience_test.go": "1c25b730d4f9a7ea6516118935ed4c0384bcdc72",
+      "pkg/hno/runner/resilience.go": "2d6c944c9a3717c00667c81e17db7277cf33b472",
+      "pkg/hno/runner/runner.go": "18fe1f80bc9256289c9550c8056e08cf3a81888b",
+      "pkg/hno/runner/runner_test.go": "15d85c1f4545d395496dc6079bada97241c95c26",
+      "pkg/hno/runner/state.go": "194c899275e3f5b61c0c8589bad0ffb2dfd5beb6",
+      "pkg/hno/runner/stop.go": "a62d85e74c0cd9681122b34fe52995ab6a5e166b",
+      "pkg/hno/runner/tool_batch.go": "219844923f570e4a27936d358b3b6c1e85dfeead",
+      "pkg/hno/runner/tool_limit_run_test.go": "ab2d2d2853d8a7270c64c61b66cc9aa7e16ea40c",
+      "pkg/hno/agent/agent_bench_test.go": "b1d36f190be322e081c396db5b61b1a5f122cdca",
+      "pkg/hno/agent/agent_instructions_test.go": "8912c35346bea5dc55a1ea40f5fd53d665d6e624",
+      "pkg/hno/agent/agent_storage_test.go": "72d22098c9c3d502484f8e625618e3f474389434",
+      "pkg/hno/agent/agent_test.go": "9b1b39192dadaee075d2c89dbfb15e18ef28491e",
+      "pkg/hno/agent/p0b_red_test.go": "10428b6e08e534a99dc0e1de55d6543601817df8",
+      "pkg/hno/agent/p0stream_red_test.go": "8480d4cd8c90bf22b980fd971be587e0c9b4709e",
+      "pkg/hno/agent/p0stream_v2_red_test.go": "281449c9269f7cbf20945bed9d7acb4b3c6b51d1",
+      "pkg/hno/agent/runcontext_test.go": "93ed72df49fc1c0d396d8e7be3fc6ea6121ffa3f",
+      "pkg/hno/agent/stream_aggregator_test.go": "6afa3630ce8c2f115a044ae74eb894279d99d526",
+      "pkg/hno/agent/stream_doubles_test.go": "e2b778fe249a742d38a2284299b10049bc827117",
+      "pkg/hno/agent/stream_tool_loop_test.go": "8d26a0ef1bee28806aade1c271b057daf455050a",
+      "pkg/hno/agent/tool_executor_test.go": "e68747d92e0e463b9c293d420522ce1e6bdcf861",
+      "pkg/hno/agent/config.go": "6c538fe4a498f5eaef7b75697b19d0c7fc93de1f"
+    },
+    "changedBefore": {
+      "pkg/hno/agent/agent.go": "9813b86af2e7c455dec6c7c36f187f0bf7627da0",
+      "pkg/hno/agent/stream.go": "bd3583dc512b0aa7c81874e0cb566ba42b36ebe4",
+      "pkg/hno/agent/kernel.go": "6140b5803e44c534264dd807c0cc090e98330e7f",
+      "pkg/hno/agent/runner_adapter.go": "8a7f36da27f0f186f86591a76b91c36793f8f386",
+      "pkg/hno/agent/tool_executor.go": "c2e9ec1c85cf889c5d8f55c0192deb28719bafd2",
+      "pkg/hno/agent/run.go": "8c2dea551cefd7035822879d568af318691a63df",
+      "pkg/hno/agent/runstreammode_test.go": "6c809c23d81949b196fd213ab5199d74047ebdab"
+    },
+    "changedBeforeCommand": "bash -c \"for f in pkg/hno/agent/agent.go pkg/hno/agent/stream.go pkg/hno/agent/kernel.go pkg/hno/agent/runner_adapter.go pkg/hno/agent/tool_executor.go pkg/hno/agent/run.go pkg/hno/agent/runstreammode_test.go; do printf '%s %s\\n' $f $(git hash-object --no-filters $f); done\"",
+    "newFileExpectedAbsent": {
+      "pkg/hno/agent/stream_producers.go": "开工实测不存在（ls 直接报 No such file or directory）；收口时它必须存在且是新文件的唯一新增名，任何其他新增 .go 都要回到本契约登记",
+      "test file": "pkg/hno/agent/stream_tasks_test.go（新增，见 allowedTestSeam.add）"
+    },
+    "outOfSeamNoChangeExpected": {
+      "pkg/hno/agent/cache.go": "cf2a6092fb1250ce40564a56d8c0948773b49e48",
+      "pkg/hno/agent/message_builder.go": "b6df2059abbd9af2ed03229f20419089e9da3089",
+      "pkg/hno/agent/output.go": "528e4c9c56180bd6d74213d03ce1133cb91ceff8",
+      "pkg/hno/agent/runcontext.go": "4f686e31453ed035960c202210a75d37fc6148ae",
+      "pkg/hno/agent/stream_aggregator.go": "cb44393c89910ab1948a25ea763fa1140bea3de3",
+      "note": "这 5 份既不在 anchors（不是测试/config）也不在 sourceSeam。预演实测它们零改动即可跑通全部六条测试与三条包级门禁，故登记为「不期望变动」；若实现者必须动其中一份，须在本契约谈判登记里补一行说明为何不可避，并按 D10 的口径把它移进 changedBefore。"
+    },
+    "counters": {
+      "runExportedSymbols": 77,
+      "runNontestLoc": 889,
+      "runAllFilesLoc": 1723,
+      "runSyncInNontest": 1,
+      "runSyncInNewFiles": 0,
+      "runnerExportedSymbols": 23,
+      "runnerNontestLoc": 582,
+      "runnerAllFilesLoc": 1601,
+      "runnerSyncInNontest": 0,
+      "agentExportedSymbols": 21,
+      "agentNontestLoc": 1567,
+      "agentSyncInNontest": 4,
+      "expectedAgentNontestLocCeiling": 1727,
+      "expectedAgentNontestLocMeasuredInRehearsal": 1685,
+      "expectedNewRunSymbols": 0,
+      "expectedNewRunnerSymbols": 0,
+      "expectedNewAgentSymbols": 0,
+      "graphDirectoryManifestMd5": "ae3c22445eb8167f500ad832513046ca",
+      "anchorFileCount": 31
+    }
+  },
+  "carriedItems": [
+    {
+      "id": "S23-SPEC-1",
+      "ref": "docs/design/v3-test-scope-p1-graph-slice23.json（carriedItems S23-SPEC-1）+ pkg/hno/run/modes.go 文件头注释",
+      "carriedIntoDesign": "本片兑现六模式清单里的 **Tasks** 一项（agent/runner 路径生产者），其余四项（Values/Updates/Checkpoints/Custom）与 Debug 继续挂账并转由 S31-SPEC-1 承接；六模式在 pkg/hno/run/modes.go 头注释里的「由各自的生产者接线片钉」表述无需改动（run 包本片零改动，注释里不点名模式状态）。"
+    },
+    {
+      "id": "S31-SPEC-1",
+      "ref": "本契约 M3 + designConsequence 第 1 条",
+      "carriedIntoDesign": "P4 第 3 片（graph→run 事件桥接）的设计门槛，逐模式登记：（a）图侧无流式面（实测 Graph 只有 Run/Resume，导出面 Stream|Events|<-chan = 0），桥接优先走**消费侧**——逐节点 WithTrace(TraceConfig{Hook: func(NodeEvent)})（policy.go:50-64/74/80，注意它是节点级而非图级）+ 图级 WithCheckpointer 装饰器（durability.go:43-56），NodeEvent{Node,Attempt,Err,In,Out} 与 run 的 node_started/node_completed/task_error 逐字段可直接映射；（b）StreamValues/StreamUpdates 的诚实限制：图侧状态账本 Result{output,values,completed} 只在运行结束后可见（graph.go:95-113），且 Completed() 刻意字典序（并行分支无全局时序），消费侧只能按「已完成节点→输出」**重建**状态，桥接片必须在契约里写明这一近似与其判据，不得宣称还原引擎内部步态；（c）StreamCustom 需要体内写入入口（实测仓库零现成入口），落位在桥接包（ctx 携带 writer）还是 graph 导出面属该片设计决定；（d）StreamDebug 的等价判据：同一运行下 Debug 的事件序列 == Tasks∪Checkpoints 两族按发射时刻的并集，且与模式给出次序无关（本片 D8 的并集语义是其可执行前提）。"
+    },
+    {
+      "id": "S23-STD-1",
+      "ref": "docs/design/v3-test-scope-p1-graph-slice23.json carriedItems S23-STD-1 + 状态文档 §5",
+      "carriedIntoDesign": "同族风险：本片测试涉及并发工具批次与通道时序。若绑定命令再现不可复现的裸 FAIL，按切片 22/23 已确立的处置：先 -v 全量捕获 + 判断是否为本片夹具的负载脆弱性（M2 已实测 -race -count=30 稳定 exit 0，若再现则须给出与 30 次重复相矛盾的现场），再判形状，不得直接归因环境。"
+    },
+    {
+      "id": "S31-STD-1",
+      "ref": "本契约 designConsequence 第 7 条",
+      "carriedIntoDesign": "fail-closed 错误文案今天只有模式**序数**没有模式**名**（实测「agent: stream mode 3 has no wired producer」）。改名可读化会同时触及切片 23 的既有锚与该测试的文案无关断（现测试只 errors.Is，不比文案），属低风险独立改动；本片不自带，留给任一后续片一并处理并登记。"
+    },
+    {
+      "id": "S25-DEFER-1 交点",
+      "ref": "docs/design/v3-test-scope-p7-g9-observability.json（slice 25）+ 母约 §10 P7 行",
+      "carriedIntoDesign": "P7 第 2 片要在 run/agent 级补 span。本片新增的事件发射点（工具批次包装、emitter）与之物理相邻，**不得**借本片把 tracing 塞进事件发射路径，也不得用事件族替代 span；两片的接线次序由编排方掌握，本片只提供 file:line 事实（stream.go:271-283、runner_adapter.go:42-78、tool_executor.go:46-63/75-109）。"
+    },
+    {
+      "id": "第3片对外上浮（原切片 28 登记）",
+      "ref": "docs/design/v3-test-scope-p1-graph-slice28.json（whyThisSlice 第 3 片 + explicitNonGoals）",
+      "carriedIntoDesign": "事件上浮为对外 HTTP/契约面是 v3.1 显式契约变更（D1 §3），本片与第 3 片都不做；本片新增的任务事件只在 Go 公共面（channel + RunOutput.Events）可见。"
+    }
+  ],
+  "explicitNonGoals": [
+    "StreamValues / StreamUpdates / StreamCheckpoints / StreamDebug / StreamCustom 五模式的生产者接线（本片一律保持 fail-closed，归属与设计门槛见 S31-SPEC-1；逐模式都有 D 行或本行登记，无一条默默缩水）。",
+    "pkg/hno/graph 的任何改动（含新增流式面、图级 sink、节点内 writer 入口）——兄弟片在途领地，本片只取其字节锚，且起草期间**未**对其执行任何 test（其 TestP1R17_* 高负载偶发红不得被本片误判为回归）。",
+    "pkg/hno/run 的任何改动：不加导出符号、不加发射器类型、不动 modes.go/stream_events.go/events_json.go 与既有测试（协议层归切片 23，本片实测可零改动达成）。",
+    "Team/Workflow 上的模式选择 API（它们今天经 Loop 消费 Events，增量兼容已由母约核实；本片不动）。",
+    "模型回合（turn）作为任务事件的另一种映射（本片只把工具调用当任务；回合级发射会与 runner 的 StepEvent 语义打架，属另案）。",
+    "任务事件的重试/断路语义（attempt 恒为 1；agent 路径没有节点级重试，重试属 graph 策略片与 P7 resilience 票面）。",
+    "事件上浮 HTTP、侧车写入（切片 28 的第 3 片范围）。",
+    "把 run_completed 改造成按模式门控（ADJ-S31-2，未经裁决不得动）。"
+  ],
+  "completionCriteria": [
+    "1. redProtocol 两段各留 receipt：第一段（模式表 + emitter + Tasks 分支最小形状）D3/D4/D5/D6/D8/D9 真实判红、D1 转绿、D2/D7/D10 保持绿；第二段（精确分类 + 批次次序 + 截断静默）全绿；两段之间测试文件零改动。",
+    "2. 每行牙齿由变异证明，至少覆盖：m-gate 摘掉按族门控、m-degrade 摘掉 fail-closed 校验、m-sniff 用 Contains 式文本嗅探分类、m-order 把 started 挪到批次汇合之后（与结束事件同批发射）、m-skip 对被截断调用也发声、m-payload 把 node 字段填成工具调用 ID 或 agentID、m-dup 模式集合改为不过滤。等价变异如实登记（M2 已确立一例：HasPrefix 式嗅探不被现有任何判据杀死，须如实写入交付记录而不是谎报杀红）。",
+    "3. 既有测试文件改动 = **恰好** runstreammode_test.go 删一行加迁移注释，其余（run 包 4 份测试、agent 包其它 12 份测试、runner 包 3 份测试）逐字节同哈希；baselineBytes.anchors 的 31 条逐字节全同（用其 anchorsCommand 那条自配对命令采集），changedBefore 的 7 条全部变动且差异只在 sourceSeam 声明范围内，outOfSeamNoChangeExpected 的 5 条不变，pkg/hno/graph 目录清单 md5 == ae3c22445eb8167f500ad832513046ca。",
+    "4. 门禁全 exit 0：绑定场景命令（-race -v）、go build ./...、go test ./pkg/hno/run/... ./pkg/hno/agent/... ./pkg/hno/runner/... 的 -count=1 与 -race、go vet 三包、gofmt -l 三包与新增文件；邻近回归 go test ./pkg/hno/team/... ./pkg/hno/workflow/... ./internal/session/contract/... -count=1（agent 工具批次被它们消费，必须实测不红）。",
+    "5. 结构判据：D10 全部数值实读到值（run 77/889/1723、新文件 sync.=0、runner 23/582/0、agent 导出 21 且非测试 LOC ≤1727 且 sync. 计数仍 4）；本片新增导出符号数 == 0（用 go doc 计数差值证明，不用目测）。",
+    "6. 绑定命令在最终字节上重跑并取新回执（ID 现取现贴，禁止沿用本契约 M 行的副本回执当作收口证据）；-race 无 DATA RACE。",
+    "7. 写回：母约 §5 七模式状态表把 StreamTasks 改为「已接（切片 31：agent 工具批次生产者）」、其余五行保持 fail-closed 并补「归属 P4 第 3 片」指针；§10 交付表 P4 行记本片（第 2 片，一模式落地 + 并集语义定形）；状态文档 §4 由编排方新增交付条目；切片 23 契约的 S23-SPEC-1 不代改（其状态由母约状态表体现）。",
+    "8. 防碰巧绿：绑定场景命令 -count=30 -race 一次 exit 0（M2 副本实测已达成，收口须在仓库最终字节上复现）；另跑 ./pkg/hno/agent ./pkg/hno/run -count=5 -race 一次 exit 0。"
+  ],
+  "forbiddenShortcuts": [
+    "为了让 D1 变绿而放宽模式校验（例如把未接线模式当 Messages 跑、或返回空事件流）——D2 的存在就是为杀这一手，且 m-degrade 变异已被实跑证明同时打破本片行与切片 23 的既有行。",
+    "把工具成败按结果文本判定（前缀**或**包含式嗅探都不许）：分类只看 toolResult.err（M2 实测 Contains 式被 D5 杀死、HasPrefix 式因 JSON 引号侥幸不被杀但同样禁止——判据依据是规则不是巧合）。",
+    "在 executeOneTool 的 goroutine 里发射事件（并发交织会破坏 D6 的确定性，且会引入锁或缓冲通道来「摆平」测试）。",
+    "为省事给 pkg/hno/run 加导出 Emitter/Writer 符号（本片 run 包零新符号是 D10 的硬判据；发射器属 agent 包未导出实现）。",
+    "借本片顺手把 StreamDebug 实现成 Tasks 别名、或把 Custom 实现成「把工具结果原样再发一遍」——语义发明必须走各自的片与裁决。",
+    "改写 runstreammode_test.go 中除授权那一行之外的任何内容（包括给循环加「已接线模式跳过」的条件——那会把反向对照变成自证）。",
+    "调整 run_completed 的记账位置或抑制它，来让 D3 的「通道/记账差一」断言看起来更整齐（ADJ-S31-2 未裁前旧行为是锚）。",
+    "把 graph 侧四模式的接线塞进本片以「凑齐七模式」——那是改 pkg/hno/graph 的导出面且在兄弟片在途领地下手，母约允许分片交付，不接受跨片夹带。"
+  ],
+  "observabilityLimit": [
+    "本片能观察的 Tasks 语义限于「一个被派发的工具调用的开始/结束/失败」三态与其载荷；attempt 恒为 1（agent 路径无节点级重试），模型回合不被当作任务（见 explicitNonGoals 第 5 条）。",
+    "「完整状态/增量/检查点/自定义写入」四族在本片公共面上不可观察（生产者不存在）；本片对它们唯一的可断言仍是 fail-closed 错误与 result==nil。",
+    "Debug 的并集等价判据在本片**不可执行**（checkpoints 族未接）：本片只交付并集语义的可用部分（Messages∪Tasks）并次序无关，Debug 等价判据作为第 3 片的门槛登记在 S31-SPEC-1（d）。",
+    "run_completed 只在记账里、永不上通道（M1 实测非对称），因此「通道序列」与「output.Events」是两个不同观察面：任何只用其一的断言都不充分（D3 同时断两面）。",
+    "D6 的确定性来自「发射与内核驱动同协程」这一实现事实；它是可观察序列稳定的担保，不是对 goroutine 数或调度器的断言（后者属 forbiddenObservations）。",
+    "副本预演数字（+118 LOC、280 行测试、6 条变异结果）是对本片可行性的度量，不是收口证据：收口须在仓库最终字节上重新取数与重新回执。"
+  ],
+  "verificationCommands": [
+    "go test ./pkg/hno/agent -run TestP4S31_ -count=1 -race -v   # 本片唯一绑定场景命令（cwd 仓库根；所有收口 receipt 逐字用这条）",
+    "go build ./... ; go test ./pkg/hno/run/... ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1 ; go test -race ./pkg/hno/run/... ./pkg/hno/agent/... ./pkg/hno/runner/... -count=1 ; go vet ./pkg/hno/run/... ./pkg/hno/agent/... ./pkg/hno/runner/... ; gofmt -l pkg/hno/run pkg/hno/agent pkg/hno/runner",
+    "go test ./pkg/hno/team/... ./pkg/hno/workflow/... ./internal/session/contract/... -count=1   # 邻近消费面回归（不得跑 pkg/hno/graph 测试）",
+    "bash -c \"for p in run agent runner; do echo \\\"== \\$p\\\"; printf 'exported=%s nontestLOC=%s allLOC=%s syncAll=%s syncNontest=%s\\n' \\\"\\$(go doc -all ./pkg/hno/\\$p | grep -cE '^(func|type|var|const) ')\\\" \\\"\\$(find pkg/hno/\\$p -maxdepth 1 -name '*.go' -not -name '*_test.go' | xargs cat | wc -l | tr -d ' ')\\\" \\\"\\$(find pkg/hno/\\$p -maxdepth 1 -name '*.go' | xargs cat | wc -l | tr -d ' ')\\\" \\\"\\$(grep -rn 'sync\\\\.' pkg/hno/\\$p --include='*.go' | wc -l | tr -d ' ')\\\" \\\"\\$(grep -rn 'sync\\\\.' pkg/hno/\\$p --include='*.go' | grep -v _test | wc -l | tr -d ' ')\\\"; done\"   # 收口读数必须与开工回执同形：receipt:6b833f42-4545-48e6-942c-5b1d549a22c7 与复采 receipt:86a55861-c33f-4ce5-a571-89c6d118aee0 的 stdoutSha256 已实测相同（42ffada543d7cbe6…），即三段计数在本契约谈判期间零漂移；等值目标 run 77/889/1723/1、runner 23/582/1601/0、agent 21/1567/…/4",
+    "bash -c \"for f in \\$(ls pkg/hno/graph/*.go); do printf '%s %s\\n' \\$f \\$(git hash-object --no-filters \\$f); done | md5\"   # 必须读到 ae3c22445eb8167f500ad832513046ca（receipt:e4ee2cd0 / d4f30d3c 同 stdoutSha256）；本包在实现前后不得有任何差异",
+    "bash -c \"for f in pkg/hno/run/*.go pkg/hno/runner/*.go pkg/hno/agent/agent_bench_test.go pkg/hno/agent/agent_instructions_test.go pkg/hno/agent/agent_storage_test.go pkg/hno/agent/agent_test.go pkg/hno/agent/p0b_red_test.go pkg/hno/agent/p0stream_red_test.go pkg/hno/agent/p0stream_v2_red_test.go pkg/hno/agent/runcontext_test.go pkg/hno/agent/stream_aggregator_test.go pkg/hno/agent/stream_doubles_test.go pkg/hno/agent/stream_tool_loop_test.go pkg/hno/agent/tool_executor_test.go pkg/hno/agent/config.go; do printf '%s %s\\n' \\$f \\$(git hash-object --no-filters \\$f); done\"   # 31 行，与 baselineBytes.anchors 逐字节全同（receipt:1ee4e99e-9091-4ddb-ab3c-e252a278699c 即此条）",
+    "grep -rn 'run.New\\(NodeStarted\\|NodeCompleted\\|TaskError\\)Event' --include='*.go' pkg | grep -v _test   # 收口后：任务族构造点必须存在且只落在 pkg/hno/agent（开工实测为 0）"
+  ],
+  "writeBackOwed": [
+    "母约 §5 七模式解禁状态表：StreamTasks 行改为「已接（切片 31）」并注明生产者落点（agent 工具批次）与并集语义已定形；其余五行的「待生产者片」补为「待 P4 第 3 片（S31-SPEC-1）」。",
+    "母约 §10 交付表 P4 行：记本片为第 2 片（一模式落地 + 多模式并选语义），保持「六模式生产者接线待各自成片」的剩余口径（六→五）。",
+    "状态文档 v3-p1-graph-status.md：由编排方新增交付条目（含本片的行为 delta 说明：runstreammode_test.go 删一行是切片 23 D10 授权的解禁，而非放宽）。",
+    "裁决材料：ADJ-S31-1 与 ADJ-S31-2 若负责人落笔，由本片或后续契约引用（本契约不自拍其结果）。"
+  ],
+  "adjudicationOptions": [
+    {
+      "id": "ADJ-S31-1",
+      "shape": "StreamCustom 的写入口归属（a）只随 P4 第 3 片在图侧节点体提供（ctx 携带 writer，桥接包导出）；（b）本片同时给 agent 路径一个工具体内 writer（工具 handler 已收 ctx，写入即发 CustomEvent，实测候选预算约 +40 LOC 仍在 D10 额度内）。",
+      "cost": "选 (b) 要新增一个未导出到导出的选择：writer 必须由 agent 包注入 ctx 并暴露给第三方工具实现 → agent 包公共面 +2 符号（本片 D10 的「新增导出符号 0」判据要改写），且母约 §5 的 Custom 字面是「节点内」，语义要扩写；选 (a) 则本片七模式只解锁两个（Messages+Tasks），P4 收口更靠后。",
+      "gain": "(b) 让 token 之外的「应用自定义进度」在 agent 流上即刻可用，与 P7 的 span 需求正交；(a) 保持本片预算与语义纯度，且图侧 writer 一旦落地，agent 侧若有需要可按同一形状复刻（映射成本一次性）。"
+    },
+    {
+      "id": "ADJ-S31-2",
+      "shape": "记账里旧 run_completed 与模式选择的关系（a）保持实测现状：run_completed 无条件进 output.Events（与模式无关），通道上从不出现它（本契约 D3 即按此写）；（b）改为 run_completed 归属 Messages 族、在未选 Messages 的模式组合下不再记账。",
+      "cost": "(b) 是对切片 23 已交付「旧事件形状与兼容」的一次实质行为变更（其 D3/D7 只锚 wire 形状与 RunStream 等价，未锚记账条件），要新登记 behavior-delta 并复核 output.Events 的下游消费方（team/inheritance.go、workflow/run.go、workflow/step.go）；(a) 的代价是 Tasks-only 流的记账序列末位挂着一条通道上从未见过的 run_completed，读起来需要注释解释。",
+      "gain": "(a) 零兼容风险、本片实测已达成（预演期即按此实现并通过三条包级门禁）；(b) 的语义更「纯」（每个模式族只见自己），可作为 v3.1 显式变更候选。"
+    }
+  ],
+  "notes": "本契约为 design-tests 阶段产物（activationId 待工作项派发后回填）。M1/M3 全部在仓库只读实测，M2 在 /tmp/g4probe 候选副本、M1 的探针在 /tmp/g4base pristine 副本（两副本均为仓库逐字节复制；diff -rq 实测 run/runner/graph 三目录与仓库同、探针只调导出 API、稳定双模型用手写 fake，无网络无真模型）；起草期间**未**对 pkg/hno/graph 执行任何 test/build 测试动作（只 go doc 读导出面与逐文件哈希），仓库字节除本契约文件外零改动。回执纪律：所有 ID 现取现贴（状态文档 §4l、§6 的两次脑补教训），写完抽查 .rex-harness/receipts/ 对应 JSON 存在；观测数值由与回执同一条命令的明文复跑读取（回执工具只记 exit 与输出哈希）。收口自纠两处（务必按现值执行，别照抄初稿）：（1）图目录 manifest md5 初稿写成 ae3c22445eb8167f500ad8325029036f，收口复采真值为 **ae3c22445eb8167f500ad832513046ca**；这不是图目录变了——开工回执 e4ee2cd0 与收口回执 d4f30d3c 的 stdoutSha256 同为 7ac4fe6cb5d5d605…（两条命令输出逐字节相同），且 git diff --numstat b994f02..HEAD -- pkg/hno/graph 为空、目录对 HEAD 干净，故确认为本契约的转写错误，已在 M3/D10/completionCriteria/baselineBytes 四处同步改回。（2）基线锚集合从初稿口径的「30 份」校正为 **31 份**（run 10 + runner 8 + agent 测试 12 除 runstreammode_test.go + agent/config.go），逐字节真值由一条自配对命令一次采齐（receipt:1ee4e99e-9091-4ddb-ab3c-e252a278699c exit 0；行数自证同族形式 receipt:039d6f8f-b47e-47a5-8abf-9bd3f2f3b8c5 exit 0 读到 31 行）；初稿的 baselineBytes 块另有格式缺陷（run/events.go 哈希尾段抄错并多写一个非法键、counters 误嵌进 anchors、31 条真值与 changedBefore 缺失），已整块重写并 JSON 校验通过——属文档级自纠，不涉及任何仓库字节。包级计数的开工回执 6b833f42 与收口复采回执 86a55861 的 stdoutSha256 相同（42ffada543d7cbe6…），说明谈判期间 run/agent/runner 三包计数面零漂移，D10 的数值锚可以放心用。中途 exit≠0 全量归类：0eede7da/7e9c78e9/7925e36b/c7032573 四条是故意的变异或行为 delta 取证（真实证据），一次 output.Events 计数判红是预演夹具的口径错误（发现 → 写成本片 D3 的记账事实），重复的 vet 回执 06f98eeb 是同一命令的第二次执行（如实登记为冗余，不作独立证据使用），其余全 exit 0。并行活动披露：起草期间观察到兄弟代理在同一仓库工作树提交并移动文件（HEAD 由 b994f02 推进到 b44b588，docs/design/v3-test-scope-p8-g8-store.json 由未跟踪转为被处理、v3-adjudication-p6-g10-scope.md 新出现、` M yarn.lock` 全程既存非本片所为）；本片锚集合（31 个锚文件 + agent/run.go 的开工值，共 32 条）在 HEAD 推进前后由**同一条命令**两次采集：开工回执 receipt:b333d83a-946a-4083-990c-4d63f13a03d0 与收口复采回执 receipt:e4fe646f-9eea-447b-bbc4-07e6b6c1fe0b 的 stdoutSha256 完全相同（4a21bb3df754578dc56ed4179e7a211f957fc4d5af1ba9ba8bdb0ce032eff0dc，均 exit 0）→ 逐字节全同由回执对账担保，不再依赖走查或口头 ANCHORS_STABLE；图目录清单 md5 同样由 e4ee2cd0/d4f30d3c 的 stdoutSha256 相同担保未变。口径提醒给实现者：本任务书转述的「run 非测试 LOC 1723 / sync.=0」与仓库实测不符，实测为「全文件 1723 / 非测试 889 / 包内 sync. 1 处既有」——本片判据一律按实测口径。｜校验回执（主代理 2026-09-28 契约校验轮，非起草者）：抽查 .rex-harness/receipts/ 发现三个引用 ID 在磁盘上不存在（5a6a371f…、26609c5f…、95a9161e…），且同时段回执大量存在（08:00 段 63 份），故判定为凭印象转写而非被清理——正是本字段自己写的「所有 ID 现取现贴」纪律的违例。逐条处置：5a6a371f 的 4 处引用（D7 判据、allowedTestSeam.modify[0]、notes 的 exit≠0 归类、evidenceRefs[19]）改指同一条命令 `go -C /tmp/g4probe test ./pkg/hno/agent -count=1 -v -run TestP4G4_RunStreamModeUnsupportedModesFailClosed` 的真实回执 0eede7da-94fa-4595-9dfc-531f5c63cf61（exit 1），并补登其 exit 0 复跑 eb7079a2-34a5-438e-8a9e-3774a31e64f8（两者命令逐字相同，差在候选副本是否已落那一行删除，这对读数是 allowedTestSeam「只有一行」的最小性证明，不是矛盾）；26609c5f 与 95a9161e 无可追溯的声明，改为校验时现取现贴的两份回执 daa972c7-9c65-48c6-81d2-4a869832001a（图目录逐文件哈希 → md5 ae3c22445eb8167f500ad832513046ca，与本契约校正值逐字相同）与 9826367c-f909-4682-957f-e24a8db089f8（run/agent/runner 计数基线：exported 77/21/23）。契约的其余数值锚未改动。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-platform.md#5",
+    "artifact:docs/design/v3-platform.md#575",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice23.json",
+    "artifact:docs/design/v3-p4-run-g4-green.md",
+    "artifact:docs/design/v3-p4-run-g4-refactor.md",
+    "artifact:docs/design/v3-red-observation-p4g4.md",
+    "artifact:docs/design/v3-p1-graph-status.md#86",
+    "receipt:b36b27aa-a183-464d-ae5f-6511b837bbd4",
+    "receipt:ce532e1e-7953-457a-afb3-cbeef4cc38fc",
+    "receipt:7c62983f-cb82-4e8e-b57b-89ea179dc9cb",
+    "receipt:7821dedf-835c-442b-8c8f-71e39b3ed4b8",
+    "receipt:6b833f42-4545-48e6-942c-5b1d549a22c7",
+    "receipt:daa972c7-9c65-48c6-81d2-4a869832001a",
+    "receipt:b333d83a-946a-4083-990c-4d63f13a03d0",
+    "receipt:0cab2a99-df24-400f-9506-52b4b2c1b11f",
+    "receipt:9826367c-f909-4682-957f-e24a8db089f8",
+    "receipt:06f98eeb-b063-4a41-8968-12f633f26321",
+    "receipt:92058d9e-d16e-496a-a799-6498ea77c996",
+    "receipt:250b7dff-f9e1-4b55-b45f-1d61659bacc3",
+    "receipt:0eede7da-94fa-4595-9dfc-531f5c63cf61",
+    "receipt:a16be0be-05eb-48a1-9f0c-8a4798edf208",
+    "receipt:d36e8098-e51d-41e6-9c90-5226cf1eeea5",
+    "receipt:7d6f40ef-ab34-480b-95eb-3c47107deb35",
+    "receipt:20141850-7974-4d3a-b16f-9d38a968ab13",
+    "receipt:1c9a045b-a11e-40ec-a1aa-730dd5eb6797",
+    "receipt:7e9c78e9-08a6-44d7-aa25-70dbd50e9fc4",
+    "receipt:7925e36b-b21b-45ea-83a7-af3d54a366c3",
+    "receipt:c7032573-acf8-4511-b3b3-84107e12818b",
+    "receipt:f750083c-659d-4faa-9a1d-a449b97e6fff",
+    "receipt:0110b4fb-1be1-4588-abc9-1b308db48ec8",
+    "receipt:e4ee2cd0-6d60-4f43-a024-bda787748d63",
+    "receipt:d4f30d3c-ec3d-4342-9045-b10a795ff2c2",
+    "receipt:86a55861-c33f-4ce5-a571-89c6d118aee0",
+    "receipt:1ee4e99e-9091-4ddb-ab3c-e252a278699c",
+    "receipt:039d6f8f-b47e-47a5-8abf-9bd3f2f3b8c5",
+    "receipt:e4fe646f-9eea-447b-bbc4-07e6b6c1fe0b",
+    "receipt:eb7079a2-34a5-438e-8a9e-3774a31e64f8"
+  ]
+}
