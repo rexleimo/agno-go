@@ -7,6 +7,7 @@ import (
 	"log/slog"
 
 	"github.com/rexleimo/agno-go/pkg/hno/models"
+	"github.com/rexleimo/agno-go/pkg/hno/observability"
 	"github.com/rexleimo/agno-go/pkg/hno/types"
 )
 
@@ -138,6 +139,22 @@ type Config struct {
 	// Logger for structured diagnostics (optional).
 	// Logger 用于结构化诊断（可选）。
 	Logger *slog.Logger
+	// Retry optionally wraps each model turn in observability.Retry (nil = no
+	// retry). MaxAttempts < 1 is clamped to a single attempt (guard clamp, no
+	// Validate row). Retries are interior to one logical turn and never
+	// consume the MaxTurns budget.
+	// Retry 可选地为每次模型回合包一层 observability.Retry（nil = 不重试）。
+	// MaxAttempts < 1 钳制为单次尝试（guard 钳制，不进 Validate）。
+	// 重试内嵌于单个逻辑回合之内，不消耗 MaxTurns 预算。
+	Retry *observability.RetryConfig
+	// Breaker optionally gates each model turn through observability.CircuitBreaker
+	// (nil = no breaker). The breaker records one logical outcome per turn
+	// (post-retry); an open breaker fails the turn with an error that satisfies
+	// errors.Is(err, observability.ErrOpen) and is never retried.
+	// Breaker 可选地让每次模型回合经过 observability.CircuitBreaker（nil = 无熔断）。
+	// 熔断器按回合记录一次逻辑结果（重试之后）；熔断打开时该回合失败，
+	// 错误满足 errors.Is(err, observability.ErrOpen)，且不进入重试。
+	Breaker *observability.CircuitBreaker
 }
 
 // Runner implements the agentic tool-call loop as an explicit state machine.
@@ -154,6 +171,10 @@ type Runner struct {
 	onStep             func(StepEvent)
 	onSkippedToolCalls func([]types.ToolCall)
 	logger             *slog.Logger
+	retry              *observability.RetryConfig
+	breaker            *observability.CircuitBreaker
+	provider           string
+	modelName          string
 }
 
 // New creates a Runner with defaults applied.
@@ -210,6 +231,10 @@ func New(cfg Config) (*Runner, error) {
 		onStep:             cfg.OnStep,
 		onSkippedToolCalls: cfg.OnSkippedToolCalls,
 		logger:             logger,
+		retry:              cfg.Retry,
+		breaker:            cfg.Breaker,
+		provider:           cfg.Model.GetProvider(),
+		modelName:          cfg.Model.GetName(),
 	}, nil
 }
 
@@ -240,7 +265,7 @@ func (r *Runner) Run(ctx context.Context, messages []*types.Message) (*types.Mod
 				return nil, allMessages, failureReason(ctx, StopModelFailure), fmt.Errorf("runner: build request: %w", err)
 			}
 
-			resp, err := r.invoker.InvokeTurn(ctx, req)
+			resp, err := r.invokeTurn(ctx, req)
 			if err != nil {
 				reason := failureReason(ctx, StopModelFailure)
 				return nil, allMessages, reason, fmt.Errorf("runner: model invoke: %w", err)
