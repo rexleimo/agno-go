@@ -309,8 +309,7 @@
       "consequence": "这是引擎语义/性能面的行为改动（新增导出符号、改变消费者单写者不变量或 `ctx_checks_in_scheduler=4` 这条结构计数），超出「夹具加固」范围且撞本片 forbiddenShortcuts 第 1/2 条；它还把当前不可观察的 select 次序暴露成契约面。若负责人要这条，应另开一张引擎片契约并附性能账，本片不做——但本片登记：OPT-A 之下「途中观察」这条语义确实不在测试可证范围内（见 observabilityLimit 第 1 条）。"
     }
   ],
-  "notes": "本契约由测试设计代理写成；M1 全部在仓库只读实测（只跑 `pkg/hno/graph` 的 R17 族与其包面，未跑全仓 `make test`），M2 全程在 /tmp 副本（`/tmp/r17exp/copy`，7 份非测试字节与仓库逐位同 `receipt:bec6af21`），变异注入只落副本且每次跑完用 `git hash-object` 复核回到 `dfd6c1ba…`；仓库工作树除本契约文件外逐字节不动（收口前 `git status --porcelain` 自证：开工时为 ` M yarn.lock` + 他人并行新增的契约文件，本代理未触碰 `.go`）。回执 ID 全部现取现贴并逐个 `ls` 复核存在；一条作废回执（`receipt:bd3a9cda`，toolchain 路径笔误 exit=127）与 `rounds.sh` 首版不可读回执（`receipt:a4530080` 那组的输出形态）已在 M3 如实登记，未被静默丢弃。开发中实测到的两处自身返工也登记在 M2/预演文件头：v1 加固形的 D2 与 D5b 是空转绿（m3/m4 0/300 命中、m5 被 ② 接住），以及 `close of closed channel` panic 与「failer 抢占了 D5b 的前 5 个槽位导致前提永不成立」两次夹具缺陷——都由变异矩阵而非人工检查发现。`.rex-harness/`（回执目录）在 .gitignore:62，故轮次原始输出另存 `/tmp/r17exp/`，账本路径写进 D6/D8 与 completionCriteria。activationId 待派发回填。"
-  ,
+  "notes": "本契约由测试设计代理写成；M1 全部在仓库只读实测（只跑 `pkg/hno/graph` 的 R17 族与其包面，未跑全仓 `make test`），M2 全程在 /tmp 副本（`/tmp/r17exp/copy`，7 份非测试字节与仓库逐位同 `receipt:bec6af21`），变异注入只落副本且每次跑完用 `git hash-object` 复核回到 `dfd6c1ba…`；仓库工作树除本契约文件外逐字节不动（收口前 `git status --porcelain` 自证：开工时为 ` M yarn.lock` + 他人并行新增的契约文件，本代理未触碰 `.go`）。回执 ID 全部现取现贴并逐个 `ls` 复核存在；一条作废回执（`receipt:bd3a9cda`，toolchain 路径笔误 exit=127）与 `rounds.sh` 首版不可读回执（`receipt:a4530080` 那组的输出形态）已在 M3 如实登记，未被静默丢弃。开发中实测到的两处自身返工也登记在 M2/预演文件头：v1 加固形的 D2 与 D5b 是空转绿（m3/m4 0/300 命中、m5 被 ② 接住），以及 `close of closed channel` panic 与「failer 抢占了 D5b 的前 5 个槽位导致前提永不成立」两次夹具缺陷——都由变异矩阵而非人工检查发现。`.rex-harness/`（回执目录）在 .gitignore:62，故轮次原始输出另存 `/tmp/r17exp/`，账本路径写进 D6/D8 与 completionCriteria。activationId 待派发回填。 实现片收口登记（2026-09-28，编排方在主会话内直接实现，activationId 仍为 pending）：第一段加固落地在测试文件 88d3cf15e5a555eedb827d1221331dbac46816fd（加固前 cbc8b692…，即本契约 fixtureBefore），26 处 t.Error* 判据行经 git show HEAD 版与现版逐行 diff 证为零改动，四个常量取值不变，7 份非测试字节与 baselineBytes.anchors 逐位全同（receipt:dab7c96f-1d08-4474-9bfc-083052badd52），导出面仍 64（receipt:dbfbef5c-14ee-4cff-8a3b-6970b10af65c）；负载协议与矩阵执行体已入库（scripts/mutation/p1r17-load-rounds.sh、scripts/mutation/p1r17-cancel-window.mjs），16/16 轮 0 红（receipt:f5337f72… + receipt:94ad9f73…）、10 条变异 0 违规（receipt:dcc7911c…）、六条 solo 杀手各 5/5 独立执行（receipt:f0824b09…）、同二进制 A/B 原始夹具 1/6 轮前提红 vs 加固形 0/6（receipt:79cb40a1…）。两条如实纠偏：(1) 矩阵第一版把 \"test\" 前置两遍，导致所有变异都记成非零退出而 m11 的「全绿」从未被验证——修复后认 [setup failed]、新增 NO_ASSERTION_RED 与 PREMISE_RED 两条不计牙齿的自检；(2) 本契约 D1 正文把加固前图形状写成「entry→{failer, spawner→2000 后继→exit}」，实现形按 scheduler.go 的判据次序落成「entry 一次性交出 2000 条无条件后继 + Sync 停靠点」，因为停靠之后 steps 必须恰为 1、中间那层 spawner 节点会让 steps==2 且 2000 条后继变成 Send 面（非本契约授权）；判据、常量、字节锚与牙齿归属四项不变，其余按实现形为准。账本：docs/design/v3-p1-graph-r30-green.md（门禁/负载/A-B）、docs/design/v3-p1-graph-r30-refactor.md（矩阵/5×5/自纠）、状态文档 §4ae、票面 §13.6、母约 §3.3 第 3 条。",
   "evidenceRefs": [
     "artifact:docs/design/v3-p1-graph-status.md#5",
     "artifact:docs/design/v3-p1-graph-status.md#4",
@@ -345,6 +344,22 @@
     "receipt:0b934fd9-a02d-4981-b2c5-2d1a6ce1f19b",
     "receipt:834bddef-b9e2-44f6-88b8-9f0f15dc5ad8",
     "receipt:bec6af21-e414-4fc1-908f-6475dc2aac6c",
-    "receipt:bd3a9cda-a067-43f0-8f43-5599362df164"
+    "receipt:bd3a9cda-a067-43f0-8f43-5599362df164",
+    "receipt:ab8987aa-67df-4c2e-bf60-42334a420747",
+    "receipt:92813c00-c02f-4f5e-8aa4-1e67efe4e4af",
+    "receipt:5efe7f82-0b8e-4500-bfe9-039af1016944",
+    "receipt:a2dac9f4-a3f6-47f9-93ff-85b37e7edf7e",
+    "receipt:b3fa2e87-8bef-47f6-b42e-6294bf3afc65",
+    "receipt:f6c0372e-5a5f-43aa-b679-c3470b00c70f",
+    "receipt:9fafcf2f-eeff-40db-97af-1d0e713de1b8",
+    "receipt:ea6a33be-6baa-413c-90c2-1601d8f373ed",
+    "receipt:c05bc67c-7764-431f-8954-fd296ced4a78",
+    "receipt:f5337f72-cf86-495f-b0d1-ed922e64b50d",
+    "receipt:94ad9f73-aa42-435b-9a70-cf3ad2f28fb9",
+    "receipt:dcc7911c-a203-46d4-bbfa-680183a26ff6",
+    "receipt:f0824b09-cff2-4597-adbe-f3f170734de0",
+    "receipt:79cb40a1-ebbf-4853-91be-78636fc0d19e",
+    "receipt:dab7c96f-1d08-4474-9bfc-083052badd52",
+    "receipt:dbfbef5c-14ee-4cff-8a3b-6970b10af65c"
   ]
 }

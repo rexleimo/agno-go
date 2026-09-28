@@ -17,10 +17,28 @@ package graph_test
 // 取消时刻由「第一个后继确实已经开始运行」「节点确实已进入阻塞」这类事件触发，
 // 文件里没有一处 time.Sleep 参与定序，上界阀只把停摆变成可判定的失败输出。
 //
-// D1/D2 的前置自证写在一起，缺一就不能判那一轮：
-//   - started < 全部后继 ⇒ 图尚未收敛（出口节点要等所有兄弟完成）；
-//   - 非阻塞探一次 Run 的结果通道仍无值 ⇒ 取消之前 Run 还在飞，也就是安全阀还没撞上。
-//     少了这一条，「派发窗口」会变成一句靠运气成立的前提，D1 的绿也就无从解释。
+// 切片 30 加固（S24-STD-2）：D1/D2/D5 第二段这三行的**判据逐字未动**，动的是「前提如何建立」。
+// 加固前那三行把前提建立在**观测**上，机器一忙前提就没建立、或前提「看起来成立」而结论仍然红；
+// 加固后前提由夹具**构造**。逐子用例对照：
+//
+//	D1  加固前：等第一个后继开始运行，读 started < 2000 且 started < 预算，再探一次结果通道。
+//	          started 数节点体启动、steps 数激活交出，负载下两者差一个数量级 ⇒ 观测的是过期瞬时值。
+//	    加固后：entry 一次交出 2000 条无条件后继，Sync 档的 entry 提交把消费者钉在
+//	          steps==1、started==0、一条都没派发的位置上；在该点 cancel 之后再放行 ⇒
+//	          安全阀只可能在取消之后、且只能在 dispatch 的循环头撞上。
+//	D2  加固前：同一个窗口观测后取消，指望消费者恰好 parked 在 select 且队列里已躺着业务错误
+//	          （实测每轮 5.8%，35/600）。
+//	    加固后：entry 的三条后继在同一次派发里全部交出；tail 的提交是停靠点，停住后先放闸
+//	          （failer 停在无缓冲投递上）、再 cancel、再放行 ⇒ 两条 select 分支同时就绪，
+//	          命中率抬到约 50%/轮，「伪装」这件事变成可复现的构造而不是运气。
+//	D5′ 加固前：同一个观测式窗口。
+//	    加固后：槽位上限 5 与「登记后上闸、零投递」的节点体让「派发停住、积压在 pending」成为
+//	          算术后果；取消之后没有任何投递，所以只有取消分支能交出结论。
+//
+// 五处「派发窗口」守卫一一映射成「停靠点」守卫（仍属前提红分型，见 p1r17AwaitDock 的 ①…⑤ 注释）。
+// 四个常量（p1r17Grace/p1r17Succ/p1r17StepBudget/p1r17RaceRounds）取值不变。
+//
+// D3/D4/D5 第一段/D6 的前提已由构造或 channel 会合担保，本片一行未动。
 //
 // 竞态行 D2 取「跨轮 0 容忍」（契约 raceAssertionForm）：不得把期望写成允许百分之几，
 // 那等于把今天的漏检率回填成容差。
@@ -34,6 +52,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -61,8 +80,9 @@ const (
 	p1r17RaceRounds = 100
 )
 
-// errP1R17Business 是测试自造的业务形状错误。夹具里的节点只在 ctx.Done() 之后才交出它，
-// 所以「它出现在 Run 的错误里」这件事本身就等价于「取消被伪装成节点业务错误」。
+// errP1R17Business 是测试自造的业务形状错误。加固形里它由闸门放行之后才交出
+// （p1r17InHandGraph 的 failer），反向对照行里它由节点直接交出且全程没有取消 ——
+// 两种场合都不该出现在「调用方已取消」的那次结论里。
 var errP1R17Business = errors.New("p1r17: store connection reset by peer")
 
 // errProbeEOF 是「节点包装了别的哨兵」这一种出口用的哨兵，与取消和业务错误都不同。
@@ -113,103 +133,252 @@ func p1r17StillInFlight(out chan p1r17Outcome) bool {
 	}
 }
 
-// p1r17RaceGraph 搭出「取消能落进派发窗口」的夹具：
+// p1r17Dock 是切片 30 的加固会合点：把 Sync 档的 Checkpointer 当成一次「位置证明」。
 //
-//	entry → {failer, spawner}
-//	spawner → f0 … f{succCount-1} → exit（唯一出口）
+// 引擎在 Sync 档由消费者同步调用 sink.Append（durability.go:103），调用点落在 complete 之后、
+// 下一轮 dispatch 之前（scheduler.go:170-173）。让 Append 停住就把消费者钉死在一个可复算的
+// 位置上：该节点的后继激活已经在 pending 里、一条都还没派发，steps 也停在派发之前。
+// 「取消」与「安全阀/队列项」的先后不再靠观测一个可能过期的瞬时值，而由放行次序构造。
 //
-// spawner 由 start 闸门放行；它一成功，消费者就要在一次 dispatch 里放出 succCount 条激活。
-// failer 阻塞到 ctx 取消之后才交出业务错误。firstStarted 在第一个 f 节点真的开始运行时关闭，
-// started 是已经启动的后继数 —— 两者都来自节点体内的自登记，不是私有字段读法。
-func p1r17RaceGraph(t *testing.T, succCount int, failerBody func(context.Context, any) (any, error), opts ...graph.Option) (
-	*graph.Graph, chan struct{}, *atomic.Int64, chan struct{}) {
+// 这条缝只当会合点用：不读引擎内部态、不断言持久化形状（契约 forbiddenShortcuts 第 5 条）。
+type p1r17Dock struct {
+	want        string
+	entered     chan struct{} // 关闭＝消费者已进入停靠点
+	release     chan struct{} // 测试侧放行
+	releaseOnce sync.Once
+	armed       atomic.Bool // 只停一次
+
+	// nodeAtDock 由消费者在 close(entered) 之前写、测试在 <-entered 之后读，
+	// happens-before 由这条 channel 担保，因此不需要锁；CAS 之后的 Append 不再写它。
+	nodeAtDock string
+}
+
+func newP1R17Dock(t *testing.T, want string) *p1r17Dock {
+	t.Helper()
+	d := &p1r17Dock{want: want, entered: make(chan struct{}), release: make(chan struct{})}
+	// 守卫失败也必须放行，否则消费者永远停在 Append 里，留下的停摆 goroutine 会拖累后续复跑。
+	t.Cleanup(d.open)
+	return d
+}
+
+// Append 实现 graph.Checkpointer：只在 want 那一次提交上停靠。
+func (d *p1r17Dock) Append(_ context.Context, cp graph.Checkpoint) error {
+	if cp.Node != d.want || !d.armed.CompareAndSwap(false, true) {
+		return nil
+	}
+	d.nodeAtDock = cp.Node
+	close(d.entered)
+	<-d.release
+	return nil
+}
+
+func (d *p1r17Dock) open() { d.releaseOnce.Do(func() { close(d.release) }) }
+
+// p1r17Docked 是加固行共用的挂法：档位显式写出，不依赖 DurabilitySync 的零值便利。
+func p1r17Docked(d *p1r17Dock, opts ...graph.Option) []graph.Option {
+	return append(opts, graph.WithCheckpointer(d), graph.WithDurability(graph.DurabilitySync))
+}
+
+// p1r17FanDockGraph 是 D1 的加固夹具：entry 一次性声明 succCount 条无条件后继，
+// 每条后继都汇到唯一出口。sink 停在 entry 那次提交上，于是停靠时刻的形状是
+// 「succCount 条激活全部在 pending、零条被派发、steps==1」——这是构造出来的事实，
+// 不是被看到的事实。放行后消费者必然回到 dispatch 的循环头，安全阀只能在那里撞上。
+func p1r17FanDockGraph(t *testing.T, succCount int, d *p1r17Dock, opts ...graph.Option) (*graph.Graph, *atomic.Int64) {
 	t.Helper()
 
-	start := make(chan struct{})
-	firstStarted := make(chan struct{})
 	var started atomic.Int64
-
-	g := graph.New(opts...)
+	g := graph.New(p1r17Docked(d, opts...)...)
 	g.AddNode(graph.NodeFunc("entry", func(ctx context.Context, in any) (any, error) { return in, nil }))
-	g.AddNode(graph.NodeFunc("spawner", func(ctx context.Context, in any) (any, error) {
-		<-start
-		return in, nil
-	}))
-	g.AddNode(graph.NodeFunc("failer", failerBody))
-	g.AddEdge("entry", "failer")
-	g.AddEdge("entry", "spawner")
-
+	g.AddNode(graph.NodeFunc("p1r17exit", func(ctx context.Context, in any) (any, error) { return in, nil }))
 	for i := 0; i < succCount; i++ {
 		name := fmt.Sprintf("p1r17f%05d", i)
 		g.AddNode(graph.NodeFunc(name, func(ctx context.Context, in any) (any, error) {
-			if started.Add(1) == 1 {
-				close(firstStarted)
-			}
+			started.Add(1)
 			return in, nil
 		}))
-		g.AddEdge("spawner", name)
+		g.AddEdge("entry", name)
 		g.AddEdge(name, "p1r17exit")
 	}
-	g.AddNode(graph.NodeFunc("p1r17exit", func(ctx context.Context, in any) (any, error) { return in, nil }))
 	g.SetEntry("entry").SetOutput("p1r17exit")
 
 	if err := g.Validate(); err != nil {
 		t.Fatalf("夹具构建期被拒（%v）——这不是行为观察，先修夹具", err)
 	}
-	return g, start, &started, firstStarted
+	return g, &started
 }
 
-// p1r17AwaitDispatchWindow 等第一个后继真的开始运行，并在同一处完成两项前置自证：
-// 图尚未收敛、Run 还在飞。任一不成立就报「窗口没建立」，与「取消语义不对」是两类失败。
-func p1r17AwaitDispatchWindow(t *testing.T, out chan p1r17Outcome, firstStarted chan struct{}, started *atomic.Int64, total, budget int) int64 {
+// p1r17InHandGraph 是 D2 的加固夹具：entry 的三条后继各自的职责是把「业务错误已在手上」
+// 与「ctx 已取消」构造成同时成立，而不是指望撞上：
+//
+//	failer → 闸门放行之后才交出 errP1R17Business（队列是无缓冲的，它必然停在投递上）
+//	holder → 永不完成（图因此不可能合法收敛，取消是唯一可交出的结论）
+//	tail   → 立即完成且无出边，它那次 Sync 提交就是停靠点
+//
+// 停在 tail 的提交上 ⇒ pending 已空（三条后继在同一次派发里全部交出），放行后消费者只能
+// 回到 select；此时 failer 的投递与 ctx.Done() 两条就绪分支同时可走，归属由 ② 号守卫决定。
+func p1r17InHandGraph(t *testing.T, d *p1r17Dock, failGate chan struct{}, opts ...graph.Option) (*graph.Graph, *atomic.Int64) {
+	t.Helper()
+
+	var started atomic.Int64
+	// allStarted 是三条后继的自登记栅栏：failer/holder/tail 各自在阻塞或提交之前 +1 并 Done，
+	// tail 等到栅栏齐了才交出那次作为停靠点的提交。少了这道会合，三条 goroutine 的
+	// 启动次序是并发的，D2 的「结论已在手上」守卫会在合法轮次上误报。
+	var allStarted sync.WaitGroup
+	allStarted.Add(3)
+	register := func() { started.Add(1); allStarted.Done() }
+
+	g := graph.New(p1r17Docked(d, opts...)...)
+	g.AddNode(graph.NodeFunc("entry", func(ctx context.Context, in any) (any, error) { return in, nil }))
+	g.AddNode(graph.NodeFunc("failer", func(ctx context.Context, in any) (any, error) {
+		register()
+		<-failGate
+		return nil, errP1R17Business
+	}))
+	g.AddNode(graph.NodeFunc("holder", func(ctx context.Context, in any) (any, error) {
+		register()
+		<-make(chan struct{}) // 永不完成：本行的结论只可能来自取消
+		return in, nil
+	}))
+	g.AddNode(graph.NodeFunc("tail", func(ctx context.Context, in any) (any, error) {
+		register()
+		allStarted.Wait()
+		return in, nil
+	}))
+	g.AddEdge("entry", "failer")
+	g.AddEdge("entry", "holder")
+	g.AddEdge("entry", "tail")
+	g.SetEntry("entry").SetOutput("tail")
+
+	if err := g.Validate(); err != nil {
+		t.Fatalf("夹具构建期被拒（%v）——这不是行为观察，先修夹具", err)
+	}
+	return g, &started
+}
+
+// p1r17GatedFanGraph 是 D5 第二段的加固夹具：entry 一次性声明 succCount 条无条件后继，
+// 且**每条节点体都闸在 gate 上**（零投递）。于是「槽位派满、派发停住、积压留在 pending」
+// 是 WithMaxConcurrency 与闸门的算术后果，不需要被看到；startedUpTo 在第 capN 个节点体
+// 真的启动时关闭（= 上限值，与 :249 那条越界即停的判据同源）。
+func p1r17GatedFanGraph(t *testing.T, succCount, capN int, gate chan struct{}, opts ...graph.Option) (
+	*graph.Graph, *atomic.Int64, chan struct{}) {
+	t.Helper()
+
+	var started atomic.Int64
+	startedUpTo := make(chan struct{})
+	g := graph.New(opts...)
+	g.AddNode(graph.NodeFunc("entry", func(ctx context.Context, in any) (any, error) { return in, nil }))
+	g.AddNode(graph.NodeFunc("p1r17exit", func(ctx context.Context, in any) (any, error) { return in, nil }))
+	for i := 0; i < succCount; i++ {
+		name := fmt.Sprintf("p1r17f%05d", i)
+		g.AddNode(graph.NodeFunc(name, func(ctx context.Context, in any) (any, error) {
+			// 先自登记再上闸：本行的前提是「第 capN 个节点体确实已开始运行、且一条都不投递」，
+			// 登记在闸门之后就让这个前提永远无法建立。
+			if int(started.Add(1)) == capN {
+				close(startedUpTo)
+			}
+			<-gate
+			return in, nil
+		}))
+		g.AddEdge("entry", name)
+		g.AddEdge(name, "p1r17exit")
+	}
+	g.SetEntry("entry").SetOutput("p1r17exit")
+
+	if err := g.Validate(); err != nil {
+		t.Fatalf("夹具构建期被拒（%v）——这不是行为观察，先修夹具", err)
+	}
+	return g, &started, startedUpTo
+}
+
+// p1r17AwaitDock 等消费者真的停在停靠点上，并把原夹具那 5 处「派发窗口」守卫一一对应成
+// 「停靠点」守卫（契约 D4：仍属前提红分型，不是判据红）：
+//
+//	① 结果通道已有值 → Run 提前交出，停靠点没建立（旧 :168）
+//	② grace 内没停靠  → 消费者没进入提交点，前提不成立（旧 :170-171）
+//	③ 停靠到的不是 want 那条提交 → 会合点被别的节点占了（新增，停靠点特有）
+//	④ 停靠时刻已有后继启动 → 派发没停在停靠点之后，位置证明失效（旧 :173-180 两条合并）
+//	⑤ 放行之前 Run 已交出 → 窗口没建立（旧 :182-183）
+//
+// 返回的是停靠时刻的后继启动数（加固后它是 0），供判据行如实插值。
+func p1r17AwaitDock(t *testing.T, out chan p1r17Outcome, d *p1r17Dock, started *atomic.Int64) int64 {
 	t.Helper()
 	select {
-	case <-firstStarted:
 	case o := <-out:
-		t.Fatalf("取消之前 Run 已经交出（err=%v, result=%v）：派发窗口没建立，本行前提不成立", o.err, o.res)
+		t.Fatalf("取消之前 Run 已经交出（err=%v, result=%v）：停靠点没建立，本行前提不成立", o.err, o.res)
+	case <-d.entered:
 	case <-time.After(p1r17Grace):
-		t.Fatal("没有任何后继节点开始运行：消费者没进入派发窗口，本行前提不成立")
+		t.Fatal("消费者没有停在任何 Sync 提交上：停靠点没建立，本行前提不成立")
 	}
-	ran := started.Load()
-	if ran >= int64(total) {
-		t.Fatalf("取消时刻已启动 %d 个后继，等于全部 %d 个：图可能已经合法收敛，"+
-			"这一轮无法证明「取消时仍在派发」，先加强夹具而不是放宽判据", ran, total)
+	if d.nodeAtDock != d.want {
+		t.Fatalf("停靠到的提交是 %q，期望 %q：会合点被别的节点占了，位置证明不成立", d.nodeAtDock, d.want)
 	}
-	if ran >= int64(budget) {
-		t.Fatalf("取消时刻已启动 %d 个后继，不少于步数预算 %d：安全阀可能已经在取消之前撞上，"+
-			"这一步的超限不是被取消掩盖的", ran, budget)
+	if ran := started.Load(); ran != 0 {
+		t.Fatalf("取消时刻已有 %d 个后继开始运行：派发没有停在停靠点之后，"+
+			"这一轮无法证明「超限只可能在取消之后撞上」，先修夹具而不是放宽判据", ran)
 	}
 	if !p1r17StillInFlight(out) {
-		t.Fatal("取消之前 Run 已经交出：派发窗口没建立，先修夹具")
+		t.Fatal("取消之前 Run 已经交出：停靠点没建立，先修夹具")
 	}
-	return ran
+	return started.Load()
 }
 
-// p1r17BusinessAfterCancel 是 D2 用的节点出口：被取消之后交出「业务形状」的错误，
-// 而不是把 ctx.Err() 原样交回。
-func p1r17BusinessAfterCancel(ctx context.Context, in any) (any, error) {
-	<-ctx.Done()
-	return nil, errP1R17Business
-}
-
-// TestP1R17_CancellationWinsOverStepLimitDuringDispatch 是契约 D1。
+// p1r17AwaitInHandDock 是 D2 的停靠守卫。它与 D1 的那条共用会合点原语，但前提不同：
+// D1 要证明「派发还没往前走」，D2 要证明「失败节点的结论已经在手上、且消费者确实回到不了
+// 成功路径」。三条后继都在同一次派发里交出，所以停靠时刻的预期是 started==3（全部启动），
+// 而图尚未收敛（holder 永不完成）与 Run 仍在飞才是要紧的自证。同样 5 处守卫、仍属前提红分型：
 //
-// 预算 p1r17StepBudget 条，而取消之前图仍在派发那一大批后继（前置自证保证 Run 还没交出，
-// 也就是阀还没撞上），于是「预算耗尽」整件都发生在调用方已经取消之后：消费者当时还在
-// dispatch 的循环里，从没有回头咨询过 ctx。调用方得到的必须是「我取消了」，不能是
-// 「图跑飞了」——后者是切片 13 的 T5（p1r13_step_limit_test.go:236）已经立下的意图，
-// 只是那一行让节点原样交回 ctx.Err()，管不到这条路径。
+//	① 结果通道已有值 → Run 提前交出（旧 :168）
+//	② grace 内没停靠 → 消费者没进入提交点（旧 :170-171）
+//	③ 停靠到的不是 tail 那次提交 → 会合点错位（新增）
+//	④ 三条后继没全部启动 → 失败项不在手上，本轮不构成「同时成立」（旧 :173-180 的对应位）
+//	⑤ 放行之前 Run 已交出 → 窗口没建立（旧 :182-183）
+func p1r17AwaitInHandDock(t *testing.T, out chan p1r17Outcome, d *p1r17Dock, started *atomic.Int64, succTotal int) {
+	t.Helper()
+	select {
+	case o := <-out:
+		t.Fatalf("取消之前 Run 已经交出（err=%v, result=%v）：停靠点没建立，本行前提不成立", o.err, o.res)
+	case <-d.entered:
+	case <-time.After(p1r17Grace):
+		t.Fatal("消费者没有停在任何 Sync 提交上：停靠点没建立，本行前提不成立")
+	}
+	if d.nodeAtDock != d.want {
+		t.Fatalf("停靠到的提交是 %q，期望 %q：会合点被别的节点占了，位置证明不成立", d.nodeAtDock, d.want)
+	}
+	// 三条后继必须都已启动，否则「失败节点的结论已经在手上」这句前提就没成立，
+	// 这一轮判绿只是运气（tail 的节点体在启动前会等到第 3 个登记，见 p1r17InHandGraph）。
+	if ran := started.Load(); ran != int64(succTotal) {
+		t.Fatalf("停靠时刻只启动了 %d/%d 条后继：failer 的结论不在手上，本轮不构成"+
+			"「业务错误与取消同时成立」，先修夹具而不是放宽判据", ran, succTotal)
+	}
+	if !p1r17StillInFlight(out) {
+		t.Fatal("取消之前 Run 已经交出：停靠点没建立，先修夹具")
+	}
+}
+
+// TestP1R17_CancellationWinsOverStepLimitDuringDispatch 是契约 D1（切片 30 加固形）。
+//
+// 预算 p1r17StepBudget 条。加固前「取消时图仍在派发」是靠读 started 的瞬时值观测的，
+// 而 started 数的是节点体启动、steps 数的是激活交出，负载下两者能差一个数量级，
+// 于是前提本身成了时序竞赛的产物（S24-STD-2 的三轮实测）。加固后同样的事是**构造**出来的：
+// entry 把 p1r17Succ 条无条件后继一次性交进 pending，Sync 档的提交把消费者钉在
+// 「steps==1、零条后继启动、一条都还没派发」这个位置上；测试在这个点上取消、再放行。
+// 因此安全阀只可能在取消之后撞上，且撞它的必然是 dispatch 的循环头本身
+// ——拿掉派发侧的取消判据（变异 τ）或把它挪到预算判据之后（变异 ο），这一步就交出超限。
+//
+// 调用方得到的必须是「我取消了」，不能是「图跑飞了」——后者是切片 13 的 T5
+// （p1r13_step_limit_test.go:236）已经立下的意图，只是那一行让节点原样交回 ctx.Err()，管不到这条路径。
 func TestP1R17_CancellationWinsOverStepLimitDuringDispatch(t *testing.T) {
-	g, start, started, firstStarted := p1r17RaceGraph(t, p1r17Succ,
-		p1r17BusinessAfterCancel, graph.WithStepLimit(p1r17StepBudget))
+	dock := newP1R17Dock(t, "entry")
+	g, started := p1r17FanDockGraph(t, p1r17Succ, dock, graph.WithStepLimit(p1r17StepBudget))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	out := p1r17RunAsync(g, ctx)
-	close(start)
 
-	ranAtCancel := p1r17AwaitDispatchWindow(t, out, firstStarted, started, p1r17Succ, p1r17StepBudget)
+	// ranAtCancel 加固后的含义：停靠时刻已启动的后继数，被证明为 0（位置读法，不是抽样）。
+	ranAtCancel := p1r17AwaitDock(t, out, dock, started)
 	cancel()
+	dock.open()
 
 	res := p1r17Await(t, out)
 	if res.stalled {
@@ -228,30 +397,38 @@ func TestP1R17_CancellationWinsOverStepLimitDuringDispatch(t *testing.T) {
 }
 
 // TestP1R17_CancellationIsNotDisguisedAsNodeBusinessErrorAcrossRounds 是契约 D2，
-// 票面 :68 后半句的逐字落点。
+// 票面 :68 后半句的逐字落点（切片 30 加固形）。
 //
-// 夹具与 D1 同形，只是把步数预算放到 1000000 让安全阀够不着，于是竞争回到消费者的 select：
-// 它从 queue 取走失败节点交出的业务错误时，两件事已经同时成立 —— 该项已在手上、ctx 已取消。
-// RED 时的实现（切片 16 收尾字节：取到队列项后 `return nil, item.err` 不看 ctx）于是随机挑一个，
-// 挑中 queue 就把「我取消了」说成「节点业务失败」（M-4 的早期夹具：8/40、7/40、9/40；
-// 本夹具实测：35/600 轮，即 17/20 次执行判红 —— 轮数因此取 100 而不是 30）。
+// 加固前这一行指望运气：它观测到「第一个后继已经开始运行」就取消，盼望消费者恰好 parked 在
+// select、且队列里已经躺着一条业务错误 —— 实测每轮命中 5.8%（35/600），负载下连这点命中都不稳。
+// 加固后这两件事由夹具**构造成同时成立**：entry 的三条后继在同一次派发里全部交出，
+// tail 立即完成并用它那次 Sync 提交把消费者钉住；测试随后放行 failer（队列无缓冲，它的投递
+// 必然停在消费者手上）、再取消、最后才放行停靠点。消费者回到 select 时，
+// `<-ctx.Done()` 与「failer 的投递」两条分支同时就绪，select 随机挑一条 ——
+// 挑中队列项就必须靠 ② 号守卫（scheduler.go:155）把这一项归到取消语义上。
+//
+// 命中率因此从 5.8% 抬到约 50%/轮：跨轮 0 容忍的形式不动（p1r17RaceRounds 仍 100，只增不减），
+// 但这一行的牙齿不再依赖机器空闲。空转自查由变异 m9（整条删除 ②）承担：它必须杀红本行，
+// 若 0 命中说明本轮形状其实由 ① 独自回答，按空转绿处理、回契约。
 //
 // 牙齿归属如实登记：这一轮判红来自「两条守卫同时拿掉」（变异 κ）。单独移除派发侧守卫（τ）时
 // 本行判绿，说明因果落在队列项侧那条守卫上；但只要派发侧守卫还在，消费者就先在 dispatch 里
 // 交出取消、根本走不到队列项分支，所以没有任何单条变异能把本行单独判红（χ/ρ 各 500 轮 0 命中）。
-//
-// 判据形式是跨轮 0 容忍（契约 raceAssertionForm）：任何一轮交出业务错误即整行红。
 func TestP1R17_CancellationIsNotDisguisedAsNodeBusinessErrorAcrossRounds(t *testing.T) {
+	const succTotal = 3 // {failer, holder, tail}，加固夹具的全部后继
+
 	for round := 1; round <= p1r17RaceRounds; round++ {
-		g, start, started, firstStarted := p1r17RaceGraph(t, p1r17Succ,
-			p1r17BusinessAfterCancel, graph.WithStepLimit(1000000))
+		failGate := make(chan struct{})
+		dock := newP1R17Dock(t, "tail")
+		g, started := p1r17InHandGraph(t, dock, failGate, graph.WithStepLimit(1000000))
 
 		ctx, cancel := context.WithCancel(context.Background())
 		out := p1r17RunAsync(g, ctx)
-		close(start)
 
-		ranAtCancel := p1r17AwaitDispatchWindow(t, out, firstStarted, started, p1r17Succ, 1000000)
-		cancel()
+		p1r17AwaitInHandDock(t, out, dock, started, succTotal)
+		close(failGate) // 业务错误此刻正停在投递上
+		cancel()        // 「该项已在手上」与「调用方已取消」同时成立
+		dock.open()
 
 		res := p1r17Await(t, out)
 		cancel()
@@ -259,8 +436,11 @@ func TestP1R17_CancellationIsNotDisguisedAsNodeBusinessErrorAcrossRounds(t *test
 			t.Fatalf("第 %d 轮：取消后 Run 未在有界阀内返回", round)
 		}
 		if errors.Is(res.err, errP1R17Business) && !errors.Is(res.err, context.Canceled) {
+			// 插值来源与这句自证文字随加固形改写过（判据谓词本身逐字未动）：加固后业务错误由
+			// 闸门放行产生、且放闸严格先于 cancel，所以「交出它」证明的是消费者在 ctx 已取消的
+			// 情况下挑了队列项，而不是「错误只可能在 ctx.Done 之后才产生」。
 			t.Errorf("第 %d 轮：取消被伪装成节点业务错误 %v（取消时刻已启动 %d/%d 个后继，"+
-				"业务错误只可能在 ctx.Done 之后产生）", round, res.err, ranAtCancel, p1r17Succ)
+				"业务错误在放闸之后、取消之前就已停在投递上）", round, res.err, started.Load(), succTotal)
 		} else if !errors.Is(res.err, context.Canceled) {
 			t.Errorf("第 %d 轮：Run 的错误 = %v, want errors.Is(err, context.Canceled)", round, res.err)
 		}
@@ -421,14 +601,34 @@ func TestP1R17_CancellationWhileQueueHasBacklog(t *testing.T) {
 		}
 	})
 	t.Run("上限让派发停住时也是取消语义", func(t *testing.T) {
-		g, start, started, firstStarted := p1r17RaceGraph(t, p1r17Succ, p1r17BusinessAfterCancel,
-			graph.WithStepLimit(p1r17StepBudget), graph.WithMaxConcurrency(5))
+		// 加固形（切片 30）：槽位上限与闸门把「派发停住、积压留在 pending」变成算术后果——
+		// entry 一次性交进 p1r17Succ 条无条件后继，每条节点体自登记之后闸在 gate 上（零投递），
+		// 于是 :249 那条「越界的激活留在 pending 头部」必然在第 capN 条之后生效，
+		// 消费者只能回到 select 并空等。此时唯一能让 Run 交出结论的路径就是取消分支（①）：
+		// 拿掉它（变异 m5）不留任何投递，本行由「未在有界阀内返回」接住，判红且不混分类。
+		const capN = 5
+		gate := make(chan struct{})
+		g, started, fifthStarted := p1r17GatedFanGraph(t, p1r17Succ, capN, gate,
+			graph.WithStepLimit(p1r17StepBudget), graph.WithMaxConcurrency(capN))
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		out := p1r17RunAsync(g, ctx)
-		close(start)
 
-		ranAtCancel := p1r17AwaitDispatchWindow(t, out, firstStarted, started, p1r17Succ, p1r17StepBudget)
+		select {
+		case <-fifthStarted:
+		case o := <-out:
+			t.Fatalf("取消之前 Run 已经交出（err=%v, result=%v）：派发停住的前提没建立，本行前提不成立", o.err, o.res)
+		case <-time.After(p1r17Grace):
+			t.Fatal("没有后继节点开始运行：槽位没打满，本行前提不成立")
+		}
+		ranAtCancel := started.Load()
+		if ranAtCancel != capN {
+			t.Fatalf("取消时刻已启动 %d 个后继，不等于槽位上限 %d：派发没停在 :249 那条判据上，"+
+				"先修夹具而不是放宽判据", ranAtCancel, capN)
+		}
+		if !p1r17StillInFlight(out) {
+			t.Fatal("取消之前 Run 已经交出：积压没建立，先修夹具")
+		}
 		cancel()
 
 		res := p1r17Await(t, out)

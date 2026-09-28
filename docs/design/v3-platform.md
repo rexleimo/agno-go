@@ -190,6 +190,7 @@ type scheduler struct {
 > 本段原文写的是「`cancelAll()` 遍历 `cancels` 调 `context.CancelFunc`；…统一归一化为取消而非错误」。P1 切片 17（票面 B9）落地后按实测回写两处（证据：`docs/design/v3-p1-graph-r17-refactor.md` §7、`docs/design/v3-p1-graph-r17-review-verdict.json`、票面 §13）：
 > 1. **`cancelAll()` / `cancels` 未实现，且当前形状下不需要**：节点拿到的就是调用方那一份 `ctx`（`runNode` 直接传 `s.ctx`），取消由 ctx 树自动传播到在途节点，无需按节点注册取消函数。只有当节点改拿**派生** ctx 时它才成为必需 —— 即 P2 G3 的 Timeout/Retry（每个节点自带超时子 ctx，取消才需要被聚合）。
 > 2. **「统一」不适用于成功路径（`running == 0`），且这一取舍目前不带断言**：在节点阻塞期间取消的形状里量不到「取消后仍交出成功 Result」的窗口（0/300 轮）；而「极早取消」下交出成功 Result 的 26/60 轮，在公共面上与「图确实先收敛」不可区分。该路径是否也必须报取消，登记为未裁决项（`S17-SPEC-3` / `R17-UNADJ-1`）挂 review，不用「统一」二字把它写成已决。
+> 3. **测试侧指针（P1 切片 30，语义零改动）**：上面三个咨询点现在都有**可构造的证明形**，不再依赖观测瞬时值 —— 夹具用 `WithCheckpointer` + `DurabilitySync` 把消费者钉在「`complete` 之后、下一轮 `dispatch` 之前」这个可复算的位置上（`scheduler.go:170-173` 的调用点），于是「取消时预算尚未耗尽」「失败项已在手上」「派发因槽位上限停住」都成为放行次序的算术后果。矩阵归属与证据见票面 §13.6 与 `docs/design/v3-p1-graph-r30-{green,refactor}.md`；`scheduler.go:237-240` 的注释里「次序不是判据」那句在同一段落里需要按 §13.6 第 2 条加限定，**本片不改字节**，登记为未来某片。
 
 **并发上限**：`maxConcurrency > 0 && len(runs) >= maxConcurrency` → 激活进 `pending`（`NodePending`），每次 completion 后 `tryDispatchPending()` FIFO 派发。
 

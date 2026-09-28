@@ -316,6 +316,42 @@ B12/B13（§1 的结构命令输出，切片 19 后重测仍为 0 / 838）。
     verification/evidenceRefs/dependsOn，见 `~/.rexcil/harness-cli/rex-harness/src/domain/planning-artifact.mjs:16`），
     已把该注记改写成判据、成本数字移到阻塞原因，validator 复跑转绿。
 
+4ae. **切片 30（R17 夹具负载加固）实现收口，`S24-STD-2` 的加固欠项结清**：三段证据分成两份账本
+    —— `docs/design/v3-p1-graph-r30-green.md`（串行门禁 + 负载协议 + 同二进制 A/B）与
+    `docs/design/v3-p1-graph-r30-refactor.md`（10 条变异矩阵 + 六条 solo 杀手各 5/5 独立执行）。
+    改动仍然只在测试文件与 `scripts/`（`allowedModifiedTestFiles: 1` 兑现），生产字节逐位不动。
+    加固形把三行负载敏感行的「前提如何建立」换成 **Sync 提交停靠点**
+    （`WithCheckpointer`+`WithDurability(DurabilitySync)`，消费者被钉在 `complete` 之后、
+    下一轮 `dispatch` 之前那个可复算的位置），26 处 `t.Error*` 判据行经机器 `diff` 证为逐字未动，
+    四个常量（`p1r17Grace/Succ/StepBudget/RaceRounds`）取值不变。
+    - **实测读数**：`-count=1 -race -v` exit 0（`receipt:ab8987aa-67df-4c2e-bf60-42334a420747`）、
+      `-count=30 -race` exit 0 且 180 条 PASS×0 FAIL（`receipt:92813c00-c02f-4f5e-8aa4-1e67efe4e4af`）、
+      整包 `-count=5 -race` **连续 3 轮全绿**（`receipt:5efe7f82-0b8e-4500-bfe9-039af1016944` /
+      `receipt:a2dac9f4-a3f6-47f9-93ff-85b37e7edf7e` / `receipt:b3fa2e87-8bef-47f6-b42e-6294bf3afc65`）、
+      负载协议 **16/16 轮 0 红**（`receipt:f5337f72-cf86-495f-b0d1-ed922e64b50d` 取 10 轮 +
+      `receipt:94ad9f73-aa42-435b-9a70-cf3ad2f28fb9` 追加 6 轮，loadavg 爬到 21.38），
+      完整矩阵 exit 0（`receipt:dcc7911c-a203-46d4-bbfa-680183a26ff6`），5/5 计数
+      （`receipt:f0824b09-cff2-4597-adbe-f3f170734de0`）。50 份原始输出里 **0 条 DATA RACE**。
+    - **A/B 对照（契约 #2 要求的那一次，同二进制、同负载曲线）**：原始夹具 **1/6 轮红**、加固形 **0/6**
+      （`receipt:79cb40a1-ebbf-4853-91be-78636fc0d19e`）。那一红按契约 D8 分型为**前提红**：
+      `p1r17o…:211`「取消之前 Run 已经交出…派发窗口没建立」——安全阀抢在测试取消之前撞上，
+      证明的是原夹具**连前提都建不起来**，不是引擎答错。这正是 `S24-STD-2` 那句
+      「(a) 守卫读的是过期瞬时值」的直接实证：**读法 (a) 证实**；
+      **(b)（引擎在单次 dispatch 内真的不回头咨询 ctx）在本片可构造的位置上不成立**——
+      m1/m2 那两条注入让 `HardD1` 稳定红 5/5，说明现行字节答对靠的正是循环头那两条判据的存在，
+      而不是靠「取消恰好先到」。
+    - **执行体入库**：`scripts/mutation/p1r17-cancel-window.mjs`（矩阵 + `--check` 锚唯一性 +
+      逐条 `git hash-object` 自检 + 原始输出落盘）与 `scripts/mutation/p1r17-load-rounds.sh`
+      （负载协议）。`S17-STD-5`/`S18-STD-6` 对这两份脚本而言关闭，对 `struct.sh` 仍欠；
+      `S19-STD-6`（变异脚本未接进 `make`）**本片不结**，见 §5。
+    - **过程如实登记（本片踩到的一条、值得所有判定脚本共用）**：矩阵第一版给十条变异都记了 exit=1，
+      包括登记为「等价变异、应当全绿」的 m11 —— 根因在脚本自己：`"test"` 被前置了两遍，
+      `go test test ./pkg/hno/graph …` 打出 `FAIL test [setup failed]` 并非零退出，而测试本体照常跑完打印 PASS。
+      当时「m11 全绿」与「十条各有牙齿」两句都是**没被验证过的叙述**。修法是三条自检进代码：
+      认 `[setup failed]`、非零退出且无判红行判 `NO_ASSERTION_RED`（不计牙齿）、
+      命中守卫文案判 `PREMISE_RED`（不计牙齿）。修后 m11 才是真 `exit 0`，其余接手行不变。
+      教训与切片 26 的 D2 空转绿同型，只是这次藏在判定脚本里：**判定脚本自己也要有牙齿。**
+
 ## 5. 本片仍带着的未裁决项（沿用，不借本审计变成已决）
 
 
@@ -361,6 +397,11 @@ B12/B13（§1 的结构命令输出，切片 19 后重测仍为 0 / 838）。
   **(a)/(b) 的分辨属 R17 加固片（切片 30）的契约职责**：加固后的夹具必须能*证明*取消时刻预算尚未耗尽
   （不是读一个可能过期的计数），并让「预算在取消之后才被耗尽」成为测试可控的事件。
   在此之前，任何在负载下撞到这三条红的收口都**不得**记为回归，也不得记为已通过。
+  - **已结清（2026-09-28，切片 30 收口，见 §4ae）**：加固形落成 Sync 提交停靠点，负载协议 16/16 轮 0 红
+    且 0 条前提红，同二进制 A/B 下原始夹具 1/6 轮红（那一红按 D8 分型为**前提红**）。
+    **(a) 证实、(b) 在本片可构造的位置上不成立**；「负载协议纳入收口口径」已落成仓库命令
+    `bash scripts/mutation/p1r17-load-rounds.sh 14 10 'TestP1R17_'`。
+    本条此前那句「不得记为回归、也不得记为已通过」的临时禁令随之撤销：R17 族现在**在负载下也可记为已通过**。
 - **切片 21 的 checkout 事故（已恢复，票面 §17.4）**：变异阶段一次 `git checkout graph.go` 把
   切片 2–21 的未提交字节回退到 HEAD 存根，靠切片 20 留在 `/tmp/sinkexp` 的逐字节副本恢复
   （`b7790b9f…` 复核全同）。`S18-SPEC-2` 的「无提交授权」单拷贝风险由口头变成了实测事故；
@@ -368,8 +409,12 @@ B12/B13（§1 的结构命令输出，切片 19 后重测仍为 0 / 838）。
 - 沿用：`R18-Q1`（是否新增导出小类型/哨兵承载归因）、`R18-Q2`（`Typed(name,nil)` 是否升级为构建期拒绝）、
   `S18-SPEC-2`（HEAD `0387000` 只含首片存根，切片 2–19 未提交；**无提交授权**）**已关闭（2026-09-28，见 §4u：
   七片本地提交 `0da4013`…`17f6845`，未 push）**、
-  `R17-GAP-1/2/3`、`R18-GAP-1`、`S17-SPEC-3`/`R17-UNADJ-1`、`S17-STD-5`+`S18-STD-6`
-  （`struct.sh`、前两片的 `mutants.mjs`、本审计的 `/tmp/p1-audit` 仍在 /tmp，未入库）。
+  `R17-GAP-1`**已闭合（切片 30：m9「整条删除 ②」现在是 `HardD2` 的 solo 杀手，5/5 实测；见票面 §13.6 第 1 条）**、
+  `R17-GAP-2`（σ 等价变异，加固形下仍 `exit 0` ⇒ **本片未给它牙齿**，继续挂账）、
+  `R17-GAP-3`（超时形状，**本片未触及**）、
+  `R18-GAP-1`、`S17-SPEC-3`/`R17-UNADJ-1`、`S17-STD-5`+`S18-STD-6`
+  （`struct.sh`、前两片的 `mutants.mjs`、本审计的 `/tmp/p1-audit` 仍在 /tmp，未入库；
+  切片 30 的两份执行体已入库，这条欠账的范围因此缩小到 `struct.sh` 与 p1-b9 那七份）。
 
 - **`S30-EVD-1`（新登记，程序级证据完整性，2026-09-28 全仓扫描实测）**：把 `docs/design/v3-*.json` 里所有
   `receipt:` 前缀的 UUID 与 `.rex-harness/` 对账。**这条对账已落成仓库命令 `node scripts/evidence-audit.mjs`**
