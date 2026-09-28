@@ -412,6 +412,17 @@ B12/B13（§1 的结构命令输出，切片 19 后重测仍为 0 / 838）。
       声明写漏（`expectGreen` 少列 `D8/swap`）。修法是让脚本自己强制**覆盖完整性**：每条变异必须把 13 个
       接手行全部署名为「主杀 / 额外红 / 应当绿」，缺一条即 `--check` 直接抛错；额外红单列 `alsoKills` 并
       要求复现，不再允许「泄漏」这种把脚本自己的错记成测试的错的口径。
+4v2. **P6 第 1 片（G10 OPT-β 控制流全换）已交付（切片 33，子代理取消后主代理接手补 1 行）—— P6 全清**：
+   契约 `v3-test-scope-p6-g10-migration.json`（D1–D14）。子代理 RED 后在并行扇出收尾被取消；
+   接手诊断：分支头漏 cloneBranchEC（注释与代码不符——OPT-β 硬阻塞「并发暴露」的形状），
+   补 1 行克隆后 14/14 全绿 `receipt:79b20f4e…`。**pkg/hno/graph 字节零改动**（D8 的解在
+   workflow 侧）；13 个既有测试文件逐字节不变全绿（零改动担保实测）；导出面 146 不变；
+   变异 9 杀红 + 2 BUILD_FAILED 登记 + e1/e2 等价。三项开工前置 (i)/(ii)/(iii) 以实现+测试
+   关闭（refactor 文档 §4）。证据链 `v3-red-observation-p6g10.md`、`v3-p6-g10-green.md`、
+   `-refactor.md`、`-review-verdict.json`（pass）。**P6 关闭——母约 P0–P8 十行交付面全部清零。**
+4w2. **同轮交付**：切片 29（G8 Store 最小核，含 Postgres 后端与 agentos SQL，verdict pass）、
+   切片 32（G9 run/agent span，P7 四级全清，verdict pass）。三片的实现子代理两度被系统取消、
+   均凭「契约+预演副本」salvage 补完（28 的教训已制度化）。
 
 ## 5. 本片仍带着的未裁决项（沿用，不借本审计变成已决）
 

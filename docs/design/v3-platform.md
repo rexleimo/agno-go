@@ -84,8 +84,8 @@ v2 设计文档 §4 的两条否决被推翻：
 | G6 | Durability 三档 + recursion_limit | LangGraph | ~400 |
 | G7 | 会话事件化 + HITL interrupt/resume | adk | ~1,500 |
 | G8 | `Store` 长期记忆（层级 namespace + 向量）**——D2 已裁 OPT-a1：收窄为最小核， vectordb 适配层不进 v3.0** | LangGraph | ~1,200 |
-| G9 | 观测接线（现有零件接进 G1）**——第 1 片已交付（切片 25：runner 模型路径 retry/breaker + model 级 span）** | 自有 | ~600 |
-| G10 | workflow 迁移到图，公共 API 不变——**范围已裁 OPT-β「控制流全换」（负责人 2026-09-28，逆着摸底材料的 α 推荐）**：线性 + 条件 + 并行 + loop 走图内核，会话/历史/持久化/取消/metrics/事件留在 workflow 侧 | — | ~1,200 → **≈1,800–2,900**（β 实测外推，见 `v3-adjudication-p6-g10-scope.md` §2 OPT-β；母约原估被推翻） |
+| G9 | 观测接线（现有零件接进 G1）**——第 1 片 + 第 2 片已交付；层级 run/agent → {chat, execute_tool} 已闭合（第 1 片＝切片 25：runner 模型路径 retry/breaker + model 级 span；第 2 片＝切片 32：agent 内核驱动点的 invoke_agent）；event 级 span 与 span status/exception 仍挂账（S32-EVT-1、S32-STATUS-1）** | 自有 | ~600 |
+| G10 | workflow 迁移到图，公共 API 不变——**范围已裁 OPT-β「控制流全换」（负责人 2026-09-28，逆着摸底材料的 α 推荐）**：线性 + 条件 + 并行 + loop 走图内核，会话/历史/持久化/取消/metrics/事件留在 workflow 侧 **——已交付（切片 33：编译器 694 行 + 14 等价测试，D1–D14 + 9 杀红变异；三项开工前置的落地形态见 `v3-p6-g10-refactor.md` §4）** | — | ~1,200 → 实际编译器 694 行（β 外推区间低端之下；别名隔离经 workflow 侧分支头克隆解决，引擎零改动） |
 | | **合计** | | **~10,100–11,200**（原 ~9,500：G10 随 β 上调，其余十行未变） |
 
 ### 2.2 不做（v3.0 明确排除）
@@ -463,7 +463,8 @@ v1 语义：控制 `graph` 在每个节点完成后向 `Session` 存储提交事
 ```go
 package store
 
-// Item 是存储的键值对，带元数据与时间戳
+// Item 是存储的键值对（时间戳由后端管理；v1 无 metadata 字段——草图注释
+// 「带元数据」与结构体字面不符，以结构体为准，见切片 29 契约 explicitNonGoals 第 8 条）
 type Item struct {
     Key       string
     Namespace []string       // 层级命名空间，如 ("users","profiles")
@@ -482,15 +483,27 @@ type Store interface {
 }
 ```
 
-**与现有概念分工**（避免重叠）：
+**与现有概念分工**（避免重叠；按切片 29 契约 M1 的导出面实测改写）：
 
 | 现有 | 职责 | 与 Store 的边界 |
 |---|---|---|
 | `pkg/hno/memory` | 对话历史（进程内，agent 私有） | Store 跨会话、持久、可共享 |
-| `pkg/hno/knowledge` + `vectordb` | RAG 文档库 | knowledge 是**非结构化文档**；Store 是**结构化用户事实**（偏好、画像） |
+| `pkg/hno/knowledge` | **纯文档摄取面**（Loader/Chunker，22 个顶层声明全无存储与检索） | Store 不做摄取管线 |
+| `pkg/hno/vectordb` | 向量库**底座**（VectorDB 十方法 + Document） | Store 不做集合管理、不架上 chromadb/redisdb（适配层留 v3.1，OPT-a2 不进） |
+| `pkg/agentos.KnowledgeService` | 仓库唯一的**检索服务面**（knowledge_handlers.go） | Store 不抢检索服务、不加 HTTP 端点 |
 | `session.State` | 会话级 KV | Store 是跨会话长期 |
 
 **后端**：v1 提供内存实现 + 复用现有 `session/db` 的 5 种后端之一（建议 Postgres）。
+
+> ✅ **本片交付（切片 29，2026-09-28，D2=OPT-a1 最小核落地）**：`pkg/hno/store`（公共面：
+> `Item` 五字段不加不减 / `Store` 七方法 = 草图五方法逐字 + `SearchScored`（ADJ-5=B）+ `PutMany`（ADJ-6=B，
+> 整批原子）/ 7 个错误哨兵（`ErrNotFound` + 参数三类 + 检索三类）/ `Composite` 无碰撞规范编码与
+> `ValidateNamespace`/`ValidateKey` 校验面）+ 内存后端 `MemoryStore` + 持久后端 `pkg/hno/store/postgres`
+> （database/sql 注入式 + go-sqlmock 测试 0 skip，DDL 双份落 `scripts/migrations/003_agentos_store.sql` 与
+> helm `files/` 镜像）。嵌入只注入 `vectordb.EmbeddingFunction`（nil 时 `Search`/`SearchScored` fail-closed
+> 报 `ErrNoEmbedder`）；向量是写入期派生的后端物理列，不在 `Item` 上；查询期恰一次嵌入调用、代价与行数无关；
+> 持久侧检索 v1 = 一次 SELECT 取行 + 应用层线性打分，pgvector 留 v3.1 且不得改接口与 `Item` 形状。
+> 证据：`docs/design/v3-p8-g8-green.md`（RED/GREEN 回执、变异矩阵、结构判据）。
 
 ---
 
@@ -591,9 +604,9 @@ func (g *Graph) Resume(ctx context.Context, responses map[string]any) (*Result, 
 | **P3** | G5 Send + G6 Durability/StepLimit | P1 | 动态扇出 + 安全阀 | **全清**：**G5 Send 已交付（切片 26：动态扇出 Send + AddJoinSend，R19-Q2 裁决 OPT-C 落地，map-reduce 端到端 D1–D9 + 6 杀红变异）**；**G6 Durability 已交付（切片 24）**；StepLimit 已随切片 13 交付 |
 | **P4** | G4 StreamMode | P0 | 七模式 + 旧类型兼容 **协议层已交付（切片 23）**；**`StreamTasks` 生产者已接（切片 31 = P4 第 2 片：一模式落地 + 并集语义定形）**；其余五模式生产者接线归 P4 第 3 片（图侧事件桥接，S31-SPEC-1） | 旧 `run_content`/`run_completed` 行为不变 |
 | **P5** | G7 事件化 + HITL | ~~P0 + 决策 D1~~ **全清（切片 27 引擎核心 + 28 侧车/跨进程恢复）** | 事件存储 + Resume **全部交付（27：引擎核心；28：`pkg/hno/session/sidecar` + `internal/hitlbridge` + `graph/restore.go`，D1–D10 + 10 杀红变异）** | 审批场景跨进程恢复**实测达成（双档端到端）**；重复 Resume 幂等**实测达成（跨重启）**；**契约测试绿（8 边界锚逐字节）** |
-| **P6** | G10 workflow 迁移 | P1–P4 | **范围已裁 OPT-β（负责人 2026-09-28）**：线性 + 条件 + 并行 + loop 编译进图，会话/历史/持久化/取消留 workflow（原「线性 []Step 编译为链式图」是 α 口径，已被裁决替换） | **现有用户零改动**；`make test` 绿。**开工前置未清，β 不得建切片契约**：(i) `S19-STD-1` 必须先裁——`ExecutionContext` 入图取**引用语义**还是**值语义**（引用 ⇒ 任何扇出/汇聚都要在 workflow 侧克隆，等于把 `parallel.go` 再写一遍；值 ⇒ `Data`/`Metadata`/`SessionState` 的拷贝规则本身变成 today 没有的新公共语义）；(ii) 互斥分支原语二选一——workflow 侧写互补谓词（一漏即两分支同跑）还是给 `pkg/hno/graph` 加 `Branch`/`Router` 公共面（动导出数字，硬门禁，且图目录是兄弟片在途领地）；(iii) Router 未命中语义不等价（today 报错 `router.go:63` vs 图侧走兜底 `scheduler.go:411-418`），β 取「保留报错」，须在适配器里显式复刻 |
-| **P7** | G9 观测接线 | P0 | retry/breaker 接进 runner **模型阶段已交付（切片 25，D1–D13 + 9 杀红变异矩阵）**；run/agent 级 span 待第 2 片（S25-DEFER-1） | span 覆盖状态表：**model=已接于 runner**（每尝试 chat span + usage 归集）；**tool=已在 agent 既有**（execute_tool）；**run/agent=待 P7 第 2 片**（pkg/hno/agent） |
-| **P8** | G8 Store | ~~决策 D2~~ **已裁决（OPT-a1，2026-09-28）** | 长期记忆最小核：接口 + namespace + 内存与单一 Postgres 后端（契约 `v3-test-scope-p8-g8-store.json` 切片 29 已起草，D1–D11） | 与 knowledge/vectordb 分工清晰（契约以导出白名单验收）；ADJ-1…ADJ-6 待落裁后开工 |
+| **P6** | G10 workflow 迁移 | ~~P1–P4~~ **已交付（切片 33，P6 全清）**：线性 + 条件 + 并行 + loop 编译进图，会话/历史/持久化/取消留 workflow | **现有用户零改动实测达成**（13 个既有测试文件逐字节不变全绿；导出面 146 不变）；`make test` 口径 -race 绿。三项开工前置以实现+测试关闭：(i) 并行扇出=值语义（分支头克隆私有 EC）、线性主干=引用穿线（D7/D8）；(ii) workflow 侧互补谓词、引擎零公共面新增（D4）；(iii) Router 未命中适配器显式复刻报错（D5 逐字节） |
+| **P7** | G9 观测接线 | P0 | retry/breaker 接进 runner **模型阶段已交付（切片 25，D1–D13 + 9 杀红变异矩阵）**；run/agent 级 span **已接（切片 32，D1–D11 + 10 项变异矩阵：8 杀红 + 等价/缺口各 1）**——S25-DEFER-1 结清 | span 覆盖状态表：**model=已接于 runner**（每尝试 chat span + usage 归集）；**tool=已在 agent 既有**（execute_tool）；**run/agent=已接（切片 32：agent 的 kernel 驱动点，私有 runKernel 单位点，chat/execute_tool 为其子）**。**P7 四级全清**（model/tool/run/agent 均有 span）；对 S25-DEFER-1 原建议形状的实测改判（驱动点之前而非 Agent.Run 入口）见 `v3-test-scope-p7-g9-agent-span.json` M3 |
+| **P8** | G8 Store | ~~决策 D2~~ **已裁决（OPT-a1，2026-09-28）** | ✅ **第 1 片交付（切片 29，2026-09-28）**：长期记忆最小核——接口 + namespace + 内存与单一 Postgres 后端（契约 `v3-test-scope-p8-g8-store.json`，D1–D13 含 ADJ-5/6=B 扩面；证据 `v3-p8-g8-green.md`） | 「长期记忆」= D4/D5/D6/D7 端到端往返；「与 knowledge/vectordb 分工清晰」= D11 导出白名单 + import/grep 判据（knowledge 摄取面/vectordb 底座/KnowledgeService 检索服务面零渗透，12 字节锚全同） |
 
 **关键路径**：P0 → P1 → (P2/P3/P4 并行) → P6
 
