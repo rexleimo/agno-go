@@ -1,0 +1,290 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p6-g10-opt-beta-migration",
+  "activationId": "pending",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-28T20:30:00Z",
+  "contractRef": "docs/design/v3-test-scope-p6-g10-migration.json",
+  "slice": 33,
+  "series": "P6（G10 OPT-β：workflow 控制流全换图内核；负责人 2026-09-28 逆 α 推荐落裁 β，见 v3-adjudication-p6-g10-scope.md §5；编号 33 刻意避开兄弟片的 slice 系列命名）",
+  "userGoal": "workflow 变成图引擎的声明前端：线性 []Step 编译为链式图，Condition/Router/Loop/Parallel 编译为图结构（决策节点+互补谓词、缺省兜底错误节点、自数环控制器、扇出+克隆头+汇聚合并），执行跑在 pkg/hno/graph 的调度内核上；会话/历史/持久化/取消/metrics/事件聚合一行不动留在 workflow。公共 API 与导出面零变化，既有 13 个 workflow 测试文件逐字节不变地继续绿——「现有用户零改动」是本片的第一验收。",
+  "whyThisSlice": "OPT-β 落裁把三条开工前置转成本片必须先回答的决策点，本契约逐条给出答案并钉死：前置(i) S19-STD-1 引用/值语义——裁「引用语义」：主干沿用今天的指针替换线程（[P2]/[P2b] 实测零落差），唯一并发的扇出（Parallel）在分支入口克隆（把 parallel.go:54-90 的克隆逻辑原样搬进分支头节点），不新造值语义；前置(ii) 互斥分支原语——workflow 侧互补谓词（决策节点把判定装进信封，两条条件边的谓词互补，恰一条命中），pkg/hno/graph 导出面零补、零改动；前置(iii) Router 未命中——适配器用 AddDefault 挂「未命中错误节点」复刻 router.go:63 的报错形状，不许借兜底边静默放行。范围就是裁决原文：控制流全换（线性+条件+并行+loop 走图），会话/历史/持久化留 workflow。",
+  "measuredBeforeDesign": [
+    {
+      "id": "M1-基线与字节锚（本轮现取）",
+      "scene": "仓库工作树，迁移前",
+      "commands": [
+        "git hash-object --no-filters pkg/hno/workflow/*_test.go",
+        "go test ./pkg/hno/workflow/... -count=1",
+        "go build ./cmd/examples/workflow_demo ./cmd/examples/workflow_history"
+      ],
+      "observations": [
+        "13 个既有测试文件的 git-blob hash 与摸底材料 §1.6 逐字节一致（本轮复核，13/13 对上）。",
+        "workflow 全包测试 exit 0（receipt:e779b656-6964-49cf-af1e-c10e346b4848）。",
+        "两个示例（包外用户代理）编译 exit 0（receipt:780238dd-9a93-42f3-a2ce-ff67608c1fdc）。"
+      ]
+    },
+    {
+      "id": "M2-结构实测（静态 grep，与摸底材料 §1.2 复核一致）",
+      "scene": "非测试源口径",
+      "commands": [
+        "ls pkg/hno/workflow/*.go | grep -v _test | xargs grep -hE '^(func|type|var|const) [A-Z]' | wc -l",
+        "ls pkg/hno/workflow/*.go | grep -v _test | xargs grep -hE '^func \\([a-zA-Z]+ \\*?[A-Z][A-Za-z]*\\) [A-Z]' | wc -l",
+        "ls pkg/hno/workflow/*.go | grep -v _test | xargs wc -l | tail -1"
+      ],
+      "observations": [
+        "workflow 导出面 = 61 顶层 + 85 方法 = 146（迁移后必须仍是 146）。",
+        "workflow 非测试 LOC = 3,263；graph 导出面 = 42+19 = 61、字节零改动（本片对 graph 的改动数 = 0）。",
+        "线性内核今天实例化 run.Loop 于 executor.go:31——迁移的结构判红就是这一处清零。"
+      ]
+    },
+    {
+      "id": "M3-硬阻塞的解（读码+摸底 [P6] 实测推演，实现片验证）",
+      "scene": "scheduler.go successors/spawn + parallel.go 克隆逻辑",
+      "commands": [
+        "sed -n '398,419p' pkg/hno/graph/scheduler.go",
+        "sed -n '46,108p' pkg/hno/workflow/parallel.go"
+      ],
+      "observations": [
+        "摸底 [P6]（receipt:7e8029a8-5ad6-4ce7-8de3-c4f3fb5c10a8，exit 1）实测：successors 把同一个 out 交给每条命中边、spawn 各起一个 goroutine——把可变 *ExecutionContext 直接当边的值就会 DATA RACE。",
+        "解（本契约 D8 钉死）：编译器信封协议——扇出交出的值是不可变信封（carrier），Condition/Router 的扇出谓词互补/互斥（恰一支激活，引用线程与今天同构）；Parallel 是唯一并发扇出，分支头节点各自克隆私有 ExecutionContext（照抄 parallel.go:54-90，含 WorkflowHistory/HistoryContext 不拷贝的原样保真），信封与源 EC 在 split 返回后无人再写（单消费者模型）。pkg/hno/graph 不需要任何改动。"
+      ]
+    }
+  ],
+  "designConsequence": "编译器映射逐形状定形（全部落在 pkg/hno/workflow 新文件 graph_compiler.go + executor.go 换内核，public API 与导出面零变化）：（1）主干：每次 Run 编译 steps[startIdx:] 为一张新图（编译是纯声明、代价可忽略；startIdx 复用 workflow.go:205-218 既有代码，resume 语义原样）；相邻主干步无条件边链接；追加恒等终止节点作 SetOutput，成功路径 Result.Output() 即最终 ExecutionContext。（2）叶（Step/GenericStep/其余 Node）：单适配节点，in/out 都是 *ExecutionContext 信封——引用线程与 [P2b] 实测同构。（3）Condition：决策节点（调 ConditionFunc、写 condition_<id>_result、信封携带判定）→ 两条互补谓词条件边 → 分支子图 → 双侧分支尾无条件边汇入下一主干步；nil 分支=恒等头节点；TrueNode==FalseNode 靠互补谓词恰执行一次，无需特判。（4）Router：决策节点（调 RouterFunc、写 router_<id>_selected）→ 每路由一条 key 匹配条件边 + AddDefault 挂未命中错误节点（逐字复刻 fmt.Errorf(\"router %s: route '%s' not found\", r.ID, key)）；nil 路由=恒等头。（5）Loop：控制器节点自数激活次数=迭代号（同图每次 Run 新编译、控制器状态天然单 Run 生命周期；环内激活严格串行），MaxIteration 守卫 + Condition(ec, iter)；continue 条件边→体子图，体尾无条件回边，done 条件边→下一主干步；done 时在穿出 EC 写 loop_<id>_iterations（含 0 次迭代）。（6）Parallel：split 捕获源 EC → 无条件扇出到每分支克隆头 → 分支子图 → AddJoin([split, 全部分支尾], merge)；merge 照抄 parallel.go:110-155（MergeParallelSessionStates、parallel_<id>_branch_<i>_output 键、Data 前缀键、Output=最后一个分支下标）；1 分支也走 join（split+1 尾=2 前驱，满足屏障下限）。别名隔离（硬阻塞解，D8）：信封不可变纪律——扇出边交同一信封，但 Condition/Router 谓词互斥恰一支跑；Parallel 分支头克隆私有 EC 后才 Execute；join 聚合 map 只读。事件/账本：消费侧 WithTrace 台账按完成序记「主干步已执行清单 + 最近成功 EC + 失败节点」，绝不读 Result.Completed()（字典序，摸底 [P6] 实测）；事件聚合照旧从最终 EC 反查 step_<id>_events，键集=已执行主干步（执行序）。失败语义：主干包 types.NewError(ErrCodeUnknown, \"step <最后成功主干步> failed\", inner)（沿用「报最后一个成功步」的既有语义，不顺手修正）；复合前缀按编译期归属链由内向外套（parallel 前缀、loop 迭代号取控制器单 Run 台账）；取消路径零复合前缀（raw ctx.Err()），workflow.go 的取消持久化代码一行不动。预算：WithStepLimit 按结构上界精确计算（loop × MaxIteration 累加），合法有界 workflow 永不撞默认 1000。零改动担保：13 个测试文件字节锚 + 导出面 146 + 示例编译是主判据族；TestP6G10_* 等价特征化测试先在旧内核上钉行为、迁移后逐字节同断言继续绿，变异矩阵证明每行牙齿。",
+  "redProtocol": "迁移片两段制。第一段（结构性红 + 特征化钉死）：落 pkg/hno/workflow/p6g10_migration_test.go 的 TestP6G10_* 等价特征化测试（D1–D14 的行为断言），在旧内核（run.Loop）上全部跑绿并留 receipt——它们钉的是「迁移不许漂移的行为」，不是新功能；同时登记结构性红：非测试 workflow 源仍实例化 run.Loop（executor.go:31，grep=1）。第二段（换内核转绿 + 变异杀红）：executor.go 内核换成编译+图执行，run.Loop 实例化清零；既有 13 个测试文件字节不变地继续绿（零改动主判据）；TestP6G10_* 同断言继续绿；绑定命令 -race 无 DATA RACE；随后 scripts/mutation/p6g10-migration.mjs 在最终字节上逐条杀红（编译结果弃用→D1 红、克隆隔离摘除→D8 -race 红、loop 迭代映射错→D6 红、事件台账错→D9 红、错误归属错→D3 红、router 未命中静默→D5 红、merge 语义错→D7 红、主干包错→D3 红、startIdx 忽略→D2 红、预算回退默认→D11 红）+ 等价变异登记。两段之间既有测试文件零改动。",
+  "acceptanceMapping": [
+    {
+      "row": "D1",
+      "behavior": "线性 []Step 跑在图内核上：输出穿线（每步读到上一步 Output）、step_<id>_output 键、最终 Output、lastStepID=最后一步，全部与旧内核逐字节同断言",
+      "publicEntry": "Workflow.Run（公共 API 不变）",
+      "assertion": "特征化断言（旧内核先钉、迁移后同绿）+ 结构判据 run.Loop 实例化=0 + 变异 m1（弃用图结果→红）",
+      "independentlyFailable": "对换内核后丢步骤/丢穿线的实现判红"
+    },
+    {
+      "row": "D2",
+      "behavior": "Resume parity：WithResumeFrom(中间步) 恰从该步跑（startIdx 语义原样）；不存在的 resume 步 → InvalidInput（workflow.go:215-217 代码不动）",
+      "publicEntry": "Workflow.Run + WithResumeFrom",
+      "assertion": "输出从中步起 + InvalidInput 文案断言 + 变异 m9（忽略 startIdx→红）",
+      "independentlyFailable": "对 resume 全量重跑或入口错位的实现判红"
+    },
+    {
+      "row": "D3",
+      "behavior": "错误聚合逐字节复刻：失败步 → [UNKNOWN] step <最后成功主干步> failed: <inner>（沿用既有「报最后成功步」语义不修正）；errors.As 可取 HnoError 且 Code=UNKNOWN",
+      "publicEntry": "Workflow.Run 失败路径",
+      "assertion": "错误串与 Code 断言 + 变异 m5（改报失败步→红）/m8（摘主干包→红）",
+      "independentlyFailable": "对错误文案/归属漂移的实现判红"
+    },
+    {
+      "row": "D4",
+      "behavior": "Condition 映射：谓词判定写 condition_<id>_result；恰一支分支执行；nil 分支=原样穿出；两分支同对象也只执行一次",
+      "publicEntry": "NewCondition + Workflow.Run",
+      "assertion": "真/假/nil 三态执行计数与键断言（互补谓词恰一支的判据由 -race 背书）",
+      "independentlyFailable": "对两分支同跑或判定键丢失的实现判红"
+    },
+    {
+      "row": "D5",
+      "behavior": "Router 映射：router_<id>_selected 写入；命中路由执行；未命中 → 逐字复刻 router %s: route '%s' not found（不许静默兜底）；nil 路由=no-op",
+      "publicEntry": "NewRouter + Workflow.Run",
+      "assertion": "命中/未命中/nil 三态断言 + 变异 m6（未命中静默→红）",
+      "independentlyFailable": "对借 AddDefault 静默放行的实现判红"
+    },
+    {
+      "row": "D6",
+      "behavior": "Loop 映射：Condition(ec, iteration) 从 0 起；MaxIteration 守卫（含默认 10）；loop_<id>_iterations 写在穿出 EC（含 0 次）；体错误 → loop %s iteration %d failed: %w（%d=在飞迭代号）",
+      "publicEntry": "NewLoop + Workflow.Run",
+      "assertion": "迭代计数/键/错误文案断言 + 变异 m3（迭代映射错→红）",
+      "independentlyFailable": "对迭代号漂移或 iterations 键丢失的实现判红"
+    },
+    {
+      "row": "D7",
+      "behavior": "Parallel 映射：分支私有克隆（照抄 parallel.go:54-90，含 WorkflowHistory/HistoryContext 不拷贝）；汇聚写 parallel_<id>_branch_<i>_output 与 Data 前缀键、MergeParallelSessionStates、Output=最后分支下标；分支错误 → parallel execution failed: %w（首个完成失败者）",
+      "publicEntry": "NewParallel + Workflow.Run",
+      "assertion": "键集/合并/Output 下标断言 + 变异 m7（Output 取首支或摘前缀→红）",
+      "independentlyFailable": "对合并语义/错误包装漂移的实现判红"
+    },
+    {
+      "row": "D8",
+      "behavior": "别名隔离（β 硬阻塞的解）：编译器扇出只交不可变信封；Parallel 是唯一并发扇出且分支头克隆后才 Execute；[P6] 形状（两分支并发写）经编译器不可表达；-race 全绿",
+      "publicEntry": "编译器内部协议 + TestP6G10 并发写夹具",
+      "assertion": "并发分支写自clone + -race + 变异 m2（克隆头摘除→DATA RACE 红）",
+      "independentlyFailable": "对把可变 EC 直接交并发激活的实现判红"
+    },
+    {
+      "row": "D9",
+      "behavior": "事件/账本 parity：按步事件从最终 EC 反查、键集=已执行主干步（执行序台账，不读 Result.Completed()）；成功时 WorkflowRun.AddEvents 内容与旧内核一致",
+      "publicEntry": "EnableHistory 的 Workflow.Run + 存储读回",
+      "assertion": "事件内容与键断言 + 变异 m4（台账改字典序/读种子 EC→红）",
+      "independentlyFailable": "对事件时点/键集漂移的实现判红"
+    },
+    {
+      "row": "D10",
+      "behavior": "取消 parity：ctx 取消 → raw ctx.Err() 为主错（零复合前缀）、取消快照/持久化（workflow.go:230-246）原代码路径生效",
+      "publicEntry": "Workflow.Run + 预取消 context",
+      "assertion": "errors.Is(err, context.Canceled)（经 HnoError.Unwrap）+ 取消记录落地断言",
+      "independentlyFailable": "对取消被复合前缀掩埋的实现判红"
+    },
+    {
+      "row": "D11",
+      "behavior": "预算与命名：WithStepLimit 按结构上界计算（高迭代 loop 不撞默认 1000）；同名步 ID 编译为不同合成名（[P5]），原 ID 照常出现在错误/键/lastStepID",
+      "publicEntry": "高 MaxIteration workflow + 重名步 workflow",
+      "assertion": "600 迭代跑完断言 + 重名步双执行断言 + 变异 m10（预算回退默认→红）",
+      "independentlyFailable": "对默认预算漏算/重名碰撞的实现判红"
+    },
+    {
+      "row": "D12",
+      "behavior": "零改动担保：13 个既有测试文件 git-blob 逐字节不变且全绿；导出面 146 不变；两示例不改编译过；pkg/hno/graph 字节零改动",
+      "publicEntry": "全部门禁命令",
+      "assertion": "hash-object 对账 + go doc 计数 + 示例 build + graph 包 hash 对账",
+      "independentlyFailable": "对任何既有测试字节或公共面漂移判红"
+    },
+    {
+      "row": "D13",
+      "behavior": "嵌套组合等价：loop{condition}、parallel{loop}、condition 在 loop 体内、parallel 在 condition 分支——语义逐层组合正确（迭代号/克隆/汇入穿线）",
+      "publicEntry": "复合嵌套 Workflow.Run",
+      "assertion": "每层的计数键与穿线断言（复合前缀归属链顺序=D3 断言）",
+      "independentlyFailable": "对嵌套下归属链倒序或穿线断裂的实现判红"
+    },
+    {
+      "row": "D14",
+      "behavior": "编译期守卫（对旧崩溃路径的显式改善，披露项）：nil 主干步/自引用复合环 → 返回清晰错误（旧：panic/栈溢出进程崩）；图构建后 Validate 必跑",
+      "publicEntry": "含 nil 步/环引用的 Workflow.Run",
+      "assertion": "错误非 nil 且可读（旧行为是进程崩，无测试可钉旧值）",
+      "independentlyFailable": "对守卫缺失导致 panic 的实现判红"
+    }
+  ],
+  "minimalVerticalSlice": "D1 + D3 + D8 + D12 四行（图内核上线、错误文案逐字节、别名隔离、零改动担保）——没有这四行，「迁移」既没发生也不安全；D2/D4–D7/D9–D11/D13/D14 为控制流全形状与账本/预算补强。",
+  "allowedTestSeam": {
+    "add": [
+      "pkg/hno/workflow/p6g10_migration_test.go（package workflow，内部等价测试；夹具自定义不依赖既有测试文件的符号）"
+    ],
+    "modify": [
+      "pkg/hno/workflow/executor.go（内核换编译+图执行；executeSteps 签名不变）",
+      "pkg/hno/workflow/graph_compiler.go（新文件：编译器+信封+台账+归属链）",
+      "pkg/hno/workflow/workflow.go（至多注释行同步，逻辑零改动）"
+    ],
+    "retires": [],
+    "sourceSeam": "pkg/hno/workflow/** 内部迁移。pkg/hno/graph 的改动数 = 0（D8 的解落在编译器信封协议，不需要动引擎——契约显式钉死这一点，摸底材料 §2 OPT-β 前置(i) 的「或给 graph 加 Branch/Router 公共面」分支不采纳）。既有 13 个 workflow 测试文件不在 modify 名单=字节恒等判据。"
+  },
+  "forbiddenObservations": [
+    "goroutine 数、scheduler 内部字段、queue/pending 形状（零锁模型内部态不观察）",
+    "并行分支的完成时序（台账只断言消费侧串行序带来的确定性结果）",
+    "Result.Completed() 的内容（字典序是引擎既有行为，workflow 侧不依赖不断言）",
+    "图内合成节点名的具体拼法（只断言「不外泄」与「图内唯一」，不断言格式）",
+    "墙钟与 metrics 数值（既有 metrics 测试已钉，本片不重复断言）"
+  ],
+  "baselineBytes": {
+    "note": "迁移前现取（2026-09-28）；13 个测试文件锚与摸底材料 §1.6 一致，本片把它们升格为逐字节门禁。",
+    "referenceAtPreMigration": {
+      "pkg/hno/workflow/execution_context_bench_test.go": "b4ce15098d1d321c498845e156e015b92d93f029",
+      "pkg/hno/workflow/execution_context_test.go": "0aa74b4816427f8dc252b3c1689d05bbfc8f03f3",
+      "pkg/hno/workflow/generic_step_test.go": "387885735f6b4b8772f7f1eec30394b76d9ecbb6",
+      "pkg/hno/workflow/history_injection_test.go": "e5edbf227111ba81f9aff210ab07953406ebc0ec",
+      "pkg/hno/workflow/memory_storage_test.go": "4522343b5f822710e629733d4ff45bb7052dd2c3",
+      "pkg/hno/workflow/metrics_test.go": "c126b0e230ee83672b9d3faac0a3da55aa3183d7",
+      "pkg/hno/workflow/run_test.go": "02b847a341b6f76b62bd501541f29074a1991ba1",
+      "pkg/hno/workflow/session_state_test.go": "d79645aab3ff7b231c03a951d685d0595c43205d",
+      "pkg/hno/workflow/session_test.go": "813ba8c592c045d950a9739148d03668bf41d2e7",
+      "pkg/hno/workflow/step_history_test.go": "2c308979684854c76464f5df61e85dbf27e42569",
+      "pkg/hno/workflow/workflow_history_e2e_test.go": "92699523ad3f856ad417171342bf3b7be6a2a0cc",
+      "pkg/hno/workflow/workflow_history_test.go": "ef6951bb70a19e1569ab63ca965dbb90b58c547e",
+      "pkg/hno/workflow/workflow_test.go": "4a822eb55a3827e0b42810eb1e9bed778156a0ea"
+    },
+    "sourceAnchorsTouched": {
+      "pkg/hno/workflow/executor.go": "e720fb7555000776a568b1c3471f531955219689",
+      "pkg/hno/workflow/workflow.go": "8622280b7485681eb4c4d7b01a95dc4b37b9b5f5",
+      "pkg/hno/graph/*": "不触碰；迁移后用 git status 复核 graph 目录零改动"
+    },
+    "counters": {
+      "workflowExportedSymbolsPre": 146,
+      "workflowExportedSymbolsPost": 146,
+      "graphExportedSymbols": 61,
+      "graphByteChanges": 0,
+      "workflowNonTestLOCPre": 3263
+    }
+  },
+  "carriedItems": [
+    {
+      "id": "S19-STD-1",
+      "ref": "docs/design/v3-adjudication-r19-q2-send-join.md:89 + v3-adjudication-p6-g10-scope.md §5",
+      "carriedIntoDesign": "β 硬阻塞的裁决落点：引用语义保主干（[P2]/[P2b] 同构），唯一并发扇出在分支头克隆（parallel.go 原样搬家）；join 聚合 map 在 merge 侧只读。D8 钉死，m2 杀红。"
+    },
+    {
+      "id": "摸底前置(i)(ii)(iii)",
+      "ref": "v3-adjudication-p6-g10-scope.md §5 落裁登记",
+      "carriedIntoDesign": "(i) 引用语义+分支克隆；(ii) 互补谓词（graph 零补面）；(iii) 未命中错误节点复刻 router.go:63。三条全部落在 workflow 侧适配器，D4/D5/D8 为各自的钉子。"
+    },
+    {
+      "id": "[P4] 错误文案",
+      "ref": "v3-adjudication-p6-g10-scope.md §1.5",
+      "carriedIntoDesign": "[UNKNOWN] step <最后成功步> failed 前缀与「最后成功步」语义逐字节复刻（D3），不夹带修正。"
+    },
+    {
+      "id": "[P5] 同名步 ID",
+      "ref": "v3-adjudication-p6-g10-scope.md §1.5",
+      "carriedIntoDesign": "图内合成唯一名，原 ID 出现在一切对外可读处（D11）。"
+    },
+    {
+      "id": "[P6] Completed 字典序",
+      "ref": "v3-adjudication-p6-g10-scope.md §1.4",
+      "carriedIntoDesign": "lastStepID/事件/取消快照的账本一律走消费侧 trace 台账（执行序），D9 钉死。"
+    }
+  ],
+  "explicitNonGoals": [
+    "pkg/hno/graph 的任何字节改动（含导出面；D8 的解不需要）",
+    "会话/历史/持久化/取消/metrics/事件聚合的搬迁（裁决原文留在 workflow）",
+    "修正「报最后成功步」的既有错误语义（要改单独立 BC，不夹带）",
+    "run 事件流/StreamMode 生产者接线（P4 第 3 片领地）",
+    "agent 泛型化（母约 §2.2，G10 稳定后单独做）",
+    "pkg/hno/agent、pkg/hno/store、internal/session 的任何触碰（兄弟片在途领地）"
+  ],
+  "completionCriteria": [
+    "1. redProtocol 两段各自留 receipt：第一段特征化测试在旧内核全绿 + 结构红登记；第二段换内核后既有 13 文件字节不变全绿 + TestP6G10_* 同绿；两段之间既有测试文件零改动。",
+    "2. 变异矩阵每行牙齿由 scripts/mutation/p6g10-migration.mjs 证明（m1–m10 杀红 + 等价变异登记），字节恢复自检 exit 干净。",
+    "3. 门禁全 exit 0：go build ./cmd/...（示例）、go test ./pkg/hno/workflow/... -count=1 与 -race、go test ./pkg/hno/agent/... ./internal/session/contract/... -count=1、go vet ./pkg/hno/workflow/...、gofmt -l 空。禁止 ./... 与 pkg/hno/store（兄弟片在途）。",
+    "4. 结构判据：workflow 导出面恰 146；非测试源 run.Loop 实例化=0；pkg/hno/graph 字节零改动（git status 复核）。",
+    "5. 防碰巧绿：绑定 TestP6G10_ -count=10 -race 与 workflow 整包 -count=3 -race 各一次 exit 0。",
+    "6. 写回：母约 §2.1 G10 行与 §10 P6 行标注 OPT-β 第 1 片交付（控制流全换落地、零改动实测）。"
+  ],
+  "forbiddenShortcuts": [
+    "复合节点留旧递归执行（β 裁决=控制流全换；只换线性是 α，不许回落）",
+    "Router 未命中静默兜底（必须复刻报错）",
+    "把「报最后成功步」顺手修成「报失败步」（语义变更需单独 BC）",
+    "为绕开 [P6] 改 pkg/hno/graph 的 successors/spawn（契约钉死 graph 零改动）",
+    "改既有测试文件任何一个字节（零改动担保的主判据族）",
+    "合成节点名泄漏进错误文案/键/WorkflowRun 对外可读处"
+  ],
+  "observabilityLimit": [
+    "步内 panic 的错误文案含图内合成节点名（旧内核下 panic 直接崩进程、无文案可对比——改善项无旧值可钉）",
+    "并行多分支同时失败时报哪支（旧=先完成先报，图=消费侧先收先报——同为「先完成先报」，多失败并发时不可复现）",
+    "挂起分支 + 另一失败分支的旧 wg.Wait 永久阻塞形状不再复现（图内核先失败先返回——改善项）",
+    "编译期守卫对「非可比对 Node 实现的自引用环」依赖深度上限（10000）兜底，超过报错"
+  ],
+  "verificationCommands": [
+    "go test ./pkg/hno/workflow/... -run TestP6G10_ -count=1 -race -v   # 本片绑定场景命令",
+    "go test ./pkg/hno/workflow/... -count=1 ; go test -race ./pkg/hno/workflow/... -count=1   # 零改动主判据族",
+    "go test ./pkg/hno/agent/... ./internal/session/contract/... -count=1   # 邻近面（不含 store/./...，兄弟片在途）",
+    "go build ./cmd/examples/workflow_demo ./cmd/examples/workflow_history",
+    "go vet ./pkg/hno/workflow/... ; gofmt -l pkg/hno/workflow",
+    "git hash-object --no-filters pkg/hno/workflow/*_test.go   # 对账 13 锚",
+    "ls pkg/hno/workflow/*.go | grep -v _test | xargs grep -c 'run.Loop'   # 必须为 0",
+    "node scripts/mutation/p6g10-migration.mjs"
+  ],
+  "writeBackOwed": [
+    "母约 §2.1 G10 行：OPT-β 已交付标注（控制流全换 + graph 零补面 + 适配器规模实测）",
+    "母约 §10 P6 行：交付列标注第 1 片落地与零改动实测；三条开工前置的解决方式登记",
+    "状态文档 §4 由编排方收口"
+  ],
+  "adjudicationOptions": [],
+  "notes": "本契约由实现子代理在摸底材料落裁基础上起草并随实现片同轮交付（契约+实现一体，派发说明明示）。M3 的别名隔离解是本契约对 β 硬阻塞的正式回答：引擎扇出语义不动，编译器用不可变信封+分支头克隆把 [P6] 的竞态形状变得不可表达——这比改 successors/spawn（动引擎语义、波及全部既有 graph 测试）窄一个数量级。activationId 待派发回填。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-adjudication-p6-g10-scope.md",
+    "receipt:e779b656-6964-49cf-af1e-c10e346b4848",
+    "receipt:780238dd-9a93-42f3-a2ce-ff67608c1fdc",
+    "receipt:7e8029a8-5ad6-4ce7-8de3-c4f3fb5c10a8",
+    "receipt:25204637-5023-49c2-abeb-3c365a2e4604",
+    "receipt:312de106-ff8e-4006-8918-8b0720d2d824"
+  ]
+}

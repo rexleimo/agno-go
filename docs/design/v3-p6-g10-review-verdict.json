@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p6-g10-opt-beta-migration",
+  "activationId": "pending",
+  "capabilityId": "software.review.standards-spec",
+  "stageId": "review",
+  "recordedAt": "2026-09-28T12:00:00Z",
+  "independenceDisclosure": "实现由派发子代理执行（用户并行指示），子代理在并行扇出收尾阶段被系统取消；主代理接手补分支头克隆 1 行（D8 硬阻塞的解）并完成全部收尾。审查由主代理承担，独立性缺口如实登记；结论落在实测上（RED/GREEN 回执、13 条变异、既有测试逐字节零改动、三项前置的落地形态）。",
+  "fixedPoint": {
+    "note": "fixed point = 契约 baselineBytes（切片 28 收口后的 workflow 字节）。切片 2–33 的提交状态：仓库已于 4u 获提交授权并入库至 c8142b2，本片及同轮切片 29/32 的字节尚未提交（待编排方本轮收口提交）。",
+    "workflowFiles": "graph_compiler.go ff847d51…（新）/ executor.go ad7b5a96…（切编译路径）/ 13 个既有测试文件逐字节不变",
+    "graphUntouched": "pkg/hno/graph 字节零改动（契约 explicitNonGoals 第 1 条兑现；D8 的解在 workflow 侧分支头）"
+  },
+  "diffRef": {
+    "how": "逐文件清单（green 文档 §2）",
+    "changedFiles": [
+      { "path": "pkg/hno/workflow/graph_compiler.go", "before": null, "afterRefactor": "ff847d51dea4d78342ec4d9b634a4ab352d4454e", "scope": "编译器：Step/Condition/Router/Loop/Parallel → 图声明（694 行）" },
+      { "path": "pkg/hno/workflow/executor.go", "before": "ad7b5a9614f3edafcfc4de2745cabd8e24136d31（基线口径）", "afterRefactor": "ad7b5a9614f3edafcfc4de2745cabd8e24136d31", "scope": "执行路径切编译图（会话/历史/持久化/取消/metrics 留 workflow，OPT-β 裁决）" },
+      { "path": "pkg/hno/workflow/p6g10_migration_test.go", "before": null, "afterRefactor": "（894 行）", "scope": "D1–D14 等价测试" },
+      { "path": "scripts/mutation/p6g10-migration.mjs", "before": null, "scope": "13 条变异执行体（9 行为杀红 + 2 BUILD_FAILED 登记 + 2 等价）" }
+    ],
+    "unchangedFiles": "13 个既有测试文件逐字节不变且全绿（D12 零改动担保）；pkg/hno/graph 零改动；公共导出面 146 不变",
+    "nonTestLoc": "workflow 非测试 LOC 增加 ~694（编译器），母约 β 外推 1,800–2,900 区间的低端",
+    "exportedSymbols": "workflow 导出面 146 不变（零新增公共符号）"
+  },
+  "standardsAxis": {
+    "gates": [
+      { "gate": "绑定命令 -count=1 -race -v", "result": "14/14 PASS（receipt:79b20f4e-178a-477e-810d-bb809d2cc35d）" },
+      { "gate": "整包 -count=1 -race（既有测试零改动全绿）", "result": "ok（receipt:2b0c0e60-1a03-4ccb-a94f-b933cdd8a692）" },
+      { "gate": "邻近面 agent/session-contract", "result": "ok（receipt:afce9ba5-da62-4fb5-b55c-49dd21d1f66a）" },
+      { "gate": "防碰巧绿 TestP6G10_ -count=10 -race", "result": "ok（receipt:49b8185e-…，子代理轮）" },
+      { "gate": "build/vet/gofmt", "result": "干净" }
+    ],
+    "forbiddenShortcutsAudit": "公共 API/导出面零改动（D12）；既有测试零改动且成对判红反向验证（变异 B 侧）；D8 的解未动引擎（克隆在 workflow 侧）；Router 未命中显式复刻不静默兜底（D5/m6）；错误聚合「报最后成功步」旧语义逐字保留不修正（D3）。"
+  },
+  "specAxis": {
+    "coverageMapping": "D1–D14 = 14 个 TestP6G10_* 一一对应；变异 m2–m7/m9–m11 覆盖主干牙齿；m1/m8 BUILD_FAILED 登记不计（脚本自纠口径同 p3g5）；e1/e2 等价登记。",
+    "redAuthenticity": "子代理 RED receipt:b5f7aad2…（编译路径未接管时 exit 1）+ 接手中间态两向红（ParallelParity/ConcurrentWriteNoRace，D7/D8 的真实红）→ 克隆 1 行 → 全绿。D8 的红-绿-变异（m7 复现）闭环完整。"
+  },
+  "findings": [
+    { "id": "S33-SPEC-1", "severity": "observation-limit", "title": "并行分支完成次序", "detail": "汇聚输入按分支下标（results[i]）重组而非完成序——多波/完成序差异不在公共面（D1/D7 钉的是下标语义）。" },
+    { "id": "S33-SPEC-2", "severity": "carried", "title": "OPT-β 范围外的 workflow 面原样保留", "detail": "会话/历史/持久化/取消/metrics/事件留在 workflow 侧（裁决原文），其与图事件桥接（S23-SPEC-1 第 3 片）的深度整合是后续可选片。" },
+    { "id": "S33-STD-1", "severity": "process", "title": "子代理取消（第二次）与 salvage", "detail": "同切片 28：契约+副本先行使 salvage 成本为 1 行克隆。取消事件与接手记录见 red 文档 §1。" }
+  ],
+  "completionAudit": {
+    "contractCriteria": "6 条 completionCriteria 逐条对账见 refactor 文档 §3，全部满足；写回完成：母约 §10 P6 行标注全清 + 三项前置的落地形态、G10 行 :88 补交付注记、四份证据文档。",
+    "programClosure": "至此 P0–P8 十行交付面全部关闭：G1–G10 无未实现项（G8 最小核按 OPT-a1、G10 按 OPT-β、G4 六模式生产者=StreamTasks 已接+族门禁、G9 四级 span 全清）。程序级欠项：golangci-lint 从未运行、contract-fixtures skip-green、切片 29/32/33 未提交（待编排方本轮收口提交）。"
+  },
+  "verdict": "pass",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-test-scope-p6-g10-migration.json",
+    "artifact:docs/design/v3-adjudication-p6-g10-scope.md",
+    "artifact:docs/design/v3-red-observation-p6g10.md",
+    "artifact:docs/design/v3-p6-g10-green.md",
+    "artifact:docs/design/v3-p6-g10-refactor.md",
+    "artifact:docs/design/v3-platform.md#10",
+    "receipt:79b20f4e-178a-477e-810d-bb809d2cc35d",
+    "receipt:2b0c0e60-1a03-4ccb-a94f-b933cdd8a692",
+    "receipt:afce9ba5-da62-4fb5-b55c-49dd21d1f66a",
+    "receipt:49b8185e-586a-4aea-a3ee-db07ab88823b",
+    "receipt:b5f7aad2-c0b5-4220-8f27-3d1f169b1362"
+  ]
+}
