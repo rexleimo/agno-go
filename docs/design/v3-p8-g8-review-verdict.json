@@ -1,0 +1,101 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p8-store",
+  "activationId": "pending",
+  "capabilityId": "software.review.standards-spec",
+  "stageId": "review",
+  "recordedAt": "2026-09-28T16:30:00Z",
+  "independenceDisclosure": "实现由派发子代理执行（用户 2026-09-28 明确允许并行子代理，G9/G10 兄弟片同会话并行在途）。本片证据文档与两轴审查由同一子代理承担——实现者与审查者未分离，独立性缺口如实登记；全部结论尽量落在可复现实测上（三段 RED/GREEN 回执、16 条变异矩阵、12 锚两次快照、契约逐条对账），编排方可在收口时以相同命令复核。",
+  "fixedPoint": {
+    "note": "本切片的 fixed point 是契约 baselineBytes（12 个边界锚）+ 开工快照，不是某个 commit。开工时实测契约锚表 11/12 同值：pkg/hno/agent/agent.go 的契约值 9813b86a… 恰为 c8142b2^ 的值，而任务书面声明的基线 HEAD 即 c8142b2（编排方 StreamTasks 提交改写了该文件）——按契约判据 3 登记为开工前已发生的再基线，非本片改动，编排方收口时裁定是否按 rebaselineCommand 更新契约锚表。本片对 12 锚零写入：开工/收尾两次 git hash-object 快照逐字节全同。",
+    "anchorsAtClose": "12/12 逐字节全同（对 /tmp/p8g8-baseline/anchors-start.txt 两次 diff 通过；agent.go 以开工值 54b5dad5… 为本片不变量）",
+    "storeFilesAtClose": "item.go 825603fb… / namespace.go ffa26fe9… / memory.go e8af66e3… / postgres/postgres.go b5db81f5…（两轮变异矩阵基线一致，finalCheck identical=true）"
+  },
+  "diffRef": {
+    "how": "逐文件清单（Store 今日全仓零消费方，无三点 diff 可言；存量包零改动为判据本体）",
+    "changedFiles": [
+      { "path": "pkg/hno/store/item.go", "before": null, "afterRefactor": "825603fb04ab174cf8ca4084ed3d08253effae8b（37 行）", "scope": "Item 五字段 + SearchHit + Store 七方法（草图五方法逐字 + SearchScored/PutMany）+ 编译期断言" },
+      { "path": "pkg/hno/store/errors.go", "before": null, "afterRefactor": "（14 行）", "scope": "7 个错误哨兵（未命中/参数三类/检索三类）" },
+      { "path": "pkg/hno/store/namespace.go", "before": null, "afterRefactor": "ffa26fe9ca4b8b5a5850a4ca99eca1bf9125cc50（82 行）", "scope": "ADJ-2=A 段规则 + Composite 无碰撞规范编码 + ValidateNamespace/ValidateKey" },
+      { "path": "pkg/hno/store/memory.go", "before": null, "afterRefactor": "e8af66e31f8a8bf90e2a6bed220bd23a58d9fe67（235 行）", "scope": "MemoryStore 七方法：写入期嵌入、upsert 时间戳、List 全量确定序、SearchScored 线性打分、PutMany 整批原子" },
+      { "path": "pkg/hno/store/postgres/postgres.go", "before": null, "afterRefactor": "b5db81f5a2366d66385c0de0a853f362842da45a（358 行）", "scope": "database/sql 注入式持久后端：标识符白名单、ON CONFLICT upsert、驱动错误翻译、单查询线性打分、PutMany 单事务、Close" },
+      { "path": "pkg/hno/store/store_test.go", "before": null, "afterRefactor": "973613c94e1ea83c9f1124592135932f6de31fc9（619 行，package store_test）", "scope": "D1–D13 外部包测试（含 D11 AST 导出白名单、D7 调用数判据、D12 等价对）" },
+      { "path": "pkg/hno/store/internal_shapes_test.go", "before": null, "afterRefactor": "b6730d881cfe2c763c5ad7e1f8d4bd1cdbd79785（64 行，package store 夹具）", "scope": "stepClock 步进时钟 + D5 时间戳确定性测试（禁 sleep/禁墙钟）" },
+      { "path": "pkg/hno/store/postgres/postgres_test.go", "before": null, "afterRefactor": "795c0f7fb83ec429e8235d29e252410666b7de75（308 行，go-sqlmock）", "scope": "七方法 mock 面 + 未命中翻译双路 + 后端故障不伪装 + 标识符注入拒绝 + 单查询硬断言 + PutMany 不触库原子" },
+      { "path": "scripts/migrations/003_agentos_store.sql", "before": null, "afterRefactor": "4d29992f3271df9755eb04eb4556d160d0e834c6", "scope": "DDL：agno_store_items 复合主键 + embedding BYTEA 物理列（helm files/ 镜像 e9a98b71… 同体）" },
+      { "path": "scripts/mutation/p8g8-store.mjs", "before": null, "afterRefactor": "a5b93700a5c118b348a30d3c970d8d7f625b9c3f", "scope": "变异执行体：14 杀（含 2 条 grep 结构牙）+ 2 等价 + 常驻结构检查；⑪ 不做 agent 文件变异的披露见 refactor §2" },
+      { "path": "docs/design/v3-platform.md", "before": "c8142b2 字节", "afterRefactor": "仅 §8/§10 写回（交付块 + 分工表实测改写 + Item 注释文案修正 + P8 行标交付）", "scope": "按派发权限只写 §8/§10；§12 D2 行落地指针与 §2.1 G8 LOC 实测回填留给主代理" }
+    ],
+    "unchangedFiles": "存量包零改动（boundaryModifiedFiles == 0）；12 个边界锚逐字节全同（D10）；既有全部测试文件零改动；裁决材料与状态文档未触碰",
+    "nonTestLoc": "新包非测试 724（契约窗口 626–726 内：item 37 + errors 14 + namespace 82 + memory 235 + postgres 358）；含测试 1,715（超出契约估计 1,080–1,330，偏差登记于 refactor §3 判据 6）",
+    "exportedSymbols": "store 唯一导出标识符 18（AST 白名单测试逐字断言；go doc -all 行计数 17 ≤ 20）/ postgres 唯一导出标识符 6（≤8）",
+    "coverage": "store 91.1% / postgres 85.0%（判据 ≥75%），绑定命令 skip 数 0",
+    "syncCount": "MemoryStore 自有 RWMutex（夹具允许项）；无其他锁语义"
+  },
+  "standardsAxis": {
+    "gates": [
+      { "gate": "go build ./...", "result": "exit 0（收尾复测；兄弟片在途改动不在本片责任面）" },
+      { "gate": "绑定命令 -run TestP8G8_ -count=1 -race -v", "result": "22 测试全 PASS，0 skip，exit 0（receipt:42224917-0ec1-49ea-a827-745dbfd2cd4b）" },
+      { "gate": "go vet 新包 / gofmt -l 新包目录", "result": "干净" },
+      { "gate": "邻近包 knowledge/vectordb/memory/embeddings/session-db -count=1", "result": "全 ok，exit 0（receipt:1c7b2fb5-f13c-4726-8cba-eb18b5547a4a）" },
+      { "gate": "go test ./pkg/agentos/... -count=1（透明构建 agent 包，不跑其测试）", "result": "ok，exit 0（receipt:a94c3726-fd25-4e82-9ccc-6660111bd913）" },
+      { "gate": "防碰巧绿：绑定 -count=30 -race", "result": "ok（receipt:40613f40-307c-4e71-96a0-060d14ff78d5）" },
+      { "gate": "12 边界锚 git hash-object 对账（开工/收尾两次）", "result": "12/12 逐字节全同；存量包零接线 grep 全程 0" }
+    ],
+    "forbiddenShortcutsAudit": "逐条核对契约 forbiddenShortcuts：未命中不返回 (nil,nil)（m4/m12 证）；不自建嵌入抽象（e1 等价 + D11 AST 白名单 + grep 常驻）；不架 vectordb.VectorDB/chromadb/redisdb（D11 grep 0）；不动 agent.Memory 面（12 锚）；不复用 session.Storage/BatchWriter（D8 grep 0）；驱动错误不伪装 ErrNotFound（PG_BackendErrorNotMasked + m3 证）；无真服务依赖、无 t.Skip（0 skip）；无 sleep 定序、无墙钟断言（stepClock 夹具）；为测试导出内部态为零（导出白名单逐字）；v1 零 pgvector/扩展/算子（D9 grep 0 + m13 牙）；未借片改 knowledge/vectordb/memory/session/agentos 任何一行（12 锚）。"
+  },
+  "specAxis": {
+    "coverageMapping": "契约 D1–D13 逐行有 Test、逐行有实现落点（green 文档 §4）、逐行有牙齿（refactor §2：m1–m14 全杀红；e1/e2 等价登记）。母约 P8 两半验收落位：「长期记忆」= D4/D5/D6/D7 端到端（Put→Search 往返、upsert 时间戳、调用数与行数解耦）；「与 knowledge/vectordb 分工清晰」= D11 导出白名单 + import/grep 判据（knowledge 摄取面、vectordb 底座、KnowledgeService 检索服务面零渗透）。ADJ-1…ADJ-6 六项裁定（A,A,A,A,B,B）全部落在形状里：pkg/hno/store 落位、精确匹配段规则、List 全量不截断、[]byte 任意字节 + 非 UTF-8 检索剔除、SearchScored 同序同集合、PutMany 一次 Embed 整批原子。",
+    "redAuthenticity": "两段制 RED 真实落盘：第一段编译红（新包落地前，契约允许类）receipt:b9d5fc23…；第二段行为红（postgres 骨架七方法 not implemented，内存侧已绿）receipt:08cefc16…——避免了「postgres 测试包无法编译」淹没行为红。GREEN 后变异矩阵对每颗牙二次判红（14 杀形态各异），红-绿-红闭环完整。"
+  },
+  "findings": [
+    {
+      "id": "S29-SPEC-1",
+      "severity": "carried",
+      "title": "pgvector 立项判据已量化登记",
+      "detail": "持久侧 v1 检索 = 一次 SELECT + 应用层线性打分（sqlmock 硬断言查询次数）；契约 D9 的 10^4 行触发条件（1536 维 median 24.7ms / ≈61MB 向量入进程）沿袭探针量级，真库数字待 v3.1 立项片重取。DDL 双份已落但未在真 Postgres 上跑过（sqlmock 担保行为与查询形状，不担保真 schema 语义——契约 observabilityLimit 同款上限）。"
+    },
+    {
+      "id": "S29-SPEC-2",
+      "severity": "carried",
+      "title": "测试面 LOC 超出契约估计（偏差）",
+      "detail": "含测试总数 1,715 vs 契约估计 1,080–1,330；非测试 724 在命令化窗口内。成因：ADJ-5/6 回填新增 D12/D13、postgres sqlmock 缝 308 行、14 颗变异牙的可观察面。未删测试凑数（每行都锚一颗契约牙）；契约的测试 LOC 估计本身基于 ADJ 回填前的探针预演，建议编排方收口时把估计口径并入 D12/D13 事实。"
+    },
+    {
+      "id": "S29-STD-1",
+      "severity": "process",
+      "title": "agent.go 锚的开工前再基线",
+      "detail": "契约锚 9813b86a… = c8142b2^ 值；任务声明基线 HEAD 即 c8142b2（含编排方对 agent.go 的改写）。本片以开工快照 54b5dad5… 为不变量并两次复核全同。归因编排方交付提交、非本片改动；是否按契约 rebaselineCommand 更新契约锚表由编排方裁定。"
+    },
+    {
+      "id": "S29-STD-2",
+      "severity": "process",
+      "title": "⑪ 号牙不做文件变异 + agent 包测试不跑",
+      "detail": "按派发硬约束：兄弟片在途领地（pkg/hno/agent）不进写-恢复循环、不跑其测试。⑪（给 Agent 接线 Store）的牙齿由常驻结构检查承担（12 锚 hash + 零接线 grep，矩阵 structural before/after 两行）；agent 面健康由 pkg/agentos 透明构建 + 锚字节担保。首版矩阵 4 条未杀红的修正全部落在矩阵/夹具，产品字节两轮矩阵间逐位未动。"
+    }
+  ],
+  "completionAudit": {
+    "contractCriteria": "8 条 completionCriteria 逐条对账见 refactor 文档 §3（判据 6 的测试 LOC 估计超标与判据 4 的 agent 测试豁免均为显式披露，其余全满足）；写回完成：母约 §8 交付块（分工表按 M1 实测改写 + Item 文案修正 + §1.5 定形回填）与 §10 P8 行标交付；§12/§2.1 与状态文档按派发权限留给主代理收口。",
+    "p8Closure": "P8 第 1 片（G8 最小核）交付：母约 §8 草图逐字落地为可运行能力（Item 五字段 / Store 七方法 / 注入 vectordb.EmbeddingFunction / 内存 + Postgres 双后端 / 检索 v1 取出+线性打分），P8 验收两半均有可测判据与牙齿。剩余前沿：vectordb 适配层（OPT-a2，v3.1）、pgvector（D9 触发条件另立契约）、分页/前缀检索（ADJ-2/3 留 v3.1 variadic）。"
+  },
+  "verdict": "pass",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-test-scope-p8-g8-store.json",
+    "artifact:docs/design/v3-red-observation-p8g8.md",
+    "artifact:docs/design/v3-p8-g8-green.md",
+    "artifact:docs/design/v3-p8-g8-refactor.md",
+    "artifact:docs/design/v3-adjudication-d2-store.md",
+    "artifact:docs/design/v3-platform.md#8",
+    "artifact:docs/design/v3-platform.md#10",
+    "receipt:b9d5fc23-db0b-4f9b-ba7b-7306dc1b7826",
+    "receipt:08cefc16-a91b-4339-a1ee-39f651891a81",
+    "receipt:f0ba21c1-c720-4654-83ac-38812794b208",
+    "receipt:42224917-0ec1-49ea-a827-745dbfd2cd4b",
+    "receipt:40613f40-307c-4e71-96a0-060d14ff78d5",
+    "receipt:1c7b2fb5-f13c-4726-8cba-eb18b5547a4a",
+    "receipt:a94c3726-fd25-4e82-9ccc-6660111bd913",
+    "receipt:f6fd0c96-e93c-4dc2-b20d-8fd4fa56f279",
+    "receipt:f3c96444-15d4-4dbb-84c1-f2e81b819529"
+  ]
+}
