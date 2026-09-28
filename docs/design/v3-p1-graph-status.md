@@ -266,6 +266,56 @@ B12/B13（§1 的结构命令输出，切片 19 后重测仍为 0 / 838）。
     这两条在 α 下不成为缺陷；一旦走 β，`S19-STD-1` 就从「未裁的引擎内部取舍」变成「用户可见的数据竞争」。
     因此 `S19-STD-1` 的裁决时机应提前到 G10 范围裁定同一轮，不排到它后面。
 
+4aa. **G10 范围已裁 OPT-β，写回母约与摸底材料（负责人 2026-09-28）**：选 **OPT-β「控制流全换」**，
+    **逆着摸底材料 §3 的「推荐 OPT-α」**。已写回三处：母约 §2.1 G10 行（成本 `~1,200` → 实测外推
+    `≈1,800–2,900`，合计行 `~9,500` → `~10,100–11,200`）、母约 §10 P6 行（交付列换成 β 口径，并把三项开工前置
+    写进验收列）、`v3-adjudication-p6-g10-scope.md` 新增 §5「落裁登记」。**α 的推荐依据仍然有效，所以它的三条前置
+    在 β 下从风险提示升格为阻塞项**：`S19-STD-1`（`ExecutionContext` 引用/值语义，只有负责人能裁，
+    且 `[P6]` 的 DATA RACE 已实测 `receipt:7e8029a8-5ad6-4ce7-8de3-c4f3fb5c10a8` exit 1）、
+    互斥分支原语落点（workflow 侧互补谓词 vs 给 graph 加 `Branch`/`Router` 导出面）、
+    Router 未命中语义（β 采 today 报错，须在适配器复刻 `router.go:63`，不许借道 `AddDefault` 静默兜底）。
+    **结论：P6 在 `S19-STD-1` 落裁前不建切片契约**——这条与 §4z 的读法一致，现在成为裁决的一部分而不是建议。
+
+4ab. **失败代理留下的两份契约已校验入库（`receipt` 抽查 + 逐锚复核）**：起草切片 30/31 的两个代理都撞到轮次上限
+    （状态为 failed），但两份 JSON 均已完整落盘。主代理逐条独立复核而非采信其自述：
+    - **切片 30（R17 负载加固，8 行 D1–D8）全项对上**：`p1r17_cancel_normalization_test.go` = `cbc8b692a84ed5ce23b461a8ed40b9ba3870d386`、
+      `scheduler.go` = `dfd6c1ba1c2a9c35bf4ccb613ee986dd80a7c736`、`go doc -all` 导出面 = 64，三个锚逐字命中；
+      它引用的 12 个断言行号（`:216/:219/:223/:226`、`:259/:262/:265/:268`、`:419/:436/:439/:443`）逐个落在原文上，
+      `p1r17RaceRounds = 100`（`:61`）与「5.8%／35 of 600」的叙述同源；它声称的加固缝 `DurabilitySync` +
+      `WithCheckpointer`（`durability.go:21/:60/:64`）**确是既有导出面**，故 D7 的「零新增导出」不是空话；
+      11 个红轮的原始文件在 `/tmp/r17exp/` 可数（`grep -l FAIL` 恰 11 份）；17 个引用回执全部存在。
+    - **切片 31（G4 StreamTasks 生产者，10 行 D1–D10）事实全对、指针有假**：图目录逐文件哈希的 md5
+      = `ae3c22445eb8167f500ad832513046ca`（契约自己纠过的现值）复采逐字相同；三个新事件构造函数
+      `NewNodeStartedEvent/NewNodeCompletedEvent/NewTaskErrorEvent` 在 `pkg/hno/run` 之外**确为零调用方**；
+      `allowedTestSeam` 承诺的唯一一行改动锚点 `runstreammode_test.go:182` 确为 `run.StreamTasks,`。
+      但它引用了 **3 个磁盘上不存在的回执 ID**（`5a6a371f…`／`26609c5f…`／`95a9161e…`）。
+      同时段（08:00 段）回执有 63 份之多，故不是被清理，而是**凭印象转写**——讽刺的是该契约 `notes`
+      自己写着「所有 ID 现取现贴……写完抽查 `.rex-harness/receipts/` 对应 JSON 存在」。
+      处置：`5a6a371f` 的 4 处（含 notes 的 exit≠0 归类短形式）改指同一条
+      `-v -run TestP4G4_RunStreamModeUnsupportedModesFailClosed` 的真实回执 `0eede7da-…`（exit 1），
+      并补登其 exit 0 复跑 `eb7079a2-…`（两者命令逐字相同，差在候选副本是否已落那一行删除，
+      这对读数正是 seam「只有一行」的最小性证明）；另两个无可追溯声明，换成校验时现取的
+      `daa972c7-9c65-48c6-81d2-4a869832001a`（图字节锚）与 `9826367c-f909-4682-957f-e24a8db089f8`
+      （run/agent/runner 计数基线 77/21/23）。修后复扫：36 个唯一 ID **全部命中**，键数仍 30。
+
+4ac. **切片 30/31 的负载/接线加固片与 G10 之外的一项程序级欠账已登记**：见 §5 新增的 **`S30-EVD-1`**
+    （证据指针对账，含 `node scripts/evidence-audit.mjs` 这条命令与 16 个真正无法核验的引用分布）。
+    它与 `S19-STD-6`（变异脚本未接进 `make`）是同一类欠账：**纪律有散文、没有可跑的检查**。
+    本轮未把它接进 `make`——因为现存 16 条 NOWHERE 引用会让门禁直接 exit 1，先登记、后由负责人定「历史引用是否豁免」。
+
+4ad. **交付票的 P6 条目随 β 改写并回到阻塞态**：`work-p6-workflow-migration` 的 outcome/completionCriteria
+    原文写的是 **α 口径**（「现有线性 Steps 工作流内部编译为链式图」「Step 内 Parallel/Loop/Condition/Router 容器节点行为等价」），
+    裁决换成 β 之后这段文字会变成实现片的错误靶子，故一并改写：outcome 改为「四类控制流全部进图、六个横切面留在 workflow」，
+    判据补三条硬约束（`S19-STD-1` 落裁结果 + `-race` 无竞态、互斥分支原语按落裁实现并带反向判据、Router 未命中复刻 `router.go:63` 报错），
+    并把摸底 §4 的 7 项未测清单写成「必须逐条执行并留现取回执」的判据。
+    frontier 相应从 ready 移回 **blocked**（原因写明先决项是 `S19-STD-1`，次决项是分支原语落点），
+    成员唯一性自证：12 个 workItem ＝ ready 10 + blocked 2，逐一对应。
+    校验：`node scripts/validate-delivery-ticket.mjs` → **VALID**（`receipt:41b5586d-c7b3-48ad-86c6-b04b70e9b894` exit 0）。
+    过程如实登记：第一版把成本注记写成 work item 上的 `notes` 字段，被 harness schema 拒为
+    `delivery work item contains unknown field: notes`（`WORK_ITEM_KEYS` 只有 id/title/outcome/completionCriteria/
+    verification/evidenceRefs/dependsOn，见 `~/.rexcil/harness-cli/rex-harness/src/domain/planning-artifact.mjs:16`），
+    已把该注记改写成判据、成本数字移到阻塞原因，validator 复跑转绿。
+
 ## 5. 本片仍带着的未裁决项（沿用，不借本审计变成已决）
 
 
@@ -320,6 +370,26 @@ B12/B13（§1 的结构命令输出，切片 19 后重测仍为 0 / 838）。
   七片本地提交 `0da4013`…`17f6845`，未 push）**、
   `R17-GAP-1/2/3`、`R18-GAP-1`、`S17-SPEC-3`/`R17-UNADJ-1`、`S17-STD-5`+`S18-STD-6`
   （`struct.sh`、前两片的 `mutants.mjs`、本审计的 `/tmp/p1-audit` 仍在 /tmp，未入库）。
+
+- **`S30-EVD-1`（新登记，程序级证据完整性，2026-09-28 全仓扫描实测）**：把 `docs/design/v3-*.json` 里所有
+  `receipt:` 前缀的 UUID 与 `.rex-harness/` 对账。**这条对账已落成仓库命令 `node scripts/evidence-audit.mjs`**
+  （存在 NOWHERE 引用即 exit 1）。登记口径为 `docs/design/v3-*.json`（唯一 ID 去重后 711 个被引用，127 个不指向
+  `receipts/<uuid>.json`）；脚本默认把 `*.md` 一并扫描，故其行数为 149，**两种口径下 NOWHERE 同为 16**。
+  **分层读数**：
+  - **94 个**在 harness 的别处存在（`activations/*.json` 内的 `activationId`／`evidence/*.ndjson` 的证据 id），
+    即**跑过、记过，只是前缀写错了命名空间**——缺陷在引用格式，不在证据本身；
+  - **17 个**是 `activations/<uuid>.json` 的真实文件名，同样属前缀误用；
+  - **16 个**在整个 `.rex-harness/` 里**任何角色都找不到**，才是真正无法核验的断言。
+    分布集中于早期片：`v3-p1-graph-review-verdict.json` 6 个，`slice7-*` 3 个，`slice8-*` 1 个，
+    `slice13/14-review-verdict` 与 `slice13/6-testability-decision` 各 1 个，`slice6-test-scope` 1 个。
+    切片 30 干净（17/17 命中），切片 31 原有 3 个已在入库前换成真实回执（见 §4ab）。
+  - **结构性成因（比个别假 id 更要紧）**：`.gitignore:62` 把 `.rex-harness/` 整目录排除入库，
+    故 650 份回执**只存在于这台机器**，提交与克隆都不携带证据。任何「收口已实测」的表述对换机/换人都不可复核。
+    这不是要立刻改 `.gitignore` 的授权——把它作为待裁项登记：**是否把收口所需的回执摘要（命令 + exit + stdout sha256）
+    随票面写进仓库文本**，使证据至少随提交迁移一次。
+  - **纪律修正（对本轮之后的所有派发有效）**：引用 harness 对象时必须写对前缀（`receipt:` / `activation:` / `evidence:`），
+    并在停笔前跑一次自动对账而不是自述「已抽查」；切片 31 的 `notes` 自写了这条纪律仍有 3 个脑补 id，
+    说明「靠散文提醒」不解决问题，对账必须是**一条命令**（已落成 `scripts/evidence-audit.mjs`，本轮实测 exit 1）。
 
 ## 6. 过程如实登记（写作本文件时的自纠）
 

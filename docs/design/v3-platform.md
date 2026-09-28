@@ -85,8 +85,8 @@ v2 设计文档 §4 的两条否决被推翻：
 | G7 | 会话事件化 + HITL interrupt/resume | adk | ~1,500 |
 | G8 | `Store` 长期记忆（层级 namespace + 向量）**——D2 已裁 OPT-a1：收窄为最小核， vectordb 适配层不进 v3.0** | LangGraph | ~1,200 |
 | G9 | 观测接线（现有零件接进 G1）**——第 1 片已交付（切片 25：runner 模型路径 retry/breaker + model 级 span）** | 自有 | ~600 |
-| G10 | workflow 迁移到图，公共 API 不变 | — | ~1,200 |
-| | **合计** | | **~9,500** |
+| G10 | workflow 迁移到图，公共 API 不变——**范围已裁 OPT-β「控制流全换」（负责人 2026-09-28，逆着摸底材料的 α 推荐）**：线性 + 条件 + 并行 + loop 走图内核，会话/历史/持久化/取消/metrics/事件留在 workflow 侧 | — | ~1,200 → **≈1,800–2,900**（β 实测外推，见 `v3-adjudication-p6-g10-scope.md` §2 OPT-β；母约原估被推翻） |
+| | **合计** | | **~10,100–11,200**（原 ~9,500：G10 随 β 上调，其余十行未变） |
 
 ### 2.2 不做（v3.0 明确排除）
 
@@ -588,7 +588,7 @@ func (g *Graph) Resume(ctx context.Context, responses map[string]any) (*Result, 
 | **P3** | G5 Send + G6 Durability/StepLimit | P1 | 动态扇出 + 安全阀 | **全清**：**G5 Send 已交付（切片 26：动态扇出 Send + AddJoinSend，R19-Q2 裁决 OPT-C 落地，map-reduce 端到端 D1–D9 + 6 杀红变异）**；**G6 Durability 已交付（切片 24）**；StepLimit 已随切片 13 交付 |
 | **P4** | G4 StreamMode | P0 | 七模式 + 旧类型兼容 **协议层已交付（切片 23）**；六模式生产者接线待各自成片 | 旧 `run_content`/`run_completed` 行为不变 |
 | **P5** | G7 事件化 + HITL | ~~P0 + 决策 D1~~ **全清（切片 27 引擎核心 + 28 侧车/跨进程恢复）** | 事件存储 + Resume **全部交付（27：引擎核心；28：`pkg/hno/session/sidecar` + `internal/hitlbridge` + `graph/restore.go`，D1–D10 + 10 杀红变异）** | 审批场景跨进程恢复**实测达成（双档端到端）**；重复 Resume 幂等**实测达成（跨重启）**；**契约测试绿（8 边界锚逐字节）** |
-| **P6** | G10 workflow 迁移 | P1–P4 | 线性 []Step 编译为链式图 | **现有用户零改动**；`make test` 绿 |
+| **P6** | G10 workflow 迁移 | P1–P4 | **范围已裁 OPT-β（负责人 2026-09-28）**：线性 + 条件 + 并行 + loop 编译进图，会话/历史/持久化/取消留 workflow（原「线性 []Step 编译为链式图」是 α 口径，已被裁决替换） | **现有用户零改动**；`make test` 绿。**开工前置未清，β 不得建切片契约**：(i) `S19-STD-1` 必须先裁——`ExecutionContext` 入图取**引用语义**还是**值语义**（引用 ⇒ 任何扇出/汇聚都要在 workflow 侧克隆，等于把 `parallel.go` 再写一遍；值 ⇒ `Data`/`Metadata`/`SessionState` 的拷贝规则本身变成 today 没有的新公共语义）；(ii) 互斥分支原语二选一——workflow 侧写互补谓词（一漏即两分支同跑）还是给 `pkg/hno/graph` 加 `Branch`/`Router` 公共面（动导出数字，硬门禁，且图目录是兄弟片在途领地）；(iii) Router 未命中语义不等价（today 报错 `router.go:63` vs 图侧走兜底 `scheduler.go:411-418`），β 取「保留报错」，须在适配器里显式复刻 |
 | **P7** | G9 观测接线 | P0 | retry/breaker 接进 runner **模型阶段已交付（切片 25，D1–D13 + 9 杀红变异矩阵）**；run/agent 级 span 待第 2 片（S25-DEFER-1） | span 覆盖状态表：**model=已接于 runner**（每尝试 chat span + usage 归集）；**tool=已在 agent 既有**（execute_tool）；**run/agent=待 P7 第 2 片**（pkg/hno/agent） |
 | **P8** | G8 Store | ~~决策 D2~~ **已裁决（OPT-a1，2026-09-28）** | 长期记忆最小核：接口 + namespace + 内存与单一 Postgres 后端（契约 `v3-test-scope-p8-g8-store.json` 切片 29 已起草，D1–D11） | 与 knowledge/vectordb 分工清晰（契约以导出白名单验收）；ADJ-1…ADJ-6 待落裁后开工 |
 

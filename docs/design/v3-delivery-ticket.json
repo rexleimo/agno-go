@@ -213,12 +213,16 @@
     {
       "id": "work-p6-workflow-migration",
       "title": "P6 workflow 迁移到图引擎，公共 API 不变",
-      "outcome": "现有线性 Steps 工作流内部编译为链式图驱动，Node.Execute(ctx, *ExecutionContext) 签名与全部对外行为保持不变。",
+      "outcome": "按已裁的 OPT-β「控制流全换」迁移：线性 Steps 与 Condition/Loop/Router/Parallel 四类控制流全部编译进 pkg/hno/graph 图内核，由图引擎调度；会话/历史/持久化/取消/metrics/事件六个横切面留在 workflow 侧且取得时刻不改。Node.Execute(ctx, *ExecutionContext) 签名与全部对外行为（含错误串形状、同名 step ID 对外仍用原 ID）保持不变。",
       "completionCriteria": [
-        "workflow/executor.go 不再自行驱动 run.Loop，改由图引擎调度",
+        "workflow/executor.go 不再自行驱动 run.Loop；线性链与四类控制流容器均由图引擎调度（OPT-β，负责人 2026-09-28 裁定，逆着摸底材料的 α 推荐）",
         "Node 接口签名 Execute(ctx, *ExecutionContext) (*ExecutionContext, error) 保持不变",
-        "现有 workflow 全部测试在未修改测试文件的前提下通过",
-        "线性 Steps 语义正确映射为无条件边链，Step 内 Parallel/Loop/Condition/Router 容器节点行为等价"
+        "现有 workflow 全部测试在未修改测试文件的前提下通过（基线实测 131 PASS / 0 FAIL，receipt:312de106-ff8e-4006-8918-8b0720d2d824）",
+        "ExecutionContext 入图的语义按 S19-STD-1 落裁结果实现，且并发扇出/汇聚形状下 go test -race 与探针 -race 均无 DATA RACE（摸底已实测旧形状竞态，receipt:7e8029a8-5ad6-4ce7-8de3-c4f3fb5c10a8 exit 1）",
+        "互斥分支按落裁的原语实现：走 workflow 侧互补谓词时必须有「两分支同跑」的反向判据；走 graph 新增 Branch/Router 公共面时导出面计数锚必须同步改写并单独登记",
+        "Router 未命中保持 today 的报错语义（复刻 router.go:63 的错误形状），不得借道图侧 AddDefault 的静默兜底（scheduler.go:411-418）",
+        "错误聚合逐字节复刻 [UNKNOWN] step <ID> failed: <inner> 且 <ID> 为最后一个成功步；按步事件来源用执行序账本，不得读 Result.Completed()（字典序）",
+        "实现片逐条执行摸底材料 docs/design/v3-adjudication-p6-g10-scope.md §4 的 7 项「未测清单」并留现取回执，不得以「摸底已给 file:line」替代执行证据（第 1 项「换内核后 workflow 测试面逐字节不改」至今是判据不是实测）"
       ],
       "verification": [
         "go build ./...",
@@ -324,7 +328,6 @@
       "work-p3-send-durability",
       "work-p4-streammode",
       "work-p5-event-hitl",
-      "work-p6-workflow-migration",
       "work-p7-observability",
       "work-p8-store"
     ],
@@ -334,6 +337,17 @@
         "reason": "依赖 work-p6/work-p7/work-p8 全部完成，v3.0.0 为收敛发布。",
         "evidenceRefs": [
           "artifact:docs/design/v3-platform.md#11"
+        ]
+      },
+      {
+        "workItemId": "work-p6-workflow-migration",
+        "reason": "OPT-β 的开工前置未清，先决项是 S19-STD-1（ExecutionContext 入图取引用语义还是值语义，负责人裁决项）：β 把控制流全换 → 必然引入扇出/汇聚并发，而未裁的 S19-STD-1 会从「引擎内部取舍」变成用户可见的数据竞争（摸底探针 -race 实测 DATA RACE）。次决项是互斥分支原语落点（workflow 侧互补谓词 vs 给 graph 加 Branch/Router 导出面）。两项落裁前 P6 不建切片契约。 成本按 β 实测外推 ≈1,800–2,900 行，母约 §2.1 的 ~1,200 已被推翻并改写。",
+        "evidenceRefs": [
+          "artifact:docs/design/v3-adjudication-p6-g10-scope.md#5",
+          "artifact:docs/design/v3-platform.md#10",
+          "artifact:docs/design/v3-adjudication-r19-q2-send-join.md",
+          "receipt:7e8029a8-5ad6-4ce7-8de3-c4f3fb5c10a8",
+          "receipt:312de106-ff8e-4006-8918-8b0720d2d824"
         ]
       }
     ]
