@@ -99,6 +99,7 @@ func TestP1R14_NonStringPanicValuesAlsoBecomeErrors(t *testing.T) {
 			if tc.inGraphBody {
 				body = func(_ context.Context, in any) (any, error) {
 					var writes map[string]string
+					//nolint:staticcheck // SA5000: 对 nil map 赋值正是用例要制造的被 panic 屏障转化的崩溃源
 					writes["boom"] = "boom"
 					return in, nil
 				}

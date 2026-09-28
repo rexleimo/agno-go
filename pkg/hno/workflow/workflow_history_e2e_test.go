@@ -608,7 +608,7 @@ func BenchmarkWorkflowHistory_Load(b *testing.B) {
 	// 预先运行 100 次以积累历史
 	// Pre-run 100 times to accumulate history
 	for i := 0; i < 100; i++ {
-		workflow.Run(ctx, fmt.Sprintf("warmup-%d", i), sessionID)
+		_, _ = workflow.Run(ctx, fmt.Sprintf("warmup-%d", i), sessionID)
 	}
 
 	b.ResetTimer()

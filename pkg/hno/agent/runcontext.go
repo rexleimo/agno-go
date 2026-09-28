@@ -101,7 +101,7 @@ func buildRunContextMetadata(rc *run.RunContext) map[string]interface{} {
 	if rc.TeamID != "" {
 		contextMeta["team_id"] = rc.TeamID
 	}
-	if rc.Metadata != nil && len(rc.Metadata) > 0 {
+	if len(rc.Metadata) > 0 {
 		contextMeta["metadata"] = rc.Metadata
 	}
 	return contextMeta

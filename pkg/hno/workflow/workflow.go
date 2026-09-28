@@ -235,8 +235,8 @@ func (w *Workflow) Run(ctx context.Context, input string, sessionID string, opts
 				workflowRun.ApplyCancellation(reason.Error(), lastStepID, snapshot)
 				persistCtx, persistCancel := context.WithTimeout(context.Background(), 5*time.Second)
 				metrics.Stop()
-				w.saveRun(persistCtx, sessionID, workflowRun, metrics)
-				w.saveCancellation(persistCtx, sessionID, &CancellationRecord{
+				_ = w.saveRun(persistCtx, sessionID, workflowRun, metrics)
+				_ = w.saveCancellation(persistCtx, sessionID, &CancellationRecord{
 					RunID:      workflowRun.RunID,
 					Reason:     reason.Error(),
 					StepID:     lastStepID,
@@ -247,7 +247,7 @@ func (w *Workflow) Run(ctx context.Context, input string, sessionID string, opts
 			} else {
 				workflowRun.MarkFailed(res.err)
 				metrics.Stop()
-				w.saveRun(ctx, sessionID, workflowRun, metrics)
+				_ = w.saveRun(ctx, sessionID, workflowRun, metrics)
 			}
 		}
 		return nil, res.err
@@ -261,7 +261,7 @@ func (w *Workflow) Run(ctx context.Context, input string, sessionID string, opts
 			workflowRun.AddEvents(stepEvents)
 		}
 		metrics.Stop()
-		w.saveRun(ctx, sessionID, workflowRun, metrics)
+		_ = w.saveRun(ctx, sessionID, workflowRun, metrics)
 	}
 
 	metrics.Stop()
@@ -378,12 +378,6 @@ func generateSessionID() string {
 	return "session-" + uuid.New().String()
 }
 
-// generateRunID 生成唯一的 run ID
-// generateRunID generates a unique run ID
-func generateRunID() string {
-	return "run-" + uuid.New().String()
-}
-
 // runContextMetadata extracts a serialisable view of the run context identifiers
 // suitable for storing in workflow metadata or logs.
 func runContextMetadata(rc *run.RunContext) map[string]interface{} {
@@ -409,7 +403,7 @@ func runContextMetadata(rc *run.RunContext) map[string]interface{} {
 	if rc.TeamID != "" {
 		meta["team_id"] = rc.TeamID
 	}
-	if rc.Metadata != nil && len(rc.Metadata) > 0 {
+	if len(rc.Metadata) > 0 {
 		meta["metadata"] = rc.Metadata
 	}
 	if len(meta) == 0 {

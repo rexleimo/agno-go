@@ -99,8 +99,8 @@ func TestStep_HistoryOverride_Disable(t *testing.T) {
 
 	// 运行两次
 	// Run twice
-	wf.Run(ctx, "first run", sessionID)
-	wf.Run(ctx, "second run", sessionID)
+	_, _ = wf.Run(ctx, "first run", sessionID)
+	_, _ = wf.Run(ctx, "second run", sessionID)
 
 	// Step 应该没有使用历史(因为被覆盖为 false)
 	// Step should not use history (overridden to false)
@@ -136,8 +136,8 @@ func TestStep_HistoryOverride_Enable(t *testing.T) {
 	ctx := context.Background()
 	sessionID := "test-session-enable"
 
-	wf.Run(ctx, "first run", sessionID)
-	wf.Run(ctx, "second run", sessionID)
+	_, _ = wf.Run(ctx, "first run", sessionID)
+	_, _ = wf.Run(ctx, "second run", sessionID)
 
 	if step.addHistoryToStep == nil || *step.addHistoryToStep != true {
 		t.Error("Step should have history enabled")
@@ -171,7 +171,7 @@ func TestStep_CustomHistoryCount(t *testing.T) {
 	sessionID := "test-session-count"
 
 	for i := 0; i < 10; i++ {
-		wf.Run(ctx, "run", sessionID)
+		_, _ = wf.Run(ctx, "run", sessionID)
 	}
 
 	if step.numHistoryRuns == nil || *step.numHistoryRuns != 5 {
@@ -234,8 +234,8 @@ func TestStep_HistoryInjectionFormat(t *testing.T) {
 
 	// 运行两次
 	// Run twice
-	wf.Run(ctx, "first input", sessionID)
-	wf.Run(ctx, "second input", sessionID)
+	_, _ = wf.Run(ctx, "first input", sessionID)
+	_, _ = wf.Run(ctx, "second input", sessionID)
 
 	// 第二次运行应该在系统消息中包含历史上下文（S008 新行为）
 	// Second run should include history context in system message (S008 new behavior)
@@ -298,8 +298,8 @@ func TestStep_NoHistoryWhenDisabled(t *testing.T) {
 	ctx := context.Background()
 	sessionID := "test-session-disabled"
 
-	wf.Run(ctx, "first input", sessionID)
-	wf.Run(ctx, "second input", sessionID)
+	_, _ = wf.Run(ctx, "first input", sessionID)
+	_, _ = wf.Run(ctx, "second input", sessionID)
 
 	// 不应该包含历史上下文
 	// Should not contain history context
@@ -444,7 +444,7 @@ func BenchmarkStep_WithHistory(b *testing.B) {
 	// 预热: 创建一些历史
 	// Warm-up: Create some history
 	for i := 0; i < 5; i++ {
-		wf.Run(ctx, "warmup", "bench-session")
+		_, _ = wf.Run(ctx, "warmup", "bench-session")
 	}
 
 	b.ResetTimer()

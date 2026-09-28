@@ -292,7 +292,7 @@ func TestP7G9_SpanPerAttemptWithError(t *testing.T) {
 		if len(s.Events) > 0 {
 			errSpans++
 		}
-		if s.Attributes != nil && len(s.Attributes) > 2 {
+		if len(s.Attributes) > 2 {
 			usageSpans++
 		}
 	}

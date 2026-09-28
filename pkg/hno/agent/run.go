@@ -181,7 +181,6 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 	sequence := len(output.Events)
 	if finalResponse.Content != "" {
 		output.appendEvent(run.NewRunContentEvent(runID, a.ID, string(types.RoleAssistant), finalResponse.Content, sequence))
-		sequence++
 	}
 	output.appendEvent(run.NewRunCompletedEvent(runID, a.ID, "", string(output.Status), finalResponse.Content))
 

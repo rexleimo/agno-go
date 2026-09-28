@@ -439,7 +439,7 @@ func TestMemoryStorage_GetWorkflowStats(t *testing.T) {
 	run1 := NewWorkflowRun("run-1", "session-1", "workflow-1", "input-1")
 	run1.MarkCompleted("output-1")
 	session1.AddRun(run1)
-	storage.UpdateSession(ctx, session1)
+	_ = storage.UpdateSession(ctx, session1)
 
 	// Add runs to workflow-2
 	run2 := NewWorkflowRun("run-2", "session-2", "workflow-2", "input-2")
@@ -449,7 +449,7 @@ func TestMemoryStorage_GetWorkflowStats(t *testing.T) {
 	run3 := NewWorkflowRun("run-3", "session-2", "workflow-2", "input-3")
 	run3.MarkCompleted("output-3")
 	session2.AddRun(run3)
-	storage.UpdateSession(ctx, session2)
+	_ = storage.UpdateSession(ctx, session2)
 
 	// Get stats for workflow-1
 	stats1, err := storage.GetWorkflowStats(ctx, "workflow-1")
@@ -524,7 +524,7 @@ func TestMemoryStorage_ContextCancellation(t *testing.T) {
 
 	// Create a session with normal context
 	normalCtx := context.Background()
-	storage.CreateSession(normalCtx, "session-1", "workflow-1", "user-1")
+	_, _ = storage.CreateSession(normalCtx, "session-1", "workflow-1", "user-1")
 
 	// Try operations with cancelled context
 	_, err = storage.GetSession(ctx, "session-1")
@@ -542,7 +542,7 @@ func BenchmarkMemoryStorage_CreateSession(b *testing.B) {
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		storage.CreateSession(ctx, "session-"+string(rune('0'+i)), "workflow-1", "user-1")
+		_, _ = storage.CreateSession(ctx, "session-"+string(rune('0'+i)), "workflow-1", "user-1")
 	}
 }
 
@@ -552,12 +552,12 @@ func BenchmarkMemoryStorage_GetSession(b *testing.B) {
 	ctx := context.Background()
 
 	// Create test session
-	storage.CreateSession(ctx, "session-1", "workflow-1", "user-1")
+	_, _ = storage.CreateSession(ctx, "session-1", "workflow-1", "user-1")
 
 	b.ResetTimer()
 	b.ReportAllocs()
 
 	for i := 0; i < b.N; i++ {
-		storage.GetSession(ctx, "session-1")
+		_, _ = storage.GetSession(ctx, "session-1")
 	}
 }
