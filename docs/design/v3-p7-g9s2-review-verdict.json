@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p7-observability",
+  "activationId": "pending",
+  "capabilityId": "software.review.standards-spec",
+  "stageId": "review",
+  "recordedAt": "2026-09-28T13:30:00Z",
+  "independenceDisclosure": "实现由派发子代理执行（用户 2026-09-28 的并行工作指令明确允许），子代理按契约预演候选字节直接落盘并完成两段制 RED→GREEN 与全部收尾（门禁/变异/证据/写回）；审查轴由主代理承担。两层同属一个会话，独立性缺口如实登记。所有结论落在实测上（两段制回执、10 项变异、8 锚 + 8 out-of-seam 逐字节对账、契约逐条对账），无一条数值来自记忆。",
+  "fixedPoint": {
+    "note": "本切片的 fixed point 是契约 baselineBytes（8 锚 + 8 out-of-seam + changedBefore 三份的开工真值），不是某个 commit（切片 2–32 未提交，S18-SPEC-2 沿用）。三份 seam 文件的 before/after 哈希均经 git hash-object --no-filters 对账。",
+    "anchorsAtClose": "8/8 逐字节全同（契约 anchors 表，含切片 31 发射缝 2f16a32b… 及其两份测试）",
+    "outOfSeamAtClose": "8/8 逐字节全同（契约 outOfSeamNoChangeExpected 表）",
+    "changedFiles": "kernel.go f68fa510…→1114030e… / run.go b445f570…→d0d975b9… / stream.go 4abb334b…→51943b69…（after 值与契约登记的候选对照值逐字节同）"
+  },
+  "diffRef": {
+    "how": "逐文件清单（非三点 git diff，理由同前序切片 fixedPoint.note）",
+    "changedFiles": [
+      { "path": "pkg/hno/agent/kernel.go", "before": "f68fa51023ec8b1237247ba2a67b77240f27b4a4", "afterRefactor": "1114030e5993cdc0011c67c6eaade56e2af659fb", "scope": "唯一新增符号位点：私有 runKernel（StartAgentSpan / defer End / r.Run(spanCtx) 三行体）+ observability import；94→117 行" },
+      { "path": "pkg/hno/agent/run.go", "before": "b445f570b705961aadbe166c7b3fe600c8b65ea6", "afterRefactor": "d0d975b9aa671cbec46e30a0213ef79ce8aeb2cd", "scope": ":132 一行改经 a.runKernel（行中性 191）" },
+      { "path": "pkg/hno/agent/stream.go", "before": "4abb334bb9cecd11b98b4db28f7a378e8fccbfb5", "afterRefactor": "51943b690dcd8d26cd9414c2265de001eda6f672", "scope": ":134 一行改经 a.runKernel（行中性 284，位于既有 goroutine 内）" },
+      { "path": "pkg/hno/agent/p7g9s2_agent_span_test.go", "before": null, "afterRefactor": "358403deb276f7bba618e7822b7552ae5176f3f6（563 行，契约登记唯一新增 .go 文件）", "scope": "D1–D8 黑盒测试（8 函数/4 子场景）；两段制间零改动" },
+      { "path": "scripts/mutation/p7g9s2-agent-span.mjs", "before": null, "scope": "变异执行体：8 杀红 + m-explicit-end 等价 + m-status 缺口登记" }
+    ],
+    "unchangedFiles": "15 份既有测试文件零改动；8 锚 + 8 out-of-seam 逐字节全同；pkg/hno/observability 与 pkg/hno/runner 零字节改动",
+    "nonTestLoc": "agent 包 1727 → 1750（≤1757 申报上限；+23 全在 kernel.go，未删双语注释）",
+    "exportedSymbols": "go doc 导出条目 21 → 21（新增公共导出符号 0，runKernel 为包内私有）",
+    "syncCount": "kernel.go 七类 sync 原语 0、go func 0；包内 sync 原语总数 3 不变；stream.go go func 站点改前后同为 2（零新增 goroutine）"
+  },
+  "standardsAxis": {
+    "gates": [
+      { "gate": "绑定命令 -count=1 -race -v", "result": "8/8 PASS，exit 0（receipt:5363712d-86d3-4446-864c-a8f7e412dde7）；裸退码 receipt:ee5fe579-bfe0-4537-8669-1d6da5a3e497" },
+      { "gate": "go vet 三门包 / gofmt -l pkg/hno/agent", "result": "干净（receipt:d9fd3228-6b03-4d95-9f6f-0916278cda86 / 无输出）" },
+      { "gate": "邻居面 runner + observability -race", "result": "ok，exit 0（receipt:76e7ef20-4178-496e-9ee3-b275eb3e16f1）" },
+      { "gate": "防碰巧绿：绑定面 -race -count=30", "result": "ok（receipt:534b4656-ea26-4a64-ab65-1a8c6a5aec30）" },
+      { "gate": "既有测试全量 ±race", "result": "双绿（receipt:99c2989f… / receipt:af65f645…）" },
+      { "gate": "go build", "result": "三门包 exit 0（receipt:37e62120…）；契约的 `go build ./...` 按编排方兄弟片约束（store/workflow/graph 在途，不跑 `./...`）收窄，偏差已在 green 文档 §1 申报" },
+      { "gate": "8 锚 + 8 out-of-seam git hash-object 对账", "result": "16/16 逐字节全同" }
+    ],
+    "forbiddenShortcutsAudit": "逐条核对契约 forbiddenShortcuts 13 条：未在入口 defer（选项 A 被 D5/D7 钉死）、未在 newKernel 内开（选项 C 被 D1/D2 钉死）、spanCtx（非调用方 ctx）交给 r.Run（m-parent-lost 杀 D2 不杀 D1/D5/D6/D8，互补性实测成立）、零 guard（无条件发射，m-tracer-guard 证可杀）、name=a.Name、run_id=EnsureRunID 归一值、恰一条（m-double-open 杀）、绝对计数断言（无非空表述）、未给早退补 span（S32-EARLY-1 登记为出口）、缝内零锁零 goroutine（D9 计数）、observability/runner 零字节、D2 与 D5 未合并（m-parent-lost 只杀 D2 不杀 D5 的实测分工）。"
+  },
+  "specAxis": {
+    "coverageMapping": "契约 D1–D11 逐行有 Test（D9/D10/D11 为结构/隔离/门禁行，以读数与 receipt 为判据）、逐行有实现落点（green 文档 §4）、逐行有牙齿（refactor 文档 §2：8 杀红 + 等价/缺口各 1，行覆盖核对每行至少一杀）。母约 G9 的 run/agent 层级行至此闭合：invoke_agent 为 chat（切片 25）与 execute_tool（既有）之父，P7 四级全清（母约 §10 P7 行已写回）。",
+    "redAuthenticity": "两段制完整落盘：第一段（runKernel 无 span，vet 过、8 函数全红，receipt:7aaacbce…；唯一绿 D7/abandoned 登记 vacuous）→ 第二段（全绿，receipt:5363712d…），两段间测试文件零改动。逐行红因分类（行为红 D1–D5/D7-cancel、前提红 D6/D8、vacuous 绿 D7/abandoned）见 v3-red-observation-p7g9s2.md。"
+  },
+  "findings": [
+    {
+      "id": "S32-STD-1",
+      "severity": "carried",
+      "title": "IsRecording(ctx) 不可作「tracer 是否配置」守卫",
+      "detail": "该谓词量的是 ctx 上当前 span 是否记录：装了真 SDK 的裸 ctx 上为 false、span.End() 后也为 false。用它作发射 guard 得到恒零 span（m-tracer-guard 实测 11 行红可杀，但规则本身独立于测试）。程序级口径已登记进契约 S32-STD-1，正确探针是 Tracer().Start + span.IsRecording()（测试文件 p7g9s2TracerInstalled 即此形）。"
+    },
+    {
+      "id": "S32-STATUS-1",
+      "severity": "carried",
+      "title": "invoke_agent 无 status/exception（已证明的覆盖缺口）",
+      "detail": "m-status（失败驱动在父 span 上 RecordError）实测全绿逃杀：错误运行与成功运行在 trace 里同形。后续片若补须自带正反夹具与变异牙齿，并与切片 25 chat 层「失败尝试记 error 事件」的语义对齐。"
+    },
+    {
+      "id": "S32-EVT-1",
+      "severity": "carried",
+      "title": "事件发射路径的 event 级 span 不在本片",
+      "detail": "切片 31 的发射缝（stream_producers.go 2f16a32b…）及其两份测试逐字节锁死；后续若为事件发 span，其与本片缝的关系（同一 ctx 上的子还是兄弟）必须先设计，不得默认沿用 runKernel。"
+    },
+    {
+      "id": "S32-EARLY-1",
+      "severity": "carried",
+      "title": "早退路径无 run 级记录（被显式选择的可观察范围）",
+      "detail": "缓存命中、前后置 hook 拦截、未接入 fail-closed、驱动前取消都不发 invoke_agent（一条 span == 一次被驱动的运行）。要改成 span-per-call 须先裁 ADJ-S32-1；入口 defer 形状的代价已由契约 M3 三手红量化。"
+    },
+    {
+      "id": "S32-STD-2",
+      "severity": "process",
+      "title": "build 门 ./... 的编排方收窄",
+      "detail": "契约 verificationCommands 的 `go build ./...` 与编排方「兄弟片在途不跑 ./...」硬约束冲突，本次以三门包 build/vet 替代并双处申报（green 文档 §1、本轴 gates）。下个安静窗口可补一次全仓 build 复账。"
+    }
+  ],
+  "completionAudit": {
+    "contractCriteria": "8 条 completionCriteria 逐条对账见 refactor 文档 §3，全部满足（判据 4 的 build 面带 S32-STD-2 收窄申报）；写回完成：母约 §10 P7 行（run/agent=已接 + P7 四级全清 + S25-DEFER-1 实测改判指针）、§3 G9 行（第 1+2 片已交付、层级闭合、两项挂账）。S25-DEFER-1 在切片 25 契约侧的结清登记与 v3-p1-graph-status.md 条目属编排方（writeBackOwed 第 3/4 条），本片不代改。",
+    "p7Closure": "P7（G9 观测接线）span 四级至此全覆盖：model=runner 每尝试 chat span（切片 25）、tool=agent 既有 execute_tool、run/agent=kernel 驱动点 invoke_agent（本片）。剩余前沿（均带登记）：event 级 span（S32-EVT-1）、span status/exception（S32-STATUS-1）、G8（P8 按 OPT-a1 在途）。"
+  },
+  "verdict": "pass",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-test-scope-p7-g9-agent-span.json",
+    "artifact:docs/design/v3-red-observation-p7g9s2.md",
+    "artifact:docs/design/v3-p7-g9s2-green.md",
+    "artifact:docs/design/v3-p7-g9s2-refactor.md",
+    "artifact:docs/design/v3-platform.md#87",
+    "artifact:docs/design/v3-platform.md#595",
+    "artifact:pkg/hno/agent/kernel.go",
+    "artifact:pkg/hno/observability/tracing.go#L65",
+    "artifact:pkg/hno/runner/resilience.go#L40",
+    "artifact:scripts/mutation/p7g9s2-agent-span.mjs",
+    "receipt:3bea1e65-9394-4481-9559-f821887cf0e1",
+    "receipt:7aaacbce-0df2-4e1a-b11a-1014acca6c94",
+    "receipt:581ff388-669b-4267-ab07-6f7f2ebd0ddb",
+    "receipt:5363712d-86d3-4446-864c-a8f7e412dde7",
+    "receipt:ee5fe579-bfe0-4537-8669-1d6da5a3e497",
+    "receipt:534b4656-ea26-4a64-ab65-1a8c6a5aec30",
+    "receipt:76e7ef20-4178-496e-9ee3-b275eb3e16f1",
+    "receipt:99c2989f-d21f-4926-9bfe-c662fe56103c",
+    "receipt:af65f645-1cd8-4a19-bbe6-21a0079b56da",
+    "receipt:37e62120-51b3-475f-bdcf-6b037141b431",
+    "receipt:d9fd3228-6b03-4d95-9f6f-0916278cda86",
+    "receipt:ea0c8872-2699-4165-9207-a42678ff7af5",
+    "receipt:a162dbeb-dc8c-4085-896b-fc44d3ec9971"
+  ]
+}

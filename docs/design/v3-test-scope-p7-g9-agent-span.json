@@ -1,0 +1,442 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p7-observability",
+  "activationId": "pending",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-28T12:40:00Z",
+  "contractRef": "docs/design/v3-test-scope-p7-g9-agent-span.json",
+  "slice": 32,
+  "series": "P7 第 2 片（母约 G9：run/agent 级 span 接线；S25-DEFER-1 的承接片）",
+  "userGoal": "把母约 G9 验收行里唯一还没落地的一级——run/agent 级 invoke_agent——接进 pkg/hno/agent 今天确实存在的驱动路径：每次被真正驱动的运行发且只发一条 invoke_agent，带 agent.name 与 agent.run_id，并且成为同一次运行里 chat（切片 25 交付）与 execute_tool（切片 32 前身 P4 第 32 票交付）的**父**。零 tracer（不配置任何 provider）时输出字节与 span 记录不得被扰动，未接线模式仍整体 fail-closed 且一条 span 也不发。事件发射路径（切片 31 的 streamEmitter）不在本片。",
+  "whyThisSlice": "母约 §10 P7 行（docs/design/v3-platform.md:595）的 span 覆盖状态表今天写着「**run/agent=待 P7 第 2 片**（pkg/hno/agent）」，:87 的 G9 行也只勾到第 1 片；缺口由切片 25 的 S25-DEFER-1 正式移交，并指定落点 pkg/hno/agent。移交的不是设计而是**调用点**：observability.StartAgentSpan 早已存在且属性集合固定（tracing.go:65-71），但实测它在 pkg/hno/agent 的非测试调用点为 **0**（receipt:c4b6ddf3-18ff-4a85-978b-3676e6afb8ba exit=0 → 0），全仓 pkg/hno 非测试里 SpanAgentRun|invoke_agent 的 6 处命中全部是 tracing.go 的常量定义与注释（receipt:57de98bc-2574-4d59-9a5c-0b1002358476 exit=0 → 6）。也就是说层级在包文档里已被当作既有现实陈述，真实 trace 里却永远缺一根主干。落点为何在 agent 而不在 runner：runner 公共面无 agent 身份（切片 25 explicitNonGoals 第 1 条禁止在 runner 内伪造），而 agent 侧 a.Name（config.go:57-97 保证 Name 缺省回落 ID，恒非空）与 runCtx.RunID（runcontext.go:51 EnsureRunID，恒非空）今天就在驱动点旁边。基线时机也刚好：切片 31 已提交（HEAD c8142b2，工作区除 yarn.lock 外干净），RunStream/RunStreamMode 都是 runStreamMessages 的纯包装，**两条驱动路径各只有一个 r.Run 调用点**，所以一个缝位能覆盖全部入口——这是本片能只改 3 个文件、只动 2 行的原因。",
+  "measuredBeforeDesign": [
+    {
+      "id": "M1-今天的实际形状（仓库只读测量，工作树零接触）",
+      "scene": "仓库 /Users/rex/codes/agno-go 只读（HEAD c8142b2；git status --porcelain 仅 ` M yarn.lock`，按设计不动）。全部计数由 receipt 的同一命令明文复跑读取。",
+      "commands": [
+        "go test ./pkg/hno/agent -count=1",
+        "go test -race ./pkg/hno/agent -count=1",
+        "find pkg/hno/agent -name '*.go' -not -name '*_test.go' | xargs wc -l | tail -1",
+        "grep -rn observability.StartAgentSpan pkg/hno/agent --include=*.go | grep -v _test.go | wc -l | tr -d ' '",
+        "grep -rn 'SpanAgentRun\\|invoke_agent' pkg/hno --include=*.go | grep -v _test.go | wc -l | tr -d ' '",
+        "grep -rnE '^[[:space:]]*t.Parallel' pkg/hno/agent --include=*.go | wc -l | tr -d ' '",
+        "go doc -all ./pkg/hno/agent | grep -cE '^(func|type|var|const) '",
+        "for f in pkg/hno/agent/kernel.go pkg/hno/agent/run.go pkg/hno/agent/stream.go; do printf '%s %s\\n' $f $(git hash-object --no-filters $f); done",
+        "for f in pkg/hno/observability/tracing.go pkg/hno/observability/tracing_test.go pkg/hno/runner/resilience.go pkg/hno/runner/runner.go pkg/hno/agent/stream_producers.go pkg/hno/agent/stream_tasks_test.go pkg/hno/agent/runstreammode_test.go pkg/hno/agent/tool_executor.go; do printf '%s %s\\n' $f $(git hash-object --no-filters $f); done"
+      ],
+      "observations": [
+        "基线全绿：./pkg/hno/agent -count=1 exit 0（receipt:b9e2cf4d-09b9-4877-8487-21854f4139d2）、-race exit 0（receipt:a8852bf3-c532-4bdc-98b3-be411b0c43d2）。",
+        "LOC 基线是**硬约束**：pkg/hno/agent 非测试 LOC 恰 **1727**（receipt:b161aaad-eb0b-4662-bd50-b3302ad0fc46 exit=0 → 1727 total），即切片 31 契约 counters.expectedAgentNontestLocCeiling 的值——该片收口时把余量用光（其 notes 明写「初稿 1731 超上限 1727，以压缩三处双语注释冗余到位，该包 LOC 余量归零」）。本片起手余量 = 0，任何 +N 都必须显式申报新上限。逐文件基线：kernel.go 94、run.go 191、stream.go 284（同一 find/wc 族；**口径纠正**见 notes，起草早期把 run.go/stream.go 记成 310/251 是错的）。",
+        "主干缺席（本片的前提）：observability.StartAgentSpan 在 pkg/hno/agent 的非测试调用点 **0**（receipt:c4b6ddf3-18ff-4a85-978b-3676e6afb8ba exit=0）；pkg/hno 非测试里 invoke_agent/SpanAgentRun 命中 6 处且全在 tracing.go 内部（常量、注释、定义；receipt:57de98bc-2574-4d59-9a5c-0b1002358476 exit=0）。observability/tracing_test.go:45 是 SpanAgentRun 目前唯一的**测试**引用——零件死着。",
+        "隔离前提实测：pkg/hno/agent 全目录 t.Parallel 调用点 **0**（receipt:b27f24e7-175c-4150-8bd9-f7cd883be2ac exit=0；口径为行首空白后直接以 t.Parallel 起头，注释里的字样不计——见 notes 的 口径自纠）。这使「进程级全局 TracerProvider 的逐测试存取」在本包内是安全且足够的隔离手段。",
+        "导出面基线：go doc -all ./pkg/hno/agent 的导出条目 **21**（receipt:c3df240b-8682-4761-8e8d-f621cbc4225f，与切片 31 收口值一致）；源码层顶层导出 func/type 10（receipt:652296a9-9c51-421f-9197-abf64a0e3273）。包内非测试同步原语（Mutex/RWMutex/Once/WaitGroup/Pool/Map/Atomic 七类）实测 **3**（receipt:5cff9bf2-915c-405f-8140-53ef4e22d9b6），与切片 31 收口登记的 3 同值。",
+        "锚（本片必须逐字节不动）：8 条哈希由同一条自配对命令一次采齐（receipt:5b4496ba-497b-4b99-97d3-618f74ee3974 exit=0），值见 baselineBytes.anchors；其中 stream_producers.go（2f16a32b…）、stream_tasks_test.go（107e4b9c…）、runstreammode_test.go（7c359976…）是切片 31 刚收口的发射缝与其测试——本片把它们锁成**字节锚**（切片 31 对 stream_tasks_test.go 的锁是「改则须重取 8 份逐字拷贝」的复制式锁，本片升格为哈希式）。"
+      ]
+    },
+    {
+      "id": "M2-候选实现的两段预演与全部门禁（/tmp/g9s2 系列副本，仓库字节未动）",
+      "scene": "/tmp/g9s2（仓库 rsync 副本 + 第二段候选：kernel.go 新增私有 runKernel、run.go:132 与 stream.go:134 各改一行、新测试 pkg/hno/agent/p7g9s2_agent_span_test.go 563 行 package agent_test）；/tmp/g9s2seg1（第一段：runKernel 已存在但**故意不含 span**、原样把调用者 ctx 交给 r.Run，两个调用点已接）；/tmp/g9s2base（pristine + 只读探针与 benchmark 夹具）。四副本均与仓库逐字节同源于 HEAD c8142b2，除声明的 in-scope 3 文件与新测试文件外 12 份锚文件实测 SAME（receipt:34ee49aa-7e56-4b46-b1cc-32478e6fa46b 的 12 行 SAME + receipt:b670db41-fc23-4cf0-8469-6f02dfede41d 的 8 份 out-of-seam SAME）。",
+      "commands": [
+        "go -C /tmp/g9s2 test ./pkg/hno/agent -run 'TestP7G9S2_' -count=1 -race -v",
+        "go -C /tmp/g9s2 test ./pkg/hno/agent -run 'TestP7G9S2_' -count=1 -race",
+        "go -C /tmp/g9s2seg1 test ./pkg/hno/agent -run 'TestP7G9S2_' -count=1 -race",
+        "go -C /tmp/g9s2seg1 vet ./pkg/hno/agent",
+        "go -C /tmp/g9s2 test ./pkg/hno/agent -race -count=30",
+        "go -C /tmp/g9s2 test ./pkg/hno/runner ./pkg/hno/observability -race",
+        "go -C /tmp/g9s2 build ./...",
+        "go -C /tmp/g9s2 vet ./pkg/hno/agent ./pkg/hno/runner ./pkg/hno/observability",
+        "gofmt -l /tmp/g9s2/pkg/hno/agent",
+        "go -C /tmp/g9s2 doc -all ./pkg/hno/agent | grep -cE '^(func|type|var|const) '",
+        "find /tmp/g9s2/pkg/hno/agent -name '*.go' -not -name '*_test.go' | xargs wc -l | tail -1",
+        "go -C /tmp/g9s2base test ./pkg/hno/agent -run ^\\$ -bench 'BenchmarkP7G9S2NoopRun$' -benchtime=200x -count=2",
+        "go -C /tmp/g9s2 test ./pkg/hno/agent -run ^\\$ -bench 'BenchmarkP7G9S2NoopRun$' -benchtime=200x -count=2"
+      ],
+      "observations": [
+        "第二段（候选字节）全绿：绑定命令 -race -v 读到 **8 个 --- PASS**（8 个测试函数、内含 4 个 t.Run 子场景，共 11 个断言读数）且裸命令 exit 0（receipt:91990c5a-972c-45f1-ae5f-6039824ee986 exit=0 → 8；receipt:54530baa-3ade-49b5-a2e1-9fa201f2c4c9 exit=0 → ok pkg/hno/agent 1.361s）。修复 gofmt 之前的同一绿读数另见 receipt:28b2c0ab / a1875eba（同命令、字节差一行缩进，见 notes 的 gofmt 自纠）。",
+        "第一段（故意不实现语义）逐行红形，**编译通过**（go -C /tmp/g9s2seg1 vet ./pkg/hno/agent exit 0，receipt:933edca3-2460-40cc-a4a7-e786ec34d324）：绑定命令 exit 1（receipt:c2ae87fa-bdfe-412e-910e-daf038b826de，8 个测试函数名全在 FAIL 名单），`-v | grep -cE '^--- FAIL'` = 8（receipt:ec06a219-b355-42c0-a91a-f754b835dd9e）。逐行红因实读（receipt:f47e8555-3c8d-491a-8baa-b5be766c9ef3）：D1 :256「invoke_agent spans = 0, want exactly 1 (exported names [chat) ]」= **行为红**（chat 在、主干缺席，正是第 1 片 D11 的 span-present 形态）；D2 :284、D3 :326、D4 :368 同形行为红；D5 两子场景 :398/:419 行为红（无父可比）；D6 :444「positive control: invoke_agent spans = 0, want 1 before the fail-closed call」= **前提红**（正控失败，非目标断言失败，如实归类）；D7/cancel :495 行为红；**D7/abandoned_without_cancel_yields_no_ended_span 在第一段即绿**（receipt:f47e8555 里唯一的 --- PASS），其绿是 vacuous：该段本来就发不出任何 span，此场景断言 0，故无法证伪任何东西——第二段落缝之后它转为「驱动仍阻塞、span 仍未结束」的正确语义绿。整包 census（不带 -run 过滤）里 P7G9S2 之外的判红 **0** 条（receipt:3335e334-6871-4c02-8084-1a6900e3e54a exit=0 → 0）⇒ 第一段没打破任何既有测试。",
+        "行为读数（候选，逐场景实测，行号取自 receipt:49ed500a-fee3-40d7-b606-f30cb0497a22 的属性断言清单）：D1 = invoke_agent 恰 1、agent.name == 「labeled-agent」（:258）、agent.run_id == out.RunID（:261）、gen_ai.system == 「hno」（:264）、EndTime 非零；D2 = chat 恰 2 / execute_tool 恰 1 / 每条子 Parent==父 SpanID、TraceID 相同，且子的 gen_ai.tool.name == 「weather」（:298）、gen_ai.provider.name == 「p7g9s2」（:301）未被父属性覆写；D3 = Messages 模式跨协程同上 + agent.run_id == done.Output.RunID（:342）；D4 = Tasks 模式通道事件非空（夹具活性正控）+ execute_tool 恰 1 且认父；D5 = 父 EndTime 非零 + 子 Start 不早于父 Start + 子 End 不晚于父 End，两模式各测；D6 = 正控 1 条 → 未接线的 run.StreamValues 报错且 result==nil 后 invoke_agent 仍 1、chat 仍 1（:444 与后续两条）；D7 = 放弃且不取消 → 已结束 invoke_agent **0** 条（驱动仍阻塞在切片 31 的 emit 上）；取消 → 恰 1 条且 EndTime 非零且 chat 认父（:495/:500）；D8 = 同一脚本在「全局未装 provider」（前置探针 p7g9s2TracerInstalled()==false，否则 t.Fatal）与「装 SDK」两侧各跑一次，掩码后的 RunOutput JSON 逐字节相等，且 SDK 侧 invoke_agent 恰 1（:561 的正控）。",
+        "默认（零 tracer）代价实测（同一 benchmark 命令、-benchtime=200x -count=2，各取两轮）：基线 /tmp/g9s2base **326 allocs/op、43721–43722 B/op**（receipt:bf6b37ac-dceb-4f44-b0c9-cfeb602f8869）；候选 /tmp/g9s2 **332 allocs/op、44199–44231 B/op**（receipt:94afc17a-31a8-48d7-b271-5f020b9c8634）→ 固定开销 **+6 allocs、约 +478…510 B（≈1.1%）**；ns/op 本机噪声大（15.7k–24.9k 对 20.5k–29.5k），按未加权指标登记、不作判据。零 tracer 下 span.End() 在 defer 中被真实调用而全程无 panic（D8 两侧各一次运行即是其执行证据）。",
+        "结构代价与门禁：agent 非测试 LOC **1727 → 1750**（+23，全在 kernel.go 94 → 117；receipt:2d9cf884-69b3-4878-9afd-3258eec3e921），run.go 与 stream.go **行中性 191/284 不变**（两处各改一行调用）；go doc 导出条目 **21 → 21**（receipt:fb38b243-5f39-4b79-8ee8-bad2f0e6263c，新增的是一个包内私有方法）；kernel.go 内 StartAgentSpan 恰 **1**（receipt:8ee3cdce-1ad8-4f4a-9d0e-8157839c766e）、同步原语 **0**（receipt:0a1baf92-d885-487b-a764-772fab568c2c，grep -c 无命中时退码 1 属工具口径）、`go func` **0**（receipt:889d09d6-f2f6-4255-a5f9-ecfed1b47b99）；run.go/stream.go 里直调 `r.Run(` 归 **0**、`a.runKernel(` 各 **1**（receipt:36a68877-182f-4750-981b-3e4975e27d90 与 receipt:35ffda9a-61ed-41a8-b482-fc0b4e48d1ee）；stream.go 的 `go func` 站点数改前改后同为 **2**（:106 与 :221，receipt:4ee8d5fb-dc37-428a-858d-d1ef04f7be29）⇒ **本片零新增 goroutine**。门禁全清：-race -count=30 exit 0（receipt:ffd7aa7f-211e-4a4e-ad58-cc5dda8cbdae）、runner+observability -race exit 0（receipt:1015bac3-abfc-4b2a-9d0d-224540455ea1）、go build ./... exit 0（receipt:66cd4e7a-faf6-4da8-9b33-d4c3a40bb60c）、三包 vet exit 0（receipt:95fda75b-f741-4a4c-883d-787ac427803b）、gofmt -l 无输出 exit 0（receipt:9abd0bbf-e78a-49c9-82c9-898febf8114b）。",
+        "谓词口径的实测纠正（决定本片负向行怎么写）：observability.IsRecording(ctx) **不是**「tracer 是否配置」的判据。同一探针四条读数（receipt:d5b68f60-7846-43cd-8948-e0535d94f04e exit=0）：未装 provider 时对 context.Background() 为 false；**装了真 SDK provider 之后对 context.Background() 仍为 false**；对活 span 自身的 IsRecording() 为 true；span.End() 之后携带它的 ctx 上又变 false。它量的是「ctx 上那条 span 此刻是否记录」。故 D8 的前置守卫改用 `Tracer().Start(...)` + `span.IsRecording()` 探针（p7g9s2TracerInstalled，测试文件 :522-529 注释里已把这个坑写明），否则负向行会偶然成立。"
+      ]
+    },
+    {
+      "id": "M3-缝位三选一与变异矩阵（/tmp 变体副本 + 实测判分）",
+      "scene": "/tmp/g9s2a（选项 A：在 Run 与 runStreamMessages 两个入口各开一条 span、defer 结束、闭包捕获 ctx）；/tmp/g9s2c（选项 C：在 newKernel 内开 span，runID 只能硬塞空串）；判分脚本 /tmp/g9s2mutate.mjs（kernel.go 7 项）、/tmp/g9s2mutate2.mjs（调用点 2 项）、/tmp/g9s2mutate3.mjs（被禁捷径 1 项），形状照抄 scripts/mutation/p4s31-tasks-producer.mjs 的 census（施加→跑→还原，只碰 /tmp/g9s2mut*，绝不碰仓库工作树）。",
+      "commands": [
+        "go -C /tmp/g9s2a test ./pkg/hno/agent -run 'TestP7G9S2_' -count=1 -race",
+        "go -C /tmp/g9s2a test ./pkg/hno/agent -run 'TestP7G9S2_' -count=1 -race -v",
+        "go -C /tmp/g9s2c test ./pkg/hno/agent -run 'TestP7G9S2_' -count=1 -race",
+        "go -C /tmp/g9s2c test ./pkg/hno/agent -run 'TestP7G9S2_' -count=1 -race -v",
+        "node /tmp/g9s2mutate.mjs",
+        "node /tmp/g9s2mutate2.mjs",
+        "node /tmp/g9s2mutate3.mjs"
+      ],
+      "observations": [
+        "选项 A（每入口 defer，也是 S25-DEFER-1 原文建议的形状「在 Agent.Run 入口开、包住整条 kernel 调用」）**被实测否证**：绑定命令 exit 1（receipt:eaa196e9-558f-4653-ac6a-9e001fa98754），3 个测试函数判红（receipt:b36ec9be-2bec-4ffc-be0b-e6a7f3296e8c）——D3 :337/:340「chat[0]/chat[1]/execute_tool child ends at … after invoke_agent ends at …: the parent closed before its work」（实测子比父晚结束约 0.15–0.44 ms）、D5/stream :424 同因、**D7/abandoned :475「invoke_agent spans while the drive is blocked on an undrained channel = 1, want 0」**。第三手最难看：入口 defer 让父在协程仍阻塞时就结束，于是 trace 里留下一条**没有任何子、看起来干干净净**的 invoke_agent——即假报一次完整运行。注意 A 的**父链行不红**（已结束 span 的 SpanContext 仍可作父），这解释了为什么 D5/D7 不可省。",
+        "选项 C（newKernel 内开）**语义上不成立**：绑定命令 exit 1（receipt:95847b99-51d6-44be-88d3-f85ed84cca39），6 个测试函数判红（receipt:2729c2c2-55dc-4a5b-b11a-b3ee888a02c5）。D1 :261「agent.run_id = 「」, want the run's own 「run-075faf15-…」」——newKernel 签名里没有 runID（本片实测：只能硬塞空串）；D2 :295 / D3 :336 / D4 :373 / D7-cancel :500 一律「chat span has an invalid/zero Parent …（invoke_agent span id d2316435754c391f）」——span 在 newKernel 返回即结束，父根本进不了 r.Run 的那条 ctx。",
+        "选项 B（本片候选：一个私有 helper 包住共享内核驱动）是唯一同时满足三条实测约束的形状：包内位点恰 1、kernel.go 零同步原语零 goroutine、D1–D8 全绿。**偏离登记**：S25-DEFER-1 原文把落点写成「在 Agent.Run 入口开、包住整条 kernel 调用」，本片按实测改判为「在 kernel 驱动点之前开」，理由即上一条的三手红；该偏离在此显式记录，并同步进 writeBackOwed（不让状态表把 A 的形状当作已裁）。",
+        "变异矩阵 10 项实跑（kernel 7 项 receipt:d4013cfe-e804-4e0b-a0ca-0e75f7ef83c1；调用点 2 项 receipt:a982d864-3f52-4640-942b-d4618a56a722；被禁捷径 1 项 receipt:38643acc-ae1b-49cf-8f39-89d8e03c8c；计数单位为 census 的 FAIL 行数，D5/D7 各含 2 个子场景行）：**m-parent-lost**（把 spanCtx 换成 ctx 交给 r.Run）杀 5 行 = D2/D3/D4/D7(+其父行)，D1 与 D5 全绿——最小可编译形态必须写作 `_, span := …`，否则 Go 报 declared and not used（该口径差异如实登记，同切片 31 的 m-degrade 教训）；**m-no-end**（开了不 End）杀 11 行，唯一绿仍是 D7/abandoned；**m-identity-id**（agent.name 取 a.ID）杀 1 行 = D1；**m-runid-blank**（run_id 留空）杀 2 行 = D1、D3；**m-double-open**（每次驱动两条 span）杀 11 行；**m-stream-unwired**（stream.go 退回直调 r.Run）杀 7 行 = D3/D4/D5(stream)/D6/D7；**m-sync-unwired**（run.go 退回直调）杀 5 行 = D1/D2/D5(sync)/**D8**；**m-tracer-guard**（以 IsRecording(ctx) 为 guard 跳过发射）杀 11 行——被禁捷径**可被杀死**，且其危险不在逃杀而在恒假谓词导致的静默零 span（M2 最后一条实测）；**m-explicit-end**（defer End 改单返回点显式 End）**exit 0 全绿 12 行** ⇒ 登记为**等价变异**（确认式，不是断言式）；**m-status**（父 span 上 RecordError）**exit 0 全绿 12 行** ⇒ 登记为**本片真实覆盖缺口**（本契约对 span 的 status/exception 无任何判据，见 observabilityLimit 第 4 条与 ADJ-S32-2）。行覆盖核对：D1（m-identity-id）、D2（m-parent-lost）、D3（m-runid-blank）、D4（m-parent-lost）、D5（m-no-end/m-sync-unwired/m-stream-unwired）、D6（m-double-open/m-stream-unwired）、D7（m-runid-blank/m-parent-lost）、D8（m-sync-unwired/m-no-end）——**每行至少被一个变异杀死**，无未声明杀、无归属泄漏（census 逐行给出 PASS 名单可核）。",
+        "副本内 12 份锚 + 8 份 out-of-seam 与仓库逐字节同哈希（receipt:34ee49aa / receipt:b670db41），实验期间**未**对仓库工作树执行任何 git 写操作，仓库除本契约文件外零改动。"
+      ]
+    }
+  ],
+  "designConsequence": "八条语义在本片定形（第 2–6 条已在副本上按此实现并实测）：（1）**缝位唯一**：invoke_agent 只在 pkg/hno/agent/kernel.go 新增的私有 runKernel 里开、也只在那里结束；Agent.Run 与 runStreamMessages 各把唯一的 r.Run 调用点改为经此 helper，两文件行中性。任何「入口 defer」「newKernel 内开」都属被实测否证的形状。（2）**父链靠 ctx 传播，传播的是 spanCtx**：runKernel 把 StartAgentSpan 返回的 spanCtx 交给 r.Run，于是 runner 的逐尝试 chat span（runner/resilience.go:40、runner.go:268）与本包的 execute_tool span（agent/tool_executor.go:103）天然成为其子；**不给 runner 传任何 agent 身份**，也不使用 SetParent 一类的显式跨层参数。（3）**身份取自运行自身**：agent.name = a.Name（config.go 保证缺省回落 ID，恒非空），agent.run_id = 该次运行已由 ensureRunContext/EnsureRunID 归一的 runID（runcontext.go:51），gen_ai.system 由 observability 零件固定为「hno」——observability 包本片零字节改动，StartAgentSpan 的属性面不许扩。（4）**存活期归驱动**：span 随驱动开合，因此被放弃且不取消的流（驱动阻塞在切片 31 的 emit 上）在 trace 里是**缺席**而非半截；取消则驱动返回、span 结束、其子仍在其中结束。宁可少一条记录，不要一条假报干净的记录。（5）**未接入模式的 span 形态 = 零**：fail-closed 发生在 runStreamMode 的模式归一阶段（agent.go:127），先于任何驱动，故缝不需要任何「是否该发 span」的分支——这条性质由 D6 以正控钉住，不许用「span 数不多于 K」这类弱断言表达。（6）**零 guard、零扰动**：无条件发射。未配置 provider 时 OTel 交出的就是 no-op span，其 End 被正常调用；实测代价 +6 allocs / ≈+478–510 B，输出 JSON 在掩码后逐字节不变。禁止以 observability.IsRecording(ctx) 作为发射条件——该谓词实测在装了真 SDK 的裸 ctx 上仍为 false，用作 guard 会得到恒零 span。（7）**隔离靠逐测试存取全局 provider，不靠并行**：每个安装 provider 的测试保存并恢复 otel 全局 provider，本片测试一律不 t.Parallel（本包基线并行数实测 0，本片维持不加剧）；负向场景以 Start 探针自证「全局确未配置」。（8）**覆盖分级如实**：本片只交付 run/agent 级的**存在、身份、父子、存活期、两种默认**；span 的 status/exception（错误运行是否被记红）与 event 级 span（发射缝）都不在本片，分别登记为 m-status 逃杀缺口（S32-STATUS-1）与 explicitNonGoals 第 1 条（S32-EVT-1）。",
+  "redProtocol": "两段制，段间测试文件零改动。第一段落 = **缝的形状**：kernel.go 里 runKernel 存在、签名与返回四元组与最终一致、run.go:132 与 stream.go:134 两个调用点已改为经它，但函数体故意原样 `return r.Run(ctx, messages)`（不含 span）。此段可编译（实测 vet exit 0，receipt:933edca3-2460-40cc-a4a7-e786ec34d324），绑定命令 exit 1 且 8 个测试函数全部判红（receipt:c2ae87fa-bdfe-412e-910e-daf038b826de；行数读数 receipt:ec06a219-b355-42c0-a91a-f754b835dd9e = 8）。逐行红因（-v 实读，receipt:f47e8555-3c8d-491a-8baa-b5be766c9ef3）：D1/D2/D3/D4/D5×2/D7-cancel 为**行为红**——读数是「invoke_agent spans = 0, want exactly 1（exported names [chat …]）」，即主干缺席而子 span 在场，恰是切片 25 D11 的 span-present 形态；D6 为**前提红**——其正控 :444「positive control: invoke_agent spans = 0, want 1 before the fail-closed call」先失败，本行在该段无法行使牙齿，如实归类不得混称为行为红；D8 为**前提红**——同样栽在 SDK 侧正控（:561）；D5/D7 的父存在性检查属 Fatal 层（前提），其包含关系比较在该段从未被执行。唯一合法的绿：D7 的子场景 abandoned_without_cancel_yields_no_ended_span（实测 --- PASS），登记为 **vacuous-green**：该段发不出任何 span，「0 条已结束 span」在此不可证伪；第二段它转为「驱动仍阻塞、span 仍未结束」的正确语义绿，其牙齿由 m-explicit-end 之外的 m-parent-lost/m-stream-unwired 提供。整包 census 里本片之外的判红实测 0 条（receipt:3335e334-6871-4c02-8084-1a6900e3e54a）⇒ 第一段对既有测试零附带伤害。第二段落 = 语义：span 在驱动之前开、spanCtx 交给 r.Run、End 由驱动拥有；绑定命令 -race -v 读到 8 个 --- PASS（receipt:91990c5a-972c-45f1-ae5f-6039824ee986）。观察记录文档：docs/design/v3-red-observation-p7g9-agent-span.md（本契约只登记路径与应登记的读数，文档由实现片落笔；命名沿用切片 25/31 的 v3-red-observation-*.md 家族）。",
+  "acceptanceMapping": [
+    {
+      "row": "D1",
+      "behavior": "同步一次运行**发且只发一条** invoke_agent，身份三属性取自运行自身：agent.name == 配置名（夹具「labeled-agent」，且与自动生成的 agent id 「agent-p7g9s2-model」可分辨——测试内有夹具自检）、agent.run_id == 该次 RunOutput 的 RunID、gen_ai.system == 「hno」，且该 span 已结束",
+      "publicEntry": "otel.SetTracerProvider(sdk+tracetest.InMemoryExporter) → agent.New(Config{Name:…}) → Agent.Run(ctx, input) → exporter.GetSpans()",
+      "assertion": "名为 observability.SpanAgentRun 的 span 恰 **1** 条（读数形态「invoke_agent spans = N, want exactly 1」，:256）+ 三属性按名等值（:258/:261/:264）+ EndTime.IsZero()==false。全部绝对，无「非空」表述",
+      "independentlyFailable": "对「未接线（0 条，M2 第一段实测形态）」「开两条（m-double-open 实测杀 11 行）」「name 取 a.ID（m-identity-id 实测只杀本行，1 红/11 绿）」「run_id 留空（m-runid-blank 实测杀本行与 D3）」「开了不 End（m-no-end）」判红"
+    },
+    {
+      "row": "D2",
+      "behavior": "同步路径的父子链：chat 与 execute_tool 的 Parent 恰等于该 invoke_agent 的 SpanID 且 TraceID 一致；子的属性不被父覆写（gen_ai.tool.name==「weather」、gen_ai.provider.name==「p7g9s2」仍读得出）",
+      "publicEntry": "同上 × 两回合脚本（第 1 回合请求 1 个工具调用、第 2 回合给最终回答）× 手写 toolkit",
+      "assertion": "chat 恰 2、execute_tool 恰 1、invoke_agent 恰 1；每条子 span 的 Parent.SpanID/TraceID == 父的两个对应值（含反例：把父换成本地新造的假 span 时断言必须不成立）；两属性等值（:298/:301）",
+      "independentlyFailable": "对「r.Run 收到的是调用者 ctx 而非 spanCtx」（m-parent-lost 实测杀本行）、对「span 开在 newKernel 内、父为 invalid/zero」（选项 C 实测 :295 红）、对「直调 r.Run 绕过缝」（m-sync-unwired）判红"
+    },
+    {
+      "row": "D3",
+      "behavior": "流式（Messages 模式）跨 goroutine 边界仍认父：驱动活在 runStreamMessages 起的协程里，父链穿过 go 语句不变；且该协程内 span 结束晚于其全部子",
+      "publicEntry": "Agent.RunStreamMode(ctx, input, run.StreamMessages) → 排空 result.Events → <-result.Done → exporter.GetSpans()",
+      "assertion": "invoke_agent 恰 1、chat 恰 2、execute_tool 恰 1；逐子 ChildOf + Contains；agent.run_id == done.Output.RunID（:342，跨协程取到的仍是同一次运行的归一 id）",
+      "independentlyFailable": "对「流式调用点未接缝」（m-stream-unwired 实测杀本行等 7 行）、对「父在入口 defer、子比父晚结束」（选项 A 实测 :337/:340 红）、对 run_id 留空（m-runid-blank）判红"
+    },
+    {
+      "row": "D4",
+      "behavior": "StreamTasks 模式（切片 31 的生产者 → taskToolExecutor → runToolBatch → executeOneTool）里被并发批执行的 execute_tool 同样认 invoke_agent 为父——缝不与事件生产者争抢 ctx",
+      "publicEntry": "Agent.RunStreamMode(ctx, input, run.StreamTasks) → 排空 → <-result.Done",
+      "assertion": "execute_tool 恰 1 且 ChildOf 成立；夹具活性正控：通道事件数 > 0（:369 的「Tasks stream produced no events」自检，防止因生产者退化而空转成立）",
+      "independentlyFailable": "对「工具批在子 goroutine 里换了 ctx」「只接同步入口」判红（m-parent-lost 与 m-stream-unwired 实测各杀本行）"
+    },
+    {
+      "row": "D5",
+      "behavior": "父的时钟区间**包住**每一个子：父 EndTime 非零、子 StartTime 不早于父、子 EndTime 不晚于父。同步与流式两场景各测。这一行是本片不可省的牙齿——父 id 相等在「父先结束」的形状下依然成立",
+      "publicEntry": "Agent.Run / Agent.RunStream × p7g9s2Contains(父, 子)",
+      "assertion": "父 EndTime.IsZero() 为 Fatal 层前提；逐子两两时间比较（Error 层，读数打印实际两个时刻，如实测选项 A 的「child ends at … +0.56ms after invoke_agent ends」）",
+      "independentlyFailable": "对「入口 defer 结束父」（A 实测杀 D5/stream）、对「newKernel 内开」（C 实测两场景皆杀）、对「从不 End」（m-no-end）判红。**注意**：m-parent-lost 不杀本行（父 id 不参与时间比较），故本行与 D2/D3 是互补而非冗余"
+    },
+    {
+      "row": "D6",
+      "behavior": "未接线模式仍整体 fail-closed，且其 span 形态为**零增量**：RunStreamMode(ctx, input, run.StreamValues) 返回错误与 nil 结果、驱动从未被调用，故既不新开 span 也不留下半截 span；同测试体内先跑 Messages 模式作正控",
+      "publicEntry": "Agent.RunStreamMode × (Messages 正控 → StreamValues 未接线)",
+      "assertion": "正控后 invoke_agent == **1**（否则 t.Fatal「positive control」，:444）；未接线调用 err 非 nil 且 result==nil；其后 invoke_agent 仍 == 1（**不变**）、chat 仍 == 1（只有正控那一回合的）",
+      "independentlyFailable": "对「在未接入分支里也开 span」「span 数翻倍（m-double-open 实测杀本行）」「流式调用点未接（m-stream-unwired 实测杀本行，正控拿不到 1 条）」判红；对「正控缺失的零断言」由 Fatal 层前提杀死"
+    },
+    {
+      "row": "D7",
+      "behavior": "span 存活期跟随驱动本身：接收者只取一条事件后消失且不取消 → 驱动阻塞在切片 31 的发射 select 上、span 未结束 → 导出器里 invoke_agent 为 **0**（宁缺不假报）；ctx 取消 → 驱动返回、span 结束、其 chat 子仍在其中认父",
+      "publicEntry": "Agent.RunStream × (100ms 缓冲通道 + 不排空) / × context.WithCancel",
+      "assertion": "两子场景各一个绝对读数：abandoned → 已结束 invoke_agent == 0（:475）；cancel → == 1 且 EndTime 非零（:495/:500）且 chat 子 ChildOf 成立",
+      "independentlyFailable": "对「入口 defer 结束父」判红（选项 A 实测在 abandoned 场景给出 1 条无子 span，:475 红）；对「流式未接缝」判红（m-stream-unwired 实测杀 cancel 场景）；对「从不 End」判红（m-no-end 杀 cancel 场景）。第一段里 abandoned 场景为 vacuous 绿，见 redProtocol"
+    },
+    {
+      "row": "D8",
+      "behavior": "默认（无人 SetTracerProvider）零扰动：同一脚本（含工具调用与 usage）在「全局未配置 provider」与「装 SDK」两侧各跑一次，RunOutput 的 json.Marshal 产物在掩码 run_id/started_at/completed_at/事件 created_at 后**逐字节相等**；SDK 侧读到 invoke_agent 恰 1 条作为正控；no-op span 的 End 在 defer 中真实执行且无 panic",
+      "publicEntry": "Agent.Run × 两种全局 provider 状态 + json.Marshal(RunOutput)",
+      "assertion": "前置探针 p7g9s2TracerInstalled()==false（否则 t.Fatal，实测 IsRecording(ctx) 不可用作此前置，见 M2 末条）；掩码后字符串相等；SDK 侧 invoke_agent == 1（:561）",
+      "independentlyFailable": "对「默认路径也进导出器」判红；对「trace 改变了输出内容/次序」判红；对「同步调用点未接导致正控消失」判红（m-sync-unwired 实测杀本行）。**登记的局限**：本行只证明缝不外溢，不证明 span 内容正确；掩码的三个面由 P0B/切片 23 既有锚钉，不在本片重复断"
+    },
+    {
+      "row": "D9",
+      "behavior": "结构门（非行为主张，单列以免冒充）：包内 invoke_agent 发射点恰 1、缝所在文件零同步原语零 goroutine 站点、两个驱动调用点各只经缝一次、两个调用文件行中性",
+      "publicEntry": "grep -cF / go doc 计数 / wc -l",
+      "assertion": "kernel.go 的 observability.StartAgentSpan == 1（实测 receipt:8ee3cdce）且 pkg/hno/agent 其它非测试文件 == 0；kernel.go 的七类 sync 原语 == 0（receipt:0a1baf92）、`go func` == 0（receipt:889d09d6）；run.go/stream.go 的 `r.Run(` == 0/0、`a.runKernel(` == 1/1；stream.go 的 `go func` 站点数改前后同为 2（receipt:4ee8d5fb）；行数 191/284 不变、kernel.go == 117",
+      "independentlyFailable": "对「第二个入口另开一条」「为并发安全在缝里加锁或加 goroutine」判红——这两类改动能让 D2/D3 仍绿而把本片退化为选项 A"
+    },
+    {
+      "row": "D10",
+      "behavior": "全局 tracer 隔离：每个装 provider 的测试保存并恢复 otel 全局 provider；本片测试与本包基线一样零并行；负向场景以探针自证未配置",
+      "publicEntry": "测试内夹具 + grep 计数",
+      "assertion": "候选测试文件与整包的行首 t.Parallel 计数 == 0（实测 receipt:30358845，改前基线同值 receipt:b27f24e7）；t.Cleanup 里恢复 previous；D8 前置探针 false→true 的翻转在 D8 与 D1 各测一次",
+      "independentlyFailable": "对「不恢复 provider 使后续测试继承 SDK」判红（D8 的未配置前置会先 t.Fatal，读数不会被静默跳过）；对「本片测试引入并行」判红（grep 计数直接红）"
+    },
+    {
+      "row": "D11",
+      "behavior": "邻居与只读门：pkg/hno/agent 全量 -race -count=30 稳定；runner 与 observability 两邻居 -race 绿；go build ./... 与三包 vet 干净；gofmt 无输出；8 份锚 + 8 份 out-of-seam 文件与基线逐字节同哈希——**尤其切片 31 的发射缝与其两个测试文件不许动**",
+      "publicEntry": "go test / go build / go vet / gofmt / git hash-object",
+      "assertion": "实测候选副本上：-race -count=30 exit 0（receipt:ffd7aa7f）、邻居 -race exit 0（receipt:1015bac3）、build ./... exit 0（receipt:66cd4e7a）、vet exit 0（receipt:95fda75b）、gofmt -l 无输出（receipt:9abd0bbf）；12 份锚 SAME（receipt:34ee49aa）+ 8 份 out-of-seam SAME（receipt:b670db41）",
+      "independentlyFailable": "对「顺手在发射路径加 event span」「改 runstreammode_test.go 的零事件断言以配合」「给 observability 加属性」判红——任何一条都表现为锚哈希漂移，无需人工走查"
+    }
+  ],
+  "minimalVerticalSlice": "D1 + D2 + D5 + D6 + D8 五行。理由：D1 是移交项的字面内容（发一条、带身份），且是唯一能被 m-identity-id 单点杀死的行；D2 是整片存在的理由（父子），但**它单独会被骗**——m-parent-lost 之下父 id 仍可相等（父已结束的 SpanContext 仍是合法父标识），所以 D5 必须与 D2 同组，二者是互补牙齿而非冗余（实测 m-parent-lost 杀 D2 不杀 D5、选项 A 杀 D5 不杀 D2）；D6 让「未接线不产生任何记录」成为可失败主张而非默认成立（正控把空断言变实断言）；D8 钉住「默认零扰动」这条母约 G9 的硬要求（本片唯一在两种全局 provider 状态下都不变的行）。D3/D4 是把 D2 的机制延伸到跨 goroutine 与并发工具批两个独立失败面（切片 31 的发射与认父可能争抢 ctx），D7 是选缝的决定性证据（A/C 在此红），D9/D10/D11 是结构、隔离与门禁。",
+  "allowedTestSeam": {
+    "add": [
+      "pkg/hno/agent/p7g9s2_agent_span_test.go（新文件，package agent_test 黑盒、只用导出 API，与同目录既有 8 份外部包测试同法；TestP7G9S2_* 命名覆盖 D1–D8；夹具 = 手写稳定 fake model（同步/流式两形脚本、工具调用与 usage 固定）+ 手写 toolkit（一个零参数 weather 处理器，成功返回「sunny」）+ tracetest.InMemoryExporter，零网络零真模型；实测 563 行、8 个测试函数、4 个 t.Run 子场景、t.Fatal 31 / t.Error 19 处（receipt:5d6789ef-3ae1-4d10-bba8-981adaf01e6f 明文 funcs=8 trun=4 fatal=31 error=19 lines=563）。副本预演形状 = /tmp/g9s2/pkg/hno/agent/p7g9s2_agent_span_test.go，字节哈希 358403deb276f7bba618e7822b7552ae5176f3f6（receipt:0c4ff2c6-778c-4e3d-9ebf-30403d47f2a4）"
+    ],
+    "modify": [],
+    "retires": [],
+    "sourceSeam": "pkg/hno/agent/kernel.go（**唯一新增符号位点**：私有方法 runKernel(ctx, runID, *runner.Runner, []*types.Message) → (resp, msgs, StopReason, err)；体内三行 = StartAgentSpan / defer span.End() / return r.Run(spanCtx, messages)；另在 import 块加 pkg/hno/observability——包内已有该依赖，无新边）、pkg/hno/agent/run.go（:132 一行改为经 runKernel，行中性）、pkg/hno/agent/stream.go（:134 一行改为经 runKernel，行中性，位于既有 goroutine :106 之内）。**本片零既有测试改动**（modify 为空即判据：切片 31 只授权改 runstreammode_test.go 一行，本片连那一行都不必动，因为 span 与事件族正交）；**pkg/hno/observability 与 pkg/hno/runner 零字节改动**（实测锚 SAME，receipt:34ee49aa）——零件已存在，缺的只是调用点，这正是本片与「扩零件」的界。"
+  },
+  "forbiddenObservations": [
+    "span 的内部标识数值（TraceID/SpanID 的具体字符串）：只断「子的 Parent == 父的 SpanContext」与「父 id 有效」，不断某个具体 id——具体 id 由 SDK 随机，断它等于断时钟。",
+    "时间戳的**差值大小**（D5 只断先后与包含，不断「父比子长多少」）；也不用 time.Sleep 定序。",
+    "otel 全局 provider 的内部类型、span 的 TracerName/instrumentation scope 字段、SpanStub 的未导出面。",
+    "goroutine 数、通道容量、streamEmitter 的内部状态（票面同族；本片只经「已结束 span 数」与「事件是否被取出」的外部事实观察，零新增 goroutine 由 D9 的源码站点数门担保，不由运行时计数断）。",
+    "为测试导出 runKernel、span 夹具或任何计数 helper（本片新增公共导出符号数必须为 0，D9/go doc 计数 21→21 为硬判据）。",
+    "断言 invoke_agent 的 status / exception / RecordError 行为（本片无此判据，m-status 实测逃杀；发明它属越界）。",
+    "断言 run/agent 级 span 的**数量随事件数变化**（事件级 span 不在本片；emit 缝仍是切片 31 的形状）。"
+  ],
+  "baselineBytes": {
+    "note": "三段结构：**anchors** = 本片必须逐字节不动的 8 份（observability 2 + runner 2 + agent 的发射缝与其 2 份测试 + agent/tool_executor.go）；**changedBefore** = 本片会改的 3 份的开工真值，收口时三份必须变动且差异只落在 allowedTestSeam.sourceSeam 声明范围内；**outOfSeamNoChangeExpected** = agent 包内既不在 anchors 也不在 sourceSeam 的 8 份非测试文件，实测候选副本零改动即可跑通全部 8 个测试与全部门禁，故登记为不期望变动；若实现必须触碰其中之一，那是新的行为 delta，须回本契约登记而不是静默改。采集口径：三份表各由**一条自配对命令**一次采齐（文件名与哈希在同一 printf 里产出，避免切片 23 的配对错位），明文复跑与回执逐字同命令。锚清单的**采集教训如实登记**：初稿把 stream_producers_test.go 与 errors_test.go 列为锚，实测 `fatal: could not open … No such file or directory`（该两份文件在本仓不存在；receipt:e5ffac1e-3701-45bc-b5ed-9a7d629dd0f9 的明文复跑里可见报错），而当时的比对命令对两份不存在的文件返回「SAME」（两个空哈希相等）——**假阳性**，已剔除并改以目录实测清单为准。这是「先查文件系统再断言存在」的既有纪律第二次抓到同类错误，登记进 notes。",
+    "anchorsCommand": "for f in pkg/hno/observability/tracing.go pkg/hno/observability/tracing_test.go pkg/hno/runner/resilience.go pkg/hno/runner/runner.go pkg/hno/agent/stream_producers.go pkg/hno/agent/stream_tasks_test.go pkg/hno/agent/runstreammode_test.go pkg/hno/agent/tool_executor.go; do printf '%s %s\\n' $f $(git hash-object --no-filters $f); done   # 实测 receipt:5b4496ba-497b-4b99-97d3-618f74ee3974 exit=0；收口输出必须与下表 8 行逐字节全同",
+    "anchors": {
+      "pkg/hno/observability/tracing.go": "ccf7014a9f940b1fbdbbd119cf0c51fc143f7e9a",
+      "pkg/hno/observability/tracing_test.go": "d83c09f59c28f4fa4fda35b636995b2fa4dc3c14",
+      "pkg/hno/runner/resilience.go": "2d6c944c9a3717c00667c81e17db7277cf33b472",
+      "pkg/hno/runner/runner.go": "18fe1f80bc9256289c9550c8056e08cf3a81888b",
+      "pkg/hno/agent/stream_producers.go": "2f16a32b060338110c379ece747fe8d846956e9e",
+      "pkg/hno/agent/stream_tasks_test.go": "107e4b9cd8c0ef3b9f82b4b36f04d8f83b03a7d5",
+      "pkg/hno/agent/runstreammode_test.go": "7c3599763fabbfc193e4e3f3c6b4a293c109d06d",
+      "pkg/hno/agent/tool_executor.go": "22f2228fe39e5475f00b35d14c8ec923d89364ec"
+    },
+    "changedBefore": {
+      "pkg/hno/agent/kernel.go": "f68fa51023ec8b1237247ba2a67b77240f27b4a4",
+      "pkg/hno/agent/run.go": "b445f570b705961aadbe166c7b3fe600c8b65ea6",
+      "pkg/hno/agent/stream.go": "4abb334bb9cecd11b98b4db28f7a378e8fccbfb5"
+    },
+    "changedBeforeCommand": "for f in pkg/hno/agent/kernel.go pkg/hno/agent/run.go pkg/hno/agent/stream.go; do printf '%s %s\\n' $f $(git hash-object --no-filters $f); done   # 实测 receipt:212d6eb7-e0cc-4c5d-a135-555d82302c84 exit=0；候选副本的收口对照值 kernel=1114030e5993cdc0011c67c6eaade56e2af659fb run=d0d975b9aa671cbec46e30a0213ef79ce8aeb2cd stream=51943b690dcd8d26cd9414c2265de001eda6f672（receipt:fb51ad53-26ed-451e-8519-4178eeb363a2）",
+    "newFileExpectedAbsent": {
+      "pkg/hno/agent/p7g9s2_agent_span_test.go": "开工实测不存在；收口时它必须存在且是唯一新增的 .go 文件（任何其它新增名须回本契约登记）",
+      "note": "kernel.go 内新增的是**私有方法 runKernel**，不是新文件——本片的唯一新增文件就是这份测试"
+    },
+    "outOfSeamNoChangeExpected": {
+      "pkg/hno/agent/agent.go": "54b5dad514d280f89e1587d11875d3602abc528a",
+      "pkg/hno/agent/cache.go": "cf2a6092fb1250ce40564a56d8c0948773b49e48",
+      "pkg/hno/agent/config.go": "6c538fe4a498f5eaef7b75697b19d0c7fc93de1f",
+      "pkg/hno/agent/message_builder.go": "b6df2059abbd9af2ed03229f20419089e9da3089",
+      "pkg/hno/agent/output.go": "528e4c9c56180bd6d74213d03ce1133cb91ceff8",
+      "pkg/hno/agent/runcontext.go": "4f686e31453ed035960c202210a75d37fc6148ae",
+      "pkg/hno/agent/runner_adapter.go": "9f05be715e8c36b361184c76083710196e66381d",
+      "pkg/hno/agent/stream_aggregator.go": "cb44393c89910ab1948a25ea763fa1140bea3de3",
+      "note": "8 份实测 SAME（receipt:b670db41-fc23-4cf0-8469-6f02dfede41d）；哈希值由同族自配对命令采齐（receipt:bdf869fb-0ee4-4fff-ac53-47f1904d8ebd）"
+    },
+    "counters": {
+      "agentExportedSymbols": 21,
+      "agentExportedSymbolsAfter": 21,
+      "expectedNewExportedSymbols": 0,
+      "agentTopLevelExportedDeclsSourceLevel": 10,
+      "agentTopLevelExportedDeclsAfter": 10,
+      "agentNontestLoc": 1727,
+      "agentNontestLocMeasuredInRehearsal": 1750,
+      "expectedAgentNontestLocCeiling": 1757,
+      "kernelLocBefore": 94,
+      "kernelLocAfterMeasured": 117,
+      "runLocBefore": 191,
+      "runLocAfterMeasured": 191,
+      "streamLocBefore": 284,
+      "streamLocAfterMeasured": 284,
+      "agentStartAgentSpanNontestSites": 0,
+      "expectedAgentStartAgentSpanSitesAfter": 1,
+      "invokeAgentMentionsInPkgHnoNontest": 6,
+      "agentParallelTestCalls": 0,
+      "agentParallelTestCallsAfter": 0,
+      "agentSyncPrimitivesNontest": 3,
+      "agentSyncPrimitivesNontestAfter": 3,
+      "kernelSyncPrimitives": 0,
+      "kernelGoroutineSites": 0,
+      "streamGoroutineSitesBothSides": 2,
+      "newTestFileLines": 563,
+      "newTestFunctions": 8,
+      "newSubtests": 4,
+      "noopBenchAllocsPerOpBefore": 326,
+      "noopBenchAllocsPerOpAfter": 332,
+      "noopBenchBytesPerOpBefore": "43721-43722",
+      "noopBenchBytesPerOpAfter": "44199-44231",
+      "anchorFileCount": 8,
+      "outOfSeamFileCount": 8,
+      "existingTestFilesModified": 0
+    }
+  },
+  "carriedItems": [
+    {
+      "id": "S25-DEFER-1",
+      "ref": "docs/design/v3-test-scope-p7-g9-observability.json carriedItems 第 1 条 + 母约 §10 P7 行（docs/design/v3-platform.md:595）",
+      "carriedIntoDesign": "**本片承接并结清**：run/agent 级 invoke_agent 挂进 pkg/hno/agent，使其成为 chat 与 execute_tool 的父。原文建议的形状是「在 Agent.Run 入口开、包住整条 kernel 调用」，本片按 M3 实测改判为「在共享 kernel **驱动点之前**开」：入口 defer 的形状实测留下三手退化（D3/D5-stream 的「子比父晚结束」与 D7-abandoned 的「一条无子的干净 span 假报完整运行」）。偏离已在 M3 与本字段登记，writeBackOwed 第 3 条负责让状态表反映真实落点而非原建议。「非 runner 内伪造身份」的禁令本片严格遵守（runner 零字节改动）。"
+    },
+    {
+      "id": "S32-EVT-1",
+      "ref": "本契约 explicitNonGoals 第 1 条 + docs/design/v3-test-scope-p1-graph-slice31.json 的 S25-DEFER-1 交点条",
+      "carriedIntoDesign": "事件发射路径（streamEmitter 的 emit / content / sealed-content 三段，pkg/hno/agent/stream_producers.go）的 event 级 span **不在本片**：切片 31 明写「不得借它的片把 tracing 塞进事件发射路径」，本片是其反向承诺的兑现方——锚文件 2f16a32b… 与其两份测试逐字节锁死。后续片若要为事件发 span，其落点与本片缝的关系（同一 ctx 上的子？还是兄弟？）必须先设计，不得默认沿用本片的 runKernel。"
+    },
+    {
+      "id": "S32-STATUS-1",
+      "ref": "本契约 M3 的 m-status 实测逃杀 + observabilityLimit 第 4 条",
+      "carriedIntoDesign": "invoke_agent 目前不记 status/exception：失败的驱动（模型错误、取消、max-loops）与成功的驱动在 trace 里同形，只多/少子 span。判分实测「在父上 RecordError」的变异全绿（receipt:d4013cfe 明文 m-status exit=0/12 绿），故这是**已证明的覆盖缺口**而非未做。后续片若要补，须自带正反夹具（错误运行 vs 成功运行的 span status 可分辨）与变异牙齿，并考虑它与切片 25 的「失败尝试记 error 事件」在 chat 层已有语义的一致性。"
+    },
+    {
+      "id": "S32-EARLY-1",
+      "ref": "本契约 outOfSeamNoChangeExpected 之外的一处语义边界（见 explicitNonGoals 第 3 条与 ADJ-S32-1）",
+      "carriedIntoDesign": "早退路径（缓存命中 run.go:107、前置/后置 hook 拦截、取消与最大轮次的驱动前返回、未接入 fail-closed）今天**不发** invoke_agent——因为缝在驱动之前。这不是缺陷而是被显式选择的可观察范围；若 owner 要「一次调用即一条 run 级记录」，落点必须前移到 ensureRunContext 之后并另设放弃/早退的区分机制（否则退化为被实测否证的选项 A）。该判断属本片出口，不在片内。"
+    },
+    {
+      "id": "S32-STD-1",
+      "ref": "本契约 M2 末条的谓词实测",
+      "carriedIntoDesign": "程序级口径，供 P7 后续片与任何 span 片直接引用：observability.IsRecording(ctx) **不可**用作「tracer 是否配置」的守卫——实测装了真 SDK 的裸 context.Background() 上它为 false，且 span.End() 之后携带该 span 的 ctx 上也变 false；正确的配置探针是 observability.Tracer().Start(...) 后看 span.IsRecording()。以 IsRecording(ctx) 作发射 guard 的形态（m-tracer-guard）实测会导致恒零 span，本片靠 D1–D8 全红抓住（11 行），但规则本身比测试更重要。"
+    },
+    {
+      "id": "S31-GAP-1 交点（不结）",
+      "ref": "docs/design/v3-p1-graph-status.md §5 的 S31-GAP-1",
+      "carriedIntoDesign": "本片不接切片 31 的 m-sniff-prefix 缺口（属工具失败分类的文本嗅探判据，与 span 无关）；仅在此声明本片未顺手处理它，避免后续片误以为已结。"
+    }
+  ],
+  "explicitNonGoals": [
+    "事件发射路径的 span（pkg/hno/agent/stream_producers.go 的 streamEmitter：emit / content / sealed-content 三段一律不 instrument）。票面与切片 31 的禁令在此重申；本片实测锚文件 2f16a32b060338110c379ece747fe8d846956e9e、stream_tasks_test.go 107e4b9cd8c0ef3b9f82b4b36f04d8f83b03a7d5、runstreammode_test.go 7c3599763fabbfc193e4e3f3c6b4a293c109d06d **逐字节不变**（D11）。诱人在 emit 里起 event span 只需三行、且能让流式全程「有记录」，但那会把 span 位点从 1 变成 1+N 并破坏 D9 的门。",
+    "移除双语注释规范（EN 段后接 ZH 段）以腾出 LOC。基线 1727 恰等于切片 31 用光的天花板，本片零余量，删注释是数字上最便宜的满足方式——**明确禁止**：那 23 行里近半正是「span 为何只能开在这里、为何不能开在入口」的解释（runKernel 的双语块），删掉它得到的是一个不解释的调用点，下一片就会重犯选项 A。切片 31 的 nonGoals 已裁过一次，本片沿用并把新上限显式申报为 1757（见 completionCriteria 第 6 条）。",
+    "早退路径与未接入 fail-closed 的 run 级可见性（缓存命中、前置/后置 hook、模式未接）：本片一律不发 invoke_agent，其正确性由 D6 的「零增量」钉住；要改成 span-per-call 需先裁 ADJ-S32-1。",
+    "invoke_agent 的 status / exception / RecordError：本片无任何判据，m-status 实测逃杀，缺口登记为 S32-STATUS-1。诱人是顺手三行，但那是本片未声明的新行为面。",
+    "observability 包的任何字节改动（含把 gen_ai.system 的常量「hno」参数化、给 StartAgentSpan 加 usage/stop_reason 属性）：零件已存在，本片只给调用点；扩属性是零件侧的行为 delta，另案。",
+    "pkg/hno/runner 获得 agent 身份（新参数、新字段或 ctx key）：切片 25 explicitNonGoals 第 1 条的禁令在本片继续生效，且实测无需（ctx 传播已足以成立父链）。",
+    "观测后端与配置面（exporter、endpoint、采样率、span kind 扩展）：G9 是接线票，observability 包文档自述 contract-only；接入后端属其它能力。",
+    "graph 级 invoke_workflow span 与 Team/Workflow 层的 run 级 span：母约 §10 的 run/agent 一行只覆盖 Agent，图/团队层各属自己的片。",
+    "为 span 引入锁、缓冲通道或额外 goroutine（本片实测零新增：kernel.go 的同步原语与 go func 站点均 0，stream.go 的 go func 站点数改前后同为 2）。"
+  ],
+  "completionCriteria": [
+    "1. redProtocol 两段各留 receipt，绑定命令逐字为 `go test ./pkg/hno/agent -run TestP7G9S2_ -count=1 -race -v`：第一段 8 个测试函数全判红（唯一绿为 D7/abandoned 子场景，登记 vacuous），第二段 8 个 --- PASS；两段之间测试文件零改动；每行的红因（行为红 / 前提红 / vacuous 绿）逐行落到 docs/design/v3-red-observation-p7g9-agent-span.md。",
+    "2. 既有测试零改动是硬判据：pkg/hno/agent 的 15 份既有测试文件（含 stream_tasks_test.go 与 runstreammode_test.go）与 8 份 anchors 逐字节同哈希；改动只允许落在 changedBefore 的 3 份，且差异只在 sourceSeam 声明范围内（run.go/stream.go 各一行、kernel.go 增 runKernel 与一个 import）。",
+    "3. 变异矩阵 10 项逐条按声明复现（收口在**仓库最终字节**上重跑，不得沿用本契约 M 行的副本回执）：m-parent-lost 杀 D2/D3/D4/D7（D1、D5 必须绿——这是互补牙齿的证明，若某日 D5 也杀它说明判据已变，须回本契约登记）、m-no-end 杀 D1–D8 除 D7/abandoned、m-identity-id 只杀 D1、m-runid-blank 杀 D1 与 D3、m-double-open 杀 D1–D7、m-stream-unwired 杀 D3/D4/D5/D6/D7、m-sync-unwired 杀 D1/D2/D5/D8、m-tracer-guard 杀 D1–D8 除 D7/abandoned；等价与缺口各一条须**实测确认**而非断言：m-explicit-end 全绿（等价，登记）、m-status 全绿（本片无 status 判据，登记为 S32-STATUS-1 覆盖缺口）。任何未声明的额外判红 = 归属泄漏，须回本契约修判据而不是修文案。",
+    "4. 门禁全 exit 0：绑定命令；`go test ./pkg/hno/agent -race -count=30`（防碰巧绿，M2 实测 1.885s 稳定）；`go test ./pkg/hno/runner ./pkg/hno/observability -race`；`go build ./...`；`go vet ./pkg/hno/agent ./pkg/hno/runner ./pkg/hno/observability`；`gofmt -l pkg/hno/agent`（M2 实测这条抓到过本契约预演测试文件的一处缩进，见 notes 的 gofmt 自纠——收口必须以空输出为准）。",
+    "5. 结构读数逐条实读到值（不得目测）：包内非测试 observability.StartAgentSpan 站点 1、kernel.go 的七类 sync 原语 0、kernel.go 的 `go func` 0、run.go 与 stream.go 的 `r.Run(` 各 0 且 `a.runKernel(` 各 1、stream.go 的 `go func` 站点 2（与基线同）、`go doc -all ./pkg/hno/agent` 导出条目 21（新增导出符号 0）、t.Parallel 计数 0。",
+    "6. LOC：pkg/hno/agent 非测试 LOC **不大于 1757**（预演实测 1750；+23 全在 kernel.go，run.go/stream.go 行中性）。**本条是显式的天花板再申报**：基线 1727 已被切片 31 用光，本片不靠删双语注释或压缩既有解释来满足数字（explicitNonGoals 第 2 条），余量 7 行留给实现期的等价微调；若实测超 1757，须回本契约点名退役哪一行，不得静默扩张。",
+    "7. 写回母约 §10 P7 行（:595）与 §3 能力表 G9 行（:87）的 span 覆盖状态，并把 S25-DEFER-1 在切片 25 契约的承接状态结清（见 writeBackOwed）。",
+    "8. 零 tracer 代价数字登记进交付文档（+6 allocs、≈+478–510 B/op），并明确它**不是**判据、不得为省它引入 guard（forbiddenShortcuts 第 3 条）。"
+  ],
+  "forbiddenShortcuts": [
+    "在每个入口各开一条 span 并 defer 结束（S25-DEFER-1 原文建议的形状）——实测 /tmp/g9s2a 三手红：D3 :337/:340 与 D5/stream :424 的「子比父晚结束」，最阴的是 D7/abandoned :475 给出 1 条无子的 invoke_agent，即假报一次干净运行；而它的父链行（D2）居然全绿。这就是 D5/D7 不可省的实测理由。",
+    "在 newKernel 内开 span——实测 /tmp/g9s2c 六手红：D1 的 agent.run_id 为「」（签名里没有 runID），且 chat/execute_tool 的父为 invalid/zero（span 进不了 r.Run 的那条 ctx）。这不是代价高，是语义不成立。",
+    "把调用者的 ctx 而不是 spanCtx 交给 r.Run——能编译、只退化语义，且父 id 仍读起来「有效」（已结束的 span）。m-parent-lost 实测杀 D2/D3/D4/D7 共 5 行；若有人试图靠削弱 D2 的反例来让它绿，那是归属泄漏。",
+    "以 observability.IsRecording(ctx) 为 guard 跳过零 tracer 发射以省那 6 次分配——实测该谓词在装了真 SDK 的裸 ctx 上为 false（receipt:d5b68f60），guard 恒真即恒零 span；m-tracer-guard 实测虽被杀（11 行红），但这条禁令 independent 于测试：任何「先问要不要发再发」的形状都使默认路径与已配置路径分叉，正是 D8 要防止的那类分叉。",
+    "把 agent.name 填成 a.ID、runner 名或 model provider 名——trace 看上去有名字且不需把身份传进缝。m-identity-id 实测单点杀 D1（1 红/11 绿，说明除 D1 外无人观察该属性），因此本行不可与别的属性行合并。",
+    "run_id 以空串或占位串发射、等接入端再补——m-runid-blank 实测杀 D1 与 D3；且 runcontext.go:51 的 EnsureRunID 保证恒非空，占位是倒退不是简化。",
+    "一次驱动开两条 span（一条给身份、一条给父链）——m-double-open 实测杀 11 行，且 D9 的站点数门变 2 直接红。",
+    "断言写成「span 数非空」或「不多于 K」——非空无法区分 1 与 2，m-double-open 会偶然通过；本片所有 span 读数均为按名绝对计数（D1–D8 无一条用非空表述）。",
+    "为覆盖早退/被放弃的运行而在驱动之外补 span 以求「可见」——即选项 A 的失败形状；正确处置是把该可见性缺口登记为 S32-EARLY-1/observabilityLimit，或先裁 ADJ-S32-1。",
+    "在缝里加锁、缓冲通道或额外 goroutine 来「摆平」并发流——D9 的 sync 原语与 go func 站点计数（实测 0/0）与切片 31 的零新增 goroutine 出口同时会红；且 span 的父子正确性从不需要同步原语。",
+    "顺手给 pkg/hno/observability 加属性（如把 usage 或 stop_reason 挂到 invoke_agent）或改 gen_ai.system 的取值——锚 ccf7014a… 会漂，属未登记的行为 delta。",
+    "给 pkg/hno/runner 传 agent 身份或用 ctx key 夹带——违反切片 25 禁令，且实测无需（ctx 传播已足以成立父链）；runner/resilience.go 与 runner.go 是锚。",
+    "把 D2 与 D5 合并成一条「父链正确」的行——实测 m-parent-lost 杀 D2 不杀 D5、选项 A 杀 D5 不杀 D2；合并会同时失去两种退化形态的探测力（这是本片唯一由实测直接证明的反冗余约束）。"
+  ],
+  "observabilityLimit": [
+    "本片的 run 级 span 只覆盖**被真正驱动的**运行：缓存命中早退、前置/后置 hook 拦截、未接入 fail-closed、驱动开始前的取消都不发 invoke_agent（S25-DEFER-1 建议的「包住整条调用」形状被实测否证，见 M3）。调用方若以「有无 run 级记录」判断「有没有发生过一次调用」，在本片会得到错误结论。",
+    "被放弃且不取消的流（接收者消失、ctx 未取消）在 trace 里**完全缺席**：驱动阻塞在切片 31 的发射 select 上，span 未结束即不被导出器收到。这是本片刻意选择的失效方向（宁可缺席也不假报干净），但它意味着「半挂起的运行」在今天的可观察面上不可见，其回收语义属切片 31 既有形状。",
+    "span 无 status/exception：错误运行与成功运行同形（只有子 span 的多寡不同）。m-status 实测逃杀，故这是**已证明的缺口**（S32-STATUS-1），不是未列的假设。",
+    "本片只断父标识相等与时间包含，不断具体 id、不断时长数值（forbiddenObservations 第 1/2 条）；「包含」在纳秒时钟上是单调性断言，不受机器性能影响（实测在 -race -count=30 下稳定）。",
+    "零 tracer 侧的「不扰动」只到掩码后的 RunOutput JSON 为止：run_id、started_at/completed_at、事件 created_at 三个易变面由 P0B/切片 23 的既有锚负责，本片不重复断，也未断言 span 内容在默认路径下的形态。",
+    "D6 只证明「未接线不新增 span 记录」，不证明未接线路径的**错误形状**（后者是切片 23/31 的既有锚，runstreammode_test.go 本片一字未动）。",
+    "预演数字（+23 LOC、563 行测试、10 项变异结果、bench 读数）是对本片可行性的度量，**不是收口证据**：收口须在仓库最终字节上重新取数并重新回执，绑定命令逐字重跑。"
+  ],
+  "verificationCommands": [
+    "go test ./pkg/hno/agent -run TestP7G9S2_ -count=1 -race -v   # 本片唯一绑定场景命令（cwd 仓库根；所有收口 receipt 逐字用这条；收口读数必须与 baselineBytes.counters 同形：8 个 --- PASS、0 个 --- FAIL）",
+    "go test ./pkg/hno/agent -run TestP7G9S2_ -count=1 -race   # 裸退码形式（预演实测 exit 0，receipt:54530baa-3ade-49b5-a2e1-9fa201f2c4c9）；收口须两条都有回执：-v 读数与裸退码",
+    "go test ./pkg/hno/agent -race -count=30 ; go test ./pkg/hno/runner ./pkg/hno/observability -race ; go build ./... ; go vet ./pkg/hno/agent ./pkg/hno/runner ./pkg/hno/observability ; gofmt -l pkg/hno/agent   # 邻居门与防碰巧绿（gofmt 必须无输出）",
+    "go test ./pkg/hno/agent -count=1 ; go test -race ./pkg/hno/agent -count=1   # 全量既有测试（含 15 份既有测试文件）不得被本片打破；基线值实测 exit 0（receipt:b9e2cf4d / a8852bf3）",
+    "grep -cF observability.StartAgentSpan pkg/hno/agent/*.go | grep -v ':0' | wc -l   # 收口恒为 1（只有 kernel.go 命中）；开工实测恒为 0（receipt:c4b6ddf3，另一口径 grep -rn | grep -v _test | wc -l 同值 0）",
+    "grep -cF 'r.Run(' pkg/hno/agent/run.go pkg/hno/agent/stream.go ; grep -cF 'a.runKernel(' pkg/hno/agent/run.go pkg/hno/agent/stream.go   # 收口读数必须分别是 0/0（注意 grep -c 无命中时退码为 1，属工具口径不是失败）与 1/1（预演实测 receipt:36a68877 / receipt:35ffda9a）",
+    "for s in Mutex RWMutex Once WaitGroup Pool Map Atomic; do grep -cF \"sync.$s\" pkg/hno/agent/kernel.go; done   # 七类全为 0（预演实测 receipt:0a1baf92 的等价形式）；另 grep -c 'go func' pkg/hno/agent/kernel.go 为 0（receipt:889d09d6）",
+    "grep -rnE '^[[:space:]]*t.Parallel' pkg/hno/agent --include=*.go | wc -l | tr -d ' '   # 恒为 0（口径：行首空白后直接以 t.Parallel 起头，注释里的字样不计；预演实测 receipt:30358845）",
+    "go doc -all ./pkg/hno/agent | grep -cE '^(func|type|var|const) '   # 恒为 21（新增导出符号 0；预演实测 receipt:c3df240b 基线 21 与 receipt:fb38b243 候选 21）",
+    "find pkg/hno/agent -name '*.go' -not -name '*_test.go' | xargs wc -l | tail -1 ; wc -l pkg/hno/agent/kernel.go pkg/hno/agent/run.go pkg/hno/agent/stream.go   # 总数 ≤ 1757（预演 1750）；三份 117/191/284（run.go 与 stream.go 与基线等长）",
+    "for f in pkg/hno/observability/tracing.go pkg/hno/observability/tracing_test.go pkg/hno/runner/resilience.go pkg/hno/runner/runner.go pkg/hno/agent/stream_producers.go pkg/hno/agent/stream_tasks_test.go pkg/hno/agent/runstreammode_test.go pkg/hno/agent/tool_executor.go; do printf '%s %s\\n' $f $(git hash-object --no-filters $f); done   # 8 行，与 baselineBytes.anchors 逐字节全同（预演采集回执 receipt:5b4496ba）",
+    "for f in pkg/hno/agent/agent.go pkg/hno/agent/cache.go pkg/hno/agent/config.go pkg/hno/agent/message_builder.go pkg/hno/agent/output.go pkg/hno/agent/runcontext.go pkg/hno/agent/runner_adapter.go pkg/hno/agent/stream_aggregator.go; do printf '%s %s\\n' $f $(git hash-object --no-filters $f); done   # 8 行，与 baselineBytes.outOfSeamNoChangeExpected 全同（receipt:bdf869fb）",
+    "node scripts/evidence-audit.mjs   # 收口对本契约全部 receipt/evidence/artifact/activation 命名空间做对账：引用了磁盘上不存在的 id 会被列出，须现取现贴替换后再入库（切片 31 的 notes 记录的正是这条欠账）"
+  ],
+  "writeBackOwed": [
+    "母约 §10 P7 行（docs/design/v3-platform.md:595）的 span 覆盖状态表：把「**run/agent=待 P7 第 2 片**（pkg/hno/agent）」改为「run/agent=已接（切片 32：agent 的 kernel 驱动点，私有 runKernel 单位点，chat/execute_tool 为其子）」，并保留 model/tool 两行现值不动。",
+    "母约 §3 能力表 G9 行（docs/design/v3-platform.md:87）：状态从「第 1 片已交付（切片 25…）」改为「第 1 片 + 第 2 片已交付；层级 run/agent → {chat, execute_tool} 已闭合；event 级 span 与 span status/exception 仍挂账（S32-EVT-1、S32-STATUS-1）」。",
+    "切片 25 契约的 S25-DEFER-1 结清登记（由编排方在状态文档记，本契约不代改那份 JSON）：并注明本片对原建议形状做了实测改判（驱动点之前而非 Agent.Run 入口），改判证据为 receipt:eaa196e9（选项 A 三手红）与 receipt:95847b99（选项 C 六手红）。",
+    "状态文档 v3-p1-graph-status.md（编排方所有）：新增切片 32 交付条目，含 LOC 天花板 1727 → 1757 的显式申报与「未删双语注释」的口径，以及 S32-STD-1 的谓词坑（供任何后续 span 片引用）。",
+    "交付票 work-p7-observability 的 verification 面：票面只点名 ./pkg/hno/observability/... 与 ./pkg/hno/runner/... 两包，而本片的绑定命令在 ./pkg/hno/agent——该差异属票面与实际落点的错位（落点由 S25-DEFER-1 指定为 pkg/hno/agent），登记待负责人确认，不由本片私自扩票。",
+    "裁决材料：ADJ-S32-1 与 ADJ-S32-2 若负责人落笔，由本片或后续契约引用结果（本契约不自拍其结果）。"
+  ],
+  "adjudicationOptions": [
+    {
+      "id": "ADJ-S32-1",
+      "shape": "run 级 span 的范围：（a）**驱动级**（本片实现）——只有真正进入内核驱动的运行有 invoke_agent，缓存命中早退、前置/后置 hook 拦截、未接入 fail-closed、驱动前取消都不发；（b）**调用级**（S25-DEFER-1 原文建议）——每次 Run/RunStream/RunStreamMode 调用恰一条，需在 ensureRunContext 之后开 span 并为早退与未接入路径各写一条结束语义。",
+      "cost": "(b) 的代价已被实测量化：入口 defer 的形状（选项 A）在三处退化——流式路径的子比父晚结束（D3 :337/:340、D5/stream :424）、被放弃的运行留下一条**无子的干净 span**（D7/abandoned :475 实测 1 条），且包内位点数从 1 变 2（违反 D9）。要修就得再加一个「区分完成/放弃/早退」的机制（同步原语或额外的收敛点），与本包的行中性与零新增 goroutine 出口冲突，粗估 +40…80 LOC 且必然触及发射缝。选 (a) 的代价是 observabilityLimit 前两条：trace 无法回答「这次调用发生了没有」，只能回答「它驱动了吗」。",
+      "gain": "(a) 的语义是「一条 invoke_agent == 一次被驱动的运行」，父子与存活期都由构造成立，本片的 10 项变异全部落位、无等价逃杀以外的缺口；(b) 换来覆盖表的直观完备（每调用必有记录），但把「假报干净运行」的风险引入 G9 的主干——对以 trace 做成本归集的调用方，(b) 的失败模式比 (a) 的空白更贵。"
+    },
+    {
+      "id": "ADJ-S32-2",
+      "shape": "invoke_agent 的错误可观察性：（a）**本片不发 status**（现状，实测逃杀的 m-status 即此选择的一致性）；（b）本片顺带在同一缝内记 status/exception（错误驱动 → span 记红并 RecordError）。",
+      "cost": "(b) 需要三件本片未声明的东西：可分辨的错误夹具（模型失败 / 取消 / max-loops 三种驱动的终态各自应或不应记红，语义要先定）、与切片 25 在 chat 层「失败尝试记 error 事件」的一致性规则（否则同一错误在父子两层重复计）、以及新增 D 行与变异牙齿（本片矩阵已按 10 项实测登记，加行即改矩阵）。粗估 +1 行判据 + 1 夹具族，且不违反任何锚——是「可做的范围扩张」而非「不得不做的改动」。(a) 的代价是 m-status 被实测证明逃杀，本片对 status 零判据（已登记为 S32-STATUS-1）。",
+      "gain": "(a) 保持本片出口纯度（存在/身份/父子/存活期/两种默认五件事，全部有牙齿）；(b) 让「失败的运行」在 trace 里一眼可见，与 G9 的运维叙事更贴近，但应由自带错误分类语义的一片来做，而不是挂在本片收口之后。"
+    }
+  ],
+  "notes": "本契约为 design-tests 阶段产物（activationId 待工作项派发后回填）。实验全部在 /tmp 副本（/tmp/g9s2 候选、/tmp/g9s2seg1 第一段、/tmp/g9s2a 与 /tmp/g9s2c 两个被否证选项、/tmp/g9s2base pristine+探针、/tmp/g9s2mut* 变异工作区），均为 HEAD c8142b2 的 rsync 副本（--exclude .git），仓库工作树除本文件外零接触、未执行任何 git 写操作（`git status --porcelain` 起草前后均为仅 ` M yarn.lock`）。回执纪律：所有 ID 现取现贴（本契约里每一个 receipt 都在本轮由 `node /tmp/rex-receipt.mjs -- bash -c \"<命令>\"` 执行、读数由**逐字同一条命令**的明文复跑读取；工具吞 stdout 只记 exit 与 sha256，故没有一条数值来自记忆）。中途出现的四类错误全部如实登记并已在正文修正：（1）**口径错值**——起草早期把 run.go/stream.go 的行数记作 310/251，实测为 **191/284**（receipt 明文 wc），基线 1727 与 kernel 94→117 未受影响；本契约一律按实测口径。（2）**锚清单里的幻文件**——初稿把 stream_producers_test.go 与 errors_test.go 列为只读锚，实测仓库内**不存在**（`git hash-object` 报 No such file；receipt:e5ffac1e 明文可见），而当时配套的比对命令对两份不存在文件返回「SAME」（空哈希互等）——假阳性，已剔除并把锚集合改为实测存在的 8 份（receipt:5b4496ba）+ out-of-seam 8 份（receipt:bdf869fb/b670db41）。这是「断言文件存在之前先查文件系统」这条纪律在本程序里第二次被抓，值得进状态文档。（3）**谓词误用**——负向行 D8 的前置最初打算用 observability.IsRecording(ctx)，实测该谓词对装了真 SDK 的裸 ctx 仍为 false（receipt:d5b68f60 四读数），遂改为 Tracer().Start 探针，并把这一坑登记为 S32-STD-1。（4）**gofmt 抓到自己的预演文件**——`gofmt -l /tmp/g9s2/pkg/hno/agent` 曾输出 p7g9s2_agent_span_test.go（receipt:0356d761，一行缩进），修复后复跑为空（receipt:9abd0bbf），随后重取全部候选回执（绿读数因此同时存在修复前 receipt:28b2c0ab/a1875eba 与修复后 receipt:91990c5a/54530baa 两组——**收口以修复后一组为准**，前一组仅登记为过程冗余，不作独立证据，同切片 31 对冗余回执的处置）。（5）**grep 口径坑**：`grep -c` 无命中时退码 1，因此 `r.Run(` 归零（receipt:36a68877 exit=1）与 sync 原语归零（receipt:0a1baf92 exit=1）两条读数取的是 stdout 计数而非退码；另一次把 `sync\\.` 的转义在双重引号里丢掉，导致命令实际匹配到注释里的单词「synchronous」得到假值 2（receipt:e3b39661）——该读数已作废并以 receipt:0a1baf92 的等价固定串形式重采。另登记一条口径提醒：本片 t.Parallel 的门禁必须是「行首空白后直接起头」的正则形式（receipt:b27f24e7/30358845），因为候选测试文件的纪律注释里含 `t.Parallel()` 字样，用朴素 `grep t.Parallel | wc -l` 会得到 1（假阳性）。工作项键取票面现值 work-p7-observability（切片 25 契约里写的 work-p7-g9-observability 不在票面 workItems 清单内，本片不沿袭该拼写）。｜实现者口径提醒三条：（i）本片**不许**改任何既有测试（allowedTestSeam.modify 为空），若实现中某条既有测试变红，那说明缝位改变了行为而不是测试需要修——回到本契约登记；（ii）D5 与 D2 的分工是最容易被误「合并优化」的地方，合并即失去对入口-defer 形状的探测力（forbiddenShortcuts 第 1/13 条）；（iii）新上限 1757 的余量只有 7 行，任何「顺手」都会立刻违约，而删双语注释不在允许的压缩手段之内。",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-platform.md#87",
+    "artifact:docs/design/v3-platform.md#595",
+    "artifact:docs/design/v3-delivery-ticket.json#work-p7-observability",
+    "artifact:docs/design/v3-test-scope-p7-g9-observability.json",
+    "artifact:docs/design/v3-test-scope-p1-graph-slice31.json",
+    "artifact:docs/design/v3-p1-graph-status.md",
+    "artifact:pkg/hno/observability/tracing.go#L65",
+    "artifact:pkg/hno/agent/tool_executor.go#L103",
+    "artifact:pkg/hno/runner/resilience.go#L40",
+    "receipt:b9e2cf4d-09b9-4877-8487-21854f4139d2",
+    "receipt:a8852bf3-c532-4bdc-98b3-be411b0c43d2",
+    "receipt:b161aaad-eb0b-4662-bd50-b3302ad0fc46",
+    "receipt:c4b6ddf3-18ff-4a85-978b-3676e6afb8ba",
+    "receipt:57de98bc-2574-4d59-9a5c-0b1002358476",
+    "receipt:b27f24e7-175c-4150-8bd9-f7cd883be2ac",
+    "receipt:c3df240b-8682-4761-8e8d-f621cbc4225f",
+    "receipt:652296a9-9c51-421f-9197-abf64a0e3273",
+    "receipt:5cff9bf2-915c-405f-8140-53ef4e22d9b6",
+    "receipt:5b4496ba-497b-4b99-97d3-618f74ee3974",
+    "receipt:212d6eb7-e0cc-4c5d-a135-555d82302c84",
+    "receipt:bdf869fb-0ee4-4fff-ac53-47f1904d8ebd",
+    "receipt:b670db41-fc23-4cf0-8469-6f02dfede41d",
+    "receipt:54530baa-3ade-49b5-a2e1-9fa201f2c4c9",
+    "receipt:91990c5a-972c-45f1-ae5f-6039824ee986",
+    "receipt:28b2c0ab-d789-4016-8fb7-6cc3d8f3bf6e",
+    "receipt:a1875eba-f997-4867-9f56-1048e02aebac",
+    "receipt:0c4ff2c6-778c-4e3d-9ebf-30403d47f2a4",
+    "receipt:fb51ad53-26ed-451e-8519-4178eeb363a2",
+    "receipt:2d9cf884-69b3-4878-9afd-3258eec3e921",
+    "receipt:14a86b3c-a7b1-4c6c-b861-723311b81951",
+    "receipt:fb38b243-5f39-4b79-8ee8-bad2f0e6263c",
+    "receipt:8ee3cdce-1ad8-4f4a-9d0e-8157839c766e",
+    "receipt:0a1baf92-d885-487b-a764-772fab568c2c",
+    "receipt:889d09d6-f2f6-4255-a5f9-ecfed1b47b99",
+    "receipt:36a68877-182f-4750-981b-3e4975e27d90",
+    "receipt:35ffda9a-61ed-41a8-b482-fc0b4e48d1ee",
+    "receipt:4ee8d5fb-dc37-428a-858d-d1ef04f7be29",
+    "receipt:0c1b605c-6d4a-4529-8678-9805df91b5f1",
+    "receipt:30358845-84bf-4ec3-b936-867f12f053da",
+    "receipt:5d6789ef-3ae1-4d10-bba8-981adaf01e6f",
+    "receipt:49ed500a-fee3-40d7-b606-f30cb0497a22",
+    "receipt:ffd7aa7f-211e-4a4e-ad58-cc5dda8cbdae",
+    "receipt:1015bac3-abfc-4b2a-9d0d-224540455ea1",
+    "receipt:66cd4e7a-faf6-4da8-9b33-d4c3a40bb60c",
+    "receipt:95fda75b-f741-4a4c-883d-787ac427803b",
+    "receipt:0356d761-6c24-41d7-a4d3-84819b72b0f7",
+    "receipt:9abd0bbf-e78a-49c9-82c9-898febf8114b",
+    "receipt:bf6b37ac-dceb-4f44-b0c9-cfeb602f8869",
+    "receipt:94afc17a-31a8-48d7-b271-5f020b9c8634",
+    "receipt:d5b68f60-7846-43cd-8948-e0535d94f04e",
+    "receipt:c2ae87fa-bdfe-412e-910e-daf038b826de",
+    "receipt:ec06a219-b355-42c0-a91a-f754b835dd9e",
+    "receipt:f47e8555-3c8d-491a-8baa-b5be766c9ef3",
+    "receipt:3335e334-6871-4c02-8084-1a6900e3e54a",
+    "receipt:933edca3-2460-40cc-a4a7-e786ec34d324",
+    "receipt:eaa196e9-558f-4653-ac6a-9e001fa98754",
+    "receipt:b36ec9be-2bec-4ffc-be0b-e6a7f3296e8c",
+    "receipt:95847b99-51d6-44be-88d3-f85ed84cca39",
+    "receipt:2729c2c2-55dc-4a5b-b11a-b3ee888a02c5",
+    "receipt:d4013cfe-e804-4e0b-a0ca-0e75f7ef83c1",
+    "receipt:a982d864-3f52-4640-942b-d4618a56a722",
+    "receipt:38643acc-ae1b-49cf-8f39-89d8e03c8c0c",
+    "receipt:e5ffac1e-3701-45bc-b5ed-9a7d629dd0f9",
+    "receipt:9aacf07e-0eee-432e-b28a-d3f6b940dd99",
+    "receipt:34ee49aa-7e56-4b46-b1cc-32478e6fa46b",
+    "artifact:/tmp/g9s2mutate.mjs",
+    "artifact:/tmp/g9s2mutate2.mjs",
+    "artifact:/tmp/g9s2mutate3.mjs",
+    "artifact:scripts/mutation/p4s31-tasks-producer.mjs"
+  ]
+}

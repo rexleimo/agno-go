@@ -131,7 +131,7 @@ func (a *Agent) runStreamMessages(ctx context.Context, input string, modes map[r
 			return
 		}
 
-		finalResponse, _, stopReason, err := r.Run(ctx, a.Memory.GetMessages(a.UserID))
+		finalResponse, _, stopReason, err := a.runKernel(ctx, runID, r, a.Memory.GetMessages(a.UserID))
 		if err != nil {
 			switch stopReason {
 			case runner.StopCancelled:

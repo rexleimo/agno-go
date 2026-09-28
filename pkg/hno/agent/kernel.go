@@ -4,9 +4,32 @@ import (
 	"context"
 
 	"github.com/rexleimo/agno-go/pkg/hno/models"
+	"github.com/rexleimo/agno-go/pkg/hno/observability"
 	"github.com/rexleimo/agno-go/pkg/hno/runner"
 	"github.com/rexleimo/agno-go/pkg/hno/types"
 )
+
+// runKernel drives the shared runner loop under the run-level invoke_agent span.
+// The span opens here and ends here, in one function, which is why Agent.Run and the
+// streaming goroutine cannot drift apart: each has exactly one drive site and both
+// call this. The ctx handed to the kernel carries the span, so the per-attempt chat
+// spans (runner) and the execute_tool spans (this package) become its children; that
+// parenting is the whole point of the seam.
+// runKernel 在运行级 invoke_agent span 之下驱动共享的 runner 循环。span 只在这一个
+// 函数里开启、也只在这里结束，因此同步入口与流式协程无法各自漂移：两条路径各只有一个
+// 驱动点，且都调用本函数。交给内核的 ctx 携带该 span，于是 runner 的逐尝试 chat span
+// 与本包的 execute_tool span 成为它的子 span —— 这个父子关系正是这条缝的全部意义。
+func (a *Agent) runKernel(
+	ctx context.Context,
+	runID string,
+	r *runner.Runner,
+	messages []*types.Message,
+) (*types.ModelResponse, []*types.Message, runner.StopReason, error) {
+	spanCtx, span := observability.StartAgentSpan(ctx, a.Name, runID)
+	defer span.End()
+
+	return r.Run(spanCtx, messages)
+}
 
 // kernelState receives the loop counters the agent needs back from the kernel.
 // kernelState 接回 agent 需要的内核循环计数。

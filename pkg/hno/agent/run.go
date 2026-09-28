@@ -129,7 +129,7 @@ func (a *Agent) Run(ctx context.Context, input string) (*RunOutput, error) {
 	}
 
 	messages := a.Memory.GetMessages(a.UserID)
-	finalResponse, _, stopReason, err := r.Run(ctx, messages)
+	finalResponse, _, stopReason, err := a.runKernel(ctx, runID, r, messages)
 
 	if err != nil {
 		// The kernel classifies the stage it failed in; the agent only maps that
