@@ -1,0 +1,5 @@
+{
+  "status": "error",
+  "code": "NOT_FOUND",
+  "message": "session not found"
+}

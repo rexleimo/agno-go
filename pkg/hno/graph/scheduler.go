@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"sort"
 	"time"
 )
@@ -84,6 +85,9 @@ type scheduler struct {
 	exitQueue    []Checkpoint
 	commits      chan Checkpoint
 	flushDone    chan error
+	// rnd 是本次 Run 的抖动随机源（时间种子，每次 Run 独立；不引入全局态，
+	// 消费者协程独占读写——零锁口径不变）。
+	rnd *rand.Rand
 	// waits/feeds 描述本次 Run 的汇聚屏障（每个目标等待的去重前驱集合及其反向索引），
 	// joinCollected 收集已经到达的前驱输出。三者与 pending 一样只由唯一消费者读写，
 	// 因此同样不需要锁（票面 §3.3）。
@@ -312,6 +316,7 @@ func (s *scheduler) runNode(act activation) (out any, sends []Send, err error, a
 			break
 		}
 		if d := pol.retry.delayFor(attempt); d > 0 {
+			d = applyJitter(d, pol.retry.Jitter, s.rnd)
 			select {
 			case <-s.ctx.Done():
 				return nil, nil, s.ctx.Err(), attempt

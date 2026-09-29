@@ -1,0 +1,5 @@
+{
+  "status": "error",
+  "code": "DATABASE_NOT_FOUND",
+  "message": "database not found"
+}

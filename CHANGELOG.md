@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-09-29
+
+The v3 program: a lock-free control-flow graph engine with policies,
+durability, HITL, streaming, and observability — plus the workflow
+migration onto it.
+
+### ✨ Added
+- **Graph engine** (`pkg/hno/graph`): zero-lock single-consumer scheduler;
+  DAG/conditional/default/join routing; dynamic fan-out (`Send`/`SenderFunc`/
+  `AddJoinSend`); build-time validation with locatable errors; step-budget
+  valve; panic barrier; cancellation normalization; typed nodes
+  (`Typed[TIn, TOut]`).
+- **Node policies** (slice 22): `WithRetry` (full-jitter backoff wired in
+  slice 35), `WithTimeout` (per-node/per-attempt), `WithCache`
+  (success-only, fail-closed), `WithTrace` (consumer-side hook) via variadic
+  `AddNode`.
+- **Durability** (slice 24): Sync/Async/Exit checkpoint tiers,
+  `Checkpointer`/`Checkpoint` with consumer-stamped `Seq`.
+- **Human-in-the-loop** (slices 27/28): `RequestInterrupt` → durable
+  `*Suspension`; `Resume` with schema-checked, idempotent semantics and
+  Rerun/Handoff modes; session sidecar (`pkg/hno/session/sidecar`) +
+  `internal/hitlbridge` for cross-process resume.
+- **Streaming protocol** (slices 23/31/34): `run.StreamMode` seven modes and
+  six event types; all seven producers wired on the agent path
+  (`Messages`/`Tasks`/`Updates`/`Values`/`Checkpoints`/`Debug`/`Custom`),
+  `RunStreamMode` selector with `Agent.WriteCustomEvent`.
+- **Observability** (slices 25/32): breaker→span→retry wired at the runner
+  model boundary; run/agent-level spans — four-level coverage
+  (run/agent/model/tool).
+- **Store** (slice 29): G8 minimal long-term-memory core
+  (`pkg/hno/store`): namespaces, optional embedding search, memory +
+  Postgres backends.
+- **Workflow migration** (slice 33): workflow control flow compiles onto the
+  graph kernel (OPT-β); public API unchanged, existing tests byte-identical.
+- Session contract fixtures landed in-repo; the 9 Go↔Python contract tests
+  now execute (previously skipped).
+
+### 🛠️ Changed
+- Lint zeroed across all v3-touched packages (first golangci-lint run).
+- Documentation: graph engine/policies/durability/HITL/Store guides, API
+  references, and three engineering posts (en+zh).
+
+
 ### 🛠️ Changed
 - `Agent.ToolCallLimit` now counts tool calls **per run** instead of accumulating across the stored conversation history. A run that starts with tool messages already in memory gets its full budget again. 行为变更：工具调用上限改为按本次运行计数。
 - Failing runs now carry a distinct stop reason: model-invocation failures report `model_failure` and tool-execution failures report `tool_failure`, instead of both being reported as `cancelled`.

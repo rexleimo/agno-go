@@ -122,7 +122,8 @@ func (a *Agent) runStreamMessages(ctx context.Context, input string, modes map[r
 			return a.streamOnce(turnCtx, req, emitter)
 		})
 
-		r, err := a.newKernel(ctx, tools, currentInstructions, state, invoker, nil, emitter.tasksExecutor(a))
+		messageCount := func() int { return len(a.Memory.GetMessages(a.UserID)) }
+		r, err := a.newKernel(ctx, tools, currentInstructions, state, invoker, emitter.turnObserver(ctx, messageCount), emitter.streamExecutor(a))
 		if err != nil {
 			a.logger.Error("failed to create runner (stream)", "error", err)
 			// The loop never started, so there is no stage to blame; the error

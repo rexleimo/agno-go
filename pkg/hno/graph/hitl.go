@@ -10,7 +10,9 @@ import (
 	"errors"
 	"fmt"
 	"maps"
+	"math/rand"
 	"slices"
+	"time"
 )
 
 // InterruptMode 决定恢复时等待节点如何消费人类的响应。
@@ -177,6 +179,7 @@ func (g *Graph) newScheduler(ctx context.Context, seq, steps int) *scheduler {
 		waits:          waits,
 		feeds:          feeds,
 		joinCollected:  map[string]map[string]any{},
+		rnd:            rand.New(rand.NewSource(time.Now().UnixNano())),
 		sendPending:    map[string]int{},
 		sendCollected:  map[string][]any{},
 		sendFired:      map[string]bool{},

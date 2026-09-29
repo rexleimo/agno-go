@@ -1,0 +1,15 @@
+{
+  "user_id": "user-001",
+  "session_id": "sess-agent-002",
+  "session_name": "Created Session",
+  "session_state": {
+    "mode": "agent"
+  },
+  "metadata": {
+    "env": "test"
+  },
+  "agent_id": "agent-001",
+  "created_at": "2026-09-29T08:00:00Z",
+  "updated_at": "2026-09-29T08:00:00Z",
+  "agent_session_id": "sess-agent-002"
+}

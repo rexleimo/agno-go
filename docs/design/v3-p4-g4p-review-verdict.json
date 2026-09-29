@@ -1,0 +1,104 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.standards-spec-review.v1",
+  "workItemKey": "work-p4-g4-producers",
+  "activationId": "pending",
+  "capabilityId": "software.review.standards-spec",
+  "stageId": "review",
+  "recordedAt": "2026-09-29T05:05:00Z",
+  "independenceDisclosure": "实现由派发子代理执行（用户 2026-09-28 明确允许并行子代理），契约起草与两段实现、测试、变异、证据落笔均由该子代理在同一会话内完成；两轴审查由同一执行者承担，独立性缺口如实登记。缓解：全部结论落在实测上（两段红绿回执、41 锚逐字节 diff、12 条变异 census、契约逐条对账），而非走查断言。",
+  "fixedPoint": {
+    "note": "本切片的 fixed point 是契约 baselineBytes（41 锚 + run/runner 计数 + graph 目录同命令同输出锚），不是某个 commit（工作树未提交，yarn.lock 的既有改动非本片所为）。",
+    "anchorsAtClose": "41/41 逐字节全同（diff 实测；收口 receipt:f7885f4b-e29a-4a01-85ef-242ace35e6d6）",
+    "graphMustStay": "pkg/hno/graph 全目录 manifest md5 实现前后同值 f8f2feed8ee5226b4f3a08919ecf6ff2（起草 receipt:d1c9cdb4 尾段 / 收口 receipt:f7885f4b 尾段）；本片对其零接触、零测试执行"
+  },
+  "diffRef": {
+    "how": "逐文件清单（git status --porcelain 实测：5 修改 + 2 新增 + 既有 yarn.lock，无其他）",
+    "changedFiles": [
+      { "path": "pkg/hno/agent/stream_producers.go", "before": "2f16a32b060338110c379ece747fe8d846956e9e", "after": "c71b26ebcfe760647437373f16acec306a7cac0a", "scope": "wiredStreamModes 七模式 + Debug 并集门 + 族门内移 + streamExecutor + turnCompleted/snapshot/turnObserver + Custom 写透（customWriter Mutex）+ 导出 WriteCustomEvent（146 → 289 行）" },
+      { "path": "pkg/hno/agent/stream.go", "before": "51943b690dcd8d26cd9414c2265de001eda6f672", "after": "cfba18557dc81832349b9b5023eef068f15896fa", "scope": "恰两处调用面：turnObserver 接上 onAssistantTurn；tasksExecutor → streamExecutor" },
+      { "path": "pkg/hno/agent/runstreammode_test.go", "before": "7c3599763fabbfc193e4e3f3c6b4a293c109d06d", "after": "0ba3068bf0f599ecf5afb76c5fa3e41eb4cb77f7", "scope": "授权迁移 1：unsupported 名单五模式 → 未知序数 99/7；mixed 子用例同步；注释迁移说明" },
+      { "path": "pkg/hno/agent/stream_tasks_test.go", "before": "107e4b9cd8c0ef3b9f82b4b36f04d8f83b03a7d5", "after": "18d215e955aa31ba023cf4a9ad111642b3199eb8", "scope": "授权迁移 2：unwired 名单 → 未知序数；D8 debug 负控转正为并集正向冒烟（完整判据搬家到本片新文件）" },
+      { "path": "pkg/hno/agent/p7g9s2_agent_span_test.go", "before": "358403deb276f7bba618e7822b7552ae5176f3f6", "after": "0ac0490230b4b0c4672ab35a5481e89126a43ec9", "scope": "授权迁移 3：D6 负控探针 StreamValues → 未知序数 99（断言形状零改动）" },
+      { "path": "pkg/hno/agent/stream_producers_test.go", "before": null, "after": "（新增，676 行，package agent_test）", "scope": "TestP4G4P_* 八个测试函数覆盖 D1–D8；自含夹具（脚本化流式 fake model + weather/boom/scribe 处理器）" },
+      { "path": "scripts/mutation/p4g4-producers.mjs", "before": null, "scope": "本片变异执行体，11 杀红 + 1 等价（m-ledger-order）" },
+      { "path": "docs/design/v3-test-scope-p4-g4-producers.json", "before": null, "scope": "本片契约（design-tests + 实现一体交付）" }
+    ],
+    "unchangedFiles": "其余 38 份既有测试文件 + run/runner 全部 18 份 + agent 其余 11 份非测试文件逐字节不动（41 锚 diff 实测）；kernel.go/run.go/runner_adapter.go/tool_executor.go/agent.go 零改动（onAssistantTurn 是现成缝）",
+    "nonTestLoc": "agent 非测试 1749 → 1894（+145，契约天花板 1920 内，余量 26）",
+    "exportedSymbols": "agent 21 → 22（唯一新增 = WriteCustomEvent，go doc 计数差值证明）",
+    "syncCount": "agent 非测试 3 → 4（唯一新增 = customWriter 的 Mutex，只护 custom 发射路径）"
+  },
+  "standardsAxis": {
+    "gates": [
+      { "gate": "绑定命令 -count=1 -race -v（8 个测试函数）", "result": "段1 红 receipt:fa6aafaa-b247-48e4-9a1d-ee319b40a519（5 行为红/3 绿，vet exit 0 receipt:eb18e52c）；段2 全绿 receipt:4082e7da-164d-4c67-b25a-99b510f4c327" },
+      { "gate": "go build ./... + agent/run plain + race + vet + gofmt", "result": "全 exit 0（receipt:f9d72be6-bd80-4442-b4bb-080168730fc9；gofmt 空输出）" },
+      { "gate": "邻近面 team/workflow/session-contract -count=1", "result": "全 ok，exit 0（receipt:03ae0b3a-99cc-4911-913b-bc605711ef2c）" },
+      { "gate": "防碰巧绿：绑定 -count=30 -race", "result": "exit 0（receipt:029f1102-c46f-450b-8cda-5424a73ccdbb）" },
+      { "gate": "防碰巧绿：agent+run -count=5 -race", "result": "exit 0（receipt:c6326052-df6b-4eb9-bd56-a529800be23e）" },
+      { "gate": "变异矩阵 12 条（control 绿 + 按声明杀红/等价登记）", "result": "exit 0 违规 0（receipt:deb6d676-eaf2-4215-99a5-0e2659bea321；首版 m-custom-gate NO_TEETH 已修正并全量重跑）" },
+      { "gate": "41 锚 + graph md5 前后同值", "result": "41/41 逐字节全同；graph md5 同值（receipt:f7885f4b）" }
+    ],
+    "forbiddenShortcutsAudit": "逐条核对契约 forbiddenShortcuts：无「加表不发事件」（D3–D7 族内容绝对序列 + m-per-chunk/m-turn-count 证）；fail-closed 未拆除只收窄（m-degrade 证，未知序数三判据存活）；Updates/Values 判别落在载荷键形而非 Node/子类型（m-values-keys 证，run 包零改动锚证）；逐回合非逐分块（m-per-chunk 证）；Debug 非别名、不暗含 Messages、不重复（m-debug-union/m-debug-messages 证）；Custom 写入口为 ctx writer 单导出符号、fail-closed（m-custom-gate/m-custom-payload 证，go doc 计数证）；emit 主路径零锁（sync 计数 3→4 且全在 customWriter 证）；三份既有测试只动授权行（41 锚 + diff 面 5+2 证）。"
+  },
+  "specAxis": {
+    "coverageMapping": "契约 D1–D9 逐行有 Test（green 文档 §5）、逐行有实现落点（stream_producers.go 行级定位）、逐行有牙齿（refactor 文档 §1：每行至少被一个变异杀死，D8←m-turn-gate）。母约 P4 三条验收全落：七模式协议=切片 23、Tasks 生产者=切片 31、剩余五模式=本片 → P4 全清；旧 run_content/run_completed 行为不变=D8 双面断言 + 切片 23/31 既有测试迁移后全绿。",
+    "redAuthenticity": "段1 红为真实行为红：5 个测试函数的 `stream kinds = [] (0 events)` 家族读数（发射体空转而非编译/setup 失败），vet exit 0 证明分段可编译；vacuous-green（D7 两个失败面子用例）按契约如实归类；两段之间测试文件零改动。"
+  },
+  "findings": [
+    {
+      "id": "S34-STD-1",
+      "severity": "process",
+      "title": "fail-closed 的构造点要数全，否则变异被自己的锚短路",
+      "detail": "首版 m-custom-gate 只摘 Execute 内的安装门，实测 NO_TEETH：D7 的负向子用例走 Messages-only 运行，而 Messages-only 在 streamExecutor 处根本不挂包装器，安装门从未被执行。修正为「安装门 + executor 选择门」两处同摘后 D7 判红。教训：一个 fail-closed 性质若由多道构造共同成立，变异必须覆盖全部构造点，否则变异在第一道短路处就被短路掉。"
+    },
+    {
+      "id": "S34-STD-2",
+      "severity": "process",
+      "title": "迁移前置是两段制归因纪律的前提",
+      "detail": "三份既有测试的「五模式 fail-closed」断言若不先迁移，第一段落的红会被无关失败污染。本片把迁移行作为 redProtocol 的显式前置步骤执行，红形因此干净（5 红全部来自 D3–D7）。供后续解禁片直接沿用。"
+    },
+    {
+      "id": "S34-SPEC-1",
+      "severity": "carried",
+      "title": "逐回合键控是 agent 路径语义本体，不是图语义近似",
+      "detail": "Updates/Values/Checkpoints 按「模型回合」键控（OnStep 时刻）、Custom 按「工具 handler 体」写入——这是 agent 路径下唯一诚实的形状；图侧键控（节点级）属 S34-QUEUE-1 未排期，本片文档与断言一律不冒充图节点语义。"
+    },
+    {
+      "id": "S34-LIM-1",
+      "severity": "limit",
+      "title": "取消丢弃回合事件无错误面 + Custom 并发写入无全序",
+      "detail": "turnObserver 的 void 签名决定取消时挂起的回合事件被丢弃且不另报错误（终态已由 done.Err/StopReason 承担）；Custom 并发 handler 写入之间的相互次序不保证（互斥只保证单条事件的账面序==通道序）。两者均为契约 observabilityLimit 显式登记的范围收缩，非缺陷。"
+    }
+  ],
+  "completionAudit": {
+    "contractCriteria": "契约 completionCriteria 8 条逐条对账：1 两段红绿 receipt 落档（red-observation 文档）；2 迁移恰三份三处、41 锚全同、changedBefore 5 变动（green 文档 §3/§4）；3 变异矩阵 12 条按声明（refactor 文档 §1，含 1 等价）；4 门禁全 exit 0（green 文档 §1；graph 若在途编译失败的分包备选未触发——go build ./... 实测过）；5 结构读数实读到值（green 文档 §4）；6 -count=30/-count=5 防碰巧绿（green 文档 §1）；7 母约 §5/§10 写回完成 + stream_producers.go 注释更新；8 证据四件套落盘（本文件为第四件）。",
+    "p4Closure": "P4（G4 StreamMode 七模式）至此全清：协议层（切片 23）→ Tasks 生产者（切片 31）→ 剩余五模式生产者（本片）。剩余前沿登记：图侧键控同族生产者（S34-QUEUE-1，未排期）、错误文案可读化（S31-STD-1 续挂）、工具失败分类的 HasPrefix 嗅探判据缺口（S31-GAP-1，本片未顺手处理）。"
+  },
+  "verdict": "pass",
+  "evidenceRefs": [
+    "artifact:docs/design/v3-test-scope-p4-g4-producers.json",
+    "artifact:docs/design/v3-red-observation-p4g4p.md",
+    "artifact:docs/design/v3-p4-g4p-green.md",
+    "artifact:docs/design/v3-p4-g4p-refactor.md",
+    "artifact:docs/design/v3-platform.md#345",
+    "artifact:docs/design/v3-platform.md#605",
+    "artifact:scripts/mutation/p4g4-producers.mjs",
+    "receipt:8210683a-ba1e-4cc1-9319-f40be844d6ad",
+    "receipt:1b7e30c7-103b-4b16-b5fe-e9e58a647ff6",
+    "receipt:de7247b1-3da2-4bf0-9b7d-20f7cf273fd9",
+    "receipt:f800c09d-6956-46ac-bfb9-1af0a03c0d55",
+    "receipt:d1c9cdb4-9c98-4843-aaea-978ffddf7d15",
+    "receipt:31ad526a-4150-4af1-9fa1-515ccddc7022",
+    "receipt:fa6aafaa-b247-48e4-9a1d-ee319b40a519",
+    "receipt:eb18e52c-0772-4512-a25f-8eecbf313c4a",
+    "receipt:4082e7da-164d-4c67-b25a-99b510f4c327",
+    "receipt:f9d72be6-bd80-4442-b4bb-080168730fc9",
+    "receipt:03ae0b3a-99cc-4911-913b-bc605711ef2c",
+    "receipt:029f1102-c46f-450b-8cda-5424a73ccdbb",
+    "receipt:c6326052-df6b-4eb9-bd56-a529800be23e",
+    "receipt:8837f5d3-5a55-4f59-9f07-8569bd8c3057",
+    "receipt:f7885f4b-e29a-4a01-85ef-242ace35e6d6",
+    "receipt:deb6d676-eaf2-4215-99a5-0e2659bea321"
+  ]
+}

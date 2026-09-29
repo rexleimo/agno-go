@@ -1,0 +1,5 @@
+{
+  "status": "error",
+  "code": "INVALID_SESSION_TYPE",
+  "message": "invalid session type: invalid"
+}

@@ -172,17 +172,15 @@ func TestP4G4_RunStreamEquivalentToRunStreamModeMessages(t *testing.T) {
 	}
 }
 
-// TestP4G4_RunStreamModeUnsupportedModesFailClosed 钉 D10：其余任一模式 → 返回可
+// TestP4G4_RunStreamModeUnsupportedModesFailClosed 钉 D10：任一未接线模式 → 返回可
 // errors.Is 到 ErrUnsupportedStreamMode 的错误且不启动流（stub 零调用、无结果对象）；
 // 无模式默认 StreamMessages（与 RunStream 同形）；与 Messages 混入其它模式同样 fail-closed。
-// Tasks 的生产者已随切片 31 落地（母约 §5 的解禁），其正向判据搬家到 stream_tasks_test.go。
+// Tasks 的生产者已随切片 31 落地（母约 §5 的解禁），其正向判据搬家到 stream_tasks_test.go；
+// 五个已知模式的生产者已随切片 34 全部落地，fail-closed 判据收窄到协议之外的未知序数。
 func TestP4G4_RunStreamModeUnsupportedModesFailClosed(t *testing.T) {
 	unsupported := []run.StreamMode{
-		run.StreamValues,
-		run.StreamUpdates,
-		run.StreamCheckpoints,
-		run.StreamDebug,
-		run.StreamCustom,
+		run.StreamMode(99),
+		run.StreamMode(7),
 	}
 	for _, mode := range unsupported {
 		t.Run(fmt.Sprintf("mode-%d", int(mode)), func(t *testing.T) {
@@ -205,7 +203,7 @@ func TestP4G4_RunStreamModeUnsupportedModesFailClosed(t *testing.T) {
 
 	t.Run("mixed with messages still fails closed", func(t *testing.T) {
 		ag, model := p4g4NewStreamAgent(t, []string{"no"})
-		result, err := ag.RunStreamMode(context.Background(), "hi", run.StreamMessages, run.StreamValues)
+		result, err := ag.RunStreamMode(context.Background(), "hi", run.StreamMessages, run.StreamMode(99))
 		if !errors.Is(err, run.ErrUnsupportedStreamMode) {
 			t.Fatalf("mixed modes: want ErrUnsupportedStreamMode, got %v", err)
 		}

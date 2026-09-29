@@ -35,7 +35,7 @@ export default defineConfig({
           { text: 'Examples', link: '/examples/' },
           { text: 'Blog', link: '/blog/' },
           {
-            text: 'v2.0.0',
+            text: 'v3.0.0',
             items: [
               { text: 'Changelog', link: 'https://github.com/rexleimo/HNO/blob/main/CHANGELOG.md' },
               { text: 'Release Notes', link: '/release-notes' }
@@ -164,7 +164,7 @@ export default defineConfig({
           { text: '示例', link: '/zh/examples/' },
           { text: '博客', link: '/zh/blog/' },
           {
-            text: 'v2.0.0',
+            text: 'v3.0.0',
             items: [
               { text: '更新日志', link: 'https://github.com/rexleimo/HNO/blob/main/CHANGELOG.md' },
               { text: '发布说明', link: '/zh/release-notes' }
@@ -292,7 +292,7 @@ export default defineConfig({
           { text: '高度な内容', link: '/ja/advanced/' },
           { text: 'サンプル', link: '/ja/examples/' },
           {
-            text: 'v2.0.0',
+            text: 'v3.0.0',
             items: [
               { text: '変更履歴', link: 'https://github.com/rexleimo/HNO/blob/main/CHANGELOG.md' },
               { text: 'リリースノート', link: '/ja/release-notes' }
@@ -397,7 +397,7 @@ export default defineConfig({
           { text: '고급', link: '/ko/advanced/' },
           { text: '예제', link: '/ko/examples/' },
           {
-            text: 'v2.0.0',
+            text: 'v3.0.0',
             items: [
               { text: '변경 로그', link: 'https://github.com/rexleimo/HNO/blob/main/CHANGELOG.md' },
               { text: '릴리스 노트', link: '/ko/release-notes' }
@@ -507,7 +507,7 @@ export default defineConfig({
       { text: 'Examples', link: '/examples/' },
       { text: 'Blog', link: '/blog/' },
       {
-        text: 'v2.0.0',
+        text: 'v3.0.0',
         items: [
           { text: 'Changelog', link: 'https://github.com/rexleimo/HNO/blob/main/CHANGELOG.md' },
           { text: 'Release Notes', link: '/release-notes' }

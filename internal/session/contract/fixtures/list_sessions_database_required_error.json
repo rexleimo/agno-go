@@ -1,0 +1,5 @@
+{
+  "status": "error",
+  "code": "DATABASE_REQUIRED",
+  "message": "db_id query parameter is required when multiple databases are configured"
+}

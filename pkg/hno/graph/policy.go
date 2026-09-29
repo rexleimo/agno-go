@@ -14,6 +14,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"math/rand"
 	"time"
 )
 
@@ -104,6 +105,20 @@ func (c *RetryConfig) delayFor(tries int) time.Duration {
 		}
 	}
 	return d
+}
+
+// applyJitter 是 RetryConfig.Jitter 的落点（full-jitter）：j>0 时实际退避在
+// [0, d) 均匀采样，d（折减后的退避）是永不放大的上限；j<=0 或 d<=0 恒等返回。
+// rnd 注入使分布可确定性测试——公共面只见「不超上限」这一界限语义，分布密度
+// 按切片 22 的预登记不进公共面。
+func applyJitter(d time.Duration, jitter float64, rnd *rand.Rand) time.Duration {
+	if d <= 0 || jitter <= 0 {
+		return d
+	}
+	if rnd == nil {
+		rnd = rand.New(rand.NewSource(time.Now().UnixNano()))
+	}
+	return time.Duration(rnd.Float64() * float64(d))
 }
 
 func (c *TimeoutConfig) deadline() (time.Duration, bool) {

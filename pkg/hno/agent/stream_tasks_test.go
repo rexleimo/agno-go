@@ -244,16 +244,14 @@ func TestP4S31_TasksModeIsWiredAndStartsTheStream(t *testing.T) {
 	}
 }
 
-// TestP4S31_UnwiredModesStillFailClosed 钉 D2：接线迁移的反方向 —— 五个未接线的模式
-// 逐个仍 fail-closed（错误、result==nil、模型零调用），与 Tasks 混选时整次调用仍
-// fail-closed 且点名**首个**未接线模式。十条子用例。
+// TestP4S31_UnwiredModesStillFailClosed 钉 D2：接线迁移的反方向 —— 未接线的模式逐个
+// 仍 fail-closed（错误、result==nil、模型零调用），与 Tasks 混选时整次调用仍
+// fail-closed 且点名**首个**未接线模式。五个已知模式的生产者已随切片 34 全部落地，
+// fail-closed 判据收窄到协议之外的未知序数。
 func TestP4S31_UnwiredModesStillFailClosed(t *testing.T) {
 	unwired := []run.StreamMode{
-		run.StreamValues,
-		run.StreamUpdates,
-		run.StreamCheckpoints,
-		run.StreamDebug,
-		run.StreamCustom,
+		run.StreamMode(99),
+		run.StreamMode(7),
 	}
 
 	for _, mode := range unwired {
@@ -643,15 +641,24 @@ func TestP4S31_ModeSelectionIsAnOrderIndependentUnion(t *testing.T) {
 		p4s31AssertKinds(t, collect(t), []string{run.EventTypeRunContent, run.EventTypeRunContent})
 	})
 
-	t.Run("debug is not accepted as a tasks alias", func(t *testing.T) {
+	t.Run("debug is wired as the checkpoints∪tasks family", func(t *testing.T) {
+		// Debug 的生产者已随切片 34 落地（并集门：Checkpoints ∪ Tasks，不暗含
+		// Messages、不重复发射）；其完整并集判据搬家到 stream_producers_test.go。
 		model := p4s31NewModel(p4s31ToolThenContent()...)
 		ag := p4s31Agent(t, model, 0)
 		result, err := ag.RunStreamMode(context.Background(), "hi", run.StreamTasks, run.StreamDebug)
-		if !errors.Is(err, run.ErrUnsupportedStreamMode) {
-			t.Fatalf("Tasks+Debug: want ErrUnsupportedStreamMode, got %v", err)
+		if err != nil {
+			t.Fatalf("Tasks+Debug: want the wired Debug union, got error %v", err)
 		}
-		if result != nil || model.streamCalls != 0 {
-			t.Fatalf("Tasks+Debug: stream started (result=%v, calls=%d)", result, model.streamCalls)
+		if result == nil {
+			t.Fatal("Tasks+Debug: result = nil, want a started stream")
+		}
+		_, done := p4s31Collect(t, result)
+		if done.Err != nil {
+			t.Fatalf("Tasks+Debug: stream finished with error = %v", done.Err)
+		}
+		if model.streamCalls < 1 {
+			t.Fatalf("Tasks+Debug: model invoked %d times, want >= 1", model.streamCalls)
 		}
 	})
 }

@@ -444,12 +444,12 @@ func TestP7G9S2_UnwiredStreamModeOpensNoSpan(t *testing.T) {
 		t.Fatalf("positive control: invoke_agent spans = %d, want 1 before the fail-closed call", before)
 	}
 
-	negative, err := p7g9s2Agent(t, p7g9s2NewModel(p7g9s2StreamTurn("hi"))).RunStreamMode(context.Background(), "hello", run.StreamValues)
+	negative, err := p7g9s2Agent(t, p7g9s2NewModel(p7g9s2StreamTurn("hi"))).RunStreamMode(context.Background(), "hello", run.StreamMode(99))
 	if err == nil {
-		t.Fatal("RunStreamMode(StreamValues) error = nil, want the fail-closed error")
+		t.Fatal("RunStreamMode(unknown mode 99) error = nil, want the fail-closed error")
 	}
 	if negative != nil {
-		t.Errorf("RunStreamMode(StreamValues) result = %v, want nil", negative)
+		t.Errorf("RunStreamMode(unknown mode 99) result = %v, want nil", negative)
 	}
 	after := p7g9s2ByName(exporter.GetSpans(), observability.SpanAgentRun)
 	if len(after) != before {

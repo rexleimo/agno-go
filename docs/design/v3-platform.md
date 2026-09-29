@@ -264,7 +264,7 @@ type RetryConfig struct {
     InitialDelay  time.Duration
     BackoffFactor float64
     MaxDelay      time.Duration
-    Jitter        float64
+    Jitter        float64  // 已接线（切片 35）：full-jitter，实际退避在 [0, 折减值) 均匀，上限不放大
     ShouldRetry   func(error) bool   // 默认不重试确定性输入错误
 }
 
@@ -344,19 +344,21 @@ type Event interface {
 >
 > **已交付（切片 31，Tasks 生产者）**：`run.StreamTasks` 在 `pkg/hno/agent` 侧接上运行期生产者 —— `stream_producers.go` 的 `wiredStreamModes` 模式表 + `streamEmitter`（按族门控、账本、序列号单一出口）+ `taskToolExecutor`（在被截断之后、并发派发之前按调用声明序发 `node_started`，批次汇合后按结果序发 `node_completed`/`task_error`）。分类只读 `toolResult.err`，不读消息文本；`ToolCallLimit` 截掉的调用不发事件。并集语义定形：模式选择是集合 ⇒ 给出次序无关、重复去重、`Debug` 不当 `Tasks` 别名。`pkg/hno/run`、`pkg/hno/runner`、`pkg/hno/graph` 本片零改动。判据 D1–D10、两段 RED/GREEN、9 条变异矩阵（含 1 条如实登记的等价变异）见 `docs/design/v3-test-scope-p1-graph-slice31.json` 与 `docs/design/v3-p1-graph-r31-green.md` / `-r31-refactor.md`。
 >
-> **七模式解禁状态**：
+> **已交付（切片 34，剩余五模式生产者 = P4 第 3 片，P4 全清）**：Values/Updates/Checkpoints/Debug/Custom 五模式在 `pkg/hno/agent` 侧全部接上运行期生产者，键控单位为**模型回合**（runner `StateAwaitModel` 的 OnStep 时刻，经 kernel 既有 `onAssistantTurn` 缝——agent 路径无图节点，这是唯一诚实的键控，图侧键控属 S34-QUEUE-1 未排期）。`StreamUpdates` 每完成回合一条 `StateUpdateEvent`（载荷 `{turn,delta}`）；`StreamValues` 每完成回合全量运行态（载荷 `{turn,content,messages}`，与 Updates 靠**载荷键形**判别，协议层零改动）；`StreamCheckpoints` 每完成回合一条 `CheckpointEvent`（label=`turn-N`，payload 与 Values 快照同形同值），同回合内次序钉死 [增量→全量→快照]；`StreamDebug` = Checkpoints ∪ Tasks 的**并集门**（每族恰一份、不暗含 Messages）；`StreamCustom` = ctx 携带 writer + 单导出写入口 `agent.WriteCustomEvent`（工具 handler 体内写入，未装 writer 时 fail-closed 报错——agent 包唯一新增导出符号）。五个已知模式解禁后，`ErrUnsupportedStreamMode` 收窄为对**未知模式序数**守门（错误文案形状不变）。`pkg/hno/run`、`pkg/hno/runner`、`pkg/hno/graph` 本片零字节改动。判据 D1–D9、两段 RED/GREEN、12 条变异矩阵（11 杀红 + 1 等价登记）见 `docs/design/v3-test-scope-p4-g4-producers.json` 与 `docs/design/v3-red-observation-p4g4p.md` / `v3-p4-g4p-green.md` / `v3-p4-g4p-refactor.md`。
+>
+> **七模式解禁状态（P4 全清）**：
 >
 > | 模式 | 状态 |
 > |---|---|
 > | `StreamMessages` | **已接**（`runStreamMessages` 生产者，`RunStream`/`RunStreamMode` 同形） |
-> | `StreamValues` | fail-closed 待生产者片（归属 P4 第 3 片：图侧事件桥接，门槛见 S31-SPEC-1） |
-> | `StreamUpdates` | fail-closed 待生产者片（归属 P4 第 3 片：图侧事件桥接，门槛见 S31-SPEC-1） |
+> | `StreamValues` | **已接**（切片 34：agent 逐回合全量状态，载荷 `{turn,content,messages}`） |
+> | `StreamUpdates` | **已接**（切片 34：agent 逐回合增量，载荷 `{turn,delta}`） |
 > | `StreamTasks` | **已接**（切片 31：agent 工具批次生产者） |
-> | `StreamCheckpoints` | fail-closed 待生产者片（归属 P4 第 3 片：检查点生产者，门槛见 S31-SPEC-1） |
-> | `StreamDebug` | fail-closed 待生产者片（依赖 Tasks/Checkpoints 的并集发射；归属 P4 第 3 片，等价判据见 S31-SPEC-1(d)） |
-> | `StreamCustom` | fail-closed 待生产者片（节点内自定义写入入口，仓库今天零现成入口；归属 P4 第 3 片） |
+> | `StreamCheckpoints` | **已接**（切片 34：agent 逐回合快照，label=`turn-N`） |
+> | `StreamDebug` | **已接**（切片 34：Checkpoints ∪ Tasks 并集门，不暗含 Messages） |
+> | `StreamCustom` | **已接**（切片 34：ctx writer + `agent.WriteCustomEvent`，工具 handler 体内写入，fail-closed） |
 >
-> 其余五模式在 `RunStreamMode` 上返回包装 `ErrUnsupportedStreamMode` 的错误、不启动流（fail-closed，不静默降级成零事件流）；各自生产者接线片落地时解禁（S23-SPEC-1 → 交 S31-SPEC-1）。
+> 七模式全部接线（P4 全清）；图侧键控的同族生产者（图节点 Values/Updates、图 Checkpointer、图节点体内 Custom）属 S34-QUEUE-1，未排期，事件协议复用切片 23 的六个构造函数。
 
 ---
 
@@ -602,7 +604,7 @@ func (g *Graph) Resume(ctx context.Context, responses map[string]any) (*Result, 
 | **P1** | G2 图引擎 v1 | P0 | `pkg/hno/graph` | 5 类图（DAG/并行/汇聚/条件/环）端到端测试；`-race` 全绿 |
 | **P2** | G3 策略四合一 | P1 | ~~Retry/Cache/Timeout/Trace~~ **已交付（切片 22）** | 每个策略独立测试 + 组合测试（D1–D14 + 9 条变异矩阵） |
 | **P3** | G5 Send + G6 Durability/StepLimit | P1 | 动态扇出 + 安全阀 | **全清**：**G5 Send 已交付（切片 26：动态扇出 Send + AddJoinSend，R19-Q2 裁决 OPT-C 落地，map-reduce 端到端 D1–D9 + 6 杀红变异）**；**G6 Durability 已交付（切片 24）**；StepLimit 已随切片 13 交付 |
-| **P4** | G4 StreamMode | P0 | 七模式 + 旧类型兼容 **协议层已交付（切片 23）**；**`StreamTasks` 生产者已接（切片 31 = P4 第 2 片：一模式落地 + 并集语义定形）**；其余五模式生产者接线归 P4 第 3 片（图侧事件桥接，S31-SPEC-1） | 旧 `run_content`/`run_completed` 行为不变 |
+| **P4** | G4 StreamMode | P0 | 七模式 + 旧类型兼容 **全清（P4 三片全交付）**：协议层（切片 23）；`StreamTasks` 生产者（切片 31 = 第 2 片，一模式落地 + 并集语义定形）；**剩余五模式生产者（切片 34 = 第 3 片：Values/Updates/Checkpoints 按模型回合键控 + Debug 并集门 + Custom ctx writer/`agent.WriteCustomEvent`，未知序数 fail-closed 收窄）——P4 全清** | 旧 `run_content`/`run_completed` 行为不变 |
 | **P5** | G7 事件化 + HITL | ~~P0 + 决策 D1~~ **全清（切片 27 引擎核心 + 28 侧车/跨进程恢复）** | 事件存储 + Resume **全部交付（27：引擎核心；28：`pkg/hno/session/sidecar` + `internal/hitlbridge` + `graph/restore.go`，D1–D10 + 10 杀红变异）** | 审批场景跨进程恢复**实测达成（双档端到端）**；重复 Resume 幂等**实测达成（跨重启）**；**契约测试绿（8 边界锚逐字节）** |
 | **P6** | G10 workflow 迁移 | ~~P1–P4~~ **已交付（切片 33，P6 全清）**：线性 + 条件 + 并行 + loop 编译进图，会话/历史/持久化/取消留 workflow | **现有用户零改动实测达成**（13 个既有测试文件逐字节不变全绿；导出面 146 不变）；`make test` 口径 -race 绿。三项开工前置以实现+测试关闭：(i) 并行扇出=值语义（分支头克隆私有 EC）、线性主干=引用穿线（D7/D8）；(ii) workflow 侧互补谓词、引擎零公共面新增（D4）；(iii) Router 未命中适配器显式复刻报错（D5 逐字节） |
 | **P7** | G9 观测接线 | P0 | retry/breaker 接进 runner **模型阶段已交付（切片 25，D1–D13 + 9 杀红变异矩阵）**；run/agent 级 span **已接（切片 32，D1–D11 + 10 项变异矩阵：8 杀红 + 等价/缺口各 1）**——S25-DEFER-1 结清 | span 覆盖状态表：**model=已接于 runner**（每尝试 chat span + usage 归集）；**tool=已在 agent 既有**（execute_tool）；**run/agent=已接（切片 32：agent 的 kernel 驱动点，私有 runKernel 单位点，chat/execute_tool 为其子）**。**P7 四级全清**（model/tool/run/agent 均有 span）；对 S25-DEFER-1 原建议形状的实测改判（驱动点之前而非 Agent.Run 入口）见 `v3-test-scope-p7-g9-agent-span.json` M3 |

@@ -1,0 +1,19 @@
+{
+  "data": [
+    {
+      "session_id": "sess-agent-001",
+      "session_name": "Support Agent Session",
+      "session_state": {
+        "mode": "agent"
+      },
+      "created_at": "2026-09-29T08:00:00Z",
+      "updated_at": "2026-09-29T08:00:00Z"
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total_count": 1,
+    "total_pages": 1
+  }
+}

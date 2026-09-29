@@ -1,0 +1,31 @@
+{
+  "user_id": "user-001",
+  "session_id": "sess-agent-001",
+  "session_name": "Support Agent Session",
+  "session_state": {
+    "mode": "agent"
+  },
+  "session_summary": {
+    "topic": "onboarding"
+  },
+  "agent_id": "agent-001",
+  "agent_data": {
+    "model": "gpt-x"
+  },
+  "metrics": {
+    "total_tokens": 128
+  },
+  "metadata": {
+    "env": "test"
+  },
+  "chat_history": [
+    {
+      "role": "user",
+      "content": "hi"
+    }
+  ],
+  "created_at": "2026-09-29T08:00:00Z",
+  "updated_at": "2026-09-29T08:00:00Z",
+  "agent_session_id": "sess-agent-001",
+  "total_tokens": 128
+}

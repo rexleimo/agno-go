@@ -368,7 +368,7 @@ func loadRunsFixture(t *testing.T, name string) []map[string]any {
 func loadRawFixture(t *testing.T, name string) []byte {
 	t.Helper()
 	_, currentFile, _, _ := runtime.Caller(0)
-	fixturesDir := filepath.Join(filepath.Dir(currentFile), "../../../../contract-fixtures")
+	fixturesDir := filepath.Join(filepath.Dir(currentFile), "fixtures")
 	fixturePath := filepath.Join(fixturesDir, name)
 	data, err := os.ReadFile(fixturePath)
 	if os.IsNotExist(err) {

@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "kind": "rex.test-scope-contract.v1",
+  "workItemKey": "work-p2-graph-jitter-wiring",
+  "activationId": "pending",
+  "capabilityId": "software.testing.design",
+  "stageId": "design-tests",
+  "recordedAt": "2026-09-29T13:00:00Z",
+  "contractRef": "docs/design/v3-test-scope-p1-graph-slice35.json",
+  "slice": 35,
+  "series": "P2 增量片：RetryConfig.Jitter 接线（切片 22 预登记的观察上限兑现）",
+  "userGoal": "切片 22 交付的 RetryConfig.Jitter 字段此前已声明未接线（文档如实标注）。本片把 full-jitter 语义接进重试退避：Jitter>0 时每次尝试的实际退避在 [0, 折减后退避) 内均匀分布——抖动把重试风暴错开，且永不放大上限。",
+  "whyThisSlice": "切片 22 的契约 observabilityLimit 预登记「Jitter 的随机分布行为不在公共面」——但字段躺在 API 上不接线是文档债。本片按预登记的口径兑现：分布密度不进公共面，可确定断言的「界限语义」进白-box 面。",
+  "designConsequence": "三条语义定形：（1）full-jitter：Jitter>0 时实际退避 = [0, 折减后退避) 均匀采样，退避上限永不放大——上限仍是 delayFor(attempt)；（2）Jitter<=0 或退避<=0 恒等返回原值（与切片 22 的 guard 钳制族一致）；（3）随机源可注入（*rand.Rand 参数），白-box 测试用固定种子做确定性断言；scheduler 每次 Run 构造自己的 rand（时间种子），不引入全局态、不新增锁。分布密度不进公共面（切片 22 预登记沿用）；接线点（runNode 调用 applyJitter）以结构对账+变异登记验证，不用真实时钟断言（R17 教训）。",
+  "redProtocol": "两段制：第一段落 applyJitter 纯函数（未接线），白-box 确定性测试即绿（纯函数自证）；接线行 D4 以结构断言（runNode 源码调用点存在 + 变异摘除后行为等价的如实登记）收口。本片无公共面行为红——切片 22 已预登记分布不在公共面，此为设计决定而非缺口。",
+  "acceptanceMapping": [
+    { "row": "D1", "behavior": "界限：Jitter>0 时 applyJitter 输出恒在 [0, d)，跨 500 次采样无一越界且至少出现两个不同值（非恒等）", "publicEntry": "applyJitter（white-box，固定种子）", "assertion": "500 采样 min>=0、max<d、distinct>=2", "independentlyFailable": "对越界或恒等返回的实现判红" },
+    { "row": "D2", "behavior": "恒等：Jitter<=0 或 d<=0 时原值返回", "publicEntry": "applyJitter", "assertion": "jitter=0/-1 与 d=0 的输出逐值等于输入", "independentlyFailable": "对负抖动改写退避的实现判红" },
+    { "row": "D3", "behavior": "确定性：同一 (d, jitter, 固定种子) 的输出序列可复现（rnd 注入语义）", "publicEntry": "applyJitter + 固定 rand.New(NewSource(42))", "assertion": "两次调用序列逐值相等", "independentlyFailable": "对使用全局随机源导致不可复现的实现判红" },
+    { "row": "D4", "behavior": "接线：runNode 的退避等待使用 applyJitter（Jitter>0 时真实休眠 ≤ 折减后退避）", "publicEntry": "scheduler.runNode（结构对账：调用点存在；行为=真实时钟，按切片 22 预登记不进断言）", "assertion": "结构断言：runNode 调用点存在且以 pol.retry.Jitter 传参；变异摘除后按观察上限登记", "independentlyFailable": "登记为观察上限（预登记），不设时钟断言" }
+  ],
+  "allowedTestSeam": { "add": ["pkg/hno/graph/retry_jitter_internal_test.go（package graph，white-box，固定种子确定性断言）"], "modify": ["无"], "retires": [], "sourceSeam": "pkg/hno/graph/policy.go（applyJitter）、pkg/hno/graph/scheduler.go（rnd 字段 + runNode 调用点）" },
+  "explicitNonGoals": ["分布密度的公共面断言（预登记）", "JitterRand 公共注入选项（导出面不动）", "equal-jitter/decorr-jitter 等其他抖动族"],
+  "verificationCommands": ["go test ./pkg/hno/graph -run TestApplyJitter -count=1 -race -v", "go build ./... ; go vet ./pkg/hno/graph/... ; gofmt -l pkg/hno/graph"],
+  "writeBackOwed": ["母约 §4 RetryConfig 注释：Jitter 已接线（full-jitter，[0, d) 均匀）"],
+  "evidenceRefs": ["artifact:docs/design/v3-test-scope-p1-graph-slice22.json", "artifact:docs/design/v3-p2-graph-g3-green.md"]
+}
