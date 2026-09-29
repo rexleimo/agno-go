@@ -174,11 +174,10 @@ func main() {
 
 Honest scope, as of this page:
 
-- **Resume / replay is not delivered.** The seam commits events; it does not
-  restore a suspended graph from them. Restoring state, re-entering at a
-  node, and resuming across processes are planned as the G7 line
-  (human-in-the-loop interrupt/resume builds on it). When that lands, this
-  page will link the resume guide and drop this note.
+- **Resume / replay has landed (G7).** Suspended runs are committed as
+  `EntryInterrupt` entries on this seam and restored from them:
+  [Human-in-the-Loop](/guide/human-in-the-loop) covers in-process `Resume`
+  and cross-process restart via the session sidecar.
 - **No bridging to stream events.** Checkpoints are engine-side entries; the
   `run.StreamCheckpoints` protocol event family
   ([Run Events API](/api/run-events)) is a separate protocol layer whose

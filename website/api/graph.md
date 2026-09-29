@@ -454,6 +454,45 @@ processing order. Sink failures fail closed and are attributable via the
 wrapped error (`graph: checkpoint sink: ...`). Resume/replay is not part of
 this seam yet. See [Graph Durability](/advanced/graph-durability).
 
+## Human-in-the-Loop (HITL)
+
+### RequestInterrupt(i Interrupt) error
+
+Call inside a node body to halt the run. The engine converts the returned
+sentinel into a suspension: `Run` returns `(nil, err)` with
+`errors.Is(err, ErrSuspended)` and `errors.As(err, *Suspension)`.
+
+`Interrupt` fields: `InterruptID` (required, unique among pending), `Message`,
+`ResponseSchema` (subset: `type` + `required` + `properties.<name>.type`),
+`Payload`, `Mode` (`ResumeRerun` default | `ResumeHandoff`).
+
+### Resume(ctx context.Context, responses map[string]any) (*Result, error)
+
+Resume a suspended graph. The response set must cover exactly the pending
+interrupt IDs. Each response is validated against its `ResponseSchema`;
+failures return an error wrapping `ErrInvalidResponse` and preserve the
+suspension. `ResumeRerun` re-executes the waiting node with the response
+reachable via `InterruptResponse(ctx, id)`; `ResumeHandoff` skips the node and
+feeds the response to successors as its output. Repeated resume with nothing
+pending returns `ErrNothingToResume`. Budget continues across resume.
+
+### InterruptResponse(ctx context.Context, interruptID string) (any, bool)
+
+Read a resolved response inside a re-run node body.
+
+### Sentinels
+
+`ErrSuspended` (run awaiting human), `ErrNothingToResume` (idempotent
+no-resume), `ErrInvalidResponse` (schema mismatch, suspension preserved).
+
+### Suspension
+
+Carried by the `Run` error via `errors.As`: `.Interrupts` (pending list) and
+`.Completed` (nodes finished before the halt). Durable via
+[Durability](/advanced/graph-durability) — suspensions commit as
+`EntryInterrupt` checkpoint entries. Cross-process restart pairs with
+`pkg/hno/session/sidecar` + `internal/hitlbridge`.
+
 ## Related Pages
 
 - [Graph Engine guide](/guide/graph-engine)

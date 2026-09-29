@@ -420,6 +420,41 @@ type Checkpointer interface {
 装错误归因（`graph: checkpoint sink: ...`）。这条缝尚不含恢复/重放。见
 [图持久化](/zh/advanced/graph-durability)。
 
+## Human-in-the-Loop（HITL）
+
+### RequestInterrupt(i Interrupt) error
+
+在节点体内调用即挂起运行。引擎把返回的哨兵变成挂起：`Run` 返回 `(nil, err)`，
+`errors.Is(err, ErrSuspended)`、`errors.As(err, *Suspension)`。
+
+`Interrupt` 字段：`InterruptID`（必填，待答集内唯一）、`Message`、
+`ResponseSchema`（子集：`type` + `required` + `properties.<name>.type`）、
+`Payload`、`Mode`（`ResumeRerun` 默认 | `ResumeHandoff`）。
+
+### Resume(ctx context.Context, responses map[string]any) (*Result, error)
+
+恢复挂起的图。响应集必须恰好覆盖全部待答 ID。每个响应按其 `ResponseSchema`
+校验；失败返回包 `ErrInvalidResponse` 的错误且挂起保留。`ResumeRerun` 让等待
+节点带响应重跑（响应经 `InterruptResponse(ctx, id)` 取）；`ResumeHandoff`
+不再执行节点、响应直接成为其输出喂后继。无处可恢复时返回
+`ErrNothingToResume`。步数预算跨恢复累计。
+
+### InterruptResponse(ctx context.Context, interruptID string) (any, bool)
+
+在重跑的节点体内读取已解析的响应。
+
+### 哨兵错误
+
+`ErrSuspended`（运行挂起等人）、`ErrNothingToResume`（幂等无恢复）、
+`ErrInvalidResponse`（schema 不符，挂起保留）。
+
+### Suspension
+
+由 `Run` 错误经 `errors.As` 携带：`.Interrupts`（待答清单）与 `.Completed`
+（挂起前完成的节点）。经 [Durability](/zh/advanced/graph-durability) 持久化
+——挂起提交为 `EntryInterrupt` 检查点条目。跨进程重启配
+`pkg/hno/session/sidecar` + `internal/hitlbridge`。
+
 ## 相关页面
 
 - [图引擎指南](/zh/guide/graph-engine)

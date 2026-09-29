@@ -23,6 +23,16 @@ head:
 
 ## 文章列表
 
+### 图的 HITL：把人放回回路 —— Interrupt、持久化与跨进程 Resume
+
+[阅读完整文章](/zh/blog/hitl-interrupt-persist-resume)
+
+v3 引擎如何把节点的 RequestInterrupt 变成可持久化的挂起，配 schema 校验、
+幂等恢复——以及为什么挂起绝不能是半截 Result。含跨进程重启恢复。
+
+- **分类：** Go engineering
+- **标签：** Go, HITL, 图, 持久化, Agent 工作流
+
 ### 在 Go 里造一个 LangGraph：一个零锁图引擎的设计与实证
 
 [阅读完整文章](/zh/blog/zero-lock-graph-engine)

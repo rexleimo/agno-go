@@ -23,6 +23,17 @@ and the engineering ideas behind the news cycle.
 
 ## Articles
 
+### Human-in-the-Loop for Graphs: Interrupt, Persist, Resume — Across Processes
+
+[Read the article](/blog/hitl-interrupt-persist-resume)
+
+How the v3 engine turns a node's RequestInterrupt into a durable suspension
+with schema-checked, idempotent resume — and why the suspension is never a
+half-done Result. Cross-process restart included.
+
+- **Category:** Go engineering
+- **Tags:** Go, HITL, graph, durability, agent workflows
+
 ### Building a LangGraph in Go: The Design and Evidence Behind a Zero-Lock Graph Engine
 
 [Read the article](/blog/zero-lock-graph-engine)

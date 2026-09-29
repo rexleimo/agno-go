@@ -7,6 +7,34 @@
     <language>en</language>
     <atom:link href="https://hno.rexai.top/rss.xml" rel="self" type="application/rss+xml" />
   <item>
+    <title>Human-in-the-Loop for Graphs: Interrupt, Persist, Resume — Across Processes</title>
+    <link>https://hno.rexai.top/blog/hitl-interrupt-persist-resume</link>
+    <guid isPermaLink="true">https://hno.rexai.top/blog/hitl-interrupt-persist-resume</guid>
+    <pubDate>Tue, 29 Sep 2026 00:00:00 GMT</pubDate>
+    <dc:language>en</dc:language>
+    <description></description>
+    <category>Go engineering</category>
+    <category>Go</category>
+    <category>HITL</category>
+    <category>graph</category>
+    <category>durability</category>
+    <category>agent workflows</category>
+  </item>
+  <item>
+    <title>图的 HitL：把人放回回路 —— Interrupt、持久化与跨进程 Resume</title>
+    <link>https://hno.rexai.top/zh/blog/hitl-interrupt-persist-resume</link>
+    <guid isPermaLink="true">https://hno.rexai.top/zh/blog/hitl-interrupt-persist-resume</guid>
+    <pubDate>Tue, 29 Sep 2026 00:00:00 GMT</pubDate>
+    <dc:language>zh-CN</dc:language>
+    <description>v3 引擎如何把节点的 RequestInterrupt 变成可持久化的挂起，配 schema 校验、幂等恢复——以及为什么挂起绝不能是半截 Result。</description>
+    <category>Go engineering</category>
+    <category>Go</category>
+    <category>HITL</category>
+    <category>图</category>
+    <category>持久化</category>
+    <category>Agent 工作流</category>
+  </item>
+  <item>
     <title>Building a LangGraph in Go: The Design and Evidence Behind a Zero-Lock Graph Engine</title>
     <link>https://hno.rexai.top/blog/zero-lock-graph-engine</link>
     <guid isPermaLink="true">https://hno.rexai.top/blog/zero-lock-graph-engine</guid>

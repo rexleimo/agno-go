@@ -156,9 +156,9 @@ func main() {
 
 诚实的范围边界，截至本页：
 
-- **恢复 / 重放未交付。** 这条缝提交事件，不从事件恢复挂起的图。状态还原、按
-  节点重入、跨进程恢复规划在 G7 线（人机协同的 Interrupt/Resume 建立在它上
-  面）。落地后本页会链接恢复指南并撤下这条说明。
+- **恢复 / 重放已交付（G7）。** 挂起的运行作为 `EntryInterrupt` 条目提交到
+  这条缝上并从中恢复：[Human-in-the-Loop](/zh/guide/human-in-the-loop) 覆盖
+  进程内 `Resume` 与经会话侧车的跨进程重启恢复。
 - **没有到流事件的桥接。** 检查点是引擎侧条目；`run.StreamCheckpoints` 协议
   事件族（见 [Run Events API](/zh/api/run-events)）是另一层协议，其生产者接线
   仍在待办。
